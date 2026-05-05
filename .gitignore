@@ -16,11 +16,15 @@ dist/
 # =========================
 # Machine Learning & Data
 # =========================
-# Ignore trained models and generated datasets
+# Ignore all generic model and data files
 *.pth
 *.pkl
 *.h5
 *.csv
+
+# EXCEPT models specifically placed in the final_models directory for the viva
+!final_models/
+!final_models/**
 # Ignore locally generated XAI reports
 *_intervention_report.html
 
