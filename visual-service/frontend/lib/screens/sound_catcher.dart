@@ -3,13 +3,15 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/intervention_poller.dart';
 
 class SoundCatcherGame extends StatefulWidget {
   @override
   _SoundCatcherGameState createState() => _SoundCatcherGameState();
 }
 
-class _SoundCatcherGameState extends State<SoundCatcherGame> {
+class _SoundCatcherGameState extends State<SoundCatcherGame>
+    with InterventionPollerMixin {
   final String studentId = "student_001";
   String currentTargetSound = "අ";
   List<String> options = ["අ", "ආ", "ඇ", "ඈ"];
@@ -33,7 +35,7 @@ class _SoundCatcherGameState extends State<SoundCatcherGame> {
   }
 
   Future<void> _sendTelemetry(int responseTime, int errorCount) async {
-    final url = Uri.parse('http://127.0.0.1:8001/telemetry');
+    final url = Uri.parse('http://127.0.0.1:8001/api/v1/telemetry');
     try {
       await http.post(
         url,
@@ -43,8 +45,10 @@ class _SoundCatcherGameState extends State<SoundCatcherGame> {
           "task_id": "sound_catcher_01",
           "response_time": responseTime.toDouble(),
           "error_count": errorCount,
-          "hesitation_count": 0,
-          "input_velocity": 0.0
+          "hesitation_count": errors > 1 ? 1 : 0,
+          "input_velocity": startTime != null
+              ? DateTime.now().difference(startTime!).inMilliseconds.toDouble()
+              : 0.0,
         }),
       );
     } catch (e) {
@@ -93,7 +97,7 @@ class _SoundCatcherGameState extends State<SoundCatcherGame> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF0F4F8),
+      backgroundColor: themeBackground,
       appBar: AppBar(
         title: Text("Sound Catcher (හඬ අල්ලන්නා)", style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.blueAccent,
@@ -104,7 +108,12 @@ class _SoundCatcherGameState extends State<SoundCatcherGame> {
           children: [
             Text(
               "පහත ශබ්දය තෝරන්න:",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: themeText,
+                letterSpacing: adaptiveCharSpacing,
+              ),
             ),
             SizedBox(height: 20),
             Container(

@@ -3,13 +3,15 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/intervention_poller.dart';
 
 class SpatialAwarenessGame extends StatefulWidget {
   @override
   _SpatialAwarenessGameState createState() => _SpatialAwarenessGameState();
 }
 
-class _SpatialAwarenessGameState extends State<SpatialAwarenessGame> {
+class _SpatialAwarenessGameState extends State<SpatialAwarenessGame>
+    with InterventionPollerMixin {
   final String studentId = "student_001";
   
   final List<Map<String, dynamic>> directions = [
@@ -40,7 +42,7 @@ class _SpatialAwarenessGameState extends State<SpatialAwarenessGame> {
   }
 
   Future<void> _sendTelemetry(int responseTime, int errorCount) async {
-    final url = Uri.parse('http://127.0.0.1:8001/telemetry');
+    final url = Uri.parse('http://127.0.0.1:8001/api/v1/telemetry');
     try {
       await http.post(
         url,
@@ -50,8 +52,10 @@ class _SpatialAwarenessGameState extends State<SpatialAwarenessGame> {
           "task_id": "spatial_awareness_01",
           "response_time": responseTime.toDouble(),
           "error_count": errorCount,
-          "hesitation_count": 0,
-          "input_velocity": 0.0
+          "hesitation_count": errors > 1 ? 1 : 0,
+          "input_velocity": startTime != null
+              ? DateTime.now().difference(startTime!).inMilliseconds.toDouble()
+              : 0.0,
         }),
       );
     } catch (e) {
@@ -80,7 +84,7 @@ class _SpatialAwarenessGameState extends State<SpatialAwarenessGame> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFFFF9E6), // Friendly yellow background
+      backgroundColor: themeBackground,
       appBar: AppBar(
         title: Text("Stage 1: Where is the Lion?", style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.orangeAccent,
