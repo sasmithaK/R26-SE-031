@@ -2,13 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/intervention_poller.dart';
 
 class SyllableChallengeGame extends StatefulWidget {
   @override
   _SyllableChallengeGameState createState() => _SyllableChallengeGameState();
 }
 
-class _SyllableChallengeGameState extends State<SyllableChallengeGame> {
+class _SyllableChallengeGameState extends State<SyllableChallengeGame>
+    with InterventionPollerMixin {
   final String studentId = "student_001";
   
   final String targetWord = "කමිසය";
@@ -110,7 +112,7 @@ class _SyllableChallengeGameState extends State<SyllableChallengeGame> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF3E5F5), // Light purple
+      backgroundColor: themeBackground, // Adapts based on student preference
       appBar: AppBar(
         title: Text("Stage 3: Hear & Tap", style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.purpleAccent,
@@ -121,7 +123,12 @@ class _SyllableChallengeGameState extends State<SyllableChallengeGame> {
           children: [
             Text(
               "වචනය සාදන්න",
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.purple[800]),
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: themeText,           // Adapts text colour
+                letterSpacing: adaptiveCharSpacing, // Adapts spacing
+              ),
             ),
             SizedBox(height: 10),
             Text(
