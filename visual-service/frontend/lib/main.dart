@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/spatial_awareness.dart';
 import 'screens/sound_catcher.dart';
 import 'screens/syllable_challenge.dart';
+import 'screens/gamified_onboarding.dart';
 
 void main() {
   runApp(const StudentApp());
@@ -19,7 +20,11 @@ class StudentApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Inter', // Fallback font, assuming Sinhala handles itself
       ),
-      home: const StudentHomeScreen(),
+      initialRoute: '/onboarding',
+      routes: {
+        '/onboarding': (context) => GamifiedOnboardingScreen(),
+        '/': (context) => const StudentHomeScreen(),
+      },
     );
   }
 }

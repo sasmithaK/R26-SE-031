@@ -17,6 +17,7 @@ class _SyllableChallengeGameState extends State<SyllableChallengeGame> {
   List<String> selectedSyllables = [];
   
   DateTime? startTime;
+  DateTime? firstTouchTime;
   int errors = 0;
   bool isCompleted = false;
 
@@ -31,12 +32,13 @@ class _SyllableChallengeGameState extends State<SyllableChallengeGame> {
       selectedSyllables.clear();
       jumbledSyllables.shuffle();
       startTime = DateTime.now();
+      firstTouchTime = null;
       errors = 0;
       isCompleted = false;
     });
   }
 
-  Future<void> _sendTelemetry(int responseTime, int errorCount) async {
+  Future<void> _sendTelemetry(int responseTime, int errorCount, int timeToFirstTouchMs) async {
     final url = Uri.parse('http://127.0.0.1:8001/telemetry');
     try {
       await http.post(
@@ -47,8 +49,8 @@ class _SyllableChallengeGameState extends State<SyllableChallengeGame> {
           "task_id": "syllable_challenge_01",
           "response_time": responseTime.toDouble(),
           "error_count": errorCount,
-          "hesitation_count": 0,
-          "input_velocity": 0.0
+          "hesitation_count": timeToFirstTouchMs > 3000 ? 1 : 0, // Flag hesitation if > 3s
+          "input_velocity": timeToFirstTouchMs.toDouble(), // Using this as touch latency
         }),
       );
     } catch (e) {
@@ -77,6 +79,11 @@ class _SyllableChallengeGameState extends State<SyllableChallengeGame> {
   void _handleTap(String syllable) {
     if (isCompleted) return;
 
+    if (firstTouchTime == null) {
+      firstTouchTime = DateTime.now();
+      print("Touch-to-Read Latency (Hesitation): ${firstTouchTime!.difference(startTime!).inMilliseconds} ms");
+    }
+
     setState(() {
       int nextExpectedIndex = selectedSyllables.length;
       if (syllable == correctSyllables[nextExpectedIndex]) {
@@ -85,7 +92,8 @@ class _SyllableChallengeGameState extends State<SyllableChallengeGame> {
         if (selectedSyllables.length == correctSyllables.length) {
           isCompleted = true;
           final responseTime = DateTime.now().difference(startTime!).inSeconds;
-          _sendTelemetry(responseTime, errors);
+          final timeToFirstTouchMs = firstTouchTime != null ? firstTouchTime!.difference(startTime!).inMilliseconds : 0;
+          _sendTelemetry(responseTime, errors, timeToFirstTouchMs);
           _updateMastery(errors == 0); // Correct mastery if no errors made
           
           Timer(Duration(seconds: 2), () {
