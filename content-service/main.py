@@ -70,6 +70,49 @@ async def get_student_mastery(student_id: str):
         "mastery_tree": state
     }
 
+# Fix 3: Dynamic content recommendation based on lowest mastery skill
+SKILL_LESSONS = {
+    "syllable_blending":  ["Lesson 1: Blend කා+ක", "Lesson 2: Blend ම+ා", "Lesson 3: Complex blends"],
+    "letter_ka":          ["Lesson 1: Trace ක",    "Lesson 2: ක in words",  "Lesson 3: ක with Pillas"],
+    "pilla_ispilla":      ["Lesson 1: Spot ි",     "Lesson 2: ි vs ී",       "Lesson 3: Apply ි"],
+    "phoneme_isolation":  ["Lesson 1: Hear /k/",  "Lesson 2: /k/ vs /g/",  "Lesson 3: Blend 3 phonemes"],
+}
+DEFAULT_LESSONS = ["Lesson 1: Introduction to Sinhala letters", "Lesson 2: Basic vowel sounds"]
+
+@app.get("/api/v1/content/next/{student_id}")
+async def get_next_content(student_id: str):
+    """Returns the next recommended lesson based on the student's weakest skill."""
+    mastery = get_all_mastery(student_id)
+
+    if not mastery:
+        return {
+            "student_id": student_id,
+            "recommended_skill": "introduction",
+            "lessons": DEFAULT_LESSONS,
+            "reason": "No data yet — starting from the beginning."
+        }
+
+    # Find the skill with the lowest mastery
+    weakest_skill  = min(mastery, key=mastery.get)
+    weakest_score  = mastery[weakest_skill]
+    lessons        = SKILL_LESSONS.get(weakest_skill, DEFAULT_LESSONS)
+
+    # Pick lesson difficulty based on mastery level
+    if weakest_score < 0.33:
+        lesson_index = 0  # Easiest
+    elif weakest_score < 0.66:
+        lesson_index = 1  # Intermediate
+    else:
+        lesson_index = 2  # Advanced
+
+    return {
+        "student_id": student_id,
+        "recommended_skill": weakest_skill,
+        "mastery_level": weakest_score,
+        "next_lesson": lessons[lesson_index],
+        "reason": f"Mastery for '{weakest_skill}' is {weakest_score:.0%} — focusing here."
+    }
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "service": "content-service"}
