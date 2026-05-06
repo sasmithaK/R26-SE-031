@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/intervention_poller.dart';
+import '../services/score_service.dart';
 
 class SpatialAwarenessGame extends StatefulWidget {
   @override
@@ -63,6 +64,13 @@ class _SpatialAwarenessGameState extends State<SpatialAwarenessGame>
     }
   }
 
+  double _calculateScore(int responseTimeSeconds, int errorCount) {
+    final baseScore = 10.0;
+    final penalty = (errorCount * 2.0) + (responseTimeSeconds * 0.5);
+    final score = baseScore - penalty;
+    return score < 0 ? 0 : score;
+  }
+
   void _handleChoice(String direction) {
     if (direction == currentTarget["direction"]) {
       final responseTime = DateTime.now().difference(startTime!).inSeconds;
@@ -70,6 +78,18 @@ class _SpatialAwarenessGameState extends State<SpatialAwarenessGame>
         isCorrect = true;
       });
       _sendTelemetry(responseTime, errors);
+      ScoreService.saveTaskScore(
+        studentId: studentId,
+        taskId: 'spatial_awareness_01',
+        taskName: 'Stage 1: Where is the Lion?',
+        score: _calculateScore(responseTime, errors),
+        maxScore: 10,
+        durationSeconds: DateTime.now().difference(startTime!).inMilliseconds / 1000,
+        metadata: {
+          'errors': errors,
+          'correct_direction': currentTarget['direction'],
+        },
+      );
       
       Timer(Duration(seconds: 1), () {
         _startNewRound();
