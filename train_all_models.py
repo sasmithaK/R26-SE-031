@@ -175,6 +175,8 @@ try:
         np.random.normal(600,  150, N//3).clip(300, 1500),   # hesitation_ms
         np.random.normal(55,    8,  N//3).clip(30, 80),      # swipe_velocity px/s
         np.random.normal(0.04,  0.02, N//3).clip(0, 0.15),   # correction_rate
+        np.random.poisson(0.5, N//3).clip(0, 2),             # error_count
+        np.random.poisson(0.2, N//3).clip(0, 1),             # hesitation_count
     ])
 
     # --- Class 1: MEDIUM load (mild dyslexic struggle) ---
@@ -183,6 +185,8 @@ try:
         np.random.normal(2800, 600,  N//3).clip(1200, 5000),
         np.random.normal(32,    8,   N//3).clip(15, 55),
         np.random.normal(0.20,  0.06, N//3).clip(0.05, 0.40),
+        np.random.poisson(2.5, N//3).clip(1, 5),
+        np.random.poisson(1.5, N//3).clip(0, 3),
     ])
 
     # --- Class 2: HIGH load (severe struggle / frustration) ---
@@ -191,6 +195,8 @@ try:
         np.random.normal(6500, 1200, N//3).clip(4000, 12000),
         np.random.normal(12,    5,   N//3).clip(3, 30),
         np.random.normal(0.52,  0.12, N//3).clip(0.30, 0.90),
+        np.random.poisson(6.0, N//3).clip(4, 15),
+        np.random.poisson(4.0, N//3).clip(2, 10),
     ])
 
     X = np.vstack([low, med, high])
