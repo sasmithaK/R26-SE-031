@@ -28,6 +28,7 @@ questions_collection = db["questions"]
 student_responses_collection = db["student_responses"]
 screen_events_collection = db["screen_events"]
 touch_events_collection = db["touch_events"]
+task_scores_collection = db["task_scores"]
 
 def init_db():
     """Initialize MongoDB collections with indexes"""
@@ -37,6 +38,8 @@ def init_db():
         pending_interventions_collection.create_index("student_id", unique=True)
         questions_collection.create_index("question_id", unique=True)
         student_responses_collection.create_index([("student_id", 1), ("question_id", 1)])
+        task_scores_collection.create_index([("student_id", 1), ("task_id", 1)])
+        task_scores_collection.create_index("created_at")
         # Telemetry indexes
         screen_events_collection.create_index([("student_id", 1), ("screen_name", 1)])
         screen_events_collection.create_index("event_time")
@@ -96,6 +99,15 @@ class StudentResponsePayload(BaseModel):
     time_taken: Optional[float] = None  # Time to answer in seconds
     confidence_level: Optional[int] = None  # 1-5 scale
     metadata: Optional[dict] = None  # Any additional data
+
+class TaskScorePayload(BaseModel):
+    student_id: str
+    task_id: str
+    task_name: str
+    score: float
+    max_score: Optional[float] = None
+    duration_seconds: Optional[float] = None
+    metadata: Optional[dict] = None
 
 
 # ── Telemetry Models ───────────────────────────────────────────────────────
@@ -267,6 +279,37 @@ async def save_student_response(payload: StudentResponsePayload):
         "submitted_at": datetime.utcnow()
     })
     return {"status": "response saved", "student_id": payload.student_id, "question_id": payload.question_id}
+
+# ── Task Score Tracking ───────────────────────────────────────────────────────
+@app.post("/api/v1/scores/save")
+async def save_task_score(payload: TaskScorePayload):
+    """Save a completed task score for the logged-in student."""
+    doc = {
+        "student_id": payload.student_id,
+        "task_id": payload.task_id,
+        "task_name": payload.task_name,
+        "score": payload.score,
+        "max_score": payload.max_score,
+        "duration_seconds": payload.duration_seconds,
+        "metadata": payload.metadata,
+        "created_at": datetime.utcnow()
+    }
+    task_scores_collection.insert_one(doc)
+    return {"status": "score saved", "student_id": payload.student_id, "task_id": payload.task_id, "score": payload.score}
+
+@app.get("/api/v1/scores/{student_id}")
+async def get_student_scores(student_id: str):
+    """Return score history for a student, newest first."""
+    scores = list(task_scores_collection.find({"student_id": student_id}, {"_id": 0}).sort("created_at", -1))
+    total_score = sum(item.get("score", 0) for item in scores)
+    total_max_score = sum(item.get("max_score", 0) or 0 for item in scores)
+    return {
+        "student_id": student_id,
+        "total_tasks": len(scores),
+        "total_score": total_score,
+        "total_max_score": total_max_score,
+        "scores": scores
+    }
 
 @app.get("/api/v1/responses/{student_id}")
 async def get_student_responses(student_id: str):
