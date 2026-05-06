@@ -25,7 +25,7 @@ class StudentDashboard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [bg, accent.withOpacity(0.2)],
+          colors: [bg, accent.withValues(alpha: 0.2)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -53,7 +53,7 @@ class StudentDashboard extends StatelessWidget {
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 6),
                         boxShadow: [
-                          BoxShadow(color: accent.withOpacity(0.4), offset: const Offset(0, 8), blurRadius: 0),
+                          BoxShadow(color: accent.withValues(alpha: 0.4), offset: const Offset(0, 8), blurRadius: 0),
                         ],
                       ),
                       child: ClipOval(
@@ -138,6 +138,15 @@ class StudentDashboard extends StatelessWidget {
                         route: '/syllable_train',
                         fontSize: fontSize,
                       ),
+                      const SizedBox(height: 24),
+                      _buildGameCard(
+                        context,
+                        title: 'ගිගුරුම් අනුපිළිවෙල',
+                        icon: Icons.bug_report_rounded,
+                        color: Colors.amber.shade600,
+                        route: '/firefly_tracking',
+                        fontSize: fontSize,
+                      ),
                     ],
                   ),
                 ),
@@ -167,7 +176,7 @@ class StudentDashboard extends StatelessWidget {
           border: Border.all(color: color, width: 6),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.4),
+              color: color.withValues(alpha: 0.4),
               offset: const Offset(0, 10),
               blurRadius: 0,
             ),
@@ -178,7 +187,7 @@ class StudentDashboard extends StatelessWidget {
             Positioned(
               right: -20,
               bottom: -20,
-              child: Icon(icon, size: 100, color: color.withOpacity(0.1)),
+              child: Icon(icon, size: 100, color: color.withValues(alpha: 0.1)),
             ),
             Row(
               children: [
