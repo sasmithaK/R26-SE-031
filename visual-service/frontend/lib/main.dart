@@ -96,7 +96,7 @@ class StudentHomeScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(15),
-          side: BorderSide(color: color.withOpacity(0.3), width: 2),
+          side: BorderSide(color: color.withValues(alpha: 0.3), width: 2),
         ),
         elevation: 2,
       ),
@@ -108,7 +108,7 @@ class StudentHomeScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 32),
