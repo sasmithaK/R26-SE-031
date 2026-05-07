@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dyslexia Monitoring Demo | WorkPlus</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <header>
+        <div class="logo">
+            <span class="gradient-text">WorkPlus</span> Monitoring System
+        </div>
+        <div class="header-right">
+            <div class="db-status">
+                <span class="dot green"></span> MongoDB Atlas Connected
+            </div>
+            <div class="status-pill">
+                <span class="pulse"></span> System Live
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <!-- TOP SECTION: SIDE BY SIDE CAMERA & QUESTIONNAIRE -->
+        <div class="top-section">
+            <section class="card video-feed">
+                <div class="card-header">
+                    <h2>Live Cognitive Assessment</h2>
+                    <span class="badge">Biometric ML</span>
+                </div>
+                <div class="video-container">
+                    <video id="video" autoplay playsinline muted></video>
+                    <div class="overlay">
+                        <div class="bounding-box" id="face-box"></div>
+                        <div class="scanline"></div>
+                        <div class="metrics-overlay">
+                            <div class="metric-mini">EYE: <span id="eye-metric">STABLE</span></div>
+                            <div class="metric-mini">HEAD: <span id="head-metric">NORMAL</span></div>
+                            <div class="metric-mini">Gaze: <span id="gaze-metric">CENTERED</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="controls">
+                    <button id="start-btn" class="btn btn-primary">Initialize Camera</button>
+                    <button id="stop-btn" class="btn btn-secondary">Stop Feed</button>
+                </div>
+            </section>
+
+            <section class="card questionnaire">
+                <div class="card-header">
+                    <h2>Student Interaction Telemetry</h2>
+                    <p>Simulating real-time app usage metrics for cognitive load prediction.</p>
+                </div>
+                <form id="telemetry-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Hesitation Time (ms)</label>
+                            <input type="range" id="hesitation" min="0" max="5000" value="500">
+                            <span class="value-display" id="hesitation-val">500 ms</span>
+                        </div>
+                        <div class="form-group">
+                            <label>Correction Rate (Mistakes)</label>
+                            <input type="range" id="correction" min="0" max="1" step="0.01" value="0.05">
+                            <span class="value-display" id="correction-val">5%</span>
+                        </div>
+                        <div class="form-group">
+                            <label>Input Velocity (px/s)</label>
+                            <input type="range" id="velocity" min="0" max="100" value="20">
+                            <span class="value-display" id="velocity-val">20 px/s</span>
+                        </div>
+                        <div class="form-group">
+                            <label>Error Count (Raw)</label>
+                            <input type="number" id="error-count" value="0" min="0" max="20" class="num-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Response Time (ms)</label>
+                            <input type="number" id="response-time" value="1500" min="0" class="num-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Task Complexity</label>
+                            <select id="task-complexity" class="num-input">
+                                <option value="low">Low (Grade 1-2)</option>
+                                <option value="medium">Medium (Grade 3-4)</option>
+                                <option value="high">High (Grade 5+)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-glow w-100">Sync & Predict Load</button>
+                </form>
+            </section>
+        </div>
+
+        <!-- BOTTOM SECTION: GAUGE & LOGS -->
+        <div class="bottom-section">
+            <section class="card cognitive-analytics">
+                <div class="card-header">
+                    <h2>Predictive Analytics Engine</h2>
+                </div>
+                <div class="analytics-content">
+                    <div class="gauge-wrapper">
+                        <div class="gauge-container">
+                            <div class="gauge-bar" id="load-bar"></div>
+                            <div class="gauge-label">
+                                <span id="load-value">0%</span>
+                            </div>
+                        </div>
+                        <div class="load-status" id="load-status">Stable State</div>
+                    </div>
+                    <div class="parameter-grid" id="param-logs">
+                        <div class="param-card">
+                            <span class="param-label">HESITATION</span>
+                            <span class="param-value" id="log-h">-</span>
+                        </div>
+                        <div class="param-card">
+                            <span class="param-label">CORRECTION</span>
+                            <span class="param-value" id="log-c">-</span>
+                        </div>
+                        <div class="param-card">
+                            <span class="param-label">VELOCITY</span>
+                            <span class="param-value" id="log-v">-</span>
+                        </div>
+                        <div class="param-card">
+                            <span class="param-label">ERRORS</span>
+                            <span class="param-value" id="log-e">-</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card events">
+                <div class="card-header">
+                    <h2>Live System Events & Database Logs</h2>
+                </div>
+                <div class="log-container" id="log-container">
+                    <div class="log-entry system">System initialized. MongoDB Atlas heartbeat active.</div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const video = document.getElementById('video');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const form = document.getElementById('telemetry-form');
+        const logContainer = document.getElementById('log-container');
+        const loadBar = document.getElementById('load-bar');
+        const loadValue = document.getElementById('load-value');
+        const loadStatus = document.getElementById('load-status');
+
+        // Ranges display
+        document.getElementById('hesitation').oninput = e => document.getElementById('hesitation-val').innerText = e.target.value + ' ms';
+        document.getElementById('correction').oninput = e => document.getElementById('correction-val').innerText = (e.target.value * 100).toFixed(0) + '%';
+        document.getElementById('velocity').oninput = e => document.getElementById('velocity-val').innerText = e.target.value + ' px/s';
+
+        function addLog(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-entry ${type}`;
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.prepend(div);
+        }
+
+        function updateParamLogs(h, c, v, e) {
+            document.getElementById('log-h').innerText = h + 'ms';
+            document.getElementById('log-c').innerText = (c * 100).toFixed(0) + '%';
+            document.getElementById('log-v').innerText = v + 'px/s';
+            document.getElementById('log-e').innerText = e;
+        }
+
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                addLog('Camera feed initialized. Biometric scanning active.', 'success');
+            } catch (err) {
+                addLog('Camera access denied. Simulation mode only.', 'warning');
+            }
+        }
+
+        startBtn.onclick = () => initCamera();
+        stopBtn.onclick = () => {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                addLog('Camera feed stopped.', 'info');
+            }
+        };
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const payload = {
+                student_id: "viva_demo_user",
+                hesitation_time_ms: parseFloat(document.getElementById('hesitation').value),
+                correction_rate: parseFloat(document.getElementById('correction').value),
+                swipe_velocity: parseFloat(document.getElementById('velocity').value),
+                error_count: parseInt(document.getElementById('error-count').value),
+                response_time: parseFloat(document.getElementById('response-time').value)
+            };
+
+            addLog(`Uplinking telemetry to MongoDB Atlas...`, 'info');
+            updateParamLogs(payload.hesitation_time_ms, payload.correction_rate, payload.swipe_velocity, payload.error_count);
+
+            try {
+                const res = await fetch('http://127.0.0.1:8001/api/v1/telemetry', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                const level = data.predicted_cognitive_load;
+                const loadPercent = level === 2 ? 95 : (level === 1 ? 55 : 15);
+                loadBar.style.width = `${loadPercent}%`;
+                loadValue.innerText = level === 2 ? "High" : (level === 1 ? "Medium" : "Low");
+                
+                if (data.intervention_triggered) {
+                    addLog('CRITICAL: High/Medium Cognitive Load detected. Notifying Intervention Service...', 'warning');
+                    loadStatus.innerText = 'Intervention Active';
+                    loadStatus.style.color = '#ff4d4d';
+                    loadBar.style.background = 'linear-gradient(90deg, #ff4d4d, #ff00c1)';
+                } else {
+                    addLog('System monitoring stable. Data persisted to MongoDB.', 'success');
+                    loadStatus.innerText = 'Stable State';
+                    loadStatus.style.color = '#00ffcc';
+                    loadBar.style.background = 'linear-gradient(90deg, #00d2ff, #92fe9d)';
+                }
+            } catch (err) {
+                addLog('Communication failure. Check if Monitoring Service is running on port 8001.', 'error');
+            }
+        };
+    </script>
+</body>
+</html>

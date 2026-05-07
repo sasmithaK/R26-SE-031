@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/intervention_poller.dart';
+import '../services/score_service.dart';
 
 class SyllableChallengeGame extends StatefulWidget {
   @override
@@ -78,6 +79,14 @@ class _SyllableChallengeGameState extends State<SyllableChallengeGame>
     }
   }
 
+  double _calculateScore(int responseTimeSeconds, int errorCount, int firstTouchLatencyMs) {
+    final baseScore = 10.0;
+    final hesitationPenalty = firstTouchLatencyMs > 3000 ? 1.5 : 0.0;
+    final penalty = (errorCount * 2.0) + (responseTimeSeconds * 0.5) + hesitationPenalty;
+    final score = baseScore - penalty;
+    return score < 0 ? 0 : score;
+  }
+
   void _handleTap(String syllable) {
     if (isCompleted) return;
 
@@ -97,6 +106,19 @@ class _SyllableChallengeGameState extends State<SyllableChallengeGame>
           final timeToFirstTouchMs = firstTouchTime != null ? firstTouchTime!.difference(startTime!).inMilliseconds : 0;
           _sendTelemetry(responseTime, errors, timeToFirstTouchMs);
           _updateMastery(errors == 0); // Correct mastery if no errors made
+          ScoreService.saveTaskScore(
+            studentId: studentId,
+            taskId: 'syllable_challenge_01',
+            taskName: 'Stage 3: Hear & Tap',
+            score: _calculateScore(responseTime, errors, timeToFirstTouchMs),
+            maxScore: 10,
+            durationSeconds: DateTime.now().difference(startTime!).inMilliseconds / 1000,
+            metadata: {
+              'errors': errors,
+              'time_to_first_touch_ms': timeToFirstTouchMs,
+              'target_word': targetWord,
+            },
+          );
           
           Timer(Duration(seconds: 2), () {
             _startRound(); // Reset for demo purposes

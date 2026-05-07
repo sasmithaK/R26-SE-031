@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/intervention_poller.dart';
+import '../services/score_service.dart';
 
 class SoundCatcherGame extends StatefulWidget {
   @override
@@ -11,8 +12,9 @@ class SoundCatcherGame extends StatefulWidget {
 }
 
 class _SoundCatcherGameState extends State<SoundCatcherGame>
-    with InterventionPollerMixin {
-  final String studentId = "student_001";
+    with InterventionPollerMixin<SoundCatcherGame> {
+  @override
+  String get studentId => "student_001";
   String currentTargetSound = "අ";
   List<String> options = ["අ", "ආ", "ඇ", "ඈ"];
   DateTime? startTime;
@@ -74,6 +76,13 @@ class _SoundCatcherGameState extends State<SoundCatcherGame>
     }
   }
 
+  double _calculateScore(int responseTimeSeconds, int errorCount) {
+    final baseScore = 10.0;
+    final penalty = (errorCount * 2.0) + (responseTimeSeconds * 0.5);
+    final score = baseScore - penalty;
+    return score < 0 ? 0 : score;
+  }
+
   void _handleChoice(String choice) {
     if (choice == currentTargetSound) {
       final responseTime = DateTime.now().difference(startTime!).inSeconds;
@@ -82,6 +91,18 @@ class _SoundCatcherGameState extends State<SoundCatcherGame>
       });
       _sendTelemetry(responseTime, errors);
       _updateMastery(true);
+      ScoreService.saveTaskScore(
+        studentId: studentId,
+        taskId: 'sound_catcher_01',
+        taskName: 'Stage 2: Sound Catcher',
+        score: _calculateScore(responseTime, errors),
+        maxScore: 10,
+        durationSeconds: DateTime.now().difference(startTime!).inMilliseconds / 1000,
+        metadata: {
+          'errors': errors,
+          'target_sound': currentTargetSound,
+        },
+      );
       
       Timer(Duration(seconds: 1), () {
         _startNewRound();

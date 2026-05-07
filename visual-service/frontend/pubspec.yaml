@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.1.0
+  flutter_tts: ^3.8.3
 
 dev_dependencies:
   flutter_test:
