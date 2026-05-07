@@ -1,5 +1,6 @@
 import os
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient  # type: ignore
+
 
 # Using local MongoDB instance by default
 MONGO_DETAILS = os.getenv("MONGO_URI", "mongodb://localhost:27017")
