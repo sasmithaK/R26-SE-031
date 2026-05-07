@@ -3,7 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react
 import ModelTrainingDashboard from './pages/ModelTrainingDashboard';
 import Simulator from './pages/Simulator';
 import ResultsDashboard from './pages/ResultsDashboard';
-import { Activity, Database, Cpu, UserCheck, Network } from 'lucide-react';
+import PipelineVisualization from './pages/PipelineVisualization';
+import { Activity, Database, Cpu, UserCheck, Network, HelpCircle } from 'lucide-react';
 
 function Navigation() {
   const location = useLocation();
@@ -12,7 +13,8 @@ function Navigation() {
   const links = [
     { path: '/', name: 'Model Training', icon: <Cpu className="w-5 h-5" /> },
     { path: '/simulator', name: 'Simulator', icon: <Activity className="w-5 h-5" /> },
-    { path: '/results', name: 'Results', icon: <UserCheck className="w-5 h-5" /> }
+    { path: '/results', name: 'Results', icon: <UserCheck className="w-5 h-5" /> },
+    { path: '/how-it-works', name: 'How it Works', icon: <HelpCircle className="w-5 h-5" /> }
   ];
 
   return (
@@ -58,6 +60,7 @@ function App() {
               <Route path="/" element={<ModelTrainingDashboard />} />
               <Route path="/simulator" element={<Simulator />} />
               <Route path="/results" element={<ResultsDashboard />} />
+              <Route path="/how-it-works" element={<PipelineVisualization />} />
             </Routes>
           </div>
         </main>
