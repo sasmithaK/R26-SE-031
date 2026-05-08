@@ -27,6 +27,12 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null && args['studentName'] != null) {
         _studentNameController.text = args['studentName'] as String;
+        if (args['studentAge'] != null) {
+          _studentAgeController.text = args['studentAge'] as String;
+        }
+        if (args['studentGrade'] != null) {
+          _studentGradeController.text = args['studentGrade'] as String;
+        }
       }
     });
   }
@@ -185,8 +191,23 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
         const SnackBar(content: Text('ප්රශ්නාවලි දත්ත සාර්ථකව සුරකිණි.')),
       );
 
+      // Compute tier from score: Tier 1 = low, Tier 2 = medium, Tier 3 = high
+      String tier;
+      if (totalScore == 0) {
+        tier = 'Tier 1';
+      } else if (totalScore <= 75) {
+        tier = 'Tier 2';
+      } else {
+        tier = 'Tier 3';
+      }
+
       Navigator.pushNamed(context, '/student_preferences', arguments: {
         'studentName': _studentNameController.text.trim(),
+        'studentAge': _studentAgeController.text.trim(),
+        'studentGrade': _studentGradeController.text.trim(),
+        'totalScore': totalScore,
+        'tier': tier,
+        'isNewStudent': true,
       });
     } catch (e) {
       if (!mounted) {

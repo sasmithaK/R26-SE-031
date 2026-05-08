@@ -18,53 +18,53 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
   final Map<int, List<Map<String, dynamic>>> sentencesByLevel = {
     1: [
       {
-        'sentence': 'බල්ලා දිවයි.',
-        'correctImageIndex': 0, // running dog
-        'images': ['🐕‍🦺 Running dog', '🐕 Sitting dog', '🐕 Eating dog'],
+        'sentence': 'බල්ලා දුවනවා.',
+        'correctImageIndex': 2, // DogRunning.jpg (index 2)
+        'images': ['assets/images/sitdog.jpg', 'assets/images/sleepingDog.jpg', 'assets/images/DogRunning.jpg'],
       },
       {
         'sentence': 'මල් පිපේ.',
         'correctImageIndex': 0, // blooming flower
-        'images': ['🌸 Blooming flower', '🌵 Cactus', '🍃 Leaves'],
+        'images': ['assets/images/flowerr.jpg','assets/images/tree1.jpg','assets/images/bird.jpg'],
       },
       {
         'sentence': 'අම්මා එයි.',
         'correctImageIndex': 0, // mother
-        'images': ['👩 Mother', '👨 Father', '👨‍⚕️ Doctor'],
+        'images': ['assets/images/mother.jpg', 'assets/images/father4.jpg', 'assets/images/grandmother.jpg'],
       },
     ],
     2: [
       {
         'sentence': 'ගෙදර ළඟ ගසක් තිබේ.',
         'correctImageIndex': 0, // house with tree
-        'images': ['🏠🌳 House with tree', '🏫🌳 School with tree', '🏠 House alone'],
+        'images': ['assets/images/road.jpg','assets/images/housetree.jpg', 'assets/images/river.jpg'],
       },
       {
-        'sentence': 'අපි පාසල යමු.',
+        'sentence': 'අපි පාසලට යමු.',
         'correctImageIndex': 0, // going to school
-        'images': ['👨‍👩‍👧‍👦➡️🏫 Going to school', '👨‍👩‍👧‍👦➡️🏠 Going home', '👨‍👩‍👧‍👦➡️🏪 Going to store'],
+        'images': ['assets/images/ball.jpg', 'assets/images/play.jpg', 'assets/images/school.jpg'],
       },
       {
-        'sentence': 'ගුරුවරයා පොත ඉතුරුවයි.',
+        'sentence': 'ගුරුවරයා පොත කියවනවා.',
         'correctImageIndex': 0, // teacher teaching book
-        'images': ['👨‍🏫📖 Teacher with book', '👨‍🏫❌ Teacher pointing no', '👨‍🏫🎨 Teacher drawing'],
+        'images': ['assets/images/sing.jpg', 'assets/images/teach.jpg', 'assets/images/batta.jpg'],
       },
     ],
     3: [
       {
         'sentence': 'ළමයා ගෙදර ගොස් කෑම කෑවා.',
         'correctImageIndex': 0, // child eating at home
-        'images': ['👧🏠🍴 Child eating at home', '👧🏫🍴 Child eating at school', '👧🏠🏃 Child running home'],
+        'images': ['assets/images/childcook.jpg', 'assets/images/tv.jpg', 'assets/images/fameat.jpg'],
       },
       {
-        'sentence': 'අම්මා කෑම හදගෙන වනවා.',
+        'sentence': 'අම්මා කෑම හදානවා.',
         'correctImageIndex': 0, // mom cooking
-        'images': ['👩‍🍳🍳 Mom cooking', '👩‍⚕️💉 Mom at doctor', '👩 Mom reading'],
+        'images': ['assets/images/backer.jpg', 'assets/images/macook.jpg', 'assets/images/grandmacook.jpg'],
       },
       {
-        'sentence': 'ගස් මතින් පතුරු වැටෙනවා.',
+        'sentence': 'ගස් වලින් පලතුරු වැටෙනවා.',
         'correctImageIndex': 0, // leaves falling from tree
-        'images': ['🌳🍃⬇️ Leaves falling', '🌳☀️ Sunny tree', '🌳❄️ Snowy tree'],
+        'images': ['assets/images/fruitree.jpg', 'assets/images/grocerry.jpg', 'assets/images/share.jpg'],
       },
     ],
   };
@@ -376,39 +376,25 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 32),
-        GridView.builder(
-          shrinkWrap: true,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 1,
-            childAspectRatio: 3,
-            mainAxisSpacing: 12,
-          ),
-          itemCount: images.length,
-          itemBuilder: (context, index) {
-            final isSelected = selectedImageIndex == index;
-            return GestureDetector(
-              onTap: selectedImageIndex == null
-                  ? () => _selectImage(index)
-                  : null,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.green.shade100 : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected ? Colors.green : Colors.grey.shade400,
-                    width: isSelected ? 3 : 2,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    images[index],
-                    style: const TextStyle(fontSize: 32),
-                    textAlign: TextAlign.center,
-                  ),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(images.length, (index) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: index == images.length - 1 ? 0 : 16),
+              child: GestureDetector(
+                onTap: selectedImageIndex == null
+                    ? () => _selectImage(index)
+                    : null,
+                child: Image.asset(
+                  images[index],
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 48),
                 ),
               ),
             );
-          },
+          }),
         ),
       ],
     );

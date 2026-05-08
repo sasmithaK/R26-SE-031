@@ -13,25 +13,123 @@ from flask import Flask, request, jsonify
 from pymongo import MongoClient
 from datetime import datetime
 import os
+from pathlib import Path
 
 app = Flask(__name__)
 
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    return response
+
 # MongoDB Connection
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
+def _load_mongo_uri() -> str:
+    env_uri = os.getenv('MONGO_URI')
+    if env_uri:
+        return env_uri
+
+    env_file = Path(__file__).with_name('.env')
+    if env_file.exists():
+        for raw_line in env_file.read_text(encoding='utf-8').splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            if key.strip() == 'MONGO_URI':
+                return value.strip().strip('"').strip("'")
+
+    return 'mongodb+srv://dyslexiaAdmin:yourpassword@cluster01.evjs7kv.mongodb.net/?appName=Cluster01'
+
+
+MONGO_URI = _load_mongo_uri()
 DB_NAME = 'dyslexia_app'
 FLUENCY_COLLECTION = 'fluency_progress'
 LETTER_ID_COLLECTION = 'letter_identification'
 COMPREHENSION_COLLECTION = 'comprehension_progress'
+QUESTIONNAIRE_COLLECTION = 'questionnaire_submissions'
 
 try:
-    client = MongoClient(MONGO_URI)
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=20000)
+    client.admin.command('ping')
     db = client[DB_NAME]
     fluency_collection = db[FLUENCY_COLLECTION]
     letter_id_collection = db[LETTER_ID_COLLECTION]
     comprehension_collection = db[COMPREHENSION_COLLECTION]
-    print("✓ Connected to MongoDB")
+    questionnaire_collection = db[QUESTIONNAIRE_COLLECTION]
+    print(f"✓ Connected to MongoDB: {MONGO_URI.split('@')[-1] if '@' in MONGO_URI else MONGO_URI}")
 except Exception as e:
     print(f"✗ MongoDB connection failed: {e}")
+
+
+@app.route('/api/questionnaire', methods=['POST'])
+@app.route('/api/questionnair', methods=['POST'])
+@app.route('/api/questionniar', methods=['POST'])
+def save_questionnaire_submission():
+    """Save questionnaire submission to MongoDB."""
+    try:
+        data = request.get_json() or {}
+
+        required_fields = [
+            'respondent_role',
+            'respondent_name',
+            'student_name',
+            'student_age',
+            'student_grade',
+            'part_one_score',
+            'risk_level',
+            'part_two_count',
+            'part_three_count',
+            'part_one_answers',
+            'part_two_answers',
+            'part_three_answers',
+        ]
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            return jsonify({'error': f"Missing fields: {', '.join(missing_fields)}"}), 400
+
+        result = questionnaire_collection.insert_one({
+            'created_at': data.get('created_at', datetime.now().isoformat()),
+            'respondent_role': data['respondent_role'],
+            'respondent_name': data['respondent_name'],
+            'student_name': data['student_name'],
+            'student_age': data['student_age'],
+            'student_grade': data['student_grade'],
+            'part_one_score': data['part_one_score'],
+            'risk_level': data['risk_level'],
+            'part_two_count': data['part_two_count'],
+            'part_three_count': data['part_three_count'],
+            'part_one_answers': data['part_one_answers'],
+            'part_two_answers': data['part_two_answers'],
+            'part_three_answers': data['part_three_answers'],
+        })
+
+        return jsonify({
+            'message': 'Questionnaire submission saved',
+            'submissionId': str(result.inserted_id),
+        }), 201
+    except Exception as e:
+        app.logger.exception('Failed to save questionnaire submission')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/questionnaire', methods=['GET'])
+@app.route('/api/questionnair', methods=['GET'])
+@app.route('/api/questionniar', methods=['GET'])
+def get_questionnaire_submissions():
+    """Fetch all questionnaire submissions from MongoDB."""
+    try:
+        records = list(questionnaire_collection.find().sort('created_at', -1))
+
+        for record in records:
+            record.pop('_id', None)
+
+        return jsonify(records), 200
+    except Exception as e:
+        app.logger.exception('Failed to fetch questionnaire submissions')
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/fluency', methods=['POST'])
 def save_fluency_progress():
@@ -374,4 +472,4 @@ def health_check():
     return jsonify({'status': 'OK', 'service': 'fluency-api'}), 200
 
 if __name__ == '__main__':
-    app.run(debug=True, host='localhost', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
