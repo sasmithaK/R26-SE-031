@@ -104,7 +104,6 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
       isCorrect = selectedLetter == tasks[currentTaskIndex].targetLetter;
       if (isCorrect == true) {
         // Start phonological awareness task after visual success
-        final visualTime = DateTime.now().difference(visualDiscriminationStartTime!).inSeconds;
         showPhonologicalTask = true;
         phonologicalAwarenessStartTime = DateTime.now();
         
