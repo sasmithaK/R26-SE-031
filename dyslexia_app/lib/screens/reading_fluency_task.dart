@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dyslexia_app/models/fluency_progress.dart';
 import 'package:dyslexia_app/services/fluency_service.dart';
+import 'package:dyslexia_app/services/task_score_service.dart';
 
 class ReadingFluencyTask extends StatefulWidget {
   const ReadingFluencyTask({super.key});
@@ -163,6 +164,20 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
       if (success) {
         print('Fluency progress saved to MongoDB');
       }
+    });
+
+    // Also save a task-level score record for analytics
+    TaskScoreService.saveTaskScore(
+      studentId: studentId,
+      taskName: 'reading_fluency',
+      score: newAvgWpm,
+      metadata: {
+        'avgWer': newAvgWer,
+        'sessionsCompleted': newSessions,
+        'breakdownLevel': newBreakdownLevel,
+      },
+    ).then((ok) {
+      if (ok) print('Task score saved for reading_fluency');
     });
 
     setState(() {

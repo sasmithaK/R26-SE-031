@@ -8,6 +8,7 @@ import '../utils/sinhala_letter_audio.dart'
 import '../models/letter_identification_score.dart';
 import '../models/letter_picture_task.dart';
 import '../services/letter_identification_service.dart';
+import '../services/task_score_service.dart';
 
 class LetterTask {
   final String targetLetter;
@@ -146,6 +147,17 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
     
     // Save to MongoDB
     await LetterIdentificationService.saveLetterScore(score);
+
+    // Also record a generic task score
+    TaskScoreService.saveTaskScore(
+      studentId: score.studentId,
+      taskName: 'letter_identification',
+      score: score.isSuccessful ? 1.0 : 0.0,
+      durationSeconds: score.totalTime.toDouble(),
+      metadata: {'letter': score.letter},
+    ).then((ok) {
+      if (ok) print('Task score saved for letter_identification');
+    });
     
     // Show result for 1 second then proceed
     await Future.delayed(const Duration(seconds: 1), () {

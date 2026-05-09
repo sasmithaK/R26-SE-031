@@ -46,19 +46,25 @@ def _load_mongo_uri() -> str:
 
 MONGO_URI = _load_mongo_uri()
 DB_NAME = 'dyslexia_app'
+CONTENT_DB_NAME = 'dyslexia_content'
 FLUENCY_COLLECTION = 'fluency_progress'
 LETTER_ID_COLLECTION = 'letter_identification'
 COMPREHENSION_COLLECTION = 'comprehension_progress'
 QUESTIONNAIRE_COLLECTION = 'questionnaire_submissions'
+TASK_SCORES_COLLECTION = 'task_scores'
 
 try:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=20000)
     client.admin.command('ping')
     db = client[DB_NAME]
+    content_db = client[CONTENT_DB_NAME]
     fluency_collection = db[FLUENCY_COLLECTION]
     letter_id_collection = db[LETTER_ID_COLLECTION]
     comprehension_collection = db[COMPREHENSION_COLLECTION]
     questionnaire_collection = db[QUESTIONNAIRE_COLLECTION]
+    task_scores_collection = db[TASK_SCORES_COLLECTION]
+    content_questionnaires_collection = content_db['questionnaires']
+    content_tasks_collection = content_db['tasks']
     print(f"✓ Connected to MongoDB: {MONGO_URI.split('@')[-1] if '@' in MONGO_URI else MONGO_URI}")
 except Exception as e:
     print(f"✗ MongoDB connection failed: {e}")
@@ -129,6 +135,49 @@ def get_questionnaire_submissions():
         return jsonify(records), 200
     except Exception as e:
         app.logger.exception('Failed to fetch questionnaire submissions')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/questionnaires/<category>', methods=['GET'])
+def get_questionnaire_content(category):
+    """Fetch questionnaire definition (content) from dyslexia_content DB."""
+    try:
+        questionnaire = content_questionnaires_collection.find_one({'category': category})
+        if not questionnaire:
+            return jsonify({'error': f'Questionnaire not found for category: {category}'}), 404
+
+        questionnaire['_id'] = str(questionnaire['_id'])
+        return jsonify(questionnaire), 200
+    except Exception as e:
+        app.logger.exception('Failed to fetch questionnaire content')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tasks/<task_type>', methods=['GET'])
+def get_tasks_content(task_type):
+    """Fetch tasks by type from dyslexia_content DB."""
+    try:
+        tasks = list(content_tasks_collection.find({'type': task_type}))
+        for task in tasks:
+            task['_id'] = str(task['_id'])
+
+        return jsonify({'task_type': task_type, 'tasks': tasks, 'count': len(tasks)}), 200
+    except Exception as e:
+        app.logger.exception('Failed to fetch tasks content')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tasks/by-level/<task_type>/<int:level>', methods=['GET'])
+def get_tasks_content_by_level(task_type, level):
+    """Fetch tasks by type and level from dyslexia_content DB."""
+    try:
+        tasks = list(content_tasks_collection.find({'type': task_type, 'level': level}))
+        for task in tasks:
+            task['_id'] = str(task['_id'])
+
+        return jsonify({'task_type': task_type, 'level': level, 'tasks': tasks, 'count': len(tasks)}), 200
+    except Exception as e:
+        app.logger.exception('Failed to fetch tasks content by level')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/fluency', methods=['POST'])
@@ -438,6 +487,50 @@ def update_comprehension_progress(student_id):
         
         return jsonify({'message': 'Comprehension progress updated'}), 200
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/task-score', methods=['POST'])
+def save_task_score():
+    """Save a generic task score to MongoDB under `task_scores` collection."""
+    try:
+        data = request.get_json() or {}
+        student_id = data.get('student_id') or data.get('studentId')
+        task_id = data.get('task_id') or data.get('taskId') or data.get('task_name')
+        score = data.get('score')
+
+        if not student_id:
+            return jsonify({'error': 'student_id is required'}), 400
+
+        doc = {
+            'studentId': student_id,
+            'taskId': task_id,
+            'taskName': data.get('task_name') or data.get('taskName'),
+            'score': score,
+            'maxScore': data.get('max_score') or data.get('maxScore'),
+            'durationSeconds': data.get('duration_seconds') or data.get('durationSeconds'),
+            'metadata': data.get('metadata', {}),
+            'created_at': data.get('created_at', datetime.now().isoformat()),
+        }
+
+        result = task_scores_collection.insert_one(doc)
+
+        return jsonify({'message': 'Task score saved', 'scoreId': str(result.inserted_id)}), 201
+    except Exception as e:
+        app.logger.exception('Failed to save task score')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/task-scores/<student_id>', methods=['GET'])
+def get_task_scores(student_id):
+    """Retrieve task scores for a student."""
+    try:
+        records = list(task_scores_collection.find({'studentId': student_id}).sort('created_at', -1))
+        for r in records:
+            r.pop('_id', None)
+        return jsonify({'scores': records}), 200
+    except Exception as e:
+        app.logger.exception('Failed to fetch task scores')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/comprehension/<student_id>', methods=['DELETE'])

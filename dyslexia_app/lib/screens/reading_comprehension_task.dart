@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dyslexia_app/models/comprehension_progress.dart';
 import 'package:dyslexia_app/services/comprehension_service.dart';
+import 'package:dyslexia_app/services/task_score_service.dart';
 
 class ReadingComprehensionTask extends StatefulWidget {
   const ReadingComprehensionTask({super.key});
@@ -262,6 +263,18 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('rc_level', currentLevel);
     await prefs.setDouble('rc_accuracy', accuracy);
+
+    // Also save a task-level score record
+    TaskScoreService.saveTaskScore(
+      studentId: studentId,
+      taskName: 'reading_comprehension',
+      score: accuracy,
+      maxScore: 100.0,
+      durationSeconds: avgReadingTime,
+      metadata: {'level': currentLevel},
+    ).then((ok) {
+      if (ok) print('Task score saved for reading_comprehension');
+    });
   }
 
   @override

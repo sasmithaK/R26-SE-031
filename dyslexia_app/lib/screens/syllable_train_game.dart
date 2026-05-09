@@ -1,6 +1,10 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../services/content_service.dart';
+import '../services/task_score_service.dart';
 
 class SyllableTrainGame extends StatefulWidget {
   const SyllableTrainGame({super.key});
@@ -20,37 +24,15 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
   final Random _random = Random();
   final GlobalKey _trainKey = GlobalKey();
 
-  final List<_TrainRound> _rounds = const [
-    _TrainRound(
-      word: 'මල',
-      carriages: ['ම', 'ල'],
-      trainColors: [Color(0xFFFF8A80), Color(0xFF80D8FF)],
-    ),
-    _TrainRound(
-      word: 'ගස',
-      carriages: ['ග', 'ස'],
-      trainColors: [Color(0xFFA5D6A7), Color(0xFFFFCC80)],
-    ),
-    _TrainRound(
-      word: 'ගෙය',
-      carriages: ['ගෙ', 'ය'],
-      trainColors: [Color(0xFFB39DDB), Color(0xFF81D4FA)],
-    ),
-    _TrainRound(
-      word: 'අම්මා',
-      carriages: ['අ', 'ම්', 'මා'],
-      trainColors: [Color(0xFFFFAB91), Color(0xFFCE93D8), Color(0xFFFFAB91)],
-    ),
-    _TrainRound(
-      word: 'පාසල',
-      carriages: ['පා', 'ස', 'ල'],
-      trainColors: [Color(0xFF80CBC4), Color(0xFFFFF59D), Color(0xFFFFAB91)],
-    ),
-  ];
+  // Rounds will be loaded from MongoDB
+  late List<_TrainRound> _rounds;
+  bool _isLoading = true;
+  String? _loadError;
 
   final List<String> _currentOrder = [];
   int _currentRoundIndex = 0;
   bool _isCelebrating = false;
+  late String studentId;
 
   @override
   void initState() {
@@ -79,7 +61,122 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
       curve: Curves.easeOutCubic,
     );
 
+    _loadSyllableRounds();
+    _loadStudentId();
+  }
+
+  Future<void> _loadStudentId() async {
+    final prefs = await SharedPreferences.getInstance();
+    studentId = prefs.getString('student_id') ?? 'student_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  /// Load syllable rounds from MongoDB via API
+  Future<void> _loadSyllableRounds() async {
+    try {
+      final tasks = await ContentService.getTasksByType('syllable_train');
+      
+      if (tasks == null || tasks.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _loadError = 'Could not load syllable rounds.';
+          // Fallback to default rounds if loading fails
+          _initializeDefaultRounds();
+        });
+        return;
+      }
+
+      // Convert task data to _TrainRound objects
+      final rounds = <_TrainRound>[];
+      for (final task in tasks) {
+        try {
+          final word = task['word'] as String? ?? '';
+          final carriages = (task['carriages'] as List?)?.cast<String>() ?? [];
+          final colorStrings = (task['trainColors'] as List?)?.cast<String>() ?? [];
+          
+          // Convert hex color strings to Color objects
+          final colors = colorStrings.map((hexColor) {
+            return _hexToColor(hexColor);
+          }).toList();
+
+          if (word.isNotEmpty && carriages.isNotEmpty && colors.isNotEmpty) {
+            rounds.add(_TrainRound(
+              word: word,
+              carriages: carriages,
+              trainColors: colors,
+            ));
+          }
+        } catch (e) {
+          print('Error parsing syllable round: $e');
+        }
+      }
+
+      setState(() {
+        if (rounds.isNotEmpty) {
+          _rounds = rounds;
+          _isLoading = false;
+          _loadError = null;
+          _prepareRound();
+        } else {
+          _isLoading = false;
+          _loadError = 'No valid syllable rounds found.';
+          _initializeDefaultRounds();
+        }
+      });
+    } catch (e) {
+      print('Error loading syllable rounds: $e');
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Error loading syllable rounds: $e';
+        _initializeDefaultRounds();
+      });
+    }
+  }
+
+  /// Initialize default rounds as fallback
+  void _initializeDefaultRounds() {
+    _rounds = const [
+      _TrainRound(
+        word: 'මල',
+        carriages: ['ම', 'ල'],
+        trainColors: [Color(0xFFFF8A80), Color(0xFF80D8FF)],
+      ),
+      _TrainRound(
+        word: 'ගස',
+        carriages: ['ග', 'ස'],
+        trainColors: [Color(0xFFA5D6A7), Color(0xFFFFCC80)],
+      ),
+      _TrainRound(
+        word: 'ගෙය',
+        carriages: ['ගෙ', 'ය'],
+        trainColors: [Color(0xFFB39DDB), Color(0xFF81D4FA)],
+      ),
+      _TrainRound(
+        word: 'අම්මා',
+        carriages: ['අ', 'ම්', 'මා'],
+        trainColors: [Color(0xFFFFAB91), Color(0xFFCE93D8), Color(0xFFFFAB91)],
+      ),
+      _TrainRound(
+        word: 'පාසල',
+        carriages: ['පා', 'ස', 'ල'],
+        trainColors: [Color(0xFF80CBC4), Color(0xFFFFF59D), Color(0xFFFFAB91)],
+      ),
+    ];
     _prepareRound();
+  }
+
+  /// Convert hex color string to Flutter Color
+  Color _hexToColor(String hexString) {
+    // Remove # if present
+    if (hexString.startsWith('#')) {
+      hexString = hexString.substring(1);
+    }
+    
+    try {
+      return Color(int.parse('0xFF$hexString'));
+    } catch (e) {
+      print('Error parsing color $hexString: $e');
+      return Colors.grey;
+    }
   }
 
   @override
@@ -183,6 +280,13 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
           TextButton(
             onPressed: () {
               Navigator.pop(context);
+              // Save a task-level score (completed all rounds)
+              TaskScoreService.saveTaskScore(
+                studentId: studentId,
+                taskName: 'syllable_train',
+                score: 1.0,
+                metadata: {'roundsCompleted': _rounds.length},
+              );
               Navigator.pop(context);
             },
             child: const Text('Done'),
@@ -194,6 +298,52 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
 
   @override
   Widget build(BuildContext context) {
+    // Show loading state while data is being fetched
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Syllable Train Game'),
+          backgroundColor: Colors.red.shade400,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Show error state if loading failed
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Syllable Train Game'),
+          backgroundColor: Colors.red.shade400,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('Error: $_loadError', textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isLoading = true;
+                    _loadError = null;
+                  });
+                  _loadSyllableRounds();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final round = _rounds[_currentRoundIndex];
     final progress = (_currentRoundIndex + 1) / _rounds.length;
 
