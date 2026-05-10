@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/spatial_awareness.dart';
 import 'screens/sound_catcher.dart';
 import 'screens/syllable_challenge.dart';
+import 'screens/gamified_onboarding.dart';
 
 void main() {
   runApp(const StudentApp());
@@ -19,7 +20,11 @@ class StudentApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Inter', // Fallback font, assuming Sinhala handles itself
       ),
-      home: const StudentHomeScreen(),
+      initialRoute: '/onboarding',
+      routes: {
+        '/onboarding': (context) => GamifiedOnboardingScreen(),
+        '/': (context) => const StudentHomeScreen(),
+      },
     );
   }
 }
@@ -91,7 +96,7 @@ class StudentHomeScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(15),
-          side: BorderSide(color: color.withOpacity(0.3), width: 2),
+          side: BorderSide(color: color.withValues(alpha: 0.3), width: 2),
         ),
         elevation: 2,
       ),
@@ -103,7 +108,7 @@ class StudentHomeScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 32),
