@@ -13,6 +13,9 @@ import 'screens/draw_a_man_test.dart';
 import 'screens/story_sequencing_game.dart';
 import 'screens/drawing_interpretation_game.dart';
 import 'screens/syllable_train_game.dart';
+import 'screens/firefly_tracking_game.dart';
+import 'screens/reading_fluency_task.dart';
+import 'screens/reading_comprehension_task.dart';
 
 void main() {
   runApp(const DyslexiaApp());
@@ -48,6 +51,9 @@ class DyslexiaApp extends StatelessWidget {
         '/story_sequencing': (context) => const StorySequencingGame(),
         '/drawing_interpretation': (context) => const DrawingInterpretationGame(),
         '/syllable_train': (context) => const SyllableTrainGame(),
+        '/firefly_tracking': (context) => const FireflyTrackingGame(),
+        '/reading_fluency': (context) => const ReadingFluencyTask(),
+        '/reading_comprehension': (context) => const ReadingComprehensionTask(),
       },
     );
   }

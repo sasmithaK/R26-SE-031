@@ -1,6 +1,10 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../services/content_service.dart';
+import '../services/task_score_service.dart';
 
 class SyllableTrainGame extends StatefulWidget {
   const SyllableTrainGame({super.key});
@@ -12,43 +16,23 @@ class SyllableTrainGame extends StatefulWidget {
 class _SyllableTrainGameState extends State<SyllableTrainGame>
     with TickerProviderStateMixin {
   late final AnimationController _trainBobController;
+  late final AnimationController _trainSuccessController;
   late final AnimationController _cloudController;
   late final Animation<double> _trainBobAnimation;
+  late final Animation<double> _trainSuccessAnimation;
 
   final Random _random = Random();
   final GlobalKey _trainKey = GlobalKey();
 
-  final List<_TrainRound> _rounds = const [
-    _TrainRound(
-      word: 'මල',
-      carriages: ['ම', 'ල'],
-      trainColors: [Color(0xFFFF8A80), Color(0xFF80D8FF)],
-    ),
-    _TrainRound(
-      word: 'ගස',
-      carriages: ['ග', 'ස'],
-      trainColors: [Color(0xFFA5D6A7), Color(0xFFFFCC80)],
-    ),
-    _TrainRound(
-      word: 'ගෙය',
-      carriages: ['ගෙ', 'ය'],
-      trainColors: [Color(0xFFB39DDB), Color(0xFF81D4FA)],
-    ),
-    _TrainRound(
-      word: 'අම්මා',
-      carriages: ['අ', 'ම්', 'මා'],
-      trainColors: [Color(0xFFFFAB91), Color(0xFFCE93D8), Color(0xFFFFAB91)],
-    ),
-    _TrainRound(
-      word: 'පාසල',
-      carriages: ['පා', 'ස', 'ල'],
-      trainColors: [Color(0xFF80CBC4), Color(0xFFFFF59D), Color(0xFFFFAB91)],
-    ),
-  ];
+  // Rounds will be loaded from MongoDB
+  late List<_TrainRound> _rounds;
+  bool _isLoading = true;
+  String? _loadError;
 
   final List<String> _currentOrder = [];
   int _currentRoundIndex = 0;
   bool _isCelebrating = false;
+  late String studentId;
 
   @override
   void initState() {
@@ -67,12 +51,138 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
       CurvedAnimation(parent: _trainBobController, curve: Curves.easeInOut),
     );
 
+    _trainSuccessController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1050),
+    );
+
+    _trainSuccessAnimation = CurvedAnimation(
+      parent: _trainSuccessController,
+      curve: Curves.easeOutCubic,
+    );
+
+    _loadSyllableRounds();
+    _loadStudentId();
+  }
+
+  Future<void> _loadStudentId() async {
+    final prefs = await SharedPreferences.getInstance();
+    studentId = prefs.getString('student_id') ?? 'student_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  /// Load syllable rounds from MongoDB via API
+  Future<void> _loadSyllableRounds() async {
+    try {
+      final tasks = await ContentService.getTasksByType('syllable_train');
+      
+      if (tasks == null || tasks.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _loadError = 'Could not load syllable rounds.';
+          // Fallback to default rounds if loading fails
+          _initializeDefaultRounds();
+        });
+        return;
+      }
+
+      // Convert task data to _TrainRound objects
+      final rounds = <_TrainRound>[];
+      for (final task in tasks) {
+        try {
+          final word = task['word'] as String? ?? '';
+          final carriages = (task['carriages'] as List?)?.cast<String>() ?? [];
+          final colorStrings = (task['trainColors'] as List?)?.cast<String>() ?? [];
+          
+          // Convert hex color strings to Color objects
+          final colors = colorStrings.map((hexColor) {
+            return _hexToColor(hexColor);
+          }).toList();
+
+          if (word.isNotEmpty && carriages.isNotEmpty && colors.isNotEmpty) {
+            rounds.add(_TrainRound(
+              word: word,
+              carriages: carriages,
+              trainColors: colors,
+            ));
+          }
+        } catch (e) {
+          print('Error parsing syllable round: $e');
+        }
+      }
+
+      setState(() {
+        if (rounds.isNotEmpty) {
+          _rounds = rounds;
+          _isLoading = false;
+          _loadError = null;
+          _prepareRound();
+        } else {
+          _isLoading = false;
+          _loadError = 'No valid syllable rounds found.';
+          _initializeDefaultRounds();
+        }
+      });
+    } catch (e) {
+      print('Error loading syllable rounds: $e');
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Error loading syllable rounds: $e';
+        _initializeDefaultRounds();
+      });
+    }
+  }
+
+  /// Initialize default rounds as fallback
+  void _initializeDefaultRounds() {
+    _rounds = const [
+      _TrainRound(
+        word: 'මල',
+        carriages: ['ම', 'ල'],
+        trainColors: [Color(0xFFFF8A80), Color(0xFF80D8FF)],
+      ),
+      _TrainRound(
+        word: 'ගස',
+        carriages: ['ග', 'ස'],
+        trainColors: [Color(0xFFA5D6A7), Color(0xFFFFCC80)],
+      ),
+      _TrainRound(
+        word: 'ගෙය',
+        carriages: ['ගෙ', 'ය'],
+        trainColors: [Color(0xFFB39DDB), Color(0xFF81D4FA)],
+      ),
+      _TrainRound(
+        word: 'අම්මා',
+        carriages: ['අ', 'ම්', 'මා'],
+        trainColors: [Color(0xFFFFAB91), Color(0xFFCE93D8), Color(0xFFFFAB91)],
+      ),
+      _TrainRound(
+        word: 'පාසල',
+        carriages: ['පා', 'ස', 'ල'],
+        trainColors: [Color(0xFF80CBC4), Color(0xFFFFF59D), Color(0xFFFFAB91)],
+      ),
+    ];
     _prepareRound();
+  }
+
+  /// Convert hex color string to Flutter Color
+  Color _hexToColor(String hexString) {
+    // Remove # if present
+    if (hexString.startsWith('#')) {
+      hexString = hexString.substring(1);
+    }
+    
+    try {
+      return Color(int.parse('0xFF$hexString'));
+    } catch (e) {
+      print('Error parsing color $hexString: $e');
+      return Colors.grey;
+    }
   }
 
   @override
   void dispose() {
     _trainBobController.dispose();
+    _trainSuccessController.dispose();
     _cloudController.dispose();
     super.dispose();
   }
@@ -133,6 +243,8 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
       _isCelebrating = true;
     });
 
+    await _trainSuccessController.forward(from: 0);
+
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -168,6 +280,13 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
           TextButton(
             onPressed: () {
               Navigator.pop(context);
+              // Save a task-level score (completed all rounds)
+              TaskScoreService.saveTaskScore(
+                studentId: studentId,
+                taskName: 'syllable_train',
+                score: 1.0,
+                metadata: {'roundsCompleted': _rounds.length},
+              );
               Navigator.pop(context);
             },
             child: const Text('Done'),
@@ -179,6 +298,52 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
 
   @override
   Widget build(BuildContext context) {
+    // Show loading state while data is being fetched
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Syllable Train Game'),
+          backgroundColor: Colors.red.shade400,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Show error state if loading failed
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Syllable Train Game'),
+          backgroundColor: Colors.red.shade400,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('Error: $_loadError', textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isLoading = true;
+                    _loadError = null;
+                  });
+                  _loadSyllableRounds();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final round = _rounds[_currentRoundIndex];
     final progress = (_currentRoundIndex + 1) / _rounds.length;
 
@@ -192,7 +357,11 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.lightBlue.shade50, Colors.orange.shade50, Colors.green.shade50],
+            colors: [
+              Colors.lightBlue.shade50,
+              Colors.orange.shade50,
+              Colors.green.shade50,
+            ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -215,13 +384,20 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
                               child: child,
                             );
                           },
-                          child: const Icon(Icons.train_rounded, size: 56, color: Colors.red),
+                          child: const Icon(
+                            Icons.train_rounded,
+                            size: 56,
+                            color: Colors.red,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text(
                             'කෝච්චිය එක අල්ලා වමට හෝ දකුණට අදින්න. වචනය හරිද බලන්න.',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
@@ -233,13 +409,18 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
                         value: progress,
                         minHeight: 10,
                         backgroundColor: Colors.grey.shade300,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.red.shade400),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.red.shade400,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
                     Text(
                       'වටය ${_currentRoundIndex + 1} / ${_rounds.length}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
                     ),
                   ],
                 ),
@@ -269,19 +450,30 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
                           const SizedBox(width: 8),
                           const Text(
                             'හඬ අණ',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.red),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
                           ),
                           const Spacer(),
                           Text(
                             'Build: ${round.word}',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.green.shade800),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.green.shade800,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'වචනය හදන්න: ${round.word}',
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                       const SizedBox(height: 14),
                       _TrainTrack(
@@ -290,6 +482,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
                         colors: round.trainColors,
                         onSwap: _swapCarriages,
                         isLocked: _isCelebrating,
+                        trainMotion: _trainSuccessAnimation,
                       ),
                     ],
                   ),
@@ -344,7 +537,10 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
                             icon: const Icon(Icons.verified_rounded),
                             label: const Text(
                               'Check Word',
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red.shade500,
@@ -377,6 +573,7 @@ class _TrainTrack extends StatelessWidget {
     required this.colors,
     required this.onSwap,
     required this.isLocked,
+    required this.trainMotion,
   });
 
   final GlobalKey trainKey;
@@ -384,52 +581,71 @@ class _TrainTrack extends StatelessWidget {
   final List<Color> colors;
   final void Function(int fromIndex, int toIndex) onSwap;
   final bool isLocked;
+  final Animation<double> trainMotion;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 180,
-      child: Stack(
-        key: trainKey,
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(
-            top: 92,
-            child: CustomPaint(
-              painter: _TrackPainter(),
+    return AnimatedBuilder(
+      animation: trainMotion,
+      child: SizedBox(
+        height: 180,
+        child: Stack(
+          key: trainKey,
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              top: 92,
+              child: CustomPaint(painter: _TrackPainter()),
             ),
-          ),
-          Positioned(
-            left: 0,
-            top: 28,
-            child: _Locomotive(sway: isLocked ? 0 : 1),
-          ),
-          Positioned(
-            left: 118,
-            right: 0,
-            top: 22,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: List.generate(carriages.length, (index) {
-                  final syllable = carriages[index];
-                  final color = colors[index % colors.length];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: _DraggableCarriage(
-                      index: index,
-                      syllable: syllable,
-                      color: color,
-                      isLocked: isLocked,
-                      onSwap: onSwap,
-                    ),
-                  );
-                }),
+            Positioned(
+              left: 0,
+              top: 28,
+              child: _Locomotive(sway: isLocked ? 0 : 1),
+            ),
+            Positioned(
+              left: 118,
+              right: 0,
+              top: 22,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: List.generate(carriages.length, (index) {
+                    final syllable = carriages[index];
+                    final color = colors[index % colors.length];
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: _DraggableCarriage(
+                        index: index,
+                        syllable: syllable,
+                        color: color,
+                        isLocked: isLocked,
+                        onSwap: onSwap,
+                      ),
+                    );
+                  }),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+      builder: (context, child) {
+        final motion = trainMotion.value;
+        final bounce = Curves.easeInOut.transform(motion);
+        final arcAngle = motion * pi * 2;
+        final loopScale = 1 - (motion * 0.18);
+        final forwardDrift = 16 * Curves.easeOut.transform(motion);
+        final offset = Offset(
+          forwardDrift + 12 * sin(arcAngle) * loopScale,
+          -14 * sin(arcAngle) * loopScale - 6 * bounce,
+        );
+        final rotation = 0.06 * sin(arcAngle) + 0.02 * cos(arcAngle * 2);
+
+        return Transform.translate(
+          offset: offset,
+          child: Transform.rotate(angle: rotation, child: child),
+        );
+      },
     );
   }
 }
@@ -452,7 +668,8 @@ class _DraggableCarriage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DragTarget<int>(
-      onWillAccept: (fromIndex) => !isLocked && fromIndex != null && fromIndex != index,
+      onWillAccept: (fromIndex) =>
+          !isLocked && fromIndex != null && fromIndex != index,
       onAccept: (fromIndex) => onSwap(fromIndex, index),
       builder: (context, candidateData, rejectedData) {
         final hovered = candidateData.isNotEmpty;
@@ -567,7 +784,11 @@ class _CarriageBody extends StatelessWidget {
             Positioned(
               top: 6,
               right: 8,
-              child: Icon(Icons.open_with_rounded, size: 18, color: Colors.white.withOpacity(0.85)),
+              child: Icon(
+                Icons.open_with_rounded,
+                size: 18,
+                color: Colors.white.withOpacity(0.85),
+              ),
             ),
         ],
       ),
@@ -615,7 +836,11 @@ class _Locomotive extends StatelessWidget {
                 color: Colors.white,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.star_rounded, size: 16, color: Colors.red),
+              child: const Icon(
+                Icons.star_rounded,
+                size: 16,
+                color: Colors.red,
+              ),
             ),
           ),
           Positioned(
@@ -634,7 +859,11 @@ class _Locomotive extends StatelessWidget {
           Positioned(
             top: 18,
             right: 12,
-            child: Icon(Icons.train_rounded, size: 54, color: Colors.white.withOpacity(0.95)),
+            child: Icon(
+              Icons.train_rounded,
+              size: 54,
+              color: Colors.white.withOpacity(0.95),
+            ),
           ),
           Positioned(
             left: 0,
@@ -696,7 +925,8 @@ class _SmokePuff extends StatefulWidget {
   State<_SmokePuff> createState() => _SmokePuffState();
 }
 
-class _SmokePuffState extends State<_SmokePuff> with SingleTickerProviderStateMixin {
+class _SmokePuffState extends State<_SmokePuff>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   @override
@@ -757,7 +987,11 @@ class _TrackPainter extends CustomPainter {
 
     final y = size.height * 0.55;
     canvas.drawLine(Offset(95, y), Offset(size.width - 10, y), railPaint);
-    canvas.drawLine(Offset(95, y + 20), Offset(size.width - 10, y + 20), railPaint);
+    canvas.drawLine(
+      Offset(95, y + 20),
+      Offset(size.width - 10, y + 20),
+      railPaint,
+    );
 
     for (double x = 110; x < size.width - 10; x += 28) {
       canvas.drawLine(Offset(x, y - 8), Offset(x + 8, y + 28), sleeperPaint);
@@ -798,7 +1032,10 @@ class _FireworksPopupState extends State<_FireworksPopup>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..forward();
-    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutBack,
+    );
 
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
@@ -860,17 +1097,28 @@ class _FireworksPopupState extends State<_FireworksPopup>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.celebration_rounded, size: 72, color: Colors.amber),
+                      const Icon(
+                        Icons.celebration_rounded,
+                        size: 72,
+                        color: Colors.amber,
+                      ),
                       const SizedBox(height: 8),
                       const Text(
                         'ඔයාට පුළුවන්!',
-                        style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: Colors.red),
+                        style: TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.red,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         '${widget.word} හරි!',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
