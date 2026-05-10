@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
@@ -6,6 +6,26 @@ import numpy as np
 import requests
 import motor.motor_asyncio
 import datetime
+# import hashlib
+# import os
+# import sys
+# from pathlib import Path
+# from typing import Optional, Any
+
+# from fastapi.staticfiles import StaticFiles
+
+# from database import init_local_db, upsert_passage, upsert_word, upsert_word_prediction, upsert_audio_asset
+
+# _ml_inf = Path(__file__).resolve().parent / "ml" / "inference"
+# if str(_ml_inf) not in sys.path:
+#     sys.path.insert(0, str(_ml_inf))
+# from model1_inference import Model1Predictor, infer_error_type_hint, tokenize_sinhala_text
+
+# _model1_predictor: Model1Predictor | None = None
+
+# BASE_DIR = Path(__file__).resolve().parent
+# AUDIO_CACHE_DIR = BASE_DIR / "audio_cache"
+
 
 app = FastAPI(title="Intervention Service", version="2.0")
 
@@ -30,6 +50,181 @@ async def init_db():
 @app.on_event("startup")
 async def startup():
     await init_db()
+#     init_local_db()
+
+#     # Load Model1 (Sinhala word difficulty) if artifacts exist
+#     global _model1_predictor
+#     try:
+#         model1_dir = BASE_DIR / "ml" / "model1"
+#         if (model1_dir / "model1.joblib").exists():
+#             _model1_predictor = Model1Predictor(model1_dir)
+#             print("Component4: Model1 predictor loaded (ml/model1).")
+#         else:
+#             _model1_predictor = None
+#             print("Component4: Model1 artifacts not found under ml/model1 (will use heuristic fallback).")
+#     except Exception as e:
+#         _model1_predictor = None
+#         print(f"Component4: Failed to load Model1 predictor: {e}")
+
+# # ── Component4: audio cache (gTTS) ────────────────────────────────────────────
+# AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+# # Serve cached mp3 files
+# app.mount("/api/v1/c4/audio", StaticFiles(directory=str(AUDIO_CACHE_DIR)), name="c4-audio")
+
+# def _hash_audio_id(lang: str, text: str, kind: str) -> str:
+#     h = hashlib.sha256()
+#     h.update(f"{lang}|{kind}|{text}".encode("utf-8"))
+#     return h.hexdigest()[:24]
+
+# def _ensure_gtts_mp3(*, lang: str, text: str, kind: str) -> dict[str, Any]:
+#     """
+#     Generates and caches an mp3 file for (lang, text). Returns {audio_id, url}.
+#     Requires `gTTS` at runtime; if missing, raises a clear error for setup.
+#     """
+#     audio_id = _hash_audio_id(lang, text, kind)
+#     filename = f"{audio_id}.mp3"
+#     rel_path = filename
+#     out_path = AUDIO_CACHE_DIR / filename
+
+#     if not out_path.exists():
+#         try:
+#             from gtts import gTTS
+#         except Exception as e:  # pragma: no cover
+#             raise HTTPException(
+#                 status_code=500,
+#                 detail="gTTS is not installed. Run: pip install gTTS",
+#             ) from e
+
+#         tts = gTTS(text=text, lang=lang)
+#         tts.save(str(out_path))
+
+#     upsert_audio_asset(audio_id=audio_id, lang=lang, text=text, kind=kind, file_rel_path=rel_path)
+#     return {"audio_id": audio_id, "url": f"/api/v1/c4/audio/{filename}"}
+
+# def _simple_tokenize(text: str) -> list[str]:
+#     # Basic whitespace tokenizer suitable for viva demo.
+#     return [w.strip() for w in text.replace("\n", " ").split(" ") if w.strip()]
+
+# def _model1_score(word: str) -> tuple[float, Optional[str]]:
+#     """
+#     Minimal Model1 placeholder (for viva):
+#     difficulty_score in [0,1] based on word length/complexity.
+#     error_type_hint is a coarse heuristic label.
+#     Replace later with your trained RF Model1.
+#     """
+#     n = len(word)
+#     score = min(1.0, max(0.0, (n - 2) / 10.0))
+#     hint: Optional[str] = None
+#     if n >= 8:
+#         hint = "long_word"
+#     return score, hint
+
+# class PassageStartPayload(BaseModel):
+#     student_id: str
+#     session_id: str
+#     passage_text: str
+#     language: Optional[str] = None  # "si" or "ta" for gTTS
+#     pre_generate_audio: bool = True
+
+# @app.post("/api/v1/c4/passage/start")
+# async def c4_passage_start(payload: PassageStartPayload):
+#     """
+#     Component4 entrypoint: store passage, tokenized words, difficulty (Model1 RF for Sinhala),
+#     and optional anticipatory error_type_hint (shape/rank heuristics — not observed learner errors).
+#     """
+#     import uuid
+
+#     passage_id = str(uuid.uuid4())
+#     upsert_passage(
+#         passage_id=passage_id,
+#         student_id=payload.student_id,
+#         session_id=payload.session_id,
+#         raw_text=payload.passage_text,
+#         language=payload.language,
+#     )
+
+#     if payload.language == "si":
+#         words = tokenize_sinhala_text(payload.passage_text)
+#         if not words:
+#             words = _simple_tokenize(payload.passage_text)
+#     else:
+#         words = _simple_tokenize(payload.passage_text)
+#     response_words: list[dict[str, Any]] = []
+#     model1_version = "heuristic_v0"
+#     model1_note = "length-based heuristic fallback"
+#     using_model1_rf = _model1_predictor is not None and payload.language == "si"
+#     if using_model1_rf and _model1_predictor is not None:
+#         mv = (
+#             _model1_predictor.meta.get("dataset_sha256_16", "model1")
+#             if isinstance(_model1_predictor.meta, dict)
+#             else "model1"
+#         )
+#         model1_version = str(mv)
+#         model1_note = "sklearn RF from ml/model1 (p_hard)"
+
+#     for idx, w in enumerate(words):
+#         word_id = str(uuid.uuid4())
+#         # Stage1 syllables: keep as whole word for now (replace with Unicode syllable splitter later)
+#         syllables = [w]
+#         upsert_word(word_id=word_id, passage_id=passage_id, word_index=idx, word_text=w, syllables=syllables)
+
+#         hint = None
+#         if using_model1_rf and _model1_predictor is not None:
+#             pred = _model1_predictor.predict_one(w)
+#             diff = float(pred.get("p_hard") or 0.0)
+#             hint = infer_error_type_hint(str(pred.get("error_type_pred") or ""))
+#         else:
+#             diff, hint = _model1_score(w)
+
+#         upsert_word_prediction(
+#             word_id=word_id,
+#             difficulty_score=diff,
+#             error_type_hint=hint,
+#             model1_version=str(model1_version),
+#         )
+
+#         audio = None
+#         if payload.pre_generate_audio and payload.language in ("si", "ta"):
+#             audio = _ensure_gtts_mp3(lang=payload.language, text=w, kind="word")
+
+#         response_words.append(
+#             {
+#                 "word_id": word_id,
+#                 "word_index": idx,
+#                 "word_text": w,
+#                 "syllables": syllables,
+#                 "difficulty_score": diff,
+#                 "error_type_hint": hint,
+#                 "audio": audio,
+#             }
+#         )
+
+#     return {
+#         "student_id": payload.student_id,
+#         "session_id": payload.session_id,
+#         "passage_id": passage_id,
+#         "words": response_words,
+#         "model1": {"version": model1_version, "note": model1_note},
+#     }
+
+# # ── Load Random Forest Model ──────────────────────────────────────────────────
+# try:
+#     rf_model = joblib.load(BASE_DIR / "ml" / "intervention_rf.pkl")
+#     print("Intervention RF model loaded successfully.")
+# except Exception as e:
+#     print(f"RF model not loaded: {e}")
+#     rf_model = None
+
+# # Try loading SHAP — graceful fallback if not installed
+# try:
+#     import shap
+#     _shap_available = True
+#     print("SHAP available — explainability enabled.")
+# except ImportError:
+#     _shap_available = False
+#     print("SHAP not installed — explanations will use feature importance fallback.")
+
 
 # ── Load Random Forest Model ──────────────────────────────────────────────────
 try:
@@ -70,6 +265,30 @@ def get_latest_telemetry(student_id: str) -> dict:
         return response.json()
     except Exception:
         return {}
+
+# async def get_failure_count(student_id: str) -> int:
+#     doc = await db.failure_tracker.find_one({"student_id": student_id})
+#     return doc.get("failure_count", 0) if doc else 0
+
+# async def increment_failure(student_id: str):
+#     await db.failure_tracker.update_one(
+#         {"student_id": student_id},
+#         {
+#             "$inc": {"failure_count": 1},
+#             "$set": {"updated_at": datetime.datetime.now(datetime.UTC)}
+#         },
+#         upsert=True
+#     )
+
+# async def reset_failure(student_id: str):
+#     await db.failure_tracker.update_one(
+#         {"student_id": student_id},
+#         {"$set": {
+#             "failure_count": 0,
+#             "updated_at": datetime.datetime.now(datetime.UTC)
+#         }}
+#     )
+
 
 async def get_failure_count(student_id: str) -> int:
     doc = await db.failure_tracker.find_one({"student_id": student_id})
