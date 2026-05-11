@@ -79,3 +79,5 @@ DerivedData/
 .idea/
 *.swp
 *.swo
+"__pycache__/" 
+"*.pyc" 
