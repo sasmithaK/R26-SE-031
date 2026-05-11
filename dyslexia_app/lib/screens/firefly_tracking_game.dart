@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 
 class FireflyTrackingGame extends StatefulWidget {
   const FireflyTrackingGame({super.key});
@@ -17,7 +18,7 @@ class _FireflyTrackingGameState extends State<FireflyTrackingGame>
 
   final Random _random = Random();
   final List<_FireflyItem> _fireflies = [];
-  final List<String> _sequenceLetters = const ['අ', 'ක', 'ග', 'ත', 'ප'];
+  late List<String> _sequenceLetters;
 
   int _nextExpectedIndex = 0;
   int _correctTaps = 0;
@@ -28,6 +29,16 @@ class _FireflyTrackingGameState extends State<FireflyTrackingGame>
   @override
   void initState() {
     super.initState();
+    _sequenceLetters = const ['අ', 'ක', 'ග', 'ත', 'ප']
+        .take(
+          DifficultyProfileService.countForLevel(
+            DifficultyProfileService.cachedStartLevel,
+            3,
+            5,
+          ),
+        )
+        .toList();
+
     _skyController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 18),
@@ -73,7 +84,7 @@ class _FireflyTrackingGameState extends State<FireflyTrackingGame>
     final yPositions = <double>[120, 210, 155, 280, 95];
     final durations = <int>[11, 12, 10, 13, 11];
 
-    for (var i = 0; i < 5; i++) {
+    for (var i = 0; i < _sequenceLetters.length; i++) {
       final controller = AnimationController(
         vsync: this,
         duration: Duration(seconds: durations[i]),

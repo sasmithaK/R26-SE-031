@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dyslexia_app/models/comprehension_progress.dart';
+import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 import 'package:dyslexia_app/services/comprehension_service.dart';
 import 'package:dyslexia_app/services/task_score_service.dart';
 
@@ -71,7 +72,7 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
   };
 
   late String studentId;
-  int currentLevel = 1;
+  int currentLevel = DifficultyProfileService.cachedStartLevel;
   int currentSentenceIndex = 0;
   late String currentSentence;
   late List<String> words;
@@ -116,7 +117,7 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
     final progress = await ComprehensionService.getComprehensionProgress(studentId);
     if (progress != null) {
       setState(() {
-        currentLevel = progress.highestLevelReached;
+        currentLevel = currentLevel > progress.highestLevelReached ? currentLevel : progress.highestLevelReached;
       });
     }
   }
@@ -378,38 +379,41 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
     final sentenceData = sentencesByLevel[currentLevel]![currentSentenceIndex];
     final images = sentenceData['images'] as List<String>;
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Icon(Icons.image, size: 64, color: Colors.orange),
-        const SizedBox(height: 32),
-        const Text(
-          'කුමන පින්තූරයද එය නිරූපණ කරයි?',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 32),
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(images.length, (index) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: index == images.length - 1 ? 0 : 16),
-              child: GestureDetector(
-                onTap: selectedImageIndex == null
-                    ? () => _selectImage(index)
-                    : null,
-                child: Image.asset(
-                  images[index],
-                  width: double.infinity,
-                  height: 180,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 48),
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.image, size: 64, color: Colors.orange),
+          const SizedBox(height: 32),
+          const Text(
+            'කුමන පින්තූරයද එය නිරූපණ කරයි?',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(images.length, (index) {
+              return Padding(
+                padding: EdgeInsets.only(bottom: index == images.length - 1 ? 0 : 16),
+                child: GestureDetector(
+                  onTap: selectedImageIndex == null
+                      ? () => _selectImage(index)
+                      : null,
+                  child: Image.asset(
+                    images[index],
+                    width: double.infinity,
+                    height: 220,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 48),
+                  ),
                 ),
-              ),
-            );
-          }),
-        ),
-      ],
+              );
+            }),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 }

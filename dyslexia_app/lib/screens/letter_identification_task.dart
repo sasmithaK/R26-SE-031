@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'dart:js_interop';
-import 'package:web/web.dart' as web;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 import '../utils/sinhala_letter_audio.dart'
   if (dart.library.html) '../utils/sinhala_letter_audio_web.dart';
-import '../models/letter_identification_score.dart';
+import '../utils/sinhala_letter_web_speech.dart'
+  if (dart.library.html) '../utils/sinhala_letter_web_speech_web.dart';
+import 'package:dyslexia_app/models/letter_identification_score.dart';
 import '../models/letter_picture_task.dart';
 import '../services/letter_identification_service.dart';
 import '../services/task_score_service.dart';
@@ -186,6 +187,10 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
   @override
   void initState() {
     super.initState();
+    currentTaskIndex = DifficultyProfileService.startTaskIndexForLevel(
+      DifficultyProfileService.cachedStartLevel,
+      tasks.length,
+    );
     visualDiscriminationStartTime = DateTime.now();
     _loadStudentId();
   }
@@ -199,11 +204,11 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
 
   Future<void> speakLetter(String letter) async {
     try {
-      // Check if we're on web platform
-      if (identical(0, 0.0)) { // This is a trick to detect if running on web
+      // Prefer native TTS, then fall back to the platform-specific helpers.
+      if (identical(0, 0.0)) {
         final played = await playSinhalaLetterAudio(letter);
         if (!played) {
-          _speakOnWeb(letter);
+          await speakSinhalaLetterOnWeb(letter);
         }
       } else {
         // Native platform
@@ -217,55 +222,8 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
       print('Error speaking letter: $e');
       final played = await playSinhalaLetterAudio(letter);
       if (!played) {
-        _speakOnWeb(letter); // Try web API as fallback
+        await speakSinhalaLetterOnWeb(letter);
       }
-    }
-  }
-
-  Future<void> _speakOnWeb(String letter) async {
-    try {
-      final speechSynthesis = web.window.speechSynthesis;
-      
-      // Cancel any ongoing speech
-      speechSynthesis.cancel();
-      
-      // Log available voices count
-      final voicesCount = speechSynthesis.getVoices().length;
-      print('Available voices: $voicesCount');
-      
-      // Speak the actual Sinhala letter and prefer a Sinhala voice if the
-      // browser has one available.
-      if (voicesCount == 0) {
-        await Future.delayed(const Duration(milliseconds: 300));
-      }
-
-      // Create utterance
-      final utterance = web.SpeechSynthesisUtterance(letter);
-      
-      // Set properties for optimal audio output
-      utterance.lang = 'si-LK';
-      utterance.rate = 1.0; // Normal speed
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0; // Maximum volume
-      
-      // Add event listeners for debugging
-      utterance.onstart = ((web.SpeechSynthesisEvent event) {
-        print('Speech started');
-      }).toJS;
-      
-      utterance.onerror = ((web.SpeechSynthesisErrorEvent event) {
-        print('Speech error: ${event.error}');
-      }).toJS;
-      
-      utterance.onend = ((web.SpeechSynthesisEvent event) {
-        print('Speech ended');
-      }).toJS;
-      
-      // Speak the text
-      print('Speaking Sinhala letter: $letter');
-      speechSynthesis.speak(utterance);
-    } catch (e) {
-      print('Web Speech API error: $e');
     }
   }
 
@@ -420,18 +378,6 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
                                         size: 50,
                                         color: currentTask.primaryColor,
                                       ),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4.0),
-                                    child: Text(
-                                      picture.sinhalaWord,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: currentTask.primaryColor,
-                                      ),
-                                      textAlign: TextAlign.center,
                                     ),
                                   ),
                                 ],

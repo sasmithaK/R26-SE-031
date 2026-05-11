@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +24,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
 
   final Random _random = Random();
   final GlobalKey _trainKey = GlobalKey();
+  final ScrollController _trainScrollController = ScrollController();
 
   // Rounds will be loaded from MongoDB
   late List<_TrainRound> _rounds;
@@ -77,9 +79,10 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
       
       if (tasks == null || tasks.isEmpty) {
         setState(() {
+          _loadError = null;
           _isLoading = false;
-          _loadError = 'Could not load syllable rounds.';
-          // Fallback to default rounds if loading fails
+          // Fallback to default rounds so the game still opens when the
+          // backend has no seeded syllable_train tasks.
           _initializeDefaultRounds();
         });
         return;
@@ -118,7 +121,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
           _prepareRound();
         } else {
           _isLoading = false;
-          _loadError = 'No valid syllable rounds found.';
+          _loadError = null;
           _initializeDefaultRounds();
         }
       });
@@ -126,7 +129,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
       print('Error loading syllable rounds: $e');
       setState(() {
         _isLoading = false;
-        _loadError = 'Error loading syllable rounds: $e';
+        _loadError = null;
         _initializeDefaultRounds();
       });
     }
@@ -184,6 +187,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
     _trainBobController.dispose();
     _trainSuccessController.dispose();
     _cloudController.dispose();
+    _trainScrollController.dispose();
     super.dispose();
   }
 
@@ -194,6 +198,11 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
       ..clear()
       ..addAll(shuffled);
     _isCelebrating = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_trainScrollController.hasClients) {
+        _trainScrollController.jumpTo(0);
+      }
+    });
     setState(() {});
   }
 
@@ -483,6 +492,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
                         onSwap: _swapCarriages,
                         isLocked: _isCelebrating,
                         trainMotion: _trainSuccessAnimation,
+                        scrollController: _trainScrollController,
                       ),
                     ],
                   ),
@@ -514,7 +524,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
                             const Icon(Icons.train_rounded, color: Colors.red),
                             const SizedBox(width: 8),
                             Text(
-                              'කෝච්චිය එක දිගට ඇදලා හරි පිළිවෙලට තබන්න',
+                              'අකුර ටික ටික පීඩනයෙන් අල්ලලා ඉදිරියට හෝ පසුපසට ඇදලා තබන්න',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w900,
@@ -574,6 +584,7 @@ class _TrainTrack extends StatelessWidget {
     required this.onSwap,
     required this.isLocked,
     required this.trainMotion,
+    required this.scrollController,
   });
 
   final GlobalKey trainKey;
@@ -582,6 +593,7 @@ class _TrainTrack extends StatelessWidget {
   final void Function(int fromIndex, int toIndex) onSwap;
   final bool isLocked;
   final Animation<double> trainMotion;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -606,23 +618,34 @@ class _TrainTrack extends StatelessWidget {
               left: 118,
               right: 0,
               top: 22,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: List.generate(carriages.length, (index) {
-                    final syllable = carriages[index];
-                    final color = colors[index % colors.length];
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: _DraggableCarriage(
-                        index: index,
-                        syllable: syllable,
-                        color: color,
-                        isLocked: isLocked,
-                        onSwap: onSwap,
-                      ),
-                    );
-                  }),
+              child: ScrollConfiguration(
+                behavior: const MaterialScrollBehavior().copyWith(
+                  dragDevices: {
+                    PointerDeviceKind.touch,
+                    PointerDeviceKind.mouse,
+                    PointerDeviceKind.trackpad,
+                  },
+                ),
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: List.generate(carriages.length, (index) {
+                      final syllable = carriages[index];
+                      final color = colors[index % colors.length];
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: _DraggableCarriage(
+                          index: index,
+                          syllable: syllable,
+                          color: color,
+                          isLocked: isLocked,
+                          onSwap: onSwap,
+                        ),
+                      );
+                    }),
+                  ),
                 ),
               ),
             ),
@@ -673,8 +696,10 @@ class _DraggableCarriage extends StatelessWidget {
       onAccept: (fromIndex) => onSwap(fromIndex, index),
       builder: (context, candidateData, rejectedData) {
         final hovered = candidateData.isNotEmpty;
-        return Draggable<int>(
+        return LongPressDraggable<int>(
           data: index,
+          delay: const Duration(milliseconds: 140),
+          maxSimultaneousDrags: isLocked ? 0 : 1,
           feedback: Material(
             color: Colors.transparent,
             child: Transform.scale(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/difficulty_profile_service.dart';
 
 import '../services/content_service.dart';
 import '../utils/questionnaire_db.dart';
@@ -99,14 +100,14 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       List<String> partTwo = [];
       if (parts.length > 1 && parts[1] is Map) {
         final part2Data = (parts[1] as Map)['questions'] as List? ?? [];
-        partTwo = (part2Data as List).map((q) => q['question'].toString()).toList();
+        partTwo = part2Data.map((q) => q['question'].toString()).toList();
       }
 
       // Parse Part 3 questions (extract just the question text)
       List<String> partThree = [];
       if (parts.length > 2 && parts[2] is Map) {
         final part3Data = (parts[2] as Map)['questions'] as List? ?? [];
-        partThree = (part3Data as List).map((q) => q['question'].toString()).toList();
+        partThree = part3Data.map((q) => q['question'].toString()).toList();
       }
 
       setState(() {
@@ -234,15 +235,17 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
         const SnackBar(content: Text('ප්රශ්නාවලි දත්ත සාර්ථකව සුරකිණි.')),
       );
 
-      // Compute tier from score: Tier 1 = low, Tier 2 = medium, Tier 3 = high
+      // Compute tier from score: high score = Tier 1 (easy), low score = Tier 3 (hard)
       String tier;
       if (totalScore == 0) {
-        tier = 'Tier 1';
+        tier = 'Tier 3';  // Low score → hard games (long sentences)
       } else if (totalScore <= 75) {
         tier = 'Tier 2';
       } else {
-        tier = 'Tier 3';
+        tier = 'Tier 1';  // High score → easy games (small sentences)
       }
+
+      await DifficultyProfileService.saveAssignedTier(tier);
 
       Navigator.pushNamed(context, '/student_preferences', arguments: {
         'studentName': _studentNameController.text.trim(),

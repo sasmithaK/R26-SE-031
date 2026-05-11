@@ -1,23 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'services/difficulty_profile_service.dart';
 
 import 'screens/login_signup_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/questionnaire_screen.dart';
 import 'screens/questionnaire_report_screen.dart';
 import 'screens/student_preferences_screen.dart';
+import 'screens/wcag_assessment_flow.dart';
 import 'screens/student_dashboard.dart';
 import 'screens/letter_identification_task.dart';
 import 'screens/word_matching_task.dart';
 import 'screens/draw_a_man_test.dart';
 import 'screens/story_sequencing_game.dart';
+import 'screens/story_reading_game.dart';
 import 'screens/drawing_interpretation_game.dart';
 import 'screens/syllable_train_game.dart';
 import 'screens/firefly_tracking_game.dart';
 import 'screens/reading_fluency_task.dart';
 import 'screens/reading_comprehension_task.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await DifficultyProfileService.restoreAssignedTier();
   runApp(const DyslexiaApp());
 }
 
@@ -44,9 +49,11 @@ class DyslexiaApp extends StatelessWidget {
         '/questionnaire': (context) => const QuestionnaireScreen(),
         '/questionnaire_reports': (context) => const QuestionnaireReportScreen(),
         '/student_preferences': (context) => const StudentPreferencesScreen(),
+        '/wcag_assessment': (context) => const WCAGAssessmentFlow(),
         '/student_dashboard': (context) => const StudentDashboard(),
         '/letter_id': (context) => const LetterIdentificationTask(),
         '/word_matching': (context) => const WordMatchingTask(),
+        '/story_reading': (context) => const StoryReadingGame(),
         '/draw_a_man': (context) => const DrawAManTest(),
         '/story_sequencing': (context) => const StorySequencingGame(),
         '/drawing_interpretation': (context) => const DrawingInterpretationGame(),
