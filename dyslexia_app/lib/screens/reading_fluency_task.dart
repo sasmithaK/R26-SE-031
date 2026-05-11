@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dyslexia_app/models/fluency_progress.dart';
+import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 import 'package:dyslexia_app/services/fluency_service.dart';
 import 'package:dyslexia_app/services/task_score_service.dart';
 
@@ -44,7 +45,7 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
   };
 
   // Track current level and sentence
-  int currentLevel = 1;
+  int currentLevel = DifficultyProfileService.cachedStartLevel;
   int currentSentenceIndex = 0;
   late String currentSentence;
   late List<String> words;
@@ -102,6 +103,7 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
       setState(() {
         sessionsCompleted = progress.sessionsCompleted;
         avgWpm = progress.avgWpm;
+        currentLevel = currentLevel > progress.fluencyLevel ? currentLevel : progress.fluencyLevel;
       });
     }
   }

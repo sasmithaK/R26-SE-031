@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 
 class StoryCard {
   final String imagePath;
@@ -35,7 +36,7 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
   }
 
   void initializeGame() {
-    cards = [
+    final allCards = [
       StoryCard(
         imagePath: 'assets/images/BeanSticker.jpg',
         description: 'බිම ගැසීම',
@@ -58,11 +59,26 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
       ),
     ];
 
+    final cardCount = DifficultyProfileService.countForLevel(
+      DifficultyProfileService.cachedStartLevel,
+      2,
+      allCards.length,
+    );
+    cards = allCards.take(cardCount).toList();
+
+    for (var i = 0; i < cards.length; i++) {
+      cards[i] = StoryCard(
+        imagePath: cards[i].imagePath,
+        description: cards[i].description,
+        correctPosition: i,
+      );
+    }
+
     // Shuffle the cards
     cards.shuffle();
 
     // Initialize sequence order as empty
-    sequenceOrder = [null, null, null, null];
+    sequenceOrder = List<StoryCard?>.filled(cards.length, null);
     isCorrect = false;
     showCelebration = false;
   }
@@ -236,7 +252,7 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
               ),
               const SizedBox(height: 16),
 
-              // 4 slots for arrangement
+              // slots for arrangement
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -259,17 +275,19 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         _buildSequenceSlot(0),
-                        _buildSequenceSlot(1),
+                        if (sequenceOrder.length > 1) _buildSequenceSlot(1),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildSequenceSlot(2),
-                        _buildSequenceSlot(3),
-                      ],
-                    ),
+                    if (sequenceOrder.length > 2) ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildSequenceSlot(2),
+                          if (sequenceOrder.length > 3) _buildSequenceSlot(3),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -428,7 +446,7 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: List.generate(
-              4,
+              sequenceOrder.length,
               (index) {
                 Color bgColor = [
                   const Color(0xFFFFE082), // Yellow
