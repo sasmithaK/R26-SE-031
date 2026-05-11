@@ -386,6 +386,7 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
                           );
                         }).toList(),
                       ),
+                      // Show result of phonological task
                       if (phonologicalCorrect != null) ...[
                         const SizedBox(height: 20),
                         AnimatedScale(
