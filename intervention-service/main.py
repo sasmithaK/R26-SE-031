@@ -71,17 +71,41 @@ AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 # Serve cached mp3 files
 app.mount("/api/v1/c4/audio", StaticFiles(directory=str(AUDIO_CACHE_DIR)), name="c4-audio")
 
-def _hash_audio_id(lang: str, text: str, kind: str) -> str:
+def _hash_audio_id(lang: str, text: str, kind: str, slow: bool) -> str:
     h = hashlib.sha256()
-    h.update(f"{lang}|{kind}|{text}".encode("utf-8"))
+    h.update(f"{lang}|{kind}|slow={int(slow)}|{text}".encode("utf-8"))
     return h.hexdigest()[:24]
+
+
+def _is_short_syllable(text: str) -> bool:
+    """Heuristic: treat 1-4 codepoint Sinhala/Tamil chunks as 'short syllable'.
+    These need gTTS slow=True + duplication or they sound near-inaudible.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return False
+    return len(stripped) <= 4
+
+
+def _prepare_tts_text(text: str, kind: str) -> tuple[str, bool]:
+    """Return (text_to_send_to_gtts, slow_flag).
+
+    For very short syllables we flip on gTTS slow mode, which stretches the
+    pronunciation to roughly 2x duration. That alone is long enough to be
+    clearly heard for a single letter/syllable, with no duplication.
+    """
+    text = text.strip()
+    slow = kind in ("syllable", "first_sound") or _is_short_syllable(text)
+    return text, slow
+
 
 def _ensure_gtts_mp3(*, lang: str, text: str, kind: str) -> dict[str, Any]:
     """
     Generates and caches an mp3 file for (lang, text). Returns {audio_id, url}.
     Requires `gTTS` at runtime; if missing, raises a clear error for setup.
     """
-    audio_id = _hash_audio_id(lang, text, kind)
+    tts_text, slow = _prepare_tts_text(text, kind)
+    audio_id = _hash_audio_id(lang, tts_text, kind, slow)
     filename = f"{audio_id}.mp3"
     rel_path = filename
     out_path = AUDIO_CACHE_DIR / filename
@@ -95,11 +119,31 @@ def _ensure_gtts_mp3(*, lang: str, text: str, kind: str) -> dict[str, Any]:
                 detail="gTTS is not installed. Run: pip install gTTS",
             ) from e
 
-        tts = gTTS(text=text, lang=lang)
+        tts = gTTS(text=tts_text, lang=lang, slow=slow)
         tts.save(str(out_path))
 
-    upsert_audio_asset(audio_id=audio_id, lang=lang, text=text, kind=kind, file_rel_path=rel_path)
+    upsert_audio_asset(
+        audio_id=audio_id, lang=lang, text=text, kind=kind, file_rel_path=rel_path
+    )
     return {"audio_id": audio_id, "url": f"/api/v1/c4/audio/{filename}"}
+
+@app.get("/api/v1/c4/tts")
+def c4_tts(text: str, lang: str = "si", kind: str = "ui"):
+    """
+    Convenience endpoint for the Flutter UI: returns a cached gTTS mp3 URL
+    for the given Sinhala/Tamil text. Cached on disk so repeats are instant.
+
+    Example:
+        GET /api/v1/c4/tts?text=සෞඛ්‍යයට&lang=si
+        -> {"audio_id": "...", "url": "/api/v1/c4/audio/<sha>.mp3"}
+    """
+    text = (text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required")
+    if lang not in ("si", "ta", "en", "hi"):
+        raise HTTPException(status_code=400, detail="unsupported lang")
+    return _ensure_gtts_mp3(lang=lang, text=text, kind=kind)
+
 
 def _simple_tokenize(text: str) -> list[str]:
     # Basic whitespace tokenizer suitable for viva demo.
