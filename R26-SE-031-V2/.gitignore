@@ -1,0 +1,53 @@
+# Environment
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# ML model artifacts (large binary files — store in cloud / DVC)
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+*/ml/*.pkl
+*/ml/*.joblib
+
+# SQLite databases
+*.db
+*.sqlite3
+*/db/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Docker
+*.dockerignore

@@ -20,6 +20,9 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
       TextEditingController();
   final TextEditingController _signupStudentNameController =
       TextEditingController();
+    final TextEditingController _signupStudentAgeController = TextEditingController();
+    final TextEditingController _signupStudentGradeController = TextEditingController();
+    String _signupCondition = 'None';
   final TextEditingController _signupEmailController = TextEditingController();
   final TextEditingController _signupPasswordController =
       TextEditingController();
@@ -37,6 +40,8 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
     _loginPasswordController.dispose();
     _signupParentNameController.dispose();
     _signupStudentNameController.dispose();
+    _signupStudentAgeController.dispose();
+    _signupStudentGradeController.dispose();
     _signupEmailController.dispose();
     _signupPasswordController.dispose();
     super.dispose();
@@ -56,6 +61,9 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
       '/questionnaire',
       arguments: {
         'studentName': _signupStudentNameController.text.trim(),
+        'studentAge': _signupStudentAgeController.text.trim(),
+        'studentGrade': _signupStudentGradeController.text.trim(),
+        'studentCondition': _signupCondition,
       },
     );
   }
@@ -260,6 +268,64 @@ class _LoginSignupScreenState extends State<LoginSignupScreen>
                 }
                 return null;
               },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _signupStudentAgeController,
+              decoration: InputDecoration(
+                labelText: 'Student Age',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon: const Icon(Icons.cake),
+              ),
+              keyboardType: TextInputType.number,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) {
+                  return 'Enter student age';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _signupStudentGradeController,
+              decoration: InputDecoration(
+                labelText: 'Student Grade',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon: const Icon(Icons.class_),
+              ),
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) {
+                  return 'Enter student grade';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _signupCondition,
+              decoration: InputDecoration(
+                labelText: 'Condition (if any)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              items: const [
+                DropdownMenuItem(value: 'None', child: Text('None')),
+                DropdownMenuItem(value: 'ADHD', child: Text('ADHD')),
+                DropdownMenuItem(value: 'Dyslexia', child: Text('Dyslexia')),
+                DropdownMenuItem(value: 'Other', child: Text('Other')),
+              ],
+              onChanged: (v) => setState(() => _signupCondition = v ?? 'None'),
             ),
             const SizedBox(height: 16),
             TextFormField(

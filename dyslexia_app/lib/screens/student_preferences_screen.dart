@@ -30,10 +30,16 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
   Color get _previewAccent => _colorOptions[_selectedColorIndex].accent;
 
   void _saveAndContinue() {
-    Navigator.pushNamed(context, '/student_dashboard', arguments: {
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    Navigator.pushNamed(context, '/wcag_assessment', arguments: {
       'preferredColorIndex': _selectedColorIndex,
       'preferredFontSize': _fontSize,
-      'studentName': (ModalRoute.of(context)?.settings.arguments as Map?)?['studentName'] ?? '',
+      'studentName': args != null && args['studentName'] != null ? args['studentName'] as String : '',
+      'studentAge': args != null && args['studentAge'] != null ? args['studentAge'] as String : '',
+      'studentGrade': args != null && args['studentGrade'] != null ? args['studentGrade'] as String : '',
+      'totalScore': args != null && args['totalScore'] != null ? args['totalScore'] as int : 0,
+      'tier': args != null && args['tier'] != null ? args['tier'] as String : 'Tier 1',
+      'isNewStudent': args != null && args['isNewStudent'] == true,
     });
   }
 

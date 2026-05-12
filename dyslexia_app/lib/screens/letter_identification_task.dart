@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'dart:js_interop';
-import 'package:web/web.dart' as web;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 import '../utils/sinhala_letter_audio.dart'
   if (dart.library.html) '../utils/sinhala_letter_audio_web.dart';
+import '../utils/sinhala_letter_web_speech.dart'
+  if (dart.library.html) '../utils/sinhala_letter_web_speech_web.dart';
+import 'package:dyslexia_app/models/letter_identification_score.dart';
+import '../models/letter_picture_task.dart';
+import '../services/letter_identification_service.dart';
+import '../services/task_score_service.dart';
 
 class LetterTask {
   final String targetLetter;
@@ -37,6 +43,7 @@ class LetterIdentificationTask extends StatefulWidget {
 class _LetterIdentificationTaskState extends State<LetterIdentificationTask> with SingleTickerProviderStateMixin {
   final FlutterTts flutterTts = FlutterTts();
 
+  // Existing variables
   final List<LetterTask> tasks = [
     LetterTask(
       targetLetter: 'අ',
@@ -84,14 +91,80 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
   bool? isCorrect;
   bool showNextLevel = false;
 
+  // NEW: Phonological awareness tracking
+  bool showPhonologicalTask = false;
+  bool? phonologicalCorrect;
+  DateTime? visualDiscriminationStartTime;
+  DateTime? phonologicalAwarenessStartTime;
+  late String studentId;
+  List<LetterIdentificationScore> sessionScores = [];
+  late LetterPictureTask currentPictureTask;
+  late List<PictureOption> randomizedPictures;
+
   void checkAnswer(String selectedLetter) {
     setState(() {
       isCorrect = selectedLetter == tasks[currentTaskIndex].targetLetter;
       if (isCorrect == true) {
-        showNextLevel = true;
+        // Start phonological awareness task after visual success
+        showPhonologicalTask = true;
+        phonologicalAwarenessStartTime = DateTime.now();
+        
+        // Get picture task for this letter
+        currentPictureTask = LetterPictureDatabase.getTaskForLetter(tasks[currentTaskIndex].targetLetter) 
+          ?? LetterPictureDatabase.tasks.first;
+        randomizedPictures = currentPictureTask.getRandomizedPictures();
+        
+        // Speak the letter sound for phonological task
+        Future.delayed(const Duration(milliseconds: 500), () {
+          speakLetter(tasks[currentTaskIndex].targetLetter);
+        });
       } else {
         showNextLevel = false;
       }
+    });
+  }
+
+  /// Handle phonological awareness picture selection
+  Future<void> checkPhonologicalAnswer(PictureOption selectedPicture) async {
+    final phonologicalTime = DateTime.now().difference(phonologicalAwarenessStartTime!).inSeconds;
+    final visualTime = visualDiscriminationStartTime!.difference(DateTime.now()).inSeconds.abs();
+    
+    setState(() {
+      phonologicalCorrect = selectedPicture.isCorrect;
+    });
+    
+    // Save score
+    final score = LetterIdentificationScore(
+      studentId: studentId,
+      letter: tasks[currentTaskIndex].targetLetter,
+      visualDiscriminationCorrect: true, // We already validated this
+      visualDiscriminationTime: visualTime,
+      phonologicalAwarenessCorrect: phonologicalCorrect!,
+      phonologicalAwarenessTime: phonologicalTime,
+      attemptedAt: DateTime.now(),
+    );
+    
+    sessionScores.add(score);
+    
+    // Save to MongoDB
+    await LetterIdentificationService.saveLetterScore(score);
+
+    // Also record a generic task score
+    TaskScoreService.saveTaskScore(
+      studentId: score.studentId,
+      taskName: 'letter_identification',
+      score: score.isSuccessful ? 1.0 : 0.0,
+      durationSeconds: score.totalTime.toDouble(),
+      metadata: {'letter': score.letter},
+    ).then((ok) {
+      if (ok) print('Task score saved for letter_identification');
+    });
+    
+    // Show result for 1 second then proceed
+    await Future.delayed(const Duration(seconds: 1), () {
+      setState(() {
+        showNextLevel = true;
+      });
     });
   }
 
@@ -105,16 +178,37 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
       }
       isCorrect = null;
       showNextLevel = false;
+      showPhonologicalTask = false;
+      phonologicalCorrect = null;
+      visualDiscriminationStartTime = DateTime.now();
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    currentTaskIndex = DifficultyProfileService.startTaskIndexForLevel(
+      DifficultyProfileService.cachedStartLevel,
+      tasks.length,
+    );
+    visualDiscriminationStartTime = DateTime.now();
+    _loadStudentId();
+  }
+
+  Future<void> _loadStudentId() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      studentId = prefs.getString('student_id') ?? 'student_${DateTime.now().millisecondsSinceEpoch}';
     });
   }
 
   Future<void> speakLetter(String letter) async {
     try {
-      // Check if we're on web platform
-      if (identical(0, 0.0)) { // This is a trick to detect if running on web
+      // Prefer native TTS, then fall back to the platform-specific helpers.
+      if (identical(0, 0.0)) {
         final played = await playSinhalaLetterAudio(letter);
         if (!played) {
-          _speakOnWeb(letter);
+          await speakSinhalaLetterOnWeb(letter);
         }
       } else {
         // Native platform
@@ -128,55 +222,8 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
       print('Error speaking letter: $e');
       final played = await playSinhalaLetterAudio(letter);
       if (!played) {
-        _speakOnWeb(letter); // Try web API as fallback
+        await speakSinhalaLetterOnWeb(letter);
       }
-    }
-  }
-
-  Future<void> _speakOnWeb(String letter) async {
-    try {
-      final speechSynthesis = web.window.speechSynthesis;
-      
-      // Cancel any ongoing speech
-      speechSynthesis.cancel();
-      
-      // Log available voices count
-      final voicesCount = speechSynthesis.getVoices().length;
-      print('Available voices: $voicesCount');
-      
-      // Speak the actual Sinhala letter and prefer a Sinhala voice if the
-      // browser has one available.
-      if (voicesCount == 0) {
-        await Future.delayed(const Duration(milliseconds: 300));
-      }
-
-      // Create utterance
-      final utterance = web.SpeechSynthesisUtterance(letter);
-      
-      // Set properties for optimal audio output
-      utterance.lang = 'si-LK';
-      utterance.rate = 1.0; // Normal speed
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0; // Maximum volume
-      
-      // Add event listeners for debugging
-      utterance.onstart = ((web.SpeechSynthesisEvent event) {
-        print('Speech started');
-      }).toJS;
-      
-      utterance.onerror = ((web.SpeechSynthesisErrorEvent event) {
-        print('Speech error: ${event.error}');
-      }).toJS;
-      
-      utterance.onend = ((web.SpeechSynthesisEvent event) {
-        print('Speech ended');
-      }).toJS;
-      
-      // Speak the text
-      print('Speaking Sinhala letter: $letter');
-      speechSynthesis.speak(utterance);
-    } catch (e) {
-      print('Web Speech API error: $e');
     }
   }
 
@@ -263,88 +310,194 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
                       ),
                     ),
                     const SizedBox(height: 25),
-                    if (isCorrect != null)
-                      AnimatedScale(
-                        scale: isCorrect! ? 1.1 : 1.0,
-                        duration: const Duration(milliseconds: 300),
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 20.0),
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    isCorrect! ? Icons.star_rounded : Icons.close_rounded,
-                                    color: isCorrect! ? Colors.orange : Colors.red,
-                                    size: 40,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    isCorrect! ? 'නියමයි!' : 'නැවත උත්සාහ කරන්න',
-                                    style: TextStyle(
-                                      fontSize: 22, 
-                                      fontWeight: FontWeight.w900,
-                                      color: isCorrect! ? Colors.orange : Colors.red,
-                                    ),
+                    
+                    // Show phonological awareness task if visual discrimination was correct
+                    if (showPhonologicalTask) ...[
+                      Text(
+                        'මෙම ශබ්දයෙන් ආරම්භ වන පින්තූරය තෝරන්න',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: currentTask.primaryColor,
+                          shadows: const [
+                            Shadow(color: Colors.white, blurRadius: 5, offset: Offset(2, 2))
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 15),
+                      ElevatedButton.icon(
+                        onPressed: () => speakLetter(currentTask.targetLetter),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: currentTask.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          elevation: 6,
+                        ),
+                        icon: const Icon(Icons.volume_up_rounded, size: 30),
+                        label: const Text(
+                          'සවන් දෙන්න',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Wrap(
+                        spacing: 15,
+                        runSpacing: 15,
+                        alignment: WrapAlignment.center,
+                        children: randomizedPictures.map((picture) {
+                          return GestureDetector(
+                            onTap: () => checkPhonologicalAnswer(picture),
+                            child: Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: currentTask.primaryColor.withOpacity(0.5), width: 5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: currentTask.primaryColor.withOpacity(0.3),
+                                    offset: const Offset(0, 6),
+                                    blurRadius: 0,
                                   )
                                 ],
                               ),
-                              if (showNextLevel) ...[
-                                const SizedBox(height: 15),
-                                ElevatedButton.icon(
-                                  onPressed: nextTask,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: currentTask.primaryColor,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: Image.asset(
+                                      picture.imagePath,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (context, error, stackTrace) => Icon(
+                                        Icons.image,
+                                        size: 50,
+                                        color: currentTask.primaryColor,
+                                      ),
                                     ),
-                                    elevation: 5,
                                   ),
-                                  icon: const Icon(Icons.arrow_forward_rounded, size: 24),
-                                  label: const Text('ඊළඟ මට්ටම', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      // Show result of phonological task
+                      if (phonologicalCorrect != null) ...[
+                        const SizedBox(height: 20),
+                        AnimatedScale(
+                          scale: phonologicalCorrect! ? 1.1 : 1.0,
+                          duration: const Duration(milliseconds: 300),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                phonologicalCorrect! ? Icons.star_rounded : Icons.close_rounded,
+                                color: phonologicalCorrect! ? Colors.orange : Colors.red,
+                                size: 40,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                phonologicalCorrect! ? 'නියමයි!' : 'නැවත උත්සාහ කරන්න',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: phonologicalCorrect! ? Colors.orange : Colors.red,
                                 ),
-                              ]
+                              )
                             ],
                           ),
                         ),
-                      ),
-                    Wrap(
-                      spacing: 15,
-                      runSpacing: 15,
-                      alignment: WrapAlignment.center,
-                      children: currentTask.options.map((letter) {
-                        return GestureDetector(
-                          onTap: () {
-                            checkAnswer(letter);
-                          },
-                          child: Container(
-                            width: 90,
-                            height: 90,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(25),
-                              border: Border.all(color: currentTask.primaryColor.withOpacity(0.5), width: 5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: currentTask.primaryColor.withOpacity(0.3),
-                                  offset: const Offset(0, 6),
-                                  blurRadius: 0,
-                                )
+                        if (showNextLevel) ...[
+                          const SizedBox(height: 15),
+                          ElevatedButton.icon(
+                            onPressed: nextTask,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: currentTask.primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              elevation: 5,
+                            ),
+                            icon: const Icon(Icons.arrow_forward_rounded, size: 24),
+                            label: const Text('ඊළඟ මට්ටම', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                          ),
+                        ]
+                      ]
+                    ] else ...[
+                      // Show visual discrimination task
+                      if (isCorrect != null)
+                        AnimatedScale(
+                          scale: isCorrect! ? 1.1 : 1.0,
+                          duration: const Duration(milliseconds: 300),
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 20.0),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      isCorrect! ? Icons.star_rounded : Icons.close_rounded,
+                                      color: isCorrect! ? Colors.orange : Colors.red,
+                                      size: 40,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isCorrect! ? 'නියමයි!' : 'නැවත උත්සාහ කරන්න',
+                                      style: TextStyle(
+                                        fontSize: 22, 
+                                        fontWeight: FontWeight.w900,
+                                        color: isCorrect! ? Colors.orange : Colors.red,
+                                      ),
+                                    )
+                                  ],
+                                ),
                               ],
                             ),
-                            child: Center(
-                              child: Text(
-                                letter,
-                                style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Colors.black87),
+                          ),
+                        ),
+                      Wrap(
+                        spacing: 15,
+                        runSpacing: 15,
+                        alignment: WrapAlignment.center,
+                        children: currentTask.options.map((letter) {
+                          return GestureDetector(
+                            onTap: () {
+                              checkAnswer(letter);
+                            },
+                            child: Container(
+                              width: 90,
+                              height: 90,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(color: currentTask.primaryColor.withOpacity(0.5), width: 5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: currentTask.primaryColor.withOpacity(0.3),
+                                    offset: const Offset(0, 6),
+                                    blurRadius: 0,
+                                  )
+                                ],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  letter,
+                                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Colors.black87),
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
                     const SizedBox(height: 28),
                     Align(
                       alignment: Alignment.centerRight,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../services/difficulty_profile_service.dart';
 
+import '../services/content_service.dart';
 import '../utils/questionnaire_db.dart';
 
 class QuestionnaireScreen extends StatefulWidget {
@@ -19,62 +21,110 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
 
   String _respondentRole = 'දෙමාපිය';
   bool _isSaving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      if (args != null && args['studentName'] != null) {
-        _studentNameController.text = args['studentName'] as String;
-      }
-    });
-  }
+  bool _isLoading = true;
+  String? _loadError;
 
   // Part One Scores
   final Map<int, int> _partOneScores = {};
   
-  final List<Map<String, dynamic>> _partOneQuestions = [
-    {'q': 'වම සහ දකුණ වෙන්කර හඳුනා ගැනීමට අපහසු ද?', 'weight': 10},
-    {'q': 'කියවීමේදී ඉක්මනින් තෙහෙට්ටුව දැනෙනවා ද?', 'weight': 10},
-    {'q': 'කියවද්දී සිත වෙනත් දෙයක් වෙත යාම නිතර සිදුවේද?', 'weight': 10},
-    {'q': 'කියවීමේදී වැරදි බොහෝවිට සිදුවේද?', 'weight': 20},
-    {'q': 'අවධානය රඳවා ගැනීමට අපහසු ද?', 'weight': 20},
-    {'q': 'නම් මතක තබා ගැනීමට අපහසු ද?', 'weight': 20},
-    {'q': 'කතා කරන විට වචන නිවැරදිව උච්චාරණයට අපහසු ද?', 'weight': 10},
-    {'q': 'ඔබ දන්නා කෙටි වචනවල අක්ෂර වින්යාසය අමතක වනවා ද?', 'weight': 20},
-    {'q': 'පෙර ලියවී නොදුටු වචනවල අක්ෂර වින්යාසය අපහසු ද?', 'weight': 30},
-    {'q': 'හුරු නැති වචන කියවීමට අපහසු ද?', 'weight': 30},
-    {'q': 'ලියන්න බැරි නමුත් භාවිතා කරන විශාල වචන තේරුම් ගන්නවා ද?', 'weight': 20},
-    {'q': 'කියවිය නොහැකි වචනවලදී නවතිනවා ද?', 'weight': 10},
-    {'q': 'කියවීමේදී ඇස් සම්බන්ධීකරණය අඩු වගේ දැනෙනවා ද?', 'weight': 10},
-    {'q': 'කියවීමේදී වචන හලනවා/අඳුරු/අවධානයට ගන්න අපහසු වගේ පෙනේද?', 'weight': 30},
-  ];
+  // Question data - will be loaded from MongoDB
+  late List<Map<String, dynamic>> _partOneQuestions;
+  late List<String> _partTwoQuestions;
+  late List<String> _partThreeQuestions;
 
   // Part Two answers (boolean) - Reading Behaviors
   final Map<int, bool?> _partTwoAnswers = {};
-  
-  final List<String> _partTwoQuestions = [
-'දරුවා කියවීම සම්බන්ධ ක්‍රියාකාරකම්වලින් වැළකී සිටීමට උත්සාහ කරනවාද?',
-'දරුවා තම පන්තියේ අනෙකුත් දරුවන්ට වඩා මන්දගාමීව කියවනවාද?',
-'දරුවා කියවීමේදී වචන මඟහැර යනවාද?',
-'දරුවා කියවීමේදී තමන් කියවමින් සිටින ස්ථානය අහිමි කරගන්නවාද?',
-'දරුවා වචනය සම්පූර්ණයෙන් කියවීම වෙනුවට අනුමාන කරමින් කියවීමට උත්සාහ කරනවාද?',
-'දරුවා නව හෝ නොහුරු වචන කියවීමට අපහසුතාවයක් දක්වනවාද?',
-'දරුවා වාක්‍යයක් තේරුම් ගැනීම සඳහා නැවත නැවත කියවීමට අවශ්‍ය වනවාද?',
-'දරුවා ටික වේලාවක් කියවීමෙන් පසු ඉක්මනින් වෙහෙසට පත්වනවාද?'
-  ];
 
   // Part Three answers (boolean) - Academic Classroom Observation
   final Map<int, bool?> _partThreeAnswers = {};
-  
-  final List<String> _partThreeQuestions = [
-    'ලිඛිතව ලබාදෙන තොරතුරු වලට වඩා කථනය මඟින් ලබාදෙන තොරතුරු දරුවාට වඩා හොඳින් අවබෝධ කරගත හැකිද?',
-'දරුවා කථන ක්‍රියාකාරකම්වල හොඳින් සහභාගී වන නමුත් ලිඛිත කාර්යයන්හි අපහසුතා පෙන්වනවාද?',
-'කියවීම සම්බන්ධ කාර්යයන් සම්පූර්ණ කිරීමට දරුවා අනෙකුත් දරුවන්ට වඩා වැඩි කාලයක් ගන්නවාද?',
-'දරුවා ශබ්ද නගා කියවීමෙන් වැළකී සිටීමට උත්සාහ කරනවාද?',
-'කියවීම හෝ ලිවීම සම්බන්ධ අධ්‍යයන ක්‍රියාකාරකම්වලදී දරුවා කලකිරීම, ආතතිය හෝ අසහනය පෙන්වනවාද?',
-  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuestionnaireData();
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['studentName'] != null) {
+        _studentNameController.text = args['studentName'] as String;
+        if (args['studentAge'] != null) {
+          _studentAgeController.text = args['studentAge'] as String;
+        }
+        if (args['studentGrade'] != null) {
+          _studentGradeController.text = args['studentGrade'] as String;
+        }
+      }
+    });
+  }
+
+  /// Load questionnaire data from MongoDB via API
+  Future<void> _loadQuestionnaireData() async {
+    try {
+      final questionnaire = await ContentService.getQuestionnaire('dyslexia_screening');
+      
+      if (questionnaire == null) {
+        setState(() {
+          _isLoading = false;
+          _loadError = 'Could not load questionnaire data. Please check connection and try again.';
+        });
+        return;
+      }
+
+      if (questionnaire.containsKey('error')) {
+        setState(() {
+          _isLoading = false;
+          _loadError = questionnaire['error'] as String;
+        });
+        return;
+      }
+
+      // Extract data from the questionnaire response
+      final parts = questionnaire['parts'] as List? ?? [];
+      
+      if (parts.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _loadError = 'Invalid questionnaire format';
+        });
+        return;
+      }
+
+      // Parse Part 1 questions
+      List<Map<String, dynamic>> partOne = [];
+      if (parts.isNotEmpty && parts[0] is Map) {
+        final part1Data = (parts[0] as Map)['questions'] as List? ?? [];
+        partOne = part1Data.cast<Map<String, dynamic>>();
+      }
+
+      // Parse Part 2 questions (extract just the question text)
+      List<String> partTwo = [];
+      if (parts.length > 1 && parts[1] is Map) {
+        final part2Data = (parts[1] as Map)['questions'] as List? ?? [];
+        partTwo = part2Data.map((q) => q['question'].toString()).toList();
+      }
+
+      // Parse Part 3 questions (extract just the question text)
+      List<String> partThree = [];
+      if (parts.length > 2 && parts[2] is Map) {
+        final part3Data = (parts[2] as Map)['questions'] as List? ?? [];
+        partThree = part3Data.map((q) => q['question'].toString()).toList();
+      }
+
+      setState(() {
+        _partOneQuestions = partOne;
+        _partTwoQuestions = partTwo;
+        _partThreeQuestions = partThree;
+        _isLoading = false;
+        _loadError = null;
+      });
+    } catch (e) {
+      print('Error loading questionnaire: $e');
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Error loading questionnaire: $e';
+      });
+    }
+  }
 
   int get totalScore {
     int score = 0;
@@ -185,8 +235,25 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
         const SnackBar(content: Text('ප්රශ්නාවලි දත්ත සාර්ථකව සුරකිණි.')),
       );
 
+      // Compute tier from score: high score = Tier 1 (easy), low score = Tier 3 (hard)
+      String tier;
+      if (totalScore == 0) {
+        tier = 'Tier 3';  // Low score → hard games (long sentences)
+      } else if (totalScore <= 75) {
+        tier = 'Tier 2';
+      } else {
+        tier = 'Tier 1';  // High score → easy games (small sentences)
+      }
+
+      await DifficultyProfileService.saveAssignedTier(tier);
+
       Navigator.pushNamed(context, '/student_preferences', arguments: {
         'studentName': _studentNameController.text.trim(),
+        'studentAge': _studentAgeController.text.trim(),
+        'studentGrade': _studentGradeController.text.trim(),
+        'totalScore': totalScore,
+        'tier': tier,
+        'isNewStudent': true,
       });
     } catch (e) {
       if (!mounted) {
@@ -219,11 +286,37 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _loadError != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text('දෝෂ: $_loadError',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16, color: Colors.red)),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _isLoading = true;
+                            _loadError = null;
+                          });
+                          _loadQuestionnaireData();
+                        },
+                        child: const Text('නැවත උත්සාහ කරන්න'),
+                      ),
+                    ],
+                  ),
+                )
+              : Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16.0),
+                    children: [
             _buildSectionHeader('ගුරු/දෙමාපිය තොරතුරු'),
             DropdownButtonFormField<String>(
               value: _respondentRole,
@@ -381,9 +474,9 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
               child: const Text('ප්රගති වාර්තා පමණක් බලන්න'),
             ),
             const SizedBox(height: 32),
-          ],
-        ),
-      ),
+                    ],
+                  ),
+                ),
     );
   }
 
@@ -402,6 +495,10 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
   }
 
   Widget _buildPartOneQuestion(int index, Map<String, dynamic> q) {
+    // Handle both old format (q key) and new format (question key from MongoDB)
+    final question = q['question'] ?? q['q'] ?? '';
+    final weight = q['weight'] ?? 0;
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Card(
@@ -413,7 +510,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${index + 1}. ${q['q']} [${q['weight']}]',
+                '${index + 1}. $question [$weight]',
                 style: const TextStyle(fontSize: 16),
               ),
               Row(
