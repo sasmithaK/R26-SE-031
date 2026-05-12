@@ -3,6 +3,7 @@ import 'package:dyslexia_app/data/reading_passages.dart';
 import 'dart:async';
 import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 import 'package:characters/characters.dart';
+import 'package:dyslexia_app/widgets/skip_button.dart';
 
 class StoryReadingGame extends StatefulWidget {
   final VoidCallback? onComplete;
@@ -35,7 +36,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
   void initState() {
     super.initState();
     currentPassageIndex = DifficultyProfileService.startIndexForLevel(
-      DifficultyProfileService.cachedStartLevel,
+      DifficultyProfileService.cachedStartingGameLevel,
       grade1Passages.length,
     );
     _highlightController = AnimationController(
@@ -334,6 +335,10 @@ class _StoryReadingGameState extends State<StoryReadingGame>
       ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        floatingActionButton: SkipButton(
+          taskName: 'story_reading',
+          onSkipped: _moveToNextSentence,
+        ),
         body: SafeArea(
           child: Column(
             children: [

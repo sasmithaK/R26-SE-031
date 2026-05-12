@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dyslexia_app/widgets/skip_button.dart';
 
 class DrawingInterpretationGame extends StatefulWidget {
   const DrawingInterpretationGame({super.key});
@@ -122,6 +123,9 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
           backgroundColor: Colors.teal,
           foregroundColor: Colors.white,
           elevation: 0,
+          actions: [
+            SkipButton(taskName: 'drawing_interpretation', onSkipped: _nextSentence),
+          ],
         ),
         body: Container(
           decoration: BoxDecoration(

@@ -3,6 +3,7 @@ import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dyslexia_app/widgets/skip_button.dart';
 
 import '../services/content_service.dart';
 import '../services/task_score_service.dart';
@@ -305,6 +306,17 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
     );
   }
 
+  void _skipRound() {
+    if (_currentRoundIndex < _rounds.length - 1) {
+      setState(() {
+        _currentRoundIndex++;
+      });
+      _prepareRound();
+    } else {
+      _showFinishDialog();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Show loading state while data is being fetched
@@ -362,6 +374,9 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
         backgroundColor: Colors.red.shade400,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          SkipButton(taskName: 'syllable_train', onSkipped: _skipRound),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(

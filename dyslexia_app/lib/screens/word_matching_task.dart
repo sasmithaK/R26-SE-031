@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dyslexia_app/widgets/skip_button.dart';
 
 class WordMatchingTask extends StatefulWidget {
   final VoidCallback? onComplete;
@@ -21,6 +22,14 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
   late Animation<double> _animation;
   
   int selectedIndex = -1;
+
+  void _skipAndContinue() {
+    if (widget.onComplete != null) {
+      widget.onComplete!();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
 
   @override
   void initState() {
@@ -52,21 +61,22 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
           ],
         ),
       ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: const Text('වචන ගලපමු 🎯', 
-            style: TextStyle(
-              fontSize: 28, 
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1,
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              title: const Text('වචන ගලපමු 🎯', 
+                style: TextStyle(
+                  fontSize: 28, 
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1,
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              foregroundColor: Colors.green.shade900,
+              centerTitle: true,
+              actions: [SkipButton(taskName: 'word_matching', onSkipped: _skipAndContinue)],
             ),
-          ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          foregroundColor: Colors.green.shade900,
-          centerTitle: true,
-        ),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10.0),

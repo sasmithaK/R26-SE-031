@@ -31,7 +31,8 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
 
   void _saveAndContinue() {
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    Navigator.pushNamed(context, '/wcag_assessment', arguments: {
+    // After preferences, go to the student dashboard with chosen color and font
+    Navigator.pushReplacementNamed(context, '/student_dashboard', arguments: {
       'preferredColorIndex': _selectedColorIndex,
       'preferredFontSize': _fontSize,
       'studentName': args != null && args['studentName'] != null ? args['studentName'] as String : '',

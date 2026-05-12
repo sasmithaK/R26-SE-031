@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:dyslexia_app/widgets/skip_button.dart';
 import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 
 class FireflyTrackingGame extends StatefulWidget {
@@ -32,7 +33,7 @@ class _FireflyTrackingGameState extends State<FireflyTrackingGame>
     _sequenceLetters = const ['අ', 'ක', 'ග', 'ත', 'ප']
         .take(
           DifficultyProfileService.countForLevel(
-            DifficultyProfileService.cachedStartLevel,
+            DifficultyProfileService.cachedStartingGameLevel,
             3,
             5,
           ),
@@ -157,6 +158,11 @@ class _FireflyTrackingGameState extends State<FireflyTrackingGame>
     }
   }
 
+  void _skipCurrentStep() {
+    if (_isComplete) return;
+    _handleTap(_nextExpectedIndex);
+  }
+
   double _fireflyX(double progress, double screenWidth, int index) {
     final delay = index * 0.1;
     final eased = ((progress + delay) % 1.0);
@@ -173,6 +179,7 @@ class _FireflyTrackingGameState extends State<FireflyTrackingGame>
 
     return Scaffold(
       backgroundColor: const Color(0xFF1D2147),
+      floatingActionButton: SkipButton(taskName: 'firefly_tracking', onSkipped: _skipCurrentStep),
       body: SafeArea(
         child: Stack(
           children: [
