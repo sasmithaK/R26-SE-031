@@ -18,7 +18,7 @@ class SimpleDKTMock:
         # If correct and fast, high boost. If correct but slow, medium boost.
         # If incorrect, penalize.
         target = 1.0 if is_correct else 0.0
-        
+            
         # Latency penalty (assume > 3000ms is slow)
         latency_penalty = 0.0
         if is_correct and response_latency > 3000:
