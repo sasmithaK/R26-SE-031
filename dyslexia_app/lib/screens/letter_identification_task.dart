@@ -10,6 +10,7 @@ import 'package:dyslexia_app/models/letter_identification_score.dart';
 import '../models/letter_picture_task.dart';
 import '../services/letter_identification_service.dart';
 import '../services/task_score_service.dart';
+import 'package:dyslexia_app/widgets/skip_button.dart';
 
 class LetterTask {
   final String targetLetter;
@@ -188,7 +189,7 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
   void initState() {
     super.initState();
     currentTaskIndex = DifficultyProfileService.startTaskIndexForLevel(
-      DifficultyProfileService.cachedStartLevel,
+      DifficultyProfileService.cachedStartingGameLevel,
       tasks.length,
     );
     visualDiscriminationStartTime = DateTime.now();
@@ -254,6 +255,9 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
           backgroundColor: Colors.transparent,
           elevation: 0,
           foregroundColor: Colors.black87,
+          actions: [
+            SkipButton(taskName: 'letter_identification', onSkipped: nextTask),
+          ],
         ),
         body: SafeArea(
           child: Stack(

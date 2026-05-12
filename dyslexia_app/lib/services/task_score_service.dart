@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class TaskScoreService {
-  static const String baseUrl = 'http://localhost:5000/api';
+  static const String baseUrl = 'http://localhost:8004/api/v1';
 
   /// Save a generic task score to the backend which records it to MongoDB.
   static Future<bool> saveTaskScore({
@@ -26,7 +26,7 @@ class TaskScoreService {
       };
 
       final response = await http.post(
-        Uri.parse('\$baseUrl/task-score'),
+        Uri.parse('$baseUrl/scores/save'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
       );

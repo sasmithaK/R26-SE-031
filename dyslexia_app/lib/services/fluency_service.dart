@@ -4,7 +4,7 @@ import 'package:dyslexia_app/models/fluency_progress.dart';
 
 class FluencyService {
   // Replace with your backend API base URL
-  static const String baseUrl = 'http://localhost:5000/api';
+  static const String baseUrl = 'http://localhost:8004/api/v1';
 
   /// Save or update fluency progress to MongoDB via backend API.
   static Future<bool> saveFluencyProgress(FluencyProgress progress) async {

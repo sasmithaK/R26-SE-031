@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'services/difficulty_profile_service.dart';
+import 'services/learner_profile_service.dart';
 
 import 'screens/login_signup_screen.dart';
 import 'screens/welcome_screen.dart';
@@ -22,7 +22,7 @@ import 'screens/reading_comprehension_task.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await DifficultyProfileService.restoreAssignedTier();
+  await LearnerProfileService.restoreCurrentProfile();
   runApp(const DyslexiaApp());
 }
 

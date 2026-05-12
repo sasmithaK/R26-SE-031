@@ -1,13 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dyslexia_app/services/assessment_results_service.dart';
+import 'package:dyslexia_app/services/fluency_service.dart';
+import 'package:dyslexia_app/services/letter_identification_service.dart';
 import 'package:dyslexia_app/models/comprehension_progress.dart';
 import 'package:dyslexia_app/services/difficulty_profile_service.dart';
+import 'package:dyslexia_app/services/learner_profile_service.dart';
 import 'package:dyslexia_app/services/comprehension_service.dart';
 import 'package:dyslexia_app/services/task_score_service.dart';
+import 'package:dyslexia_app/widgets/skip_button.dart';
 
 class ReadingComprehensionTask extends StatefulWidget {
-  const ReadingComprehensionTask({super.key});
+  final VoidCallback? onComplete;
+
+  const ReadingComprehensionTask({super.key, this.onComplete});
 
   @override
   State<ReadingComprehensionTask> createState() =>
@@ -16,7 +23,7 @@ class ReadingComprehensionTask extends StatefulWidget {
 
 class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
     with SingleTickerProviderStateMixin {
-  // Sentences by level with corresponding correct picture index (0, 1, or 2)
+  // Sentences grouped by word-count band, keeping the original wording intact.
   final Map<int, List<Map<String, dynamic>>> sentencesByLevel = {
     1: [
       {
@@ -37,31 +44,31 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
     ],
     2: [
       {
-        'sentence': 'ගෙදර ළඟ ගසක් තිබේ.',
-        'correctImageIndex': 0, // house with tree
-        'images': ['assets/images/road.jpg','assets/images/housetree.jpg', 'assets/images/river.jpg'],
-      },
-      {
         'sentence': 'අපි පාසලට යමු.',
-        'correctImageIndex': 0, // going to school
+        'correctImageIndex': 2, // going to school
         'images': ['assets/images/ball.jpg', 'assets/images/play.jpg', 'assets/images/school.jpg'],
       },
       {
         'sentence': 'ගුරුවරයා පොත කියවනවා.',
-        'correctImageIndex': 0, // teacher teaching book
+        'correctImageIndex': 1, // teacher teaching book
         'images': ['assets/images/sing.jpg', 'assets/images/teach.jpg', 'assets/images/batta.jpg'],
+      },
+      {
+        'sentence': 'අම්මා කෑම හදානවා.',
+        'correctImageIndex': 1, // mom cooking
+        'images': ['assets/images/backer.jpg', 'assets/images/macook.jpg', 'assets/images/grandmacook.jpg'],
       },
     ],
     3: [
       {
+        'sentence': 'ගෙදර ළඟ ගසක් තිබේ.',
+        'correctImageIndex': 1, // house with tree
+        'images': ['assets/images/road.jpg','assets/images/housetree.jpg', 'assets/images/river.jpg'],
+      },
+      {
         'sentence': 'ළමයා ගෙදර ගොස් කෑම කෑවා.',
         'correctImageIndex': 0, // child eating at home
         'images': ['assets/images/childcook.jpg', 'assets/images/tv.jpg', 'assets/images/fameat.jpg'],
-      },
-      {
-        'sentence': 'අම්මා කෑම හදානවා.',
-        'correctImageIndex': 0, // mom cooking
-        'images': ['assets/images/backer.jpg', 'assets/images/macook.jpg', 'assets/images/grandmacook.jpg'],
       },
       {
         'sentence': 'ගස් වලින් පලතුරු වැටෙනවා.',
@@ -72,7 +79,8 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
   };
 
   late String studentId;
-  int currentLevel = DifficultyProfileService.cachedStartLevel;
+  int currentLevel = DifficultyProfileService.cachedStartingGameLevel;
+  late int assignedLevel; // Track the starting assigned level to complete assessment after it
   int currentSentenceIndex = 0;
   late String currentSentence;
   late List<String> words;
@@ -88,9 +96,14 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
 
   late AnimationController _pulseController;
 
+  List<Map<String, dynamic>> get _activeSentenceSet {
+    return sentencesByLevel[assignedLevel] ?? sentencesByLevel[currentLevel] ?? sentencesByLevel[1]!;
+  }
+
   @override
   void initState() {
     super.initState();
+    assignedLevel = currentLevel; // Save the assigned starting level
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -123,8 +136,9 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
   }
 
   void _loadNextSentence() {
-    if (currentSentenceIndex < sentencesByLevel[currentLevel]!.length) {
-      final sentenceData = sentencesByLevel[currentLevel]![currentSentenceIndex];
+    final sentenceSet = _activeSentenceSet;
+    if (currentSentenceIndex < sentenceSet.length) {
+      final sentenceData = sentenceSet[currentSentenceIndex];
       setState(() {
         currentSentence = sentenceData['sentence'];
         words = currentSentence.split(' ');
@@ -135,7 +149,7 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
         _startTime = DateTime.now();
       });
     } else {
-      _moveToNextLevel();
+      _showLevelResults();
     }
   }
 
@@ -170,7 +184,7 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
     });
 
     // Check if correct
-    final sentenceData = sentencesByLevel[currentLevel]![currentSentenceIndex];
+    final sentenceData = _activeSentenceSet[currentSentenceIndex];
     final isCorrect = index == sentenceData['correctImageIndex'];
 
     if (isCorrect) {
@@ -181,12 +195,21 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
     // Show result briefly then move to next sentence
     Future.delayed(const Duration(milliseconds: 800), () {
       currentSentenceIndex++;
-      if (currentSentenceIndex < sentencesByLevel[currentLevel]!.length) {
+      if (currentSentenceIndex < _activeSentenceSet.length) {
         _loadNextSentence();
       } else {
         _showLevelResults();
       }
     });
+  }
+
+  void _skipCurrentSentence() {
+    currentSentenceIndex++;
+    if (currentSentenceIndex < _activeSentenceSet.length) {
+      _loadNextSentence();
+    } else {
+      _showLevelResults();
+    }
   }
 
   void _showLevelResults() {
@@ -209,40 +232,24 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
           ],
         ),
         actions: [
-          if (currentLevel < 3)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _moveToNextLevel();
-              },
-              child: const Text('ඊළඟ මට්ටමට යන්න'),
-            ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
+              // After assigned level is completed, save and complete assessment (no more level adjustments)
               _saveProgress();
-              Navigator.pop(context);
+              if (widget.onComplete != null) {
+                widget.onComplete!();
+                return;
+              }
+              if (Navigator.of(context).canPop()) {
+                Navigator.pop(context);
+              }
             },
             child: const Text('අවසන් කරන්න'),
           ),
         ],
       ),
     );
-  }
-
-  void _moveToNextLevel() {
-    if (currentLevel < 3) {
-      setState(() {
-        currentLevel++;
-        currentSentenceIndex = 0;
-        correctAnswers = 0;
-        totalAnswers = 0;
-      });
-      _loadNextSentence();
-    } else {
-      _saveProgress();
-      Navigator.pop(context);
-    }
   }
 
   Future<void> _saveProgress() async {
@@ -276,6 +283,57 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
     ).then((ok) {
       if (ok) print('Task score saved for reading_comprehension');
     });
+
+    // Save assessment after the assigned level is completed
+    await _saveAssessmentSummary();
+  }
+
+  Future<void> _saveAssessmentSummary() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final studentIdValue = prefs.getString('student_id') ?? studentId;
+      final studentName = prefs.getString('student_name') ?? '';
+      final studentAge = prefs.getInt('student_age') ?? 0;
+      final studentGrade = prefs.getString('student_grade') ?? '';
+
+      final fluencyProgress = await FluencyService.getFluencyProgress(studentIdValue);
+      final wordsPerMinute = fluencyProgress?.avgWpm ?? (prefs.getDouble('rf_avg_wpm') ?? 0.0);
+      final wordErrorCount = prefs.getInt('rf_last_error_count') ?? 0;
+
+      final letterScores = await LetterIdentificationService.getScoresForStudent(studentIdValue);
+      final successfulLetterCount = letterScores?.where((s) => s.isSuccessful).length ?? 0;
+      final letterScore = (letterScores == null || letterScores.isEmpty)
+          ? 0
+          : ((successfulLetterCount / letterScores.length) * 3).round().clamp(0, 3);
+
+      final comprehensionScore = correctAnswers.clamp(0, 3);
+      final results = AssessmentResultsService.createAssessmentResults(
+        studentId: studentIdValue,
+        studentName: studentName,
+        studentAge: studentAge,
+        studentGrade: studentGrade,
+        letterScore: letterScore,
+        wordsPerMinute: wordsPerMinute,
+        comprehensionScore: comprehensionScore,
+        wordErrorCount: wordErrorCount,
+      );
+
+      final saved = await AssessmentResultsService.saveAssessmentResults(results);
+      if (saved) {
+        print('Assessment results saved for $studentIdValue');
+
+        final learnerProfile = await LearnerProfileService.buildAndSave(
+          studentId: studentIdValue,
+          letterScore: letterScore,
+          wpmScore: wordsPerMinute,
+          comprehensionScore: comprehensionScore,
+          wordErrorCount: wordErrorCount,
+        );
+        print('✅ Learner profile saved: tier ${learnerProfile.profileTier}, start level ${learnerProfile.startingGameLevel}');
+      }
+    } catch (e) {
+      print('Failed to save assessment summary: $e');
+    }
   }
 
   @override
@@ -292,6 +350,9 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
             ),
           ],
         ),
+        actions: [
+          SkipButton(taskName: 'reading_comprehension', onSkipped: _skipCurrentSentence),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

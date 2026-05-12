@@ -5,10 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dyslexia_app/models/fluency_progress.dart';
 import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 import 'package:dyslexia_app/services/fluency_service.dart';
+import 'package:dyslexia_app/widgets/skip_button.dart';
 import 'package:dyslexia_app/services/task_score_service.dart';
 
 class ReadingFluencyTask extends StatefulWidget {
-  const ReadingFluencyTask({super.key});
+  final VoidCallback? onComplete;
+
+  const ReadingFluencyTask({super.key, this.onComplete});
 
   @override
   State<ReadingFluencyTask> createState() => _ReadingFluencyTaskState();
@@ -45,7 +48,7 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
   };
 
   // Track current level and sentence
-  int currentLevel = DifficultyProfileService.cachedStartLevel;
+  int currentLevel = DifficultyProfileService.cachedStartingGameLevel;
   int currentSentenceIndex = 0;
   late String currentSentence;
   late List<String> words;
@@ -127,7 +130,7 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
     });
   }
 
-  Future<void> _saveSession(double wpm, double wer) async {
+  Future<void> _saveSession(double wpm, double wer, int lastErrorCount) async {
     final prefs = await SharedPreferences.getInstance();
     final prevSessions = prefs.getInt('rf_sessions') ?? 0;
     final prevAvgWpm = prefs.getDouble('rf_avg_wpm') ?? 0.0;
@@ -149,6 +152,8 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
     await prefs.setDouble('rf_avg_wpm', newAvgWpm);
     await prefs.setDouble('rf_avg_wer', newAvgWer);
     await prefs.setInt('rf_breakdown_level', newBreakdownLevel);
+    await prefs.setInt('rf_last_error_count', lastErrorCount);
+    await prefs.setDouble('rf_last_wpm', wpm);
 
     // Also save to MongoDB
     final fluencyLevel =
@@ -222,7 +227,7 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
         final wpm = minutes > 0 ? (words.length / minutes) : 0.0;
         final wer = (errorCount / words.length) * 100;
 
-        _saveSession(wpm, wer);
+        _saveSession(wpm, wer, errorCount);
         _showResultDialog(wpm, wer, totalSeconds);
       }
     });
@@ -234,9 +239,18 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
     });
   }
 
+  void _skipCurrentSentence() {
+    _timer?.cancel();
+    _startTime = null;
+    _endTime = null;
+    currentSentenceIndex++;
+    _loadNextSentence();
+  }
+
   void _showResultDialog(double wpm, double wer, double totalSeconds) {
     final isBreakdown = wpm < 15 || wer > 20;
-    final nextLevel = currentLevel + 1;
+    final nextLevel = isBreakdown ? currentLevel - 1 : currentLevel + 1;
+    final canAdjustLevel = nextLevel >= 1 && nextLevel <= 3;
 
     showDialog<void>(
       context: context,
@@ -275,8 +289,7 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              if (!isBreakdown && nextLevel <= 3) {
-                // Move to next level
+              if (canAdjustLevel) {
                 setState(() {
                   currentLevel = nextLevel;
                   currentSentenceIndex = 0;
@@ -288,7 +301,9 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
               }
             },
             child: Text(
-              isBreakdown ? 'ඉවිතින්න' : (nextLevel <= 3 ? 'ඉදිරි මට්ටම' : 'අවසන්'),
+              canAdjustLevel
+                  ? (isBreakdown ? 'පහළ මට්ටම' : 'ඉදිරි මට්ටම')
+                  : 'අවසන්',
             ),
           )
         ],
@@ -333,6 +348,13 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
+              if (widget.onComplete != null) {
+                widget.onComplete!();
+                return;
+              }
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
             },
             child: const Text('හරි'),
           )
@@ -360,6 +382,9 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
             ),
           ],
         ),
+        actions: [
+          SkipButton(taskName: 'reading_fluency', onSkipped: _skipCurrentSentence),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

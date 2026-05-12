@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/difficulty_profile_service.dart';
 
 import '../services/content_service.dart';
@@ -212,6 +213,13 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
     });
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final studentId = prefs.getString('student_id') ?? 'student_${DateTime.now().millisecondsSinceEpoch}';
+      await prefs.setString('student_id', studentId);
+      await prefs.setString('student_name', _studentNameController.text.trim());
+      await prefs.setInt('student_age', studentAge);
+      await prefs.setString('student_grade', _studentGradeController.text.trim());
+
       await QuestionnaireDb.instance.insertSubmission(
         respondentRole: _respondentRole,
         respondentName: _respondentNameController.text.trim(),
@@ -247,7 +255,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
 
       await DifficultyProfileService.saveAssignedTier(tier);
 
-      Navigator.pushNamed(context, '/student_preferences', arguments: {
+      // After questionnaire, go to student preferences so they can choose color/font
+      Navigator.pushReplacementNamed(context, '/student_preferences', arguments: {
         'studentName': _studentNameController.text.trim(),
         'studentAge': _studentAgeController.text.trim(),
         'studentGrade': _studentGradeController.text.trim(),
