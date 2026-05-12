@@ -1,0 +1,300 @@
+# System Architecture & AI Model Reference
+## Adaptive Sinhala Dyslexia Support Platform — R26-SE-031
+
+---
+
+## 1. Full System Flow
+
+```mermaid
+flowchart TD
+    subgraph Flutter["📱 Flutter App (Visual-Service Frontend)"]
+        OB["Gamified Onboarding\n(collects font/theme preference)"]
+        SC["SyllableChallenge\nSoundCatcher\nSpatialAwareness"]
+        POLL["InterventionPollerMixin\n(polls every 10s)"]
+        UI["Adaptive UI\n(theme, spacing, Bionic Reading)"]
+        OB -->|first launch| SC
+        SC -->|student plays| POLL
+        POLL -->|fetches layout + interventions| UI
+    end
+
+    subgraph MON["🔍 Monitoring Service :8001"]
+        TEL["/api/v1/telemetry\nReceive raw event"]
+        LGBM["LightGBM\nCognitive Load Classifier"]
+        ENS["Anomaly Ensemble\n(IsoForest + AE + LogReg)"]
+        DB1[("SQLite\ntelemetry_events")]
+        TEL --> LGBM
+        TEL --> ENS
+        LGBM --> DB1
+        ENS --> DB1
+    end
+
+    subgraph CON["📚 Content Service :8002"]
+        MAS["/api/v1/mastery/update\nEMA-DKT Mastery Update"]
+        NXT["/api/v1/content/next\nRecommend Next Lesson"]
+        DB2[("SQLite\nmastery_tree")]
+        MAS --> DB2
+        DB2 --> NXT
+    end
+
+    subgraph INT["🧠 Intervention Service :8003"]
+        TRG["/api/v1/intervention/trigger"]
+        RF["Random Forest\nIntervention Classifier"]
+        XAI["SHAP / LIME\nExplainability"]
+        FWD["forward_to_visual_service()"]
+        TRG --> RF
+        RF --> XAI
+        RF --> FWD
+    end
+
+    subgraph VIS["🎨 Visual Service :8004"]
+        PREF["/api/v1/preferences/update\nStore student prefs"]
+        LAY["/api/v1/ui/layout\nCompute adaptive layout"]
+        STORE["/api/v1/intervention/store\nQueue pending action"]
+        STATUS["/api/v1/intervention/status\nPoll result"]
+        BAND["ε-Greedy Bandit\nLayout arm selector"]
+        DB3[("SQLite\npreferences +\nintervention_queue")]
+        PREF --> DB3
+        LAY --> BAND
+        BAND --> LAY
+        STORE --> DB3
+        STATUS --> DB3
+    end
+
+    SC -->|"POST telemetry (latency, errors, hesitations)"| TEL
+    SC -->|"POST mastery update (skill_id, is_correct)"| MAS
+    OB -->|"POST preferences (font, theme)"| PREF
+
+    DB1 -->|"GET /telemetry/latest"| LAY
+    DB2 -->|"GET /mastery"| TRG
+    FWD -->|"POST intervention"| STORE
+    MON -->|"BG task → POST /intervention/trigger"| TRG
+
+    STATUS -->|"pending intervention + ui_action"| POLL
+    LAY -->|"layout config"| POLL
+```
+
+---
+
+## 2. Component-by-Component Breakdown
+
+### 🔵 Flutter App (Frontend)
+
+**Role:** Captures student interaction data and renders an adaptive interface.
+
+| Screen | What it tracks |
+|---|---|
+| `SyllableChallengeGame` | Touch-to-Read latency (time from word shown → first tap), error count per word |
+| `SoundCatcherGame` | Response time to match a vowel sound, error count |
+| `SpatialAwarenessGame` | Direction selection latency, error count |
+| `GamifiedOnboarding` | Preferred font (OpenDyslexic/Sinhala default), colour theme |
+
+**Key file:** `intervention_poller.dart`  
+Every game screen uses `InterventionPollerMixin` which:
+1. Fetches the adaptive layout from Visual Service on load.
+2. Polls every **10 seconds** for pending interventions.
+3. On intervention — shows a `SnackBar` hint and refreshes layout (theme, spacing, Bionic Reading).
+
+---
+
+### 🔴 Monitoring Service `:8001`
+
+**Role:** The "sensory cortex" — converts raw tap/swipe events into a cognitive load signal.
+
+#### Model A — LightGBM Cognitive Load Classifier
+
+| Item | Detail |
+|---|---|
+| **File** | `monitoring-service/ml/lgbm_cognitive_load.pkl` |
+| **Type** | Gradient-Boosted Decision Tree (multi-class) |
+| **Trained on** | 3,000 synthetic samples stratified across 3 difficulty tiers |
+
+**Inputs (features):**
+
+| Feature | Description |
+|---|---|
+| `hesitation_ms` | Time from stimulus display to first interaction (ms) |
+| `swipe_velocity` | Speed of touch swipe gestures (px/s) |
+| `correction_rate` | Ratio of backspace/error correction events |
+
+**Output:**
+
+| Class | Label | Meaning |
+|---|---|---|
+| `0` | Low | Student is fluent; no action needed |
+| `1` | Medium | Mild struggle; queue a soft audio hint |
+| `2` | High | Significant struggle; trigger syllable splitter / break |
+
+---
+
+#### Model B — Anomaly Detection Ensemble
+
+Used alongside LightGBM as a second opinion, especially for edge cases.
+
+**Stage 1 — Autoencoder (PyTorch)**
+
+| Item | Detail |
+|---|---|
+| **File** | `monitoring-service/ml/anomaly_autoencoder.pth` |
+| **Type** | Encoder–Decoder Neural Network |
+| **Architecture** | 4 → 8 → 4 (bottleneck) → 8 → 4 |
+
+> **Inputs:** `[latency_ms, dwell_time_ms, erratic_click_count, swipe_velocity]`  
+> **Output:** Reconstruction MSE score — higher means the session is *unusual* vs. the normal baseline.
+
+**Stage 2 — Isolation Forest (scikit-learn)**
+
+| Item | Detail |
+|---|---|
+| **File** | `monitoring-service/ml/anomaly_iso_forest.pkl` |
+| **Type** | Unsupervised Anomaly Detector |
+
+> **Inputs:** Same 4 telemetry features  
+> **Output:** Anomaly score (negative decision function value — higher = more anomalous)
+
+**Stage 3 — Logistic Regression Meta-Classifier**
+
+| Item | Detail |
+|---|---|
+| **File** | `monitoring-service/ml/anomaly_meta_clf.pkl` |
+| **Type** | Binary Logistic Regression (ensemble combiner) |
+
+> **Inputs:** `[AE_MSE_score, IsoForest_score]`  
+> **Output:** `0` = fluent session, `1` = anomalous (high cognitive struggle)
+
+**Why the ensemble?** Neither Isolation Forest nor Autoencoder alone is reliable for small dyslexia datasets. The meta-classifier uses both signals, reducing false positives.
+
+---
+
+### 🟢 Content Service `:8002`
+
+**Role:** Tracks what the student knows (mastery tree) and recommends what to study next.
+
+#### Model C — DKT-Mock / EMA Mastery Updater
+
+| Item | Detail |
+|---|---|
+| **File** | `content-service/ml/dkt_mock.pkl` |
+| **Type** | Exponential Moving Average (mimics Deep Knowledge Tracing output) |
+| **Formula** | `new_mastery = α × (correct + speed_bonus) + (1−α) × old_mastery` |
+
+**Inputs (per game round):**
+
+| Input | Description |
+|---|---|
+| `current_mastery` | Current mastery level (0.0–1.0) |
+| `is_correct` | Whether the student answered correctly |
+| `response_latency_ms` | How quickly they answered (faster = more confident) |
+
+**Output:** Updated mastery score for the specific skill (e.g., `syllable_blending: 0.73`)
+
+**Skills tracked:**
+- `syllable_blending`
+- `letter_ka`
+- `pilla_ispilla`
+- `phoneme_isolation`
+- `vowel_recognition`
+
+**`/api/v1/content/next/{student_id}`** uses the mastery tree to pick the **weakest skill** and selects a lesson difficulty (Easy / Intermediate / Advanced) based on the mastery score.
+
+---
+
+### 🟠 Intervention Service `:8003`
+
+**Role:** The "decision engine" — given a student's cognitive state and weakest skill, decides *what kind of help* to deliver.
+
+#### Model D — Random Forest Intervention Classifier
+
+| Item | Detail |
+|---|---|
+| **File** | `intervention-service/ml/intervention_rf.pkl` |
+| **Type** | Random Forest (multi-class, 100 trees) |
+
+**Inputs:**
+
+| Feature | Description |
+|---|---|
+| `latency_ms` | Current session touch latency |
+| `erratic_clicks` | Number of off-target taps |
+| `mastery_level` | Weakest skill mastery (from Content Service) |
+| `previous_failures` | Consecutive incorrect answers this session |
+
+**Output — Intervention Type:**
+
+| Class | Intervention | UI Action |
+|---|---|---|
+| `0` | `Audio_Hint` | Soft audio replay + highlight the correct answer |
+| `1` | `Visual_Split` | Syllable-by-syllable visual breakdown, pause game |
+| `2` | `Break` | Full pause, breathing prompt, restart round |
+
+#### Explainability (SHAP / LIME)
+After the RF decision, the Intervention Service computes a SHAP explanation identifying **which feature drove the decision** — e.g., *"erratic_clicks (0.62 weight) was the primary indicator of struggle."* This is returned in the API response for educator dashboards.
+
+**Closed-loop action:** After deciding, the service immediately calls `POST /api/v1/intervention/store` on the Visual Service so the Flutter app can poll and act on it within 10 seconds.
+
+---
+
+### 🟣 Visual Service `:8004`
+
+**Role:** The "rendering engine" — translates AI signals into concrete UI configuration.
+
+#### Model E — ε-Greedy Bandit (Reinforcement Learning)
+
+| Item | Detail |
+|---|---|
+| **File** | `visual-service/ml/ui_bandit.pkl` |
+| **Type** | Multi-Armed Bandit (ε=0.1, 3 arms) |
+| **Arms** | `0` = Default spacing, `1` = Medium spacing (3px), `2` = High spacing (6px) |
+
+> **Input:** Student session reward signal (derived from error rate improvement)  
+> **Output:** Selected layout arm (which spacing preset to apply)
+
+After warm-up training, the bandit's Q-values were:
+```
+Arm 0 (Default):  0.402
+Arm 1 (Medium):   0.566
+Arm 2 (High):     0.789  ← preferred
+```
+
+**`/api/v1/ui/layout`** combines:
+1. Bandit arm selection
+2. Student preferences (from onboarding)
+3. Live cognitive load from Monitoring Service
+
+To return a full layout config:
+```json
+{
+  "theme": "Calm Blue",
+  "character_spacing": 6.0,
+  "highlight_pilla": true,
+  "bionic_reading": false,
+  "font": "OpenDyslexic"
+}
+```
+
+---
+
+## 3. Data Flow Summary Table
+
+| Step | From | To | Data |
+|---|---|---|---|
+| 1 | Student taps | Flutter → Monitoring | `{latency_ms, error_count, hesitations}` |
+| 2 | Student answers | Flutter → Content | `{skill_id, is_correct, latency_ms}` |
+| 3 | Monitoring computes | Monitoring → SQLite | `cognitive_load_level` (0/1/2) |
+| 4 | Monitoring triggers | Monitoring → Intervention | `{student_id, cognitive_load_level}` |
+| 5 | Intervention queries | Intervention → Content | `GET /mastery/{student_id}` |
+| 6 | Intervention decides | Intervention → Visual | `{intervention_type, ui_action}` |
+| 7 | Flutter polls | Flutter → Visual | `GET /intervention/status/{student_id}` |
+| 8 | Flutter polls | Flutter → Visual | `POST /ui/layout` |
+| 9 | UI adapts | Flutter renders | Theme, spacing, hint banner |
+
+---
+
+## 4. What Each Model Was Designed to Solve
+
+| Research Problem | Clinical Parallel | Model Used |
+|---|---|---|
+| Detect reading hesitation | Phonological processing deficits | LightGBM Cognitive Load |
+| Spot unusual interaction patterns | Irregular letter scanning | Anomaly Ensemble (AE + IsoForest) |
+| Track skill progression | Mastery-based learning | DKT Mock (EMA) |
+| Decide optimal help type | Educator intervention decision | Random Forest + SHAP |
+| Find best UI layout | Perceptual sensitivity to spacing | ε-Greedy Bandit |
