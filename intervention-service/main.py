@@ -225,6 +225,191 @@ async def startup():
 #     _shap_available = False
 #     print("SHAP not installed — explanations will use feature importance fallback.")
 
+# ── Component4: audio cache (gTTS) ────────────────────────────────────────────
+AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Serve cached mp3 files
+app.mount("/api/v1/c4/audio", StaticFiles(directory=str(AUDIO_CACHE_DIR)), name="c4-audio")
+
+def _hash_audio_id(lang: str, text: str, kind: str, slow: bool) -> str:
+    h = hashlib.sha256()
+    h.update(f"{lang}|{kind}|slow={int(slow)}|{text}".encode("utf-8"))
+    return h.hexdigest()[:24]
+
+
+def _is_short_syllable(text: str) -> bool:
+    """Heuristic: treat 1-4 codepoint Sinhala/Tamil chunks as 'short syllable'.
+    These need gTTS slow=True + duplication or they sound near-inaudible.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return False
+    return len(stripped) <= 4
+
+
+def _prepare_tts_text(text: str, kind: str) -> tuple[str, bool]:
+    """Return (text_to_send_to_gtts, slow_flag).
+
+    For very short syllables we flip on gTTS slow mode, which stretches the
+    pronunciation to roughly 2x duration. That alone is long enough to be
+    clearly heard for a single letter/syllable, with no duplication.
+    """
+    text = text.strip()
+    slow = kind in ("syllable", "first_sound") or _is_short_syllable(text)
+    return text, slow
+
+
+def _ensure_gtts_mp3(*, lang: str, text: str, kind: str) -> dict[str, Any]:
+    """
+    Generates and caches an mp3 file for (lang, text). Returns {audio_id, url}.
+    Requires `gTTS` at runtime; if missing, raises a clear error for setup.
+    """
+    tts_text, slow = _prepare_tts_text(text, kind)
+    audio_id = _hash_audio_id(lang, tts_text, kind, slow)
+    filename = f"{audio_id}.mp3"
+    rel_path = filename
+    out_path = AUDIO_CACHE_DIR / filename
+
+    if not out_path.exists():
+        try:
+            from gtts import gTTS
+        except Exception as e:  # pragma: no cover
+            raise HTTPException(
+                status_code=500,
+                detail="gTTS is not installed. Run: pip install gTTS",
+            ) from e
+
+        tts = gTTS(text=tts_text, lang=lang, slow=slow)
+        tts.save(str(out_path))
+
+    upsert_audio_asset(
+        audio_id=audio_id, lang=lang, text=text, kind=kind, file_rel_path=rel_path
+    )
+    return {"audio_id": audio_id, "url": f"/api/v1/c4/audio/{filename}"}
+
+@app.get("/api/v1/c4/tts")
+def c4_tts(text: str, lang: str = "si", kind: str = "ui"):
+    """
+    Convenience endpoint for the Flutter UI: returns a cached gTTS mp3 URL
+    for the given Sinhala/Tamil text. Cached on disk so repeats are instant.
+
+    Example:
+        GET /api/v1/c4/tts?text=සෞඛ්‍යයට&lang=si
+        -> {"audio_id": "...", "url": "/api/v1/c4/audio/<sha>.mp3"}
+    """
+    text = (text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required")
+    if lang not in ("si", "ta", "en", "hi"):
+        raise HTTPException(status_code=400, detail="unsupported lang")
+    return _ensure_gtts_mp3(lang=lang, text=text, kind=kind)
+
+
+def _simple_tokenize(text: str) -> list[str]:
+    # Basic whitespace tokenizer suitable for viva demo.
+    return [w.strip() for w in text.replace("\n", " ").split(" ") if w.strip()]
+
+def _model1_score(word: str) -> tuple[float, Optional[str]]:
+    """
+    Minimal Model1 placeholder (for viva):
+    difficulty_score in [0,1] based on word length/complexity.
+    error_type_hint is a coarse heuristic label.
+    Replace later with your trained RF Model1.
+    """
+    n = len(word)
+    score = min(1.0, max(0.0, (n - 2) / 10.0))
+    hint: Optional[str] = None
+    if n >= 8:
+        hint = "long_word"
+    return score, hint
+
+class PassageStartPayload(BaseModel):
+    student_id: str
+    session_id: str
+    passage_text: str
+    language: Optional[str] = None  # "si" or "ta" for gTTS
+    pre_generate_audio: bool = True
+
+@app.post("/api/v1/c4/passage/start")
+async def c4_passage_start(payload: PassageStartPayload):
+    """
+    Component4 entrypoint: store passage, tokenized words, difficulty (Model1 RF for Sinhala),
+    and optional anticipatory error_type_hint (shape/rank heuristics — not observed learner errors).
+    """
+    import uuid
+
+    passage_id = str(uuid.uuid4())
+    upsert_passage(
+        passage_id=passage_id,
+        student_id=payload.student_id,
+        session_id=payload.session_id,
+        raw_text=payload.passage_text,
+        language=payload.language,
+    )
+
+    if payload.language == "si":
+        words = tokenize_sinhala_text(payload.passage_text)
+        if not words:
+            words = _simple_tokenize(payload.passage_text)
+    else:
+        words = _simple_tokenize(payload.passage_text)
+    response_words: list[dict[str, Any]] = []
+    model1_version = "heuristic_v0"
+    model1_note = "length-based heuristic fallback"
+    using_model1_rf = _model1_predictor is not None and payload.language == "si"
+    if using_model1_rf and _model1_predictor is not None:
+        mv = (
+            _model1_predictor.meta.get("dataset_sha256_16", "model1")
+            if isinstance(_model1_predictor.meta, dict)
+            else "model1"
+        )
+        model1_version = str(mv)
+        model1_note = "sklearn RF from ml/model1 (p_hard)"
+
+    for idx, w in enumerate(words):
+        word_id = str(uuid.uuid4())
+        # Stage1 syllables: keep as whole word for now (replace with Unicode syllable splitter later)
+        syllables = [w]
+        upsert_word(word_id=word_id, passage_id=passage_id, word_index=idx, word_text=w, syllables=syllables)
+
+        hint = None
+        if using_model1_rf and _model1_predictor is not None:
+            pred = _model1_predictor.predict_one(w)
+            diff = float(pred.get("p_hard") or 0.0)
+            hint = infer_error_type_hint(str(pred.get("error_type_pred") or ""))
+        else:
+            diff, hint = _model1_score(w)
+
+        upsert_word_prediction(
+            word_id=word_id,
+            difficulty_score=diff,
+            error_type_hint=hint,
+            model1_version=str(model1_version),
+        )
+
+        audio = None
+        if payload.pre_generate_audio and payload.language in ("si", "ta"):
+            audio = _ensure_gtts_mp3(lang=payload.language, text=w, kind="word")
+
+        response_words.append(
+            {
+                "word_id": word_id,
+                "word_index": idx,
+                "word_text": w,
+                "syllables": syllables,
+                "difficulty_score": diff,
+                "error_type_hint": hint,
+                "audio": audio,
+            }
+        )
+
+    return {
+        "student_id": payload.student_id,
+        "session_id": payload.session_id,
+        "passage_id": passage_id,
+        "words": response_words,
+        "model1": {"version": model1_version, "note": model1_note},
+    }
 
 # ── Load Random Forest Model ──────────────────────────────────────────────────
 try:

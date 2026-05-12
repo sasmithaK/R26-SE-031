@@ -34,22 +34,22 @@ def main() -> None:
     if args.limit:
         df = df.head(args.limit)
 
-    ok_d = 0
-    ok_e = 0
-    n = 0
-
+    gold: list[tuple[str, int, str]] = []
     for _, row in df.iterrows():
         w = str(row.get("word", "")).strip()
         if not w:
             continue
-        r = p.predict_one(w)
-        td = int(row["difficulty"])
-        te = str(row["error_type"]).strip()
-        if r["difficulty_pred"] == td:
-            ok_d += 1
-        if r["error_type_pred"] == te:
-            ok_e += 1
-        n += 1
+        gold.append((w, int(row["difficulty"]), str(row["error_type"]).strip()))
+
+    if not gold:
+        print("No rows with a word to evaluate.")
+        return
+
+    words = [w for w, _, _ in gold]
+    preds = p.predict_many(words)
+    ok_d = sum(1 for (_, td, _), r in zip(gold, preds) if r["difficulty_pred"] == td)
+    ok_e = sum(1 for (_, _, te), r in zip(gold, preds) if r["error_type_pred"] == te)
+    n = len(gold)
 
     print(f"Rows evaluated: {n}")
     print(f"Difficulty accuracy: {ok_d / max(1, n):.4f}")
