@@ -18,7 +18,7 @@ import time
 import json
 import math
 from pathlib import Path
-from typing import Optional
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,44 +39,47 @@ PORT = int(os.getenv("C1_PORT", "8011"))
 # ── Try to load LightGBM models ────────────────────────────────────────────
 try:
     import pickle
+    import joblib  # MultiOutputRegressor often requires joblib or pickle
     import numpy as np
-    MODELS_DIR = Path(__file__).parent / "ml"
-    LGBM_MODELS = {}
+    
+    MODELS_DIR = Path(__file__).parent.parent / "models"
+    MODEL_PATH = MODELS_DIR / "c1_lgbm_mbsv.pkl"
+    
+    LGBM_MODEL = None
+    if MODEL_PATH.exists():
+        with open(MODEL_PATH, "rb") as f:
+            LGBM_MODEL = pickle.load(f)
+    
+    MODELS_LOADED = LGBM_MODEL is not None
     DIMENSION_NAMES = [
-        "visual_strain_index", "cognitive_load_index", "phonological_strain_index",
-        "engagement_index", "session_fatigue_index",
+        "cognitive_load_index", "phonological_strain_index", "visual_strain_index",
+        "session_fatigue_index", "engagement_index", "error_resilience_index"
     ]
-    for dim in DIMENSION_NAMES:
-        model_path = MODELS_DIR / f"lgbm_{dim.replace('_index','').replace('_','-')}.pkl"
-        if model_path.exists():
-            with open(model_path, "rb") as f:
-                LGBM_MODELS[dim] = pickle.load(f)
-    MODELS_LOADED = len(LGBM_MODELS) == len(DIMENSION_NAMES)
-except Exception:
-    LGBM_MODELS = {}
+except Exception as e:
+    print(f"[C1] Model load error: {e}")
+    LGBM_MODEL = None
     MODELS_LOADED = False
 
 # ── Feature storage (latest MBSV per student) ──────────────────────────────
 # Moved to MongoDB using motor collections
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await connect_to_mongo()
+    yield
+    await close_mongo_connection()
 
 # ── App ────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="C1 — Cognitive Behavioral Monitoring Engine (CBME)",
     description="Produces the 6-dimension MBSV from Flutter behavioral telemetry.",
     version="2.0.0",
+    lifespan=lifespan
 )
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def startup_db_client():
-    connect_to_mongo()
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    close_mongo_connection()
 
 
 # ── Helper: extract feature dict from telemetry payload ───────────────────
@@ -177,7 +180,7 @@ def _rule_based_mbsv(features: dict, z_scores: dict) -> MBSV:
 
 
 def _lgbm_mbsv(features: dict, z_scores: dict) -> MBSV:
-    """Compute MBSV using trained LightGBM models."""
+    """Compute MBSV using trained LightGBM MultiOutput model."""
     import numpy as np
     feature_vector = np.array([[
         z_scores.get(k, 0.0) for k in [
@@ -187,16 +190,22 @@ def _lgbm_mbsv(features: dict, z_scores: dict) -> MBSV:
             "disfluency_count", "kalman_innovation",
         ]
     ]])
-    dims = {}
-    for dim, model in LGBM_MODELS.items():
-        dims[dim] = float(max(0.0, min(1.0, model.predict(feature_vector)[0])))
+    
+    # Predict all 6 dimensions
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+    
+    # Mapping based on train_c1_lgbm.py: 
+    # TARGETS = ["label_CLI", "label_PSI", "label_VSI", "label_FI", "label_ES", "label_ERI"]
+    def clamp(v: float) -> float:
+        return float(max(0.0, min(1.0, v)))
 
     return MBSV(
-        visual_strain_index=dims.get("visual_strain_index", 0.5),
-        cognitive_load_index=dims.get("cognitive_load_index", 0.5),
-        phonological_strain_index=dims.get("phonological_strain_index", 0.5),
-        engagement_index=dims.get("engagement_index", 0.5),
-        session_fatigue_index=dims.get("session_fatigue_index", 0.0),
+        cognitive_load_index=clamp(preds[0]),
+        phonological_strain_index=clamp(preds[1]),
+        visual_strain_index=clamp(preds[2]),
+        session_fatigue_index=clamp(preds[3]),
+        engagement_index=clamp(preds[4]),
+        error_resilience_index=clamp(preds[5]),
         error_pattern_vector=_compute_error_pattern(features, z_scores),
     )
 

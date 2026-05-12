@@ -30,7 +30,7 @@ def _section(title):
 def run():
     total_start = time.time()
 
-    _section("Step 1/4 — Synthetic Dataset Generation")
+    _section("Step 1/5 — Synthetic Dataset Generation")
     t = time.time()
     from generate_datasets import generate_c1_dataset, generate_learner_type_dataset, generate_c2_linucb_dataset
     generate_c1_dataset()
@@ -38,22 +38,28 @@ def run():
     generate_c2_linucb_dataset()
     print(f"  Done in {time.time()-t:.1f}s")
 
-    _section("Step 2/4 — C1 LightGBM MBSV Model")
+    _section("Step 2/5 — C1 LightGBM MBSV Model")
     t = time.time()
     from train_c1_lgbm import train as train_lgbm
     train_lgbm()
     print(f"  Done in {time.time()-t:.1f}s")
 
-    _section("Step 3/4 — C1 Random Forest Learner Type")
+    _section("Step 3/5 — C1 Random Forest Learner Type")
     t = time.time()
     from train_c1_learner_type import train as train_rf
     train_rf()
     print(f"  Done in {time.time()-t:.1f}s")
 
-    _section("Step 4/4 — C2 LinUCB Warm-Start")
+    _section("Step 4/5 — C2 LinUCB Warm-Start")
     t = time.time()
     from train_c2_linucb import train as train_linucb
     train_linucb()
+    print(f"  Done in {time.time()-t:.1f}s")
+
+    _section("Step 5/5 — C4 Intervention RF")
+    t = time.time()
+    from train_c4_intervention_rf import train as train_c4
+    train_c4()
     print(f"  Done in {time.time()-t:.1f}s")
 
     total = time.time() - total_start

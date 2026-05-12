@@ -53,55 +53,76 @@ ACT_PAIR      = "MINIMAL_PAIR"
 PAST_FRUSTRATION_STOP = 3
 
 
-# ---------------------------------------------------------------------------
-# Phoneme Error Analyser
-# ---------------------------------------------------------------------------
+import pickle
+import numpy as np
+from pathlib import Path
+
+# ── Paths ──────────────────────────────────────────────────────────────────
+BASE = Path(__file__).parent.parent.parent
+MODEL_PATH = BASE / "models" / "c4_intervention_rf.pkl"
+
+def extract_word_features(word: str) -> dict:
+    """Matches feature extraction in scripts/train_c4_intervention_rf.py"""
+    syl_count = sum(1 for c in word if 0x0D80 <= ord(c) <= 0x0DFF)
+    vowel_signs = sum(1 for c in word if 0x0DCF <= ord(c) <= 0x0DDF)
+    consonant_clusters = word.count('\u0DCA')
+    return {
+        "syl_count": syl_count,
+        "vowel_density": vowel_signs / max(syl_count, 1),
+        "cluster_len": consonant_clusters
+    }
 
 def classify_error_type(
     current_word: str,
     error_pattern_vector: List[int],
+    model: Optional[RandomForestClassifier] = None,
     mastery_vector: Optional[Dict[str, float]] = None,
 ) -> str:
     """
     Classify the dominant phonological error type for a given word + MBSV flags.
-
-    Decision logic:
-        1. If syllable_count >= 4  → LONG_WORD
-        2. If omission_flag=1 or vowel-sign-heavy word → VOWEL_CONFUSION
-        3. If reversal_flag=1 or substitution_flag=1   → CONSONANT_CONFUSION
-        4. If mastery for word's skill node is very low → UNFAMILIAR
-        5. Default                                      → VOWEL_CONFUSION
-
-    Uses Unicode-derived features only (no audio, no labeled data for 50%).
+    Uses Random Forest model if available, else falls back to heuristics.
     """
     reversal, omission, substitution, hesitation = (
         error_pattern_vector + [0] * 4
     )[:4]
 
+    # Heuristic Rule 1: Long word (pre-empts model for reliability)
     syllables = split_syllables(current_word)
-
-    # Rule 1: Long word
     if len(syllables) >= 4:
         return ERROR_LONG_WORD
 
-    # Rule 2: Count vowel signs in word (U+0DCF–U+0DDF)
-    vowel_sign_count = sum(
-        1 for c in current_word if 0x0DCF <= ord(c) <= 0x0DDF
-    )
+    # ML Inference
+    if model:
+        try:
+            wf = extract_word_features(current_word)
+            # Feature order must match training script
+            features = np.array([[
+                wf["syl_count"],
+                wf["vowel_density"],
+                wf["cluster_len"],
+                reversal,
+                omission,
+                substitution,
+                hesitation
+            ]], dtype=float)
+            
+            prediction = model.predict(features)[0]
+            return str(prediction)
+        except Exception:
+            pass # Fallback to heuristics below
+
+    # Heuristic Fallback
+    vowel_sign_count = sum(1 for c in current_word if 0x0DCF <= ord(c) <= 0x0DDF)
     if omission == 1 or vowel_sign_count >= 3:
         return ERROR_VOWEL
-
-    # Rule 3: Reversal/substitution → consonant confusion
     if reversal == 1 or substitution == 1:
         return ERROR_CONSONANT
-
-    # Rule 4: No mastery at all (very first encounter)
     if mastery_vector:
         avg_mastery = sum(mastery_vector.values()) / max(len(mastery_vector), 1)
         if avg_mastery < 0.25:
             return ERROR_UNFAMILIAR
 
-    return ERROR_VOWEL  # Default: most common error type in Sinhala literacy
+    return ERROR_VOWEL
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +191,15 @@ class InterventionEngine:
         self._strain_start: Dict[str, int] = {}
         # Track consecutive incorrect attempts per student for PAST frustration-stop rule
         self._consecutive_failures: Dict[str, int] = {}
+        
+        # Load trained RF model if exists
+        self.model = None
+        if MODEL_PATH.exists():
+            try:
+                with open(MODEL_PATH, "rb") as f:
+                    self.model = pickle.load(f)
+            except Exception as e:
+                print(f"[C4] Error loading RF model: {e}")
 
     async def check(
         self,
@@ -223,7 +253,7 @@ class InterventionEngine:
 
         # Stage 2: activity overlay (≥ 10s of strain)
         error_type = classify_error_type(
-            current_word, error_pattern_vector, mastery_vector
+            current_word, error_pattern_vector, self.model, mastery_vector
         )
         activity_type, difficulty = select_activity(
             error_type, mastery_vector, active_skill_id

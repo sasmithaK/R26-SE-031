@@ -53,9 +53,9 @@ async def _get_learner_type(student_id: str) -> str:
 # ── App ────────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    connect_to_mongo()
+    await connect_to_mongo()
     yield
-    close_mongo_connection()
+    await close_mongo_connection()
 
 app = FastAPI(
     title="C3 — Personalized Learning Content Engine (PLCE)",

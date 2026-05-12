@@ -107,8 +107,8 @@ def train():
     df_features['substitution'] = (df_combined['target'] == 'CONSONANT_CONFUSION').astype(int) * np.random.choice([0, 1], size=len(df_combined), p=[0.5, 0.5])
     df_features['hesitation'] = np.random.choice([0, 1], size=len(df_combined), p=[0.6, 0.4])
 
-    X = df_features.values
-    y = df_combined['target'].values
+    X = np.array(df_features.values, dtype=float)
+    y = np.array(df_combined['target'].values, dtype=str)
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
