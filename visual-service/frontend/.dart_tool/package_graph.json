@@ -8,6 +8,7 @@
       "version": "1.0.0+1",
       "dependencies": [
         "flutter",
+        "flutter_tts",
         "http"
       ],
       "devDependencies": [
@@ -251,6 +252,21 @@
       "name": "vm_service",
       "version": "15.2.0",
       "dependencies": []
+    },
+    {
+      "name": "flutter_tts",
+      "version": "3.8.5",
+      "dependencies": [
+        "flutter",
+        "flutter_web_plugins"
+      ]
+    },
+    {
+      "name": "flutter_web_plugins",
+      "version": "0.0.0",
+      "dependencies": [
+        "flutter"
+      ]
     }
   ],
   "configVersion": 1

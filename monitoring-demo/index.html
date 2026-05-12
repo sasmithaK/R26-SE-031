@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adaptive Dyslexia Platform - Monitoring Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Sinhala:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg-color: #F3F4F6;
+            --surface: #FFFFFF;
+            --text-main: #1F2937;
+            --text-muted: #6B7280;
+            --border: #E5E7EB;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --radius: 12px;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            flex: 1;
+        }
+
+        .panel {
+            background: var(--surface);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.75rem;
+        }
+
+        /* Video Section */
+        .video-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4/3;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror */
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .recording-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--danger);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Questionnaire Section */
+        .question-card {
+            background: var(--bg-color);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px;
+            gap: 2rem;
+            position: relative;
+        }
+
+        .sinhala-text {
+            font-family: 'Noto Sans Sinhala', sans-serif;
+            font-size: 3rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            width: 100%;
+        }
+
+        .option-btn {
+            font-family: 'Noto Sans Sinhala', sans-serif;
+            background: var(--surface);
+            border: 2px solid var(--border);
+            padding: 1rem;
+            font-size: 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .option-btn:hover {
+            border-color: var(--primary);
+            background: #EEF2FF;
+        }
+
+        /* Telemetry Dashboard */
+        .telemetry-panel {
+            grid-column: 1 / -1;
+            background: var(--text-main);
+            color: #D1D5DB;
+            font-family: monospace;
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            height: 250px;
+            overflow-y: auto;
+            box-shadow: var(--shadow);
+            margin-top: 1rem;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid #374151;
+            padding-bottom: 0.5rem;
+        }
+        
+        .log-time { color: #9CA3AF; margin-right: 1rem; }
+        .log-info { color: #60A5FA; }
+        .log-success { color: #34D399; }
+        .log-warning { color: #FBBF24; }
+        .log-danger { color: #F87171; }
+
+        .intervention-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            border-radius: 8px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 10;
+        }
+
+        .intervention-overlay h3 {
+            color: var(--warning);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .intervention-overlay p {
+            font-size: 1.25rem;
+        }
+        
+        .overlay-btn {
+            margin-top: 1.5rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Adaptive Dyslexia Platform</h1>
+        <p>Real-time Monitoring & Cognitive Load Detection Demo</p>
+    </header>
+
+    <div class="container">
+        
+        <!-- Left Panel: Simulated Eye Tracking / Camera -->
+        <div class="panel">
+            <h2>Live Observation Feed</h2>
+            <p style="color: var(--text-muted); font-size: 0.875rem;">Simulates background facial and behavioral observation for academic demonstration.</p>
+            
+            <div class="video-container">
+                <video id="webcam" autoplay playsinline></video>
+                <div class="camera-overlay">
+                    <div class="recording-dot"></div>
+                    Active Monitoring
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; align-items: center; font-size: 0.875rem;">
+                <div><span style="font-weight: 600;">Student ID:</span> STU_DEMO_01</div>
+                <div><span style="font-weight: 600;">Session:</span> Active</div>
+            </div>
+        </div>
+
+        <!-- Right Panel: The Interactive Questionnaire -->
+        <div class="panel">
+            <h2>Student Interface</h2>
+            <p style="color: var(--text-muted); font-size: 0.875rem;">Interact with the game. Hesitate, move the mouse erratically, or make mistakes to trigger high cognitive load.</p>
+
+            <div class="question-card" id="game-area">
+                <div class="intervention-overlay" id="intervention-overlay">
+                    <h3 id="intervention-title">Intervention Triggered</h3>
+                    <p id="intervention-desc">Taking a breath...</p>
+                    <button class="overlay-btn" onclick="resumeGame()">Resume</button>
+                </div>
+
+                <div style="font-weight: 500; color: var(--text-muted);">Match the sound to the syllable:</div>
+                <div class="sinhala-text" id="target-word">ක</div>
+                
+                <div class="options-grid" id="options-container">
+                    <button class="option-btn" onclick="checkAnswer('ka', this)">ka</button>
+                    <button class="option-btn" onclick="checkAnswer('ga', this)">ga</button>
+                    <button class="option-btn" onclick="checkAnswer('ta', this)">ta</button>
+                    <button class="option-btn" onclick="checkAnswer('ma', this)">ma</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Panel: Telemetry Logs -->
+        <div class="telemetry-panel" id="log-console">
+            <div class="log-entry">
+                <span class="log-time">[System]</span>
+                <span class="log-info">Monitoring Service Connected. Awaiting interactions...</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

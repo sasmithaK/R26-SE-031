@@ -3,8 +3,15 @@ from pymongo import MongoClient
 from typing import Optional, List, Dict, Any
 import os
 
-DB_PATH = 'content_state.db'
+MONGO_URI = "mongodb+srv://kavindugunasena_db_user:2Vp8ipkprifuEH8t@cluster0.ypxuqen.mongodb.net/"
+client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
+db = client.content_db
 
+# async def init_db():
+#     # Create indexes for fast lookup
+#     await db.mastery.create_index([("student_id", 1), ("skill_id", 1)], unique=True)
+#     await db.mastery_history.create_index("student_id")
+#     print("Content Service: MongoDB indexes initialized.")
 # MongoDB Configuration
 MONGO_URL = os.getenv('MONGO_URL', 'mongodb://localhost:27017')
 MONGO_DB = os.getenv('MONGO_DB', 'dyslexia_content')
@@ -68,26 +75,37 @@ def init_db():
     # Initialize MongoDB for questions and tasks
     init_mongo()
 
-def update_mastery(student_id: str, skill_id: str, mastery_level: float):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO mastery (student_id, skill_id, mastery_level, last_updated)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(student_id, skill_id) DO UPDATE SET
-            mastery_level = excluded.mastery_level,
-            last_updated = CURRENT_TIMESTAMP
-    ''', (student_id, skill_id, mastery_level))
-    conn.commit()
-    conn.close()
+async def update_mastery(student_id: str, skill_id: str, mastery_level: float):
+    now = datetime.datetime.now(datetime.UTC)
+    
+    # Update current mastery
+    await db.mastery.update_one(
+        {"student_id": student_id, "skill_id": skill_id},
+        {
+            "$set": {
+                "mastery_level": mastery_level,
+                "last_practiced_at": now
+            },
+            "$inc": {"attempt_count": 1}
+        },
+        upsert=True
+    )
+    
+    # Log history for curve analysis
+    await db.mastery_history.insert_one({
+        "student_id": student_id,
+        "skill_id": skill_id,
+        "mastery_level": mastery_level,
+        "timestamp": now
+    })
 
-def get_mastery(student_id: str, skill_id: str):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('SELECT mastery_level FROM mastery WHERE student_id = ? AND skill_id = ?', (student_id, skill_id))
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result else 0.0
+async def get_mastery(student_id: str, skill_id: str) -> float:
+    doc = await db.mastery.find_one({"student_id": student_id, "skill_id": skill_id})
+    if not doc:
+        return 0.0
+    
+    # Apply forgetting curve logic (Ebbinghaus)
+    return _apply_forgetting(doc["mastery_level"], doc["last_practiced_at"])
 
 def get_all_mastery(student_id: str):
     conn = sqlite3.connect(DB_PATH)

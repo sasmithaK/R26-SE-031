@@ -1,0 +1,100 @@
+{
+  "arms": [
+    {
+      "arm_id": 0,
+      "name": "Baseline (NIE Standard)",
+      "description": "Default NIE Grade 1 typography — no modifications",
+      "font_size": 20.0,
+      "letter_spacing": 1.0,
+      "word_spacing": 6.0,
+      "line_height": 1.5,
+      "background_contrast": "WCAG_AA",
+      "diacritic_offset": 0.0,
+      "glyph_padding": 0.0
+    },
+    {
+      "arm_id": 1,
+      "name": "Increased spacing",
+      "description": "Wider letter + word spacing to reduce crowding",
+      "font_size": 20.0,
+      "letter_spacing": 3.0,
+      "word_spacing": 10.0,
+      "line_height": 1.6,
+      "background_contrast": "WCAG_AA",
+      "diacritic_offset": 0.0,
+      "glyph_padding": 1.0
+    },
+    {
+      "arm_id": 2,
+      "name": "Large font",
+      "description": "Larger font size for visual strain reduction",
+      "font_size": 24.0,
+      "letter_spacing": 2.0,
+      "word_spacing": 8.0,
+      "line_height": 1.7,
+      "background_contrast": "WCAG_AA",
+      "diacritic_offset": 0.0,
+      "glyph_padding": 0.5
+    },
+    {
+      "arm_id": 3,
+      "name": "Diacritic-safe",
+      "description": "Positive diacritic_offset to prevent vowel sign overlap on Sinhala abugida",
+      "font_size": 22.0,
+      "letter_spacing": 2.5,
+      "word_spacing": 9.0,
+      "line_height": 1.8,
+      "background_contrast": "WCAG_AA",
+      "diacritic_offset": 2.0,
+      "glyph_padding": 2.0
+    },
+    {
+      "arm_id": 4,
+      "name": "High contrast",
+      "description": "WCAG AAA contrast with standard spacing",
+      "font_size": 20.0,
+      "letter_spacing": 2.0,
+      "word_spacing": 8.0,
+      "line_height": 1.6,
+      "background_contrast": "WCAG_AAA",
+      "diacritic_offset": 0.0,
+      "glyph_padding": 0.0
+    },
+    {
+      "arm_id": 5,
+      "name": "Maximum accessibility",
+      "description": "Large font + max spacing + AAA contrast + diacritic offset",
+      "font_size": 26.0,
+      "letter_spacing": 5.0,
+      "word_spacing": 14.0,
+      "line_height": 2.0,
+      "background_contrast": "WCAG_AAA",
+      "diacritic_offset": 3.0,
+      "glyph_padding": 4.0
+    },
+    {
+      "arm_id": 6,
+      "name": "Compact high-contrast",
+      "description": "Smaller spacing but high contrast — for low-engagement fast pace",
+      "font_size": 20.0,
+      "letter_spacing": 1.5,
+      "word_spacing": 7.0,
+      "line_height": 1.55,
+      "background_contrast": "WCAG_AAA",
+      "diacritic_offset": 1.0,
+      "glyph_padding": 0.5
+    },
+    {
+      "arm_id": 7,
+      "name": "Glyph-padded line",
+      "description": "Maximum glyph padding — for consonant-cluster crowding in 3+ syllable words",
+      "font_size": 22.0,
+      "letter_spacing": 4.0,
+      "word_spacing": 12.0,
+      "line_height": 1.9,
+      "background_contrast": "WCAG_AA",
+      "diacritic_offset": 1.5,
+      "glyph_padding": 6.0
+    }
+  ]
+}

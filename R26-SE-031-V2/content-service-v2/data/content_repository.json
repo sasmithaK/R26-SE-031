@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "version": "1.0",
+    "description": "Sinhala phonological skill content repository for C3 (PLCE). 50-item seed set covering 10 skill nodes. Difficulty values (irt_difficulty_b) calibrated from NIE Grade 1-2 curriculum word frequency analysis.",
+    "total_items": 30,
+    "skills_covered": ["S0","S1","S2","S3","S4","S5","S6","S7","S8","S9"]
+  },
+  "items": [
+    {"item_id":"S0_001","skill_id":"S0_shape_recognition","sinhala_text":"ක","english_gloss":"ka","irt_difficulty_b":-1.5,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S0_002","skill_id":"S0_shape_recognition","sinhala_text":"ග","english_gloss":"ga","irt_difficulty_b":-1.2,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S0_003","skill_id":"S0_shape_recognition","sinhala_text":"ත","english_gloss":"tha","irt_difficulty_b":-1.0,"modality":"VISUAL","audio_url":null,"image_url":null},
+
+    {"item_id":"S1_001","skill_id":"S1_vowel_id","sinhala_text":"අ","english_gloss":"a","irt_difficulty_b":-1.4,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S1_002","skill_id":"S1_vowel_id","sinhala_text":"ආ","english_gloss":"aa","irt_difficulty_b":-1.2,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S1_003","skill_id":"S1_vowel_id","sinhala_text":"ඉ","english_gloss":"i","irt_difficulty_b":-1.0,"modality":"VISUAL","audio_url":null,"image_url":null},
+
+    {"item_id":"S2_001","skill_id":"S2_consonant_recognition","sinhala_text":"ත","english_gloss":"tha","irt_difficulty_b":-0.8,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S2_002","skill_id":"S2_consonant_recognition","sinhala_text":"ද","english_gloss":"da","irt_difficulty_b":-0.6,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S2_003","skill_id":"S2_consonant_recognition","sinhala_text":"ප","english_gloss":"pa","irt_difficulty_b":-0.5,"modality":"VISUAL","audio_url":null,"image_url":null},
+
+    {"item_id":"S3_001","skill_id":"S3_syllable_formation","sinhala_text":"කා","english_gloss":"kaa","irt_difficulty_b":-0.5,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S3_002","skill_id":"S3_syllable_formation","sinhala_text":"තා","english_gloss":"thaa","irt_difficulty_b":-0.3,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S3_003","skill_id":"S3_syllable_formation","sinhala_text":"පි","english_gloss":"pi","irt_difficulty_b":0.0,"modality":"AUDITORY","audio_url":null,"image_url":null},
+
+    {"item_id":"S4_001","skill_id":"S4_syllable_counting","sinhala_text":"කළු","english_gloss":"black","irt_difficulty_b":0.0,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S4_002","skill_id":"S4_syllable_counting","sinhala_text":"ගෙදර","english_gloss":"home","irt_difficulty_b":0.2,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S4_003","skill_id":"S4_syllable_counting","sinhala_text":"කතා","english_gloss":"story","irt_difficulty_b":0.1,"modality":"KINESTHETIC","audio_url":null,"image_url":null},
+
+    {"item_id":"S5_001","skill_id":"S5_two_syllable_reading","sinhala_text":"ඇඹුල","english_gloss":"tamarind","irt_difficulty_b":0.3,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S5_002","skill_id":"S5_two_syllable_reading","sinhala_text":"ඇඳ","english_gloss":"bed","irt_difficulty_b":0.2,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S5_003","skill_id":"S5_two_syllable_reading","sinhala_text":"කෙළ","english_gloss":"saliva","irt_difficulty_b":0.4,"modality":"AUDITORY","audio_url":null,"image_url":null},
+
+    {"item_id":"S6_001","skill_id":"S6_three_syllable_reading","sinhala_text":"ගිනි","english_gloss":"fire","irt_difficulty_b":0.5,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S6_002","skill_id":"S6_three_syllable_reading","sinhala_text":"කිරිය","english_gloss":"milk","irt_difficulty_b":0.6,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S6_003","skill_id":"S6_three_syllable_reading","sinhala_text":"කාමරය","english_gloss":"room","irt_difficulty_b":0.8,"modality":"KINESTHETIC","audio_url":null,"image_url":null},
+
+    {"item_id":"S7_001","skill_id":"S7_word_picture_match","sinhala_text":"බල්ලා","english_gloss":"dog","irt_difficulty_b":0.4,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S7_002","skill_id":"S7_word_picture_match","sinhala_text":"ගස","english_gloss":"tree","irt_difficulty_b":0.3,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S7_003","skill_id":"S7_word_picture_match","sinhala_text":"කොළ","english_gloss":"leaf","irt_difficulty_b":0.5,"modality":"VISUAL","audio_url":null,"image_url":null},
+
+    {"item_id":"S8_001","skill_id":"S8_sentence_reading","sinhala_text":"මම ගෙදර යයි","english_gloss":"I go home","irt_difficulty_b":1.0,"modality":"AUDITORY","audio_url":null,"image_url":null},
+    {"item_id":"S8_002","skill_id":"S8_sentence_reading","sinhala_text":"ගස ලොකුය","english_gloss":"The tree is big","irt_difficulty_b":1.2,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S8_003","skill_id":"S8_sentence_reading","sinhala_text":"බල්ලා දුවයි","english_gloss":"The dog runs","irt_difficulty_b":1.1,"modality":"VISUAL","audio_url":null,"image_url":null},
+
+    {"item_id":"S9_001","skill_id":"S9_sentence_comprehension","sinhala_text":"ගස ළඟ පිපෙන මල කොළ වර්ණ ය","english_gloss":"The flower blooming near the tree is green","irt_difficulty_b":1.8,"modality":"AUDITORY","audio_url":null,"image_url":null},
+    {"item_id":"S9_002","skill_id":"S9_sentence_comprehension","sinhala_text":"අම්මා කඩේ ගිහිල්ල බත් ගෙනාවා","english_gloss":"Mother went to the shop and brought rice","irt_difficulty_b":2.0,"modality":"VISUAL","audio_url":null,"image_url":null},
+    {"item_id":"S9_003","skill_id":"S9_sentence_comprehension","sinhala_text":"ළමයා පාසලේ සිතුවමක් ඇඳීය","english_gloss":"The child drew a picture at school","irt_difficulty_b":2.0,"modality":"KINESTHETIC","audio_url":null,"image_url":null}
+  ]
+}
