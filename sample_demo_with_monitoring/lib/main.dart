@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/adaptive_state.dart';
-import 'screens/word_matching_task.dart';
+import 'screens/home_screen.dart';
 
 void main() {
   runApp(
@@ -29,7 +29,7 @@ class DyslexiaAdaptiveApp extends StatelessWidget {
         primaryColor: Colors.blueAccent,
         useMaterial3: true,
       ),
-      home: const WordMatchingTask(),
+      home: const HomeScreen(),
     );
   }
 }
