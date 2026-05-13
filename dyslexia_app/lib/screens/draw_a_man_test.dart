@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
 import 'package:dyslexia_app/widgets/skip_button.dart';
+import 'package:dyslexia_app/utils/logger.dart';
 
 class DrawAManTest extends StatefulWidget {
   const DrawAManTest({super.key});
@@ -20,6 +21,7 @@ class _DrawAManTestState extends State<DrawAManTest> with SingleTickerProviderSt
   late Animation<double> _animation;
 
   void _skipAndContinue() {
+    AppLogger.info('Skipping DrawAManTest');
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
@@ -106,7 +108,7 @@ class _DrawAManTestState extends State<DrawAManTest> with SingleTickerProviderSt
                       border: Border.all(color: Colors.purpleAccent, width: 8),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.purple.withOpacity(0.3),
+                          color: Colors.purple.withValues(alpha: 0.3),
                           offset: const Offset(0, 12),
                           blurRadius: 0,
                         )
@@ -167,7 +169,7 @@ class _DrawAManTestState extends State<DrawAManTest> with SingleTickerProviderSt
           border: Border.all(color: Colors.white, width: 6),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.6),
+              color: color.withValues(alpha: 0.6),
               offset: const Offset(0, 8),
               blurRadius: 0,
             )

@@ -1,12 +1,15 @@
 import 'dart:math';
-import 'dart:ui' show PointerDeviceKind;
-
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:dyslexia_app/widgets/skip_button.dart';
-
 import '../services/content_service.dart';
 import '../services/task_score_service.dart';
+import '../services/visual_service.dart';
+import '../utils/telemetry_collector.dart';
+import '../utils/visual_training_loop.dart';
+import '../models/visual_config.dart';
+import '../widgets/skip_button.dart';
+import '../utils/logger.dart';
 
 class SyllableTrainGame extends StatefulWidget {
   const SyllableTrainGame({super.key});
@@ -29,13 +32,18 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
 
   // Rounds will be loaded from MongoDB
   late List<_TrainRound> _rounds;
+  int _currentRoundIndex = 0;
+  final List<String> _currentOrder = [];
+  bool _isCelebrating = false;
   bool _isLoading = true;
   String? _loadError;
-
-  final List<String> _currentOrder = [];
-  int _currentRoundIndex = 0;
-  bool _isCelebrating = false;
   late String studentId;
+  TelemetryCollector? _telemetryCollector;
+
+  // C2 Adaptive UI State
+  TypographyConfig _typographyConfig = TypographyConfig();
+  int _selectedArmId = -1;
+  final String _currentSessionId = 'sess_${DateTime.now().millisecondsSinceEpoch}';
 
   @override
   void initState() {
@@ -64,8 +72,43 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
       curve: Curves.easeOutCubic,
     );
 
-    _loadSyllableRounds();
-    _loadStudentId();
+    _initializeGame();
+  }
+
+  Future<void> _initializeGame() async {
+    await _loadStudentId();
+    await _loadSyllableRounds();
+  }
+
+  Future<void> _fetchAdaptiveTypography() async {
+    try {
+      final adaptiveData = await VisualService.getAdaptiveTypography(
+        'SyllableTrainGame',
+        sessionId: _currentSessionId,
+      );
+
+      if (adaptiveData != null && mounted) {
+        final response = adaptiveData['response'] as TypographyResponse;
+        final visualStrain = adaptiveData['visualStrain'] as double;
+        final sId = response.studentId;
+
+        setState(() {
+          _typographyConfig = response.config;
+          _selectedArmId = response.armSelected;
+        });
+
+        // Initialize MAB Training Loop context
+        VisualTrainingLoop().startLevel(
+          armId: _selectedArmId,
+          visualStrainBefore: visualStrain,
+          sessionId: _currentSessionId,
+          studentId: sId,
+        );
+        AppLogger.info('🎯 Syllable Game: MAB Started (Arm: $_selectedArmId)');
+      }
+    } catch (e) {
+      AppLogger.error('❌ Error in SyllableTrainGame adaptive loop', error: e);
+    }
   }
 
   Future<void> _loadStudentId() async {
@@ -110,7 +153,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
             ));
           }
         } catch (e) {
-          print('Error parsing syllable round: $e');
+          AppLogger.error('Error parsing syllable round', error: e);
         }
       }
 
@@ -127,7 +170,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
         }
       });
     } catch (e) {
-      print('Error loading syllable rounds: $e');
+      AppLogger.error('Error loading syllable rounds', error: e);
       setState(() {
         _isLoading = false;
         _loadError = null;
@@ -178,7 +221,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
     try {
       return Color(int.parse('0xFF$hexString'));
     } catch (e) {
-      print('Error parsing color $hexString: $e');
+      AppLogger.error('Error parsing color $hexString', error: e);
       return Colors.grey;
     }
   }
@@ -199,11 +242,19 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
       ..clear()
       ..addAll(shuffled);
     _isCelebrating = false;
+    
+    _telemetryCollector = TelemetryCollector(
+      studentId: studentId,
+      taskId: 'syllable_train_${round.word}',
+      sessionId: 'sess_${DateTime.now().millisecondsSinceEpoch}',
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_trainScrollController.hasClients) {
         _trainScrollController.jumpTo(0);
       }
     });
+    _fetchAdaptiveTypography();
     setState(() {});
   }
 
@@ -222,6 +273,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
     setState(() {
       final item = _currentOrder.removeAt(fromIndex);
       _currentOrder.insert(toIndex, item);
+      _telemetryCollector?.recordCorrection();
     });
 
     if (_isCorrect) {
@@ -253,12 +305,22 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
       _isCelebrating = true;
     });
 
+    if (_telemetryCollector != null) {
+      final payload = _telemetryCollector!.finalize('TAP');
+      TaskScoreService.sendTelemetry(payload.toJson());
+    }
+
+    // 4. Trigger MAB Reward cycle (fetch new MBSV after level completion)
+    VisualTrainingLoop().endLevel(accuracyDelta: 1.0);
+
     await _trainSuccessController.forward(from: 0);
+
+    if (!mounted) return;
 
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.35),
+      barrierColor: Colors.black.withValues(alpha: 0.35),
       builder: (context) {
         return Dialog(
           backgroundColor: Colors.transparent,
@@ -459,7 +521,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),
@@ -494,9 +556,11 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
                       const SizedBox(height: 12),
                       Text(
                         'වචනය හදන්න: ${round.word}',
-                        style: const TextStyle(
-                          fontSize: 24,
+                        style: TextStyle(
+                          fontSize: _typographyConfig.fontSize + 4, // Header logic
                           fontWeight: FontWeight.w900,
+                          fontFamily: _typographyConfig.fontFamily,
+                          letterSpacing: _typographyConfig.letterSpacing,
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -508,6 +572,8 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
                         isLocked: _isCelebrating,
                         trainMotion: _trainSuccessAnimation,
                         scrollController: _trainScrollController,
+                        telemetryCollector: _telemetryCollector,
+                        typographyConfig: _typographyConfig,
                       ),
                     ],
                   ),
@@ -525,7 +591,7 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         ),
@@ -592,6 +658,16 @@ class _SyllableTrainGameState extends State<SyllableTrainGame>
 }
 
 class _TrainTrack extends StatelessWidget {
+  final GlobalKey trainKey;
+  final List<String> carriages;
+  final List<Color> colors;
+  final void Function(int fromIndex, int toIndex) onSwap;
+  final bool isLocked;
+  final Animation<double> trainMotion;
+  final ScrollController scrollController;
+  final TelemetryCollector? telemetryCollector;
+  final TypographyConfig typographyConfig;
+
   const _TrainTrack({
     required this.trainKey,
     required this.carriages,
@@ -600,15 +676,9 @@ class _TrainTrack extends StatelessWidget {
     required this.isLocked,
     required this.trainMotion,
     required this.scrollController,
+    this.telemetryCollector,
+    required this.typographyConfig,
   });
-
-  final GlobalKey trainKey;
-  final List<String> carriages;
-  final List<Color> colors;
-  final void Function(int fromIndex, int toIndex) onSwap;
-  final bool isLocked;
-  final Animation<double> trainMotion;
-  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -657,6 +727,8 @@ class _TrainTrack extends StatelessWidget {
                           color: color,
                           isLocked: isLocked,
                           onSwap: onSwap,
+                          telemetryCollector: telemetryCollector,
+                          typographyConfig: typographyConfig,
                         ),
                       );
                     }),
@@ -689,26 +761,30 @@ class _TrainTrack extends StatelessWidget {
 }
 
 class _DraggableCarriage extends StatelessWidget {
+  final int index;
+  final String syllable;
+  final Color color;
+  final bool isLocked;
+  final void Function(int fromIndex, int toIndex) onSwap;
+  final TelemetryCollector? telemetryCollector;
+  final TypographyConfig typographyConfig;
+
   const _DraggableCarriage({
     required this.index,
     required this.syllable,
     required this.color,
     required this.isLocked,
     required this.onSwap,
+    this.telemetryCollector,
+    required this.typographyConfig,
   });
-
-  final int index;
-  final String syllable;
-  final Color color;
-  final bool isLocked;
-  final void Function(int fromIndex, int toIndex) onSwap;
 
   @override
   Widget build(BuildContext context) {
     return DragTarget<int>(
-      onWillAccept: (fromIndex) =>
-          !isLocked && fromIndex != null && fromIndex != index,
-      onAccept: (fromIndex) => onSwap(fromIndex, index),
+      onWillAcceptWithDetails: (details) =>
+          !isLocked && details.data != index,
+      onAcceptWithDetails: (details) => onSwap(details.data, index),
       builder: (context, candidateData, rejectedData) {
         final hovered = candidateData.isNotEmpty;
         return LongPressDraggable<int>(
@@ -724,26 +800,37 @@ class _DraggableCarriage extends StatelessWidget {
                 color: color,
                 isHovered: true,
                 isDragging: true,
+                typographyConfig: typographyConfig,
               ),
             ),
           ),
           childWhenDragging: Opacity(
             opacity: 0.35,
-            child: _CarriageBody(
-              syllable: syllable,
-              color: color,
-              isHovered: hovered,
-            ),
+              child: _CarriageBody(
+                syllable: syllable,
+                color: color,
+                isHovered: hovered,
+                typographyConfig: typographyConfig,
+              ),
           ),
           onDragCompleted: () {},
-          onDraggableCanceled: (_, __) {},
-          child: AnimatedScale(
-            duration: const Duration(milliseconds: 120),
-            scale: hovered ? 1.04 : 1.0,
-            child: _CarriageBody(
-              syllable: syllable,
-              color: color,
-              isHovered: hovered,
+          onDraggableCanceled: (_, _) {},
+          child: GestureDetector(
+            onTapDown: (details) {
+              telemetryCollector?.recordTouch(
+                details.globalPosition.dx,
+                details.globalPosition.dy,
+              );
+            },
+            child: AnimatedScale(
+              duration: const Duration(milliseconds: 120),
+              scale: hovered ? 1.04 : 1.0,
+              child: _CarriageBody(
+                syllable: syllable,
+                color: color,
+                isHovered: hovered,
+                typographyConfig: typographyConfig,
+              ),
             ),
           ),
         );
@@ -758,12 +845,14 @@ class _CarriageBody extends StatelessWidget {
     required this.color,
     this.isHovered = false,
     this.isDragging = false,
+    required this.typographyConfig,
   });
 
   final String syllable;
   final Color color;
   final bool isHovered;
   final bool isDragging;
+  final TypographyConfig typographyConfig;
 
   @override
   Widget build(BuildContext context) {
@@ -779,7 +868,7 @@ class _CarriageBody extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDragging ? 0.2 : 0.12),
+            color: Colors.black.withValues(alpha: isDragging ? 0.2 : 0.12),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -813,10 +902,12 @@ class _CarriageBody extends StatelessWidget {
           Center(
             child: Text(
               syllable,
-              style: const TextStyle(
-                fontSize: 34,
+              style: TextStyle(
+                fontSize: typographyConfig.fontSize * 1.5, // Scale for carriage
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
+                fontFamily: typographyConfig.fontFamily,
+                letterSpacing: typographyConfig.letterSpacing,
               ),
             ),
           ),
@@ -827,7 +918,7 @@ class _CarriageBody extends StatelessWidget {
               child: Icon(
                 Icons.open_with_rounded,
                 size: 18,
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
               ),
             ),
         ],
@@ -857,7 +948,7 @@ class _Locomotive extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.red.withOpacity(0.3),
+            color: Colors.red.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -902,7 +993,7 @@ class _Locomotive extends StatelessWidget {
             child: Icon(
               Icons.train_rounded,
               size: 54,
-              color: Colors.white.withOpacity(0.95),
+              color: Colors.white.withValues(alpha: 0.95),
             ),
           ),
           Positioned(
@@ -914,7 +1005,7 @@ class _Locomotive extends StatelessWidget {
                 width: 58,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.22),
+                  color: Colors.white.withValues(alpha: 0.22),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Center(
@@ -1000,7 +1091,7 @@ class _SmokePuffState extends State<_SmokePuff>
                 width: widget.size,
                 height: widget.size,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -1128,7 +1219,7 @@ class _FireworksPopupState extends State<_FireworksPopup>
                     border: Border.all(color: Colors.amber.shade300, width: 4),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.25),
+                        color: Colors.black.withValues(alpha: 0.25),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),

@@ -1,13 +1,89 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/logger.dart';
+import '../services/task_score_service.dart';
+import '../services/visual_service.dart';
+import '../models/visual_config.dart';
 
-class StudentDashboard extends StatelessWidget {
+class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
 
   @override
+  State<StudentDashboard> createState() => _StudentDashboardState();
+}
+
+class _StudentDashboardState extends State<StudentDashboard> {
+  TypographyConfig _config = TypographyConfig();
+  bool _isLoading = true;
+  late String studentId;
+  late String sessionId;
+
+  @override
+  void initState() {
+    super.initState();
+    sessionId = 'sess_${DateTime.now().millisecondsSinceEpoch}';
+    _initializeDashboard();
+  }
+
+  Future<void> _initializeDashboard() async {
+    final prefs = await SharedPreferences.getInstance();
+    studentId = prefs.getString('student_id') ?? 'student_demo';
+    
+    await _fetchAdaptiveUI();
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchAdaptiveUI() async {
+    try {
+      // 1. Get latest behavioral state (MBSV) from C1
+      final mbsvData = await TaskScoreService.getLatestMBSV(studentId);
+      
+      double visualStrain = 0.5;
+      double engagement = 0.5;
+      double phonologicalStrain = 0.5;
+
+      if (mbsvData != null && mbsvData['mbsv'] != null) {
+        final m = mbsvData['mbsv'];
+        visualStrain = (m['visual_strain_index'] as num).toDouble();
+        engagement = (m['engagement_index'] as num).toDouble();
+        phonologicalStrain = (m['phonological_strain_index'] as num).toDouble();
+      }
+
+      // 2. Get adaptive typography from C2 based on MBSV
+      final typographyResponse = await VisualService.getTypographyConfig(
+        studentId: studentId,
+        sessionId: sessionId,
+        visualStrain: visualStrain,
+        engagement: engagement,
+        phonologicalStrain: phonologicalStrain,
+      );
+
+      if (typographyResponse != null) {
+        setState(() {
+          _config = typographyResponse.config;
+        });
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('Error in adaptive UI loop', error: e, stackTrace: stackTrace, tag: 'StudentDashboard');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final int colorIndex = args != null && args['preferredColorIndex'] is int ? args['preferredColorIndex'] as int : 0;
-    final double fontSize = args != null && args['preferredFontSize'] is double ? args['preferredFontSize'] as double : 20.0;
+    
+    // Override manual fontSize with adaptive one from C2
+    final double fontSize = _config.fontSize;
 
     final List<Map<String, Color>> palette = [
       {'bg': const Color(0xFFFFFFFF), 'accent': const Color(0xFFE0E0E0)},
@@ -35,7 +111,15 @@ class StudentDashboard extends StatelessWidget {
         child: Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
-            title: Text('මගේ වැඩ', style: TextStyle(fontSize: fontSize + 12, fontWeight: FontWeight.w900)),
+            title: Text(
+              'මගේ වැඩ', 
+              style: TextStyle(
+                fontSize: fontSize + 12, 
+                fontWeight: FontWeight.w900,
+                letterSpacing: _config.letterSpacing,
+                fontFamily: _config.fontFamily,
+              )
+            ),
             backgroundColor: Colors.transparent,
             foregroundColor: accent.computeLuminance() > 0.5 ? Colors.brown.shade900 : Colors.white,
             elevation: 0,
@@ -97,6 +181,8 @@ class StudentDashboard extends StatelessWidget {
                   fontSize: fontSize + 20,
                   fontWeight: FontWeight.w900,
                   color: accent,
+                  letterSpacing: _config.letterSpacing,
+                  fontFamily: _config.fontFamily,
                   shadows: const [
                     Shadow(color: Colors.white, blurRadius: 5, offset: Offset(2, 2)),
                   ],
@@ -126,7 +212,15 @@ class StudentDashboard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Initial assessment', style: TextStyle(fontSize: fontSize + 4, fontWeight: FontWeight.w900, color: accent)),
+                        Text(
+                          'Initial assessment', 
+                          style: TextStyle(
+                            fontSize: fontSize + 4, 
+                            fontWeight: FontWeight.w900, 
+                            color: accent,
+                            fontFamily: _config.fontFamily,
+                          )
+                        ),
                         const SizedBox(height: 8),
                         Text('Tier: $tier', style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w700)),
                         const SizedBox(height: 4),
@@ -384,6 +478,7 @@ class StudentDashboard extends StatelessWidget {
                           fontSize: fontSize + 8,
                           fontWeight: FontWeight.w900,
                           color: color,
+                          fontFamily: _config.fontFamily,
                         ),
                       ),
                     ),

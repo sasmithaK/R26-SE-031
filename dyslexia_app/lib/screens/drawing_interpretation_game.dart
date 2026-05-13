@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dyslexia_app/widgets/skip_button.dart';
+import 'package:dyslexia_app/utils/visual_training_loop.dart';
+import 'package:dyslexia_app/services/visual_service.dart';
+import 'package:dyslexia_app/models/visual_config.dart';
 
 class DrawingInterpretationGame extends StatefulWidget {
   const DrawingInterpretationGame({super.key});
@@ -24,11 +28,14 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
   ];
 
   int _currentSentenceIndex = 0;
-  List<DrawingPoint> _drawingPoints = [];
+  final List<DrawingPoint> _drawingPoints = [];
   final GlobalKey _canvasKey = GlobalKey();
   Color _selectedColor = Colors.black;
   double _strokeWidth = 4;
   bool _isEraser = false;
+
+  final VisualTrainingLoop _trainingLoop = VisualTrainingLoop();
+  TypographyConfig? _typographyConfig;
 
   final List<Color> _colors = [
     Colors.black,
@@ -56,7 +63,39 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
+    _prepareRound();
   }
+
+  Future<void> _prepareRound() async {
+    final prefs = await SharedPreferences.getInstance();
+    final studentId = prefs.getString('student_id') ?? 'student_demo';
+    final sessionId = 'sess_drawing_${DateTime.now().millisecondsSinceEpoch}';
+
+    // 1. Fetch Adaptive Typography and Init MAB
+    final adaptiveData = await VisualService.getAdaptiveTypography(
+      'drawing_interpretation',
+      sessionId: sessionId,
+    );
+
+    if (adaptiveData != null && mounted) {
+      final response = adaptiveData['response'] as TypographyResponse;
+      final visualStrain = adaptiveData['visualStrain'] as double;
+
+      setState(() {
+        _typographyConfig = response.config;
+      });
+
+      // Start MAB Training Level
+      _trainingLoop.startLevel(
+        armId: response.armSelected,
+        visualStrainBefore: visualStrain,
+        sessionId: sessionId,
+        studentId: studentId,
+      );
+    }
+  }
+
+  // Deprecated in favor of unified logic in _prepareRound
 
   @override
   void dispose() {
@@ -65,7 +104,9 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
     super.dispose();
   }
 
-  void _nextSentence() {
+  void _nextSentence() async {
+    await _trainingLoop.endLevel(accuracyDelta: 1.0);
+
     if (_currentSentenceIndex < _sentences.length - 1) {
       setState(() {
         _currentSentenceIndex++;
@@ -73,6 +114,7 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
         _isEraser = false;
       });
       _celebrate();
+      _prepareRound(); // Start next round tracking
     } else {
       _showCompletionDialog();
     }
@@ -115,11 +157,17 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
     final currentSentence = _sentences[_currentSentenceIndex];
     final progress = (_currentSentenceIndex + 1) / _sentences.length;
 
-    return WillPopScope(
-      onWillPop: () async => true,
+    return PopScope(
+      canPop: true,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('චිතර අඳින්න හා තේරුම් ගන්න'),
+          title: Text(
+            'චිතර අඳින්න හා තේරුම් ගන්න',
+            style: TextStyle(
+              fontSize: _typographyConfig?.fontSize ?? 18,
+              letterSpacing: _typographyConfig?.letterSpacing,
+            ),
+          ),
           backgroundColor: Colors.teal,
           foregroundColor: Colors.white,
           elevation: 0,
@@ -173,7 +221,7 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -204,23 +252,25 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'තේරුම් ගන්න!',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.teal,
+                                  const Text(
+                                    'තේරුම් ගන්න!',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.teal,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  currentSentence['sinhala']!,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    currentSentence['sinhala']!,
+                                    style: TextStyle(
+                                      fontSize: _typographyConfig?.fontSize ?? 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                      letterSpacing: _typographyConfig?.letterSpacing,
+                                      height: _typographyConfig?.lineHeight,
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                           ),
@@ -240,7 +290,7 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         ),
@@ -300,7 +350,7 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
                                 boxShadow: isSelected
                                     ? [
                                         BoxShadow(
-                                          color: color.withOpacity(0.6),
+                                          color: color.withValues(alpha: 0.6),
                                           blurRadius: 8,
                                           offset: const Offset(0, 4),
                                         ),
@@ -316,7 +366,7 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
                           ),
                         ),
                       );
-                    }).toList(),
+                    }),
                     const SizedBox(width: 8),
                     // Eraser
                     GestureDetector(
@@ -344,7 +394,7 @@ class _DrawingInterpretationGameState extends State<DrawingInterpretationGame>
                             boxShadow: _isEraser
                                 ? [
                                     BoxShadow(
-                                      color: Colors.grey.withOpacity(0.6),
+                                      color: Colors.grey.withValues(alpha: 0.6),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:dyslexia_app/widgets/skip_button.dart';
+import 'package:dyslexia_app/utils/visual_service.dart';
+import 'package:dyslexia_app/utils/visual_training_loop.dart';
+import 'package:dyslexia_app/utils/typography_config.dart';
 
 class WordMatchingTask extends StatefulWidget {
   final VoidCallback? onComplete;
@@ -17,6 +20,9 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
   final List<String> options = ['මල', 'ගහ', 'කොළය', 'පලතුර']; // Flower, Tree, Leaf, Fruit
 
   bool? isCorrect;
+  TypographyConfig? _typographyConfig;
+  final VisualService _visualService = VisualService();
+  final VisualTrainingLoop _trainingLoop = VisualTrainingLoop();
   
   late AnimationController _controller;
   late Animation<double> _animation;
@@ -34,11 +40,25 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
   @override
   void initState() {
     super.initState();
+    _fetchTypography();
     _controller = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
     _animation = Tween<double>(begin: -5.0, end: 5.0).animate(_controller);
+  }
+
+  Future<void> _fetchTypography() async {
+    try {
+      final config = await _visualService.getTypographyConfig();
+      if (mounted) {
+        setState(() {
+          _typographyConfig = config;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching typography: $e');
+    }
   }
 
   @override
@@ -103,7 +123,7 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
                       color: Colors.green.shade100,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.green.shade300.withOpacity(0.4),
+                          color: Colors.green.shade300.withValues(alpha: 0.4),
                           blurRadius: 16,
                           spreadRadius: 3,
                         ),
@@ -167,7 +187,7 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
                         spreadRadius: 2,
                       ),
                       BoxShadow(
-                        color: Colors.green.shade200.withOpacity(0.3),
+                        color: Colors.green.shade200.withValues(alpha: 0.3),
                         offset: const Offset(0, 20),
                         blurRadius: 16,
                       ),
@@ -203,8 +223,8 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
                           boxShadow: [
                             BoxShadow(
                               color: isCorrect! 
-                                  ? Colors.orange.withOpacity(0.4)
-                                  : Colors.red.withOpacity(0.3),
+                                  ? Colors.orange.withValues(alpha: 0.4)
+                                  : Colors.red.withValues(alpha: 0.3),
                               blurRadius: 12,
                               spreadRadius: 2,
                             ),
@@ -271,6 +291,9 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
                         });
                         
                         if (word == targetWord && widget.onComplete != null) {
+                          // Send MAB reward
+                          _trainingLoop.endLevel(accuracyDelta: 1.0);
+                          
                           Future.delayed(const Duration(milliseconds: 1500), () {
                             if (mounted) {
                               widget.onComplete!();
@@ -316,9 +339,9 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
                               BoxShadow(
                                 color: isSelected
                                     ? (isCorrect == true
-                                        ? Colors.green.withOpacity(0.5)
-                                        : Colors.red.withOpacity(0.5))
-                                    : Colors.green.shade200.withOpacity(0.3),
+                                        ? Colors.green.withValues(alpha: 0.5)
+                                        : Colors.red.withValues(alpha: 0.5))
+                                    : Colors.green.shade200.withValues(alpha: 0.3),
                                 offset: const Offset(0, 8),
                                 blurRadius: isSelected ? 12 : 6,
                                 spreadRadius: isSelected ? 2 : 0,
@@ -329,12 +352,13 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
                             child: Text(
                               word,
                               style: TextStyle(
-                                fontSize: 28,
+                                fontSize: _typographyConfig?.fontSize ?? 28,
                                 fontWeight: FontWeight.w900,
                                 color: isSelected
                                     ? Colors.white
                                     : Colors.green.shade800,
-                                letterSpacing: 0.5,
+                                letterSpacing: _typographyConfig?.letterSpacing,
+                                height: _typographyConfig?.lineHeight,
                               ),
                             ),
                           ),

@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/assessment_results.dart';
+import 'api_config.dart';
+import '../utils/logger.dart';
 
 class AssessmentResultsService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api/v1';
+  static const String baseUrl = ApiConfig.monitoringUrl;
 
   /// Convert letter score (0-3) to rating
   static String rateLetterScore(int score) {
@@ -142,15 +144,14 @@ class AssessmentResultsService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        print('✅ Assessment results saved successfully for ${results.studentId}');
+        AppLogger.info('✅ Assessment results saved successfully for ${results.studentId}');
         return true;
       } else {
-        print('❌ Failed to save assessment results: ${response.statusCode}');
-        print('Response: ${response.body}');
+        AppLogger.error('❌ Failed to save assessment results: ${response.statusCode}. Body: ${response.body}');
         return false;
       }
     } catch (e) {
-      print('❌ Error saving assessment results: $e');
+      AppLogger.error('❌ Error saving assessment results', error: e);
       return false;
     }
   }
@@ -169,11 +170,11 @@ class AssessmentResultsService {
             .map((json) => AssessmentResults.fromJson(json as Map<String, dynamic>))
             .toList();
       } else {
-        print('Failed to fetch assessment history: ${response.statusCode}');
+        AppLogger.warning('Failed to fetch assessment history: ${response.statusCode}');
         return [];
       }
     } catch (e) {
-      print('Error fetching assessment history: $e');
+      AppLogger.error('Error fetching assessment history', error: e);
       return [];
     }
   }

@@ -1,5 +1,5 @@
-/// Picture-Sound Mapping for Phonological Awareness Task
-/// Each letter has 3 pictures: correct (starts with that sound) and 2 distractors
+// Picture-Sound Mapping for Phonological Awareness Task
+// Each letter has 3 pictures: correct (starts with that sound) and 2 distractors
 
 class PictureOption {
   final String sinhalaWord; // The Sinhala word displayed/understood

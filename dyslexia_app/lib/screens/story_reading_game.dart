@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:dyslexia_app/data/reading_passages.dart';
 import 'dart:async';
 import 'package:dyslexia_app/services/difficulty_profile_service.dart';
-import 'package:characters/characters.dart';
 import 'package:dyslexia_app/widgets/skip_button.dart';
 
 class StoryReadingGame extends StatefulWidget {
   final VoidCallback? onComplete;
 
-  const StoryReadingGame({Key? key, this.onComplete}) : super(key: key);
+  const StoryReadingGame({super.key, this.onComplete});
 
   @override
   State<StoryReadingGame> createState() => _StoryReadingGameState();
@@ -30,7 +29,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
   Timer? _inactivityTimer;
   final Duration _tapTimeout = const Duration(milliseconds: 3500);
   int? _letterModeWordIndex; // which word index is currently split into letters
-  Map<int, int> _letterProgress = {}; // wordIndex -> next letter index to tap
+  final Map<int, int> _letterProgress = {}; // wordIndex -> next letter index to tap
 
   @override
   void initState() {
@@ -377,7 +376,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.blue.withOpacity(0.3),
+                  color: Colors.blue.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -439,7 +438,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                         boxShadow: index == currentPassageIndex
                             ? [
                                 BoxShadow(
-                                  color: Colors.blue.shade400.withOpacity(0.6),
+                                  color: Colors.blue.shade400.withValues(alpha: 0.6),
                                   blurRadius: 8,
                                   spreadRadius: 2,
                                 ),
@@ -468,7 +467,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.2),
+            color: Colors.blue.withValues(alpha: 0.2),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -495,7 +494,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                         color: Colors.blue.shade100,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.blue.withOpacity(0.3),
+                            color: Colors.blue.withValues(alpha: 0.3),
                             blurRadius: 12,
                             spreadRadius: 2,
                           ),
@@ -540,7 +539,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   transform: Matrix4.identity()
-                    ..scale(showHint ? 1.1 : 1.0),
+                    ..scaleByDouble(showHint ? 1.1 : 1.0, showHint ? 1.1 : 1.0, 1.0, 1.0),
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
@@ -553,8 +552,8 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                     boxShadow: [
                       BoxShadow(
                         color: showHint
-                            ? Colors.orange.withOpacity(0.4)
-                            : Colors.blue.withOpacity(0.3),
+                            ? Colors.orange.withValues(alpha: 0.4)
+                            : Colors.blue.withValues(alpha: 0.3),
                         blurRadius: 12,
                         spreadRadius: 2,
                       ),
@@ -650,10 +649,10 @@ class _StoryReadingGameState extends State<StoryReadingGame>
           boxShadow: [
             BoxShadow(
               color: isHighlighted
-                  ? Colors.yellow.withOpacity(0.5)
+                  ? Colors.yellow.withValues(alpha: 0.5)
                   : isTapped
-                      ? Colors.green.withOpacity(0.3)
-                      : Colors.blue.withOpacity(0.2),
+                      ? Colors.green.withValues(alpha: 0.3)
+                      : Colors.blue.withValues(alpha: 0.2),
               blurRadius: isHighlighted ? 12 : 6,
               spreadRadius: isHighlighted ? 2 : 0,
             ),
@@ -713,7 +712,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                 boxShadow: tapped
                     ? [
                         BoxShadow(
-                          color: Colors.orange.shade300.withOpacity(0.4),
+                          color: Colors.orange.shade300.withValues(alpha: 0.4),
                           blurRadius: 6,
                           offset: const Offset(0, 3),
                         )
@@ -759,7 +758,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.orange.withOpacity(0.3),
+                  color: Colors.orange.withValues(alpha: 0.3),
                   blurRadius: 12,
                   spreadRadius: 2,
                 ),

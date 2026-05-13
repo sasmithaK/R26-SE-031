@@ -1,5 +1,6 @@
 import 'dart:js_interop';
 import 'package:web/web.dart' as web;
+import 'logger.dart';
 
 Future<void> speakSinhalaLetterOnWeb(String letter) async {
   try {
@@ -8,7 +9,7 @@ Future<void> speakSinhalaLetterOnWeb(String letter) async {
     speechSynthesis.cancel();
 
     final voicesCount = speechSynthesis.getVoices().length;
-    print('Available voices: $voicesCount');
+    AppLogger.info('Available voices: $voicesCount', tag: 'WebSpeech');
 
     if (voicesCount == 0) {
       await Future.delayed(const Duration(milliseconds: 300));
@@ -21,20 +22,20 @@ Future<void> speakSinhalaLetterOnWeb(String letter) async {
     utterance.volume = 1.0;
 
     utterance.onstart = ((web.SpeechSynthesisEvent event) {
-      print('Speech started');
+      AppLogger.info('Speech started', tag: 'WebSpeech');
     }).toJS;
 
     utterance.onerror = ((web.SpeechSynthesisErrorEvent event) {
-      print('Speech error: ${event.error}');
+      AppLogger.error('Speech error: ${event.error}', tag: 'WebSpeech');
     }).toJS;
 
     utterance.onend = ((web.SpeechSynthesisEvent event) {
-      print('Speech ended');
+      AppLogger.info('Speech ended', tag: 'WebSpeech');
     }).toJS;
 
-    print('Speaking Sinhala letter: $letter');
+    AppLogger.info('Speaking Sinhala letter: $letter', tag: 'WebSpeech');
     speechSynthesis.speak(utterance);
   } catch (e) {
-    print('Web Speech API error: $e');
+    AppLogger.error('Web Speech API error', error: e, tag: 'WebSpeech');
   }
 }

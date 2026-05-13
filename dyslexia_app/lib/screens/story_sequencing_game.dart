@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 import 'package:dyslexia_app/widgets/skip_button.dart';
+import 'package:dyslexia_app/utils/visual_training_loop.dart';
+import 'package:dyslexia_app/services/visual_service.dart';
+import 'package:dyslexia_app/models/visual_config.dart';
+import 'package:dyslexia_app/utils/logger.dart';
 
 class StoryCard {
   final String imagePath;
@@ -30,13 +35,46 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
   bool isCorrect = false;
   bool showCelebration = false;
 
+  final VisualTrainingLoop _trainingLoop = VisualTrainingLoop();
+  TypographyConfig? _typographyConfig;
+
   @override
   void initState() {
     super.initState();
     initializeGame();
   }
 
-  void initializeGame() {
+  void initializeGame() async {
+    final prefs = await SharedPreferences.getInstance();
+    final studentId = prefs.getString('student_id') ?? 'student_demo';
+    final sessionId = 'sess_story_${DateTime.now().millisecondsSinceEpoch}';
+
+    // 1. Fetch Adaptive Typography and Init MAB
+    final adaptiveData = await VisualService.getAdaptiveTypography(
+      'story_sequencing',
+      sessionId: sessionId,
+    );
+
+    if (adaptiveData != null && mounted) {
+      final response = adaptiveData['response'] as TypographyResponse;
+      final visualStrain = adaptiveData['visualStrain'] as double;
+
+      setState(() {
+        _typographyConfig = response.config;
+      });
+
+      // Start MAB Training Level
+      _trainingLoop.startLevel(
+        armId: response.armSelected,
+        visualStrainBefore: visualStrain,
+        sessionId: sessionId,
+        studentId: studentId,
+      );
+      AppLogger.info('🎯 Story Game: MAB Started (Arm: ${response.armSelected})');
+    } else {
+      AppLogger.warning('⚠️ Story Game: Adaptive data null, using defaults');
+    }
+
     final allCards = [
       StoryCard(
         imagePath: 'assets/images/BeanSticker.jpg',
@@ -79,10 +117,13 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
     cards.shuffle();
 
     // Initialize sequence order as empty
-    sequenceOrder = List<StoryCard?>.filled(cards.length, null);
-    isCorrect = false;
-    showCelebration = false;
+    setState(() {
+      sequenceOrder = List<StoryCard?>.filled(cards.length, null);
+      isCorrect = false;
+      showCelebration = false;
+    });
   }
+
 
   void placeCard(StoryCard card, int position) {
     setState(() {
@@ -111,10 +152,21 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
         }
       }
       if (correctSequence) {
-        isCorrect = true;
-        showCelebration = true;
+        setState(() {
+          isCorrect = true;
+          showCelebration = true;
+        });
+        _onGameComplete();
       }
     }
+  }
+
+  void _onGameComplete() async {
+    // Report telemetry
+    // In StorySequencing, we usually finalize on completion
+    // _telemetryCollector.finalize('COMPLETED');
+    // Signal end level and report rewards to C2 Visual Service
+    await _trainingLoop.endLevel(accuracyDelta: 1.0);
   }
 
   void resetGame() {
@@ -128,9 +180,14 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
     return Scaffold(
       backgroundColor: const Color(0xFFFFF8E1), // Warm cream background
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'කතාවේ අනුපිළිවෙල සකස් කරන්න',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            fontSize: _typographyConfig?.fontSize ?? 24,
+            fontWeight: FontWeight.w900,
+            letterSpacing: _typographyConfig?.letterSpacing,
+            height: _typographyConfig?.lineHeight,
+          ),
         ),
         backgroundColor: const Color(0xFF4CAF50), // Green
         elevation: 0,
@@ -147,9 +204,10 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
               Text(
                 'සිතුවම් එකතු කර කතාව සකස් කරන්න',
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: (_typographyConfig?.fontSize ?? 22) * 0.9,
                   fontWeight: FontWeight.w900,
                   color: const Color(0xFF2E7D32),
+                  letterSpacing: _typographyConfig?.letterSpacing,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -174,7 +232,7 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
+                      color: Colors.grey.withValues(alpha: 0.2),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -207,7 +265,7 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
                                 ? [
                                     BoxShadow(
                                       color: const Color(0xFF4CAF50)
-                                          .withOpacity(0.3),
+                                          .withValues(alpha: 0.3),
                                       blurRadius: 8,
                                     ),
                                   ]
@@ -224,10 +282,11 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
                               const SizedBox(height: 6),
                               Text(
                                 card.description,
-                                style: const TextStyle(
-                                  fontSize: 12,
+                                style: TextStyle(
+                                  fontSize: (_typographyConfig?.fontSize ?? 12) * 0.5,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.black87,
+                                  letterSpacing: _typographyConfig?.letterSpacing,
                                 ),
                                 textAlign: TextAlign.center,
                                 maxLines: 1,
@@ -266,7 +325,7 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
+                      color: Colors.grey.withValues(alpha: 0.1),
                       blurRadius: 8,
                     ),
                   ],
@@ -309,21 +368,23 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
                   ),
                   child: Column(
                     children: [
-                      const Text(
+                      Text(
                         '🎉 සුපිරිසිඳු! 🎉',
                         style: TextStyle(
-                          fontSize: 28,
+                          fontSize: _typographyConfig?.fontSize ?? 28,
                           fontWeight: FontWeight.w900,
-                          color: Color(0xFF2E7D32),
+                          color: const Color(0xFF2E7D32),
+                          letterSpacing: _typographyConfig?.letterSpacing,
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'ඔබ කතාව සම්පූර්ණ කිරීවි!',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: (_typographyConfig?.fontSize ?? 20) * 0.7,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF2E7D32),
+                          color: const Color(0xFF2E7D32),
+                          letterSpacing: _typographyConfig?.letterSpacing,
                         ),
                       ),
                     ],
@@ -378,7 +439,7 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
         width: 110,
         height: 140,
         decoration: BoxDecoration(
-          color: bgColor.withOpacity(0.3),
+          color: bgColor.withValues(alpha: 0.3),
           border: Border.all(
             color: bgColor,
             width: 3,
@@ -471,7 +532,7 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: bgColor.withOpacity(0.3),
+                        color: bgColor.withValues(alpha: 0.3),
                         border: Border.all(
                           color: bgColor,
                           width: 2,
