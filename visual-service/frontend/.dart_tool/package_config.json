@@ -57,13 +57,13 @@
     },
     {
       "name": "flutter_tts",
-      "rootUri": "file:///C:/Users/Sasmitha%20Kavindu/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_tts-3.8.5",
+      "rootUri": "file:///C:/Users/perer/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_tts-3.8.5",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
     {
       "name": "flutter_web_plugins",
-      "rootUri": "file:///C:/Users/Sasmitha%20Kavindu/flutter/packages/flutter_web_plugins",
+      "rootUri": "file:///D:/Softwares/flutter/packages/flutter_web_plugins",
       "packageUri": "lib/",
       "languageVersion": "3.9"
     },
