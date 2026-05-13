@@ -141,6 +141,7 @@ class MBSV(BaseModel):
     phonological_strain_index: float = Field(..., ge=0.0, le=1.0)
     engagement_index: float = Field(..., ge=0.0, le=1.0)
     session_fatigue_index: float = Field(..., ge=0.0, le=1.0)
+    error_resilience_index: float = Field(0.0, ge=0.0, le=1.0)  # Added to match C1 model dimensions
     error_pattern_vector: ErrorPatternVector = Field(default_factory=ErrorPatternVector)
 
 

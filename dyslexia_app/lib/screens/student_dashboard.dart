@@ -48,6 +48,12 @@ class _StudentDashboardState extends State<StudentDashboard> {
   int _savedTotalScore = 0;
   bool _savedIsNewStudent = false;
 
+  // Typography configuration with defaults
+  final Map<String, dynamic> _config = {
+    'fontFamily': 'Roboto',
+    'fontSize': 20.0,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -840,7 +846,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                           fontSize: fontSize + 8,
                           fontWeight: FontWeight.w900,
                           color: color,
-                          fontFamily: _config.fontFamily,
+                          fontFamily: _config['fontFamily'] as String?,
                         ),
                       ),
                     ),

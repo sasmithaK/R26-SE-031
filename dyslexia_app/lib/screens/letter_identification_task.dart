@@ -14,6 +14,7 @@ import 'package:dyslexia_app/widgets/skip_button.dart';
 import 'package:dyslexia_app/utils/logger.dart';
 import 'package:dyslexia_app/services/visual_service.dart';
 import 'package:dyslexia_app/utils/visual_training_loop.dart';
+import 'package:dyslexia_app/models/visual_config.dart';
 
 class LetterTask {
   final String targetLetter;
@@ -215,11 +216,22 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
 
   Future<void> _fetchAdaptiveTypography() async {
     try {
-      final config = await VisualService.getTypographyConfig(studentId);
-      if (mounted) {
+      final adaptiveData = await VisualService.getAdaptiveTypography('LetterIdentificationTask');
+      if (adaptiveData != null && mounted) {
+        final response = adaptiveData['response'] as TypographyResponse;
+        final visualStrain = adaptiveData['visualStrain'] as double;
+        
         setState(() {
-          _typographyConfig = config;
+          _typographyConfig = response.config;
         });
+
+        // Start MAB training loop
+        VisualTrainingLoop().startLevel(
+          armId: response.armSelected,
+          visualStrainBefore: visualStrain,
+          sessionId: 'letter_id_${DateTime.now().millisecondsSinceEpoch}',
+          studentId: response.studentId,
+        );
       }
     } catch (e) {
       AppLogger.error('Error fetching typography for Letter ID Task: $e');

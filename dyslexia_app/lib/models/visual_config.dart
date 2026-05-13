@@ -31,6 +31,8 @@ class TypographyConfig {
       glyphPadding: (json['glyph_padding'] as num?)?.toDouble() ?? 0.0,
     );
   }
+
+  static TypographyConfig defaultConfig() => TypographyConfig();
 }
 
 class TypographyResponse {

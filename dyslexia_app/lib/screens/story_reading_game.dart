@@ -3,6 +3,12 @@ import 'package:dyslexia_app/data/reading_passages.dart';
 import 'dart:async';
 import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 import 'package:dyslexia_app/widgets/skip_button.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dyslexia_app/services/mbsv_listener_service.dart';
+import 'package:dyslexia_app/services/inline_intervention_service.dart';
+import 'package:dyslexia_app/widgets/intervention_overlay.dart';
+import 'package:dyslexia_app/utils/telemetry_collector.dart';
+import 'package:dyslexia_app/models/telemetry.dart';
 
 class StoryReadingGame extends StatefulWidget {
   final VoidCallback? onComplete;
@@ -31,6 +37,16 @@ class _StoryReadingGameState extends State<StoryReadingGame>
   int? _letterModeWordIndex; // which word index is currently split into letters
   final Map<int, int> _letterProgress = {}; // wordIndex -> next letter index to tap
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // C1-C4 INTEGRATION: MBSV listening, telemetry, and intervention
+  // ═══════════════════════════════════════════════════════════════════════════
+  late String _studentId;
+  late MBSVListenerService _mbsvListener;
+  late TelemetryCollector? _telemetryCollector;
+  bool _interventionActive = false;
+  List<String> _interventionSyllables = [];
+  String _interventionWord = '';
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +59,102 @@ class _StoryReadingGameState extends State<StoryReadingGame>
       vsync: this,
     );
     _initializeSentence();
+
+    // ═══ Initialize C1-C4 integration ═══
+    _initializeMonitoring();
+  }
+
+  Future<void> _initializeMonitoring() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _studentId = prefs.getString('student_id') ?? 'demo_student_${DateTime.now().millisecondsSinceEpoch}';
+
+      // Start MBSV listening (C1)
+      _mbsvListener = MBSVListenerService();
+      _mbsvListener.addListener(_onMBSVUpdate);
+      _mbsvListener.start(_studentId);
+
+      // Initialize telemetry collector
+      final sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
+      _telemetryCollector = TelemetryCollector(
+        studentId: _studentId,
+        taskId: 'story_reading_game',
+        sessionId: sessionId,
+      );
+
+      debugPrint('[Story] Monitoring initialized for student: $_studentId');
+    } catch (e) {
+      debugPrint('[Story] Monitoring init error: $e');
+    }
+  }
+
+  /// Called when MBSV updates - check if intervention should trigger
+  void _onMBSVUpdate() {
+    if (!mounted || _interventionActive) return;
+
+    final mbsv = _mbsvListener.current;
+
+    // Trigger intervention if phonological strain exceeds threshold
+    if (mbsv.phonologicalStrainIndex > 0.45) {
+      _triggerIntervention();
+    }
+  }
+
+  /// Trigger the intervention overlay with syllable splitting
+  Future<void> _triggerIntervention() async {
+    if (_interventionActive) return;
+
+    setState(() => _interventionActive = true);
+
+    try {
+      // Pick a challenging word (longest word in current sentence)
+      final sentence = grade1Passages[currentPassageIndex].sentences[currentSentenceIndex];
+      final words = sentence.split(' ').where((w) => w.isNotEmpty).toList();
+
+      if (words.isEmpty) {
+        setState(() => _interventionActive = false);
+        return;
+      }
+
+      final challengeWord = words.reduce((a, b) => a.length > b.length ? a : b);
+
+      // Request syllable split from C4
+      final syllables = await InlineInterventionService.splitSyllables(challengeWord);
+
+      if (!mounted) return;
+
+      setState(() {
+        _interventionSyllables = syllables;
+        _interventionWord = challengeWord;
+      });
+
+      // Show intervention overlay
+      _showInterventionOverlay();
+    } catch (e) {
+      debugPrint('[Story] Intervention trigger error: $e');
+      setState(() => _interventionActive = false);
+    }
+  }
+
+  /// Display the intervention overlay
+  void _showInterventionOverlay() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => InterventionOverlay(
+        syllables: _interventionSyllables,
+        fullWord: _interventionWord,
+        onDismiss: () {
+          Navigator.pop(context);
+          setState(() {
+            _interventionActive = false;
+            _interventionSyllables = [];
+            _interventionWord = '';
+          });
+          debugPrint('[Story] Intervention dismissed');
+        },
+      ),
+    );
   }
 
   void _initializeSentence() {
@@ -69,6 +181,20 @@ class _StoryReadingGameState extends State<StoryReadingGame>
     if (_letterModeWordIndex == index) {
       _letterModeWordIndex = null;
       _letterProgress.remove(index);
+    }
+
+    // ═══ Send telemetry to C1 ═══
+    final sentence = grade1Passages[currentPassageIndex].sentences[currentSentenceIndex];
+    final words = sentence.split(' ');
+    if (index < words.length) {
+      final word = words[index];
+      final elapsed = DateTime.now().difference(sessionStartTime).inMilliseconds;
+      _telemetryCollector?.recordTouch(0, 0); // Record touch event
+      // Send payload to C1
+      final payload = _telemetryCollector?.finalize('word_tap');
+      if (payload != null) {
+        _telemetryCollector?.send(payload);
+      }
     }
 
     // restart timer for next words
@@ -311,6 +437,11 @@ class _StoryReadingGameState extends State<StoryReadingGame>
   void dispose() {
     _highlightController.dispose();
     _cancelInactivityTimer();
+
+    // ═══ Clean up monitoring ═══
+    _mbsvListener.removeListener(_onMBSVUpdate);
+    _mbsvListener.stop();
+
     super.dispose();
   }
 
