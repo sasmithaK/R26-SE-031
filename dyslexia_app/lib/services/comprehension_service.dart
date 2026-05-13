@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:dyslexia_app/models/comprehension_progress.dart';
 
 class ComprehensionService {
-  static const String baseUrl = 'http://localhost:8004/api/v1';
+  static const String baseUrl = 'http://127.0.0.1:5001/api/v1';
 
   /// Save or update comprehension progress in MongoDB
   static Future<bool> saveComprehensionProgress(

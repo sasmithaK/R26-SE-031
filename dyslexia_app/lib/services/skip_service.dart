@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SkipService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api/v1';
+  static const String baseUrl = 'http://127.0.0.1:5001/api/v1';
 
   /// Record a skip event for the current student and task by inserting
   /// a task score document with a numeric `skip_count` field.

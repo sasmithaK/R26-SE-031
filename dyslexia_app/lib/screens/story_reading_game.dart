@@ -47,8 +47,8 @@ class _StoryReadingGameState extends State<StoryReadingGame>
   }
 
   void _initializeSentence() {
-    final sentence = grade1Passages[currentPassageIndex]
-        .sentences[currentSentenceIndex];
+    final sentence =
+        grade1Passages[currentPassageIndex].sentences[currentSentenceIndex];
     final words = sentence.split(' ');
     tappedWords = List.filled(words.length, false);
     tappedWordIndices.clear();
@@ -94,7 +94,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
 
   void _moveToNextSentence() {
     final passage = grade1Passages[currentPassageIndex];
-    
+
     if (currentSentenceIndex < passage.sentences.length - 1) {
       Future.delayed(const Duration(milliseconds: 600), () {
         if (mounted) {
@@ -126,8 +126,8 @@ class _StoryReadingGameState extends State<StoryReadingGame>
     _inactivityTimer = Timer(_tapTimeout, () {
       if (!mounted) return;
       // find first untapped word and enable letter-by-letter mode
-      final sentence = grade1Passages[currentPassageIndex]
-          .sentences[currentSentenceIndex];
+      final sentence =
+          grade1Passages[currentPassageIndex].sentences[currentSentenceIndex];
       final words = sentence.split(' ');
       for (int i = 0; i < words.length; i++) {
         if (!tappedWords[i]) {
@@ -170,8 +170,8 @@ class _StoryReadingGameState extends State<StoryReadingGame>
     if (!mounted) return;
     // reset inactivity while user interacts with letters
     _cancelInactivityTimer();
-    final sentence = grade1Passages[currentPassageIndex]
-        .sentences[currentSentenceIndex];
+    final sentence =
+        grade1Passages[currentPassageIndex].sentences[currentSentenceIndex];
     final words = sentence.split(' ');
     final word = words[wordIndex];
     final letters = _extractLetters(word);
@@ -216,10 +216,13 @@ class _StoryReadingGameState extends State<StoryReadingGame>
   void _showSessionCompleteDialog() {
     final duration = DateTime.now().difference(sessionStartTime);
     final totalSeconds = duration.inSeconds;
-    final totalWords =
-        grade1Passages.fold<int>(0, (sum, p) => sum + p.wordCount);
-    final wordsPerMinute =
-        totalSeconds > 0 ? ((totalWords / totalSeconds) * 60).toInt() : 0;
+    final totalWords = grade1Passages.fold<int>(
+      0,
+      (sum, p) => sum + p.wordCount,
+    );
+    final wordsPerMinute = totalSeconds > 0
+        ? ((totalWords / totalSeconds) * 60).toInt()
+        : 0;
 
     showDialog(
       context: context,
@@ -228,7 +231,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
-          '🎉 පුටුවක්ෂණ සම්පූර්ණයි!',
+          '🎉 සැසිය සම්පූර්ණයි!',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 24,
@@ -244,10 +247,10 @@ class _StoryReadingGameState extends State<StoryReadingGame>
             const SizedBox(height: 12),
             _buildStatItem('ඉඟු භාවිතා කරන ලද', '$hintsUsed'),
             const SizedBox(height: 12),
-            _buildStatItem('පසි සම්පූර්ණ කරන ලද', '${grade1Passages.length}'),
+            _buildStatItem('සැසි සම්පූර්ණ කරන ලද', '${grade1Passages.length}'),
             const SizedBox(height: 24),
             const Text(
-              'ඔබ බෙහෙවින් කල්ට ලැබුවා!',
+              'ඔබ බොහෝ හොඳට කල!',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
@@ -389,9 +392,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                 value: (currentPassageIndex + 1) / grade1Passages.length,
                 minHeight: 12,
                 backgroundColor: Colors.grey.shade300,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  Colors.blue.shade400,
-                ),
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade400),
               ),
             ),
           ),
@@ -434,8 +435,8 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                         color: index < currentPassageIndex
                             ? Colors.green.shade400
                             : index == currentPassageIndex
-                                ? Colors.blue.shade600
-                                : Colors.grey.shade300,
+                            ? Colors.blue.shade600
+                            : Colors.grey.shade300,
                         boxShadow: index == currentPassageIndex
                             ? [
                                 BoxShadow(
@@ -509,8 +510,10 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                   ),
                   const SizedBox(height: 12),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.purple.shade100,
                       borderRadius: BorderRadius.circular(12),
@@ -539,8 +542,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
-                  transform: Matrix4.identity()
-                    ..scale(showHint ? 1.1 : 1.0),
+                  transform: Matrix4.identity()..scale(showHint ? 1.1 : 1.0),
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
@@ -561,11 +563,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                     ],
                   ),
                   child: Center(
-                    child: Icon(
-                      Icons.lightbulb,
-                      color: Colors.white,
-                      size: 32,
-                    ),
+                    child: Icon(Icons.lightbulb, color: Colors.white, size: 32),
                   ),
                 ),
               ),
@@ -620,31 +618,22 @@ class _StoryReadingGameState extends State<StoryReadingGame>
         decoration: BoxDecoration(
           gradient: isHighlighted
               ? LinearGradient(
-                  colors: [
-                    Colors.yellow.shade300,
-                    Colors.amber.shade300,
-                  ],
+                  colors: [Colors.yellow.shade300, Colors.amber.shade300],
                 )
               : isTapped
-                  ? LinearGradient(
-                      colors: [
-                        Colors.green.shade300,
-                        Colors.green.shade600,
-                      ],
-                    )
-                  : LinearGradient(
-                      colors: [
-                        Colors.blue.shade200,
-                        Colors.cyan.shade200,
-                      ],
-                    ),
+              ? LinearGradient(
+                  colors: [Colors.green.shade300, Colors.green.shade600],
+                )
+              : LinearGradient(
+                  colors: [Colors.blue.shade200, Colors.cyan.shade200],
+                ),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isHighlighted
                 ? Colors.amber.shade600
                 : isTapped
-                    ? Colors.green.shade600
-                    : Colors.blue.shade400,
+                ? Colors.green.shade600
+                : Colors.blue.shade400,
             width: isHighlighted ? 3 : 2,
           ),
           boxShadow: [
@@ -652,8 +641,8 @@ class _StoryReadingGameState extends State<StoryReadingGame>
               color: isHighlighted
                   ? Colors.yellow.withOpacity(0.5)
                   : isTapped
-                      ? Colors.green.withOpacity(0.3)
-                      : Colors.blue.withOpacity(0.2),
+                  ? Colors.green.withOpacity(0.3)
+                  : Colors.blue.withOpacity(0.2),
               blurRadius: isHighlighted ? 12 : 6,
               spreadRadius: isHighlighted ? 2 : 0,
             ),
@@ -667,8 +656,8 @@ class _StoryReadingGameState extends State<StoryReadingGame>
             color: isHighlighted
                 ? Colors.amber.shade900
                 : isTapped
-                    ? Colors.green.shade900
-                    : Colors.blue.shade900,
+                ? Colors.green.shade900
+                : Colors.blue.shade900,
             letterSpacing: 0.5,
           ),
         ),
@@ -697,8 +686,10 @@ class _StoryReadingGameState extends State<StoryReadingGame>
             onTap: enabled ? () => _onLetterTapped(wordIndex, i) : null,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8.0,
+                vertical: 6.0,
+              ),
               decoration: BoxDecoration(
                 color: tapped
                     ? Colors.orange.shade300
@@ -707,7 +698,9 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                 border: Border.all(
                   color: tapped
                       ? Colors.orange.shade700
-                      : (enabled ? Colors.amber.shade700 : Colors.grey.shade300),
+                      : (enabled
+                            ? Colors.amber.shade700
+                            : Colors.grey.shade300),
                   width: 1.6,
                 ),
                 boxShadow: tapped
@@ -716,7 +709,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                           color: Colors.orange.shade300.withOpacity(0.4),
                           blurRadius: 6,
                           offset: const Offset(0, 3),
-                        )
+                        ),
                       ]
                     : [],
               ),
@@ -727,7 +720,9 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                   fontWeight: FontWeight.w800,
                   color: tapped
                       ? Colors.white
-                      : (enabled ? Colors.amber.shade900 : Colors.grey.shade800),
+                      : (enabled
+                            ? Colors.amber.shade900
+                            : Colors.grey.shade800),
                 ),
               ),
             ),
@@ -747,16 +742,10 @@ class _StoryReadingGameState extends State<StoryReadingGame>
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  Colors.orange.shade50,
-                  Colors.amber.shade50,
-                ],
+                colors: [Colors.orange.shade50, Colors.amber.shade50],
               ),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.orange.shade400,
-                width: 2,
-              ),
+              border: Border.all(color: Colors.orange.shade400, width: 2),
               boxShadow: [
                 BoxShadow(
                   color: Colors.orange.withOpacity(0.3),

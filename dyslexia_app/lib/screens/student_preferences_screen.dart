@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class StudentPreferencesScreen extends StatefulWidget {
   const StudentPreferencesScreen({super.key});
 
   @override
-  State<StudentPreferencesScreen> createState() => _StudentPreferencesScreenState();
+  State<StudentPreferencesScreen> createState() =>
+      _StudentPreferencesScreenState();
 }
 
 class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
@@ -18,10 +20,41 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
     _ColorChoice('ලා නිල්', Color(0xFFE1F5FE), Color(0xFF81D4FA)),
   ];
 
-  final List<double> _fontOptions = const [14, 16, 18, 20, 24, 28, 32];
+  final List<double> _fontOptions = const [18, 20, 22, 24, 26, 28];
 
   int _selectedColorIndex = 0;
   int _selectedFontIndex = 2;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedPreferences();
+  }
+
+  Future<void> _loadSavedPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedColorIndex = prefs.getInt('preferred_color_index');
+    final savedFontSize = prefs.getDouble('preferred_font_size');
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (savedColorIndex != null &&
+          savedColorIndex >= 0 &&
+          savedColorIndex < _colorOptions.length) {
+        _selectedColorIndex = savedColorIndex;
+      }
+
+      if (savedFontSize != null) {
+        final fontIndex = _fontOptions.indexOf(savedFontSize);
+        if (fontIndex >= 0) {
+          _selectedFontIndex = fontIndex;
+        }
+      }
+    });
+  }
 
   double get _fontSize => _fontOptions[_selectedFontIndex];
 
@@ -30,24 +63,63 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
   Color get _previewAccent => _colorOptions[_selectedColorIndex].accent;
 
   void _saveAndContinue() {
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    _savePreferences();
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     // After preferences, go to the student dashboard with chosen color and font
-    Navigator.pushReplacementNamed(context, '/student_dashboard', arguments: {
-      'preferredColorIndex': _selectedColorIndex,
-      'preferredFontSize': _fontSize,
-      'studentName': args != null && args['studentName'] != null ? args['studentName'] as String : '',
-      'studentAge': args != null && args['studentAge'] != null ? args['studentAge'] as String : '',
-      'studentGrade': args != null && args['studentGrade'] != null ? args['studentGrade'] as String : '',
-      'totalScore': args != null && args['totalScore'] != null ? args['totalScore'] as int : 0,
-      'tier': args != null && args['tier'] != null ? args['tier'] as String : 'Tier 1',
-      'isNewStudent': args != null && args['isNewStudent'] == true,
-    });
+    Navigator.pushReplacementNamed(
+      context,
+      '/student_dashboard',
+      arguments: {
+        'preferredColorIndex': _selectedColorIndex,
+        'preferredFontSize': _fontSize,
+        'studentName': args != null && args['studentName'] != null
+            ? args['studentName'] as String
+            : '',
+        'studentAge': args != null && args['studentAge'] != null
+            ? args['studentAge'] as String
+            : '',
+        'studentGrade': args != null && args['studentGrade'] != null
+            ? args['studentGrade'] as String
+            : '',
+        'totalScore': args != null && args['totalScore'] != null
+            ? args['totalScore'] as int
+            : 0,
+        'tier': args != null && args['tier'] != null
+            ? args['tier'] as String
+            : 'Tier 1',
+        'isNewStudent': args != null && args['isNewStudent'] == true,
+      },
+    );
+  }
+
+  Future<void> _savePreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('preferred_color_index', _selectedColorIndex);
+    await prefs.setDouble('preferred_font_size', _fontSize);
+
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (args != null) {
+      if (args['totalScore'] is int) {
+        await prefs.setInt('student_total_score', args['totalScore'] as int);
+      }
+      if (args['tier'] is String) {
+        await prefs.setString('student_tier', args['tier'] as String);
+      }
+      if (args['isNewStudent'] is bool) {
+        await prefs.setBool('student_is_new', args['isNewStudent'] as bool);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final studentName = args != null && args['studentName'] != null ? args['studentName'] as String : '';
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final studentName = args != null && args['studentName'] != null
+        ? args['studentName'] as String
+        : '';
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFDF7),
@@ -86,7 +158,8 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
                         duration: const Duration(milliseconds: 180),
                         scale: isSelected ? 1.05 : 1.0,
                         child: GestureDetector(
-                          onTap: () => setState(() => _selectedColorIndex = index),
+                          onTap: () =>
+                              setState(() => _selectedColorIndex = index),
                           child: Container(
                             width: 92,
                             padding: const EdgeInsets.all(10),
@@ -94,7 +167,9 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
                               color: option.background,
                               borderRadius: BorderRadius.circular(18),
                               border: Border.all(
-                                color: isSelected ? Colors.brown : option.accent,
+                                color: isSelected
+                                    ? Colors.brown
+                                    : option.accent,
                                 width: isSelected ? 3 : 1.5,
                               ),
                               boxShadow: [
@@ -114,14 +189,20 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Center(
-                                    child: Icon(Icons.brush, color: Colors.white, size: 22),
+                                    child: Icon(
+                                      Icons.brush,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
                                   option.label,
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ],
                             ),
@@ -145,12 +226,15 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
                         label: Text('${size.toInt()}'),
                         selected: isSelected,
                         labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : Colors.brown.shade800,
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.brown.shade800,
                           fontWeight: FontWeight.w700,
                         ),
                         backgroundColor: Colors.white,
                         selectedColor: Colors.orangeAccent,
-                        onSelected: (_) => setState(() => _selectedFontIndex = index),
+                        onSelected: (_) =>
+                            setState(() => _selectedFontIndex = index),
                       );
                     }),
                   ),
@@ -163,12 +247,17 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
                   icon: const Icon(Icons.arrow_forward_rounded),
                   label: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 14.0),
-                    child: Text('සුරකින්න සහ ඉදිරියට යන්න', style: TextStyle(fontSize: 17)),
+                    child: Text(
+                      'සුරකින්න සහ ඉදිරියට යන්න',
+                      style: TextStyle(fontSize: 17),
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF8A65),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
                   ),
                 ),
               ],
@@ -214,7 +303,9 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  studentName.isNotEmpty ? '$studentName, අපි තෝරමු.' : 'අපි තෝරමු.',
+                  studentName.isNotEmpty
+                      ? '$studentName, අපි තෝරමු.'
+                      : 'අපි තෝරමු.',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
@@ -241,7 +332,11 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
     );
   }
 
-  Widget _buildSectionCard({required String title, required String subtitle, required Widget child}) {
+  Widget _buildSectionCard({
+    required String title,
+    required String subtitle,
+    required Widget child,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -282,7 +377,10 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
       decoration: BoxDecoration(
         color: _previewBackground,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _previewAccent.withValues(alpha: 0.5), width: 2),
+        border: Border.all(
+          color: _previewAccent.withValues(alpha: 0.5),
+          width: 2,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,7 +389,10 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
             children: [
               Icon(Icons.visibility_rounded, color: _previewAccent),
               const SizedBox(width: 8),
-              const Text('පෙරදසුන', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              const Text(
+                'පෙරදසුන',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -310,7 +411,11 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Center(
-                    child: Icon(Icons.auto_awesome, color: _previewAccent, size: 30),
+                    child: Icon(
+                      Icons.auto_awesome,
+                      color: _previewAccent,
+                      size: 30,
+                    ),
                   ),
                 ),
               ),
@@ -323,7 +428,11 @@ class _StudentPreferencesScreenState extends State<StudentPreferencesScreen> {
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Center(
-                    child: Icon(Icons.menu_book_rounded, color: Colors.brown.shade400, size: 30),
+                    child: Icon(
+                      Icons.menu_book_rounded,
+                      color: Colors.brown.shade400,
+                      size: 30,
+                    ),
                   ),
                 ),
               ),
