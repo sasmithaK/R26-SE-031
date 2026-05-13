@@ -34,16 +34,16 @@ from core.linucb import LinUCBAgent, build_context_vector, compute_reward
 from shared.database import connect_to_mongo, close_mongo_connection, get_db
 
 # ── Configuration ──────────────────────────────────────────────────────────
-ML_DIR   = Path(__file__).parent / "ml"
-DATA_DIR = Path(__file__).parent / "data"
-STATE_PATH   = str(ML_DIR / "linucb_state.pkl")
+MODELS_DIR = Path(__file__).parent.parent / "models"
+DATA_DIR   = Path(__file__).parent / "data"
+STATE_PATH   = str(MODELS_DIR / "c2_linucb_agent_warmstart.pkl")
 PRESETS_PATH = str(DATA_DIR / "arm_presets.json")
 PORT = int(os.getenv("C2_PORT", "8014"))
 
 ENGAGEMENT_LOW_THRESHOLD = float(os.getenv("ENGAGEMENT_LOW_THRESHOLD", "0.30"))
 VISUAL_STRAIN_TRIGGER    = float(os.getenv("VISUAL_STRAIN_TRIGGER", "0.60"))
 
-ML_DIR.mkdir(parents=True, exist_ok=True)
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
 Path("./db").mkdir(parents=True, exist_ok=True)
 
 # ── LinUCB Agent ───────────────────────────────────────────────────────────
@@ -99,9 +99,9 @@ def _check_gamification_trigger(student_id: str, engagement_index: float) -> boo
 # ── App ────────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    connect_to_mongo()
+    await connect_to_mongo()
     yield
-    close_mongo_connection()
+    await close_mongo_connection()
 
 app = FastAPI(
     title="C2 — Adaptive Visual Learning Interface (AVLI)",

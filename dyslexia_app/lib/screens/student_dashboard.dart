@@ -30,209 +30,300 @@ class StudentDashboard extends StatelessWidget {
           end: Alignment.bottomCenter,
         ),
       ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text('මගේ වැඩ', style: TextStyle(fontSize: fontSize + 12, fontWeight: FontWeight.w900)),
+      child: DefaultTabController(
+        length: 2,
+        child: Scaffold(
           backgroundColor: Colors.transparent,
-          foregroundColor: accent.computeLuminance() > 0.5 ? Colors.brown.shade900 : Colors.white,
-          elevation: 0,
-          centerTitle: true,
-        ),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 6),
-                        boxShadow: [
-                          BoxShadow(color: accent.withValues(alpha: 0.4), offset: const Offset(0, 8), blurRadius: 0),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/student_icon.png',
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.child_care, size: 50),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: Text(
-                        'ක්‍රීඩා කරමු!',
-                        style: TextStyle(
-                          fontSize: fontSize + 20,
-                          fontWeight: FontWeight.w900,
-                          color: accent,
-                          shadows: const [
-                            Shadow(color: Colors.white, blurRadius: 5, offset: Offset(2, 2)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 40),
-                Expanded(
-                  child: Builder(builder: (context) {
-                    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-                    final bool isNew = args != null && args['isNewStudent'] == true;
-                    if (isNew) {
-                      final tier = args['tier'] as String? ?? 'Tier 1';
-                      final score = args['totalScore'] as int? ?? 0;
-                      return ListView(
-                        physics: const BouncingScrollPhysics(),
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.12), blurRadius: 12)],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Initial assessment', style: TextStyle(fontSize: fontSize + 4, fontWeight: FontWeight.w900, color: accent)),
-                                const SizedBox(height: 8),
-                                Text('Tier: $tier', style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 4),
-                                Text('Risk score: $score', style: TextStyle(fontSize: fontSize - 2)),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          _buildGameCard(
-                            context,
-                            title: 'අකුරු හඳුනාගනිමු',
-                            icon: Icons.sort_by_alpha_rounded,
-                            color: Colors.blue.shade400,
-                            route: '/letter_id',
-                            fontSize: fontSize,
-                          ),
-                          const SizedBox(height: 24),
-                          _buildGameCard(
-                            context,
-                            title: 'කියවීමේ ප්‍රවාහිතාව',
-                            icon: Icons.menu_book_rounded,
-                            color: Colors.teal.shade400,
-                            route: '/reading_fluency',
-                            fontSize: fontSize,
-                          ),
-                          const SizedBox(height: 24),
-                          _buildGameCard(
-                            context,
-                            title: 'කියවීමේ වටහා ගැනීම',
-                            icon: Icons.image_search_rounded,
-                            color: Colors.orange.shade400,
-                            route: '/reading_comprehension',
-                            fontSize: fontSize,
-                          ),
-                        ],
-                      );
-                    }
-
-                    // Default full dashboard for returning students
-                    return ListView(
-                      physics: const BouncingScrollPhysics(),
-                      children: [
-                        _buildGameCard(
-                          context,
-                          title: 'අකුරු හඳුනාගනිමු',
-                          icon: Icons.sort_by_alpha_rounded,
-                          color: Colors.blue.shade400,
-                          route: '/letter_id',
-                          fontSize: fontSize,
-                        ),
-                        const SizedBox(height: 24),
-                        _buildGameCard(
-                          context,
-                          title: 'වචන ගලපමු',
-                          icon: Icons.extension_rounded,
-                          color: Colors.green.shade400,
-                          route: '/word_matching',
-                          fontSize: fontSize,
-                        ),
-                        const SizedBox(height: 24),
-                        _buildGameCard(
-                          context,
-                          title: 'රූපයක් අඳිමු',
-                          icon: Icons.brush_rounded,
-                          color: Colors.purple.shade400,
-                          route: '/draw_a_man',
-                          fontSize: fontSize,
-                        ),
-                        const SizedBox(height: 24),
-                        _buildGameCard(
-                          context,
-                          title: 'කතා සකස් කරමු',
-                          icon: Icons.auto_stories_rounded,
-                          color: Colors.deepOrange.shade300,
-                          route: '/story_sequencing',
-                          fontSize: fontSize,
-                        ),
-                        const SizedBox(height: 24),
-                        _buildGameCard(
-                          context,
-                          title: 'චිතර අඳින්න',
-                          icon: Icons.brush_rounded,
-                          color: Colors.cyan.shade400,
-                          route: '/drawing_interpretation',
-                          fontSize: fontSize,
-                        ),
-                        const SizedBox(height: 24),
-                        _buildGameCard(
-                          context,
-                          title: 'සදම් රේල්ලුව',
-                          icon: Icons.train_rounded,
-                          color: Colors.red.shade400,
-                          route: '/syllable_train',
-                          fontSize: fontSize,
-                        ),
-                        const SizedBox(height: 24),
-                        _buildGameCard(
-                          context,
-                          title: 'ගිගුරුම් අනුපිළිවෙල',
-                          icon: Icons.bug_report_rounded,
-                          color: Colors.amber.shade600,
-                          route: '/firefly_tracking',
-                          fontSize: fontSize,
-                        ),
-                        const SizedBox(height: 24),
-                        _buildGameCard(
-                          context,
-                          title: 'කියවීමේ ප්‍රවාහිතාව',
-                          icon: Icons.menu_book_rounded,
-                          color: Colors.teal.shade400,
-                          route: '/reading_fluency',
-                          fontSize: fontSize,
-                        ),
-                        const SizedBox(height: 24),
-                        _buildGameCard(
-                          context,
-                          title: 'කියවීමේ වටහා ගැනීම',
-                          icon: Icons.image_search_rounded,
-                          color: Colors.orange.shade400,
-                          route: '/reading_comprehension',
-                          fontSize: fontSize,
-                        ),
-                      ],
-                    );
-                  }),
-                ),
+          appBar: AppBar(
+            title: Text('මගේ වැඩ', style: TextStyle(fontSize: fontSize + 12, fontWeight: FontWeight.w900)),
+            backgroundColor: Colors.transparent,
+            foregroundColor: accent.computeLuminance() > 0.5 ? Colors.brown.shade900 : Colors.white,
+            elevation: 0,
+            centerTitle: true,
+            bottom: TabBar(
+              labelColor: accent,
+              unselectedLabelColor: accent.withValues(alpha: 0.7),
+              indicatorColor: accent,
+              tabs: const [
+                Tab(text: 'Home'),
+                Tab(text: 'Games'),
               ],
+            ),
+          ),
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: TabBarView(
+                children: [
+                  _buildHomeTab(context, fontSize, accent),
+                  _buildGamesTab(context, fontSize),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildHomeTab(BuildContext context, double fontSize, Color accent) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 6),
+                boxShadow: [
+                  BoxShadow(color: accent.withValues(alpha: 0.4), offset: const Offset(0, 8), blurRadius: 0),
+                ],
+              ),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/student_icon.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.child_care, size: 50),
+                ),
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Text(
+                'ක්‍රීඩා කරමු!',
+                style: TextStyle(
+                  fontSize: fontSize + 20,
+                  fontWeight: FontWeight.w900,
+                  color: accent,
+                  shadows: const [
+                    Shadow(color: Colors.white, blurRadius: 5, offset: Offset(2, 2)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 40),
+        Expanded(
+          child: Builder(builder: (context) {
+            final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+            final bool isNew = args != null && args['isNewStudent'] == true;
+            if (isNew) {
+              final tier = args['tier'] as String? ?? 'Tier 1';
+              final score = args['totalScore'] as int? ?? 0;
+              return ListView(
+                physics: const BouncingScrollPhysics(),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.12), blurRadius: 12)],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Initial assessment', style: TextStyle(fontSize: fontSize + 4, fontWeight: FontWeight.w900, color: accent)),
+                        const SizedBox(height: 8),
+                        Text('Tier: $tier', style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
+                        Text('Risk score: $score', style: TextStyle(fontSize: fontSize - 2)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildGameCard(
+                    context,
+                    title: 'අකුරු හඳුනාගනිමු',
+                    icon: Icons.sort_by_alpha_rounded,
+                    color: Colors.blue.shade400,
+                    route: '/letter_id',
+                    fontSize: fontSize,
+                  ),
+                  const SizedBox(height: 24),
+                  _buildGameCard(
+                    context,
+                    title: 'කියවීමේ ප්‍රවාහිතාව',
+                    icon: Icons.menu_book_rounded,
+                    color: Colors.teal.shade400,
+                    route: '/reading_fluency',
+                    fontSize: fontSize,
+                  ),
+                  const SizedBox(height: 24),
+                  _buildGameCard(
+                    context,
+                    title: 'කතාව කියවමු',
+                    icon: Icons.chrome_reader_mode_rounded,
+                    color: Colors.indigo.shade400,
+                    route: '/story_reading',
+                    fontSize: fontSize,
+                  ),
+                  const SizedBox(height: 24),
+                  _buildGameCard(
+                    context,
+                    title: 'කියවීමේ වටහා ගැනීම',
+                    icon: Icons.image_search_rounded,
+                    color: Colors.orange.shade400,
+                    route: '/reading_comprehension',
+                    fontSize: fontSize,
+                  ),
+                ],
+              );
+            }
+
+            // Default full dashboard for returning students
+            return ListView(
+              physics: const BouncingScrollPhysics(),
+              children: [
+                _buildGameCard(
+                  context,
+                  title: 'අකුරු හඳුනාගනිමු',
+                  icon: Icons.sort_by_alpha_rounded,
+                  color: Colors.blue.shade400,
+                  route: '/letter_id',
+                  fontSize: fontSize,
+                ),
+                const SizedBox(height: 24),
+                _buildGameCard(
+                  context,
+                  title: 'වචන ගලපමු',
+                  icon: Icons.extension_rounded,
+                  color: Colors.green.shade400,
+                  route: '/word_matching',
+                  fontSize: fontSize,
+                ),
+                const SizedBox(height: 24),
+                _buildGameCard(
+                  context,
+                  title: 'රූපයක් අඳිමු',
+                  icon: Icons.brush_rounded,
+                  color: Colors.purple.shade400,
+                  route: '/draw_a_man',
+                  fontSize: fontSize,
+                ),
+                const SizedBox(height: 24),
+                _buildGameCard(
+                  context,
+                  title: 'කතා සකස් කරමු',
+                  icon: Icons.auto_stories_rounded,
+                  color: Colors.deepOrange.shade300,
+                  route: '/story_sequencing',
+                  fontSize: fontSize,
+                ),
+                const SizedBox(height: 24),
+                _buildGameCard(
+                  context,
+                  title: 'චිතර අඳින්න',
+                  icon: Icons.brush_rounded,
+                  color: Colors.cyan.shade400,
+                  route: '/drawing_interpretation',
+                  fontSize: fontSize,
+                ),
+                const SizedBox(height: 24),
+                _buildGameCard(
+                  context,
+                  title: 'සදම් රේල්ලුව',
+                  icon: Icons.train_rounded,
+                  color: Colors.red.shade400,
+                  route: '/syllable_train',
+                  fontSize: fontSize,
+                ),
+                const SizedBox(height: 24),
+                _buildGameCard(
+                  context,
+                  title: 'ගිගුරුම් අනුපිළිවෙල',
+                  icon: Icons.bug_report_rounded,
+                  color: Colors.amber.shade600,
+                  route: '/firefly_tracking',
+                  fontSize: fontSize,
+                ),
+                const SizedBox(height: 24),
+                _buildGameCard(
+                  context,
+                  title: 'කියවීමේ ප්‍රවාහිතාව',
+                  icon: Icons.menu_book_rounded,
+                  color: Colors.teal.shade400,
+                  route: '/reading_fluency',
+                  fontSize: fontSize,
+                ),
+                const SizedBox(height: 24),
+                _buildGameCard(
+                  context,
+                  title: 'කියවීමේ වටහා ගැනීම',
+                  icon: Icons.image_search_rounded,
+                  color: Colors.orange.shade400,
+                  route: '/reading_comprehension',
+                  fontSize: fontSize,
+                ),
+                const SizedBox(height: 24),
+                _buildGameCard(
+                  context,
+                  title: 'කතාව කියවමු',
+                  icon: Icons.chrome_reader_mode_rounded,
+                  color: Colors.indigo.shade400,
+                  route: '/story_reading',
+                  fontSize: fontSize,
+                ),
+              ],
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGamesTab(BuildContext context, double fontSize) {
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      children: [
+        _buildGameCard(
+          context,
+          title: 'අකුරු හඳුනාගනිමු',
+          icon: Icons.sort_by_alpha_rounded,
+          color: Colors.blue.shade400,
+          route: '/letter_id',
+          fontSize: fontSize,
+        ),
+        const SizedBox(height: 24),
+        _buildGameCard(
+          context,
+          title: 'ගිගුරුම් අනුපිළිවෙල',
+          icon: Icons.bug_report_rounded,
+          color: Colors.amber.shade600,
+          route: '/firefly_tracking',
+          fontSize: fontSize,
+        ),
+        const SizedBox(height: 24),
+        _buildGameCard(
+          context,
+          title: 'චිතර අඳින්න',
+          icon: Icons.brush_rounded,
+          color: Colors.cyan.shade400,
+          route: '/drawing_interpretation',
+          fontSize: fontSize,
+        ),
+        const SizedBox(height: 24),
+        _buildGameCard(
+          context,
+          title: 'කතා සකස් කරමු',
+          icon: Icons.auto_stories_rounded,
+          color: Colors.deepOrange.shade300,
+          route: '/story_sequencing',
+          fontSize: fontSize,
+        ),
+        const SizedBox(height: 24),
+        _buildGameCard(
+          context,
+          title: 'සදම් රේල්ලුව',
+          icon: Icons.train_rounded,
+          color: Colors.red.shade400,
+          route: '/syllable_train',
+          fontSize: fontSize,
+        ),
+      ],
     );
   }
 

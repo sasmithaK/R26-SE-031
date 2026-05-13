@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
+import 'package:dyslexia_app/widgets/skip_button.dart';
 
 class DrawAManTest extends StatefulWidget {
   const DrawAManTest({super.key});
@@ -17,6 +18,12 @@ class _DrawAManTestState extends State<DrawAManTest> with SingleTickerProviderSt
 
   late AnimationController _animController;
   late Animation<double> _animation;
+
+  void _skipAndContinue() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
 
   @override
   void initState() {
@@ -54,7 +61,8 @@ class _DrawAManTestState extends State<DrawAManTest> with SingleTickerProviderSt
           backgroundColor: Colors.transparent,
           elevation: 0,
           foregroundColor: Colors.purple.shade900,
-        ),
+              actions: [SkipButton(taskName: 'draw_a_man', onSkipped: _skipAndContinue)],
+            ),
         body: SafeArea(
           child: Column(
             children: [

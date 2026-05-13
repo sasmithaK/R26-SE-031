@@ -4,7 +4,7 @@ import 'package:dyslexia_app/models/letter_identification_score.dart';
 
 class LetterIdentificationService {
   // Replace with your backend API base URL
-  static const String baseUrl = 'http://localhost:5000/api';
+  static const String baseUrl = 'http://localhost:8004/api/v1';
 
   /// Save a single letter identification score to MongoDB.
   static Future<bool> saveLetterScore(LetterIdentificationScore score) async {

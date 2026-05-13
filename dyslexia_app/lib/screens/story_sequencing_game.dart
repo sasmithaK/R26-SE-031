@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dyslexia_app/services/difficulty_profile_service.dart';
+import 'package:dyslexia_app/widgets/skip_button.dart';
 
 class StoryCard {
   final String imagePath;
@@ -60,7 +61,7 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
     ];
 
     final cardCount = DifficultyProfileService.countForLevel(
-      DifficultyProfileService.cachedStartLevel,
+      DifficultyProfileService.cachedStartingGameLevel,
       2,
       allCards.length,
     );
@@ -134,6 +135,7 @@ class _StorySequencingGameState extends State<StorySequencingGame> {
         backgroundColor: const Color(0xFF4CAF50), // Green
         elevation: 0,
         foregroundColor: Colors.white,
+        actions: [SkipButton(taskName: 'story_sequencing', onSkipped: resetGame)],
       ),
       body: SingleChildScrollView(
         child: Padding(

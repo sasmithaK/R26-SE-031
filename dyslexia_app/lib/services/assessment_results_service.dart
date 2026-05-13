@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/assessment_results.dart';
 
 class AssessmentResultsService {
-  static const String baseUrl = 'http://localhost:5000/api';
+  static const String baseUrl = 'http://127.0.0.1:8000/api/v1';
 
   /// Convert letter score (0-3) to rating
   static String rateLetterScore(int score) {
@@ -34,9 +34,9 @@ class AssessmentResultsService {
   }
 
   /// Calculate tier (1, 2, or 3) based on four ratings
-  /// Tier 1 - Needs High Support: Most weak ratings (3+ weak or 2+ weak with few strong)
+  /// Tier 1 - Developing Well: Most moderate/strong ratings
   /// Tier 2 - Needs Moderate Support: Mix of weak and moderate
-  /// Tier 3 - Developing Well: Most moderate or strong ratings (3+ moderate/strong)
+  /// Tier 3 - Needs High Support: Most weak ratings
   static Map<String, dynamic> calculateTier(
     String letterRating,
     String wpmRating,
@@ -53,21 +53,21 @@ class AssessmentResultsService {
     String tierDescription;
     String tierSupport;
     
-    // Determine tier based on counts
+    // Determine tier based on counts (Tier 1 = easy, Tier 3 = hard)
     if (weakCount >= 2) {
-      // Most weak ratings
-      tier = 1;
-      tierDescription = 'Tier 1 - Needs High Support';
+      // Most weak ratings => highest support needed
+      tier = 3;
+      tierDescription = 'Tier 3 - Needs High Support';
       tierSupport = 'Most of the four ratings came back as weak. This child is struggling significantly.';
     } else if (strongCount >= 2 && weakCount == 0) {
       // Most moderate or strong, no weak
-      tier = 3;
-      tierDescription = 'Tier 3 - Developing Well';
+      tier = 1;
+      tierDescription = 'Tier 1 - Developing Well';
       tierSupport = 'Most ratings came back as moderate or strong. This child is managing reasonably well.';
     } else if (strongCount >= 2 && weakCount <= 1) {
       // Good mix, mostly strong/moderate
-      tier = 3;
-      tierDescription = 'Tier 3 - Developing Well';
+      tier = 1;
+      tierDescription = 'Tier 1 - Developing Well';
       tierSupport = 'Most ratings came back as moderate or strong. This child is managing reasonably well.';
     } else {
       // Mix of weak and moderate, or moderate dominant
