@@ -139,7 +139,8 @@ async def get_next_content(
     mastery_vector = await bkt.get_mastery_vector(student_id)
     target_skill = await bkt.get_next_skill(student_id)
     learner_type = await _get_learner_type(student_id)
-    from core.bkt_engine import MASTERY_THRESHOLD, ZPD_LOWER, ZPD_UPPER, FATIGUE_THRESHOLD
+    from core.bkt_engine import MASTERY_THRESHOLD, ZPD_LOWER, ZPD_UPPER
+    from core.content_selector import FATIGUE_THRESHOLD
 
     item_dict = selector.select(
         student_id=student_id,
