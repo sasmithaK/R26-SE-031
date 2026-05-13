@@ -5,7 +5,7 @@ import '../utils/logger.dart';
 
 class FluencyService {
   // Replace with your backend API base URL
-  static const String baseUrl = 'http://localhost:8004/api/v1';
+  static const String baseUrl = 'http://127.0.0.1:5001/api/v1';
 
   /// Save or update fluency progress to MongoDB via backend API.
   static Future<bool> saveFluencyProgress(FluencyProgress progress) async {

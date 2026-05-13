@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import os
 import numpy as np
 import joblib
 import motor.motor_asyncio
@@ -116,7 +117,7 @@ def init_db():
 
 @app.on_event("startup")
 async def startup():
-    await init_db()
+    init_db()
 
 # ── Load RL Bandit (optional) ─────────────────────────────────────────────────
 try:

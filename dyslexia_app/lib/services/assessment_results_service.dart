@@ -5,7 +5,8 @@ import 'api_config.dart';
 import '../utils/logger.dart';
 
 class AssessmentResultsService {
-  static const String baseUrl = ApiConfig.monitoringUrl;
+  // static const String baseUrl = ApiConfig.monitoringUrl;
+  static const String baseUrl = 'http://127.0.0.1:5001/api/v1';
 
   /// Convert letter score (0-3) to rating
   static String rateLetterScore(int score) {

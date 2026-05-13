@@ -5,7 +5,7 @@ import '../utils/logger.dart';
 
 class LetterIdentificationService {
   // Replace with your backend API base URL
-  static const String baseUrl = 'http://localhost:8004/api/v1';
+  static const String baseUrl = 'http://127.0.0.1:5001/api/v1';
 
   /// Save a single letter identification score to MongoDB.
   static Future<bool> saveLetterScore(LetterIdentificationScore score) async {

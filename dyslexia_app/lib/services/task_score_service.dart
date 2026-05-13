@@ -4,7 +4,8 @@ import 'api_config.dart';
 import '../utils/logger.dart';
 
 class TaskScoreService {
-  static const String baseUrl = ApiConfig.monitoringUrl;
+  // static const String baseUrl = ApiConfig.monitoringUrl;
+  static const String baseUrl = 'http://127.0.0.1:5001/api/v1';
 
   /// Send telemetry payload to C1 Monitoring Service
   static Future<Map<String, dynamic>?> sendTelemetry(Map<String, dynamic> payload) async {
