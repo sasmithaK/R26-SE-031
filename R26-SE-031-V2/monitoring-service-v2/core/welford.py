@@ -112,6 +112,7 @@ class WelfordBaseline:
         "syllable_rate",
         "disfluency_count",
         "kalman_innovation",   # Kalman Filter output — added by feature_extractor
+        "whisper_wer_proxy",   # Whisper STT WER proxy (Perera & Sumanathilaka 2025)
     ]
 
     def __init__(self, student_id: str):

@@ -61,6 +61,60 @@ from pathlib import Path
 BASE = Path(__file__).parent.parent.parent
 MODEL_PATH = BASE / "models" / "c4_intervention_rf.pkl"
 
+# ── SinBERT classifier (Perera & Sumanathilaka 2025, arXiv:2510.04750) ──────
+# Fine-tuned on SPEAK-PP dataset → 70% error classification accuracy.
+# Loaded lazily; falls back to rule-based Unicode analysis if unavailable.
+from typing import Optional as _Opt
+_SINBERT_MODEL = None
+_SINBERT_TOKENIZER = None
+_SINBERT_LABELS = ["LONG_WORD", "VOWEL_CONFUSION", "CONSONANT_CONFUSION", "UNFAMILIAR"]
+_SINBERT_AVAILABLE = None  # None=untested
+
+SINBERT_MODEL_PATH = BASE / "models" / "c4_sinbert"
+
+
+def load_sinbert() -> bool:
+    """Load fine-tuned SinBERT from local models/c4_sinbert/. Returns True if loaded."""
+    global _SINBERT_MODEL, _SINBERT_TOKENIZER, _SINBERT_AVAILABLE
+    if _SINBERT_AVAILABLE is not None:
+        return _SINBERT_AVAILABLE
+    if not SINBERT_MODEL_PATH.exists():
+        print("[C4-SinBERT] models/c4_sinbert/ not found — run scripts/train_c4_sinbert.py first")
+        _SINBERT_AVAILABLE = False
+        return False
+    try:
+        from transformers import AutoTokenizer, AutoModelForSequenceClassification
+        _SINBERT_TOKENIZER = AutoTokenizer.from_pretrained(str(SINBERT_MODEL_PATH))
+        _SINBERT_MODEL = AutoModelForSequenceClassification.from_pretrained(str(SINBERT_MODEL_PATH))
+        _SINBERT_MODEL.eval()
+        _SINBERT_AVAILABLE = True
+        print("[C4-SinBERT] Loaded successfully from models/c4_sinbert/")
+        return True
+    except Exception as e:
+        print(f"[C4-SinBERT] Load error: {e} — using rule-based fallback")
+        _SINBERT_AVAILABLE = False
+        return False
+
+
+def _sinbert_classify(sentence: str) -> tuple[str, float]:
+    """
+    Run SinBERT inference on a full Sinhala sentence.
+    Returns (error_type, confidence).
+    """
+    try:
+        import torch
+        inputs = _SINBERT_TOKENIZER(
+            sentence, return_tensors="pt", truncation=True, max_length=128
+        )
+        with torch.no_grad():
+            logits = _SINBERT_MODEL(**inputs).logits
+        probs = torch.softmax(logits, dim=-1)[0]
+        predicted = int(torch.argmax(probs).item())
+        return _SINBERT_LABELS[predicted], float(probs[predicted].item())
+    except Exception as e:
+        print(f"[C4-SinBERT] Inference error: {e}")
+        return ERROR_VOWEL, 0.0
+
 def extract_word_features(word: str) -> dict:
     """Matches feature extraction in scripts/train_c4_intervention_rf.py"""
     syl_count = sum(1 for c in word if 0x0D80 <= ord(c) <= 0x0DFF)
@@ -75,54 +129,51 @@ def extract_word_features(word: str) -> dict:
 def classify_error_type(
     current_word: str,
     error_pattern_vector: List[int],
-    model: Optional[RandomForestClassifier] = None,
+    model=None,
     mastery_vector: Optional[Dict[str, float]] = None,
-) -> str:
+    context_sentence: Optional[str] = None,
+) -> tuple[str, str, float]:
     """
-    Classify the dominant phonological error type for a given word + MBSV flags.
-    Uses Random Forest model if available, else falls back to heuristics.
+    Two-stage error type classification.
+
+    Stage 1 (primary): SinBERT on context_sentence if available and model loaded.
+    Stage 2 (fallback): Rule-based Unicode analysis + Random Forest on word.
+
+    Returns: (error_type, classifier_model, confidence)
     """
+    # Stage 1: SinBERT (sentence-level, research-grade)
+    if context_sentence and _SINBERT_AVAILABLE and _SINBERT_MODEL is not None:
+        error_type, confidence = _sinbert_classify(context_sentence)
+        return error_type, "sinbert", confidence
+
+    # Stage 2: Rule-based heuristic (existing)
     reversal, omission, substitution, hesitation = (
         error_pattern_vector + [0] * 4
     )[:4]
-
-    # Heuristic Rule 1: Long word (pre-empts model for reliability)
     syllables = split_syllables(current_word)
     if len(syllables) >= 4:
-        return ERROR_LONG_WORD
-
-    # ML Inference
+        return ERROR_LONG_WORD, "rule_based", 1.0
     if model:
         try:
             wf = extract_word_features(current_word)
-            # Feature order must match training script
             features = np.array([[
-                wf["syl_count"],
-                wf["vowel_density"],
-                wf["cluster_len"],
-                reversal,
-                omission,
-                substitution,
-                hesitation
+                wf["syl_count"], wf["vowel_density"], wf["cluster_len"],
+                reversal, omission, substitution, hesitation
             ]], dtype=float)
-            
             prediction = model.predict(features)[0]
-            return str(prediction)
+            return str(prediction), "random_forest", 0.7
         except Exception:
-            pass # Fallback to heuristics below
-
-    # Heuristic Fallback
+            pass
     vowel_sign_count = sum(1 for c in current_word if 0x0DCF <= ord(c) <= 0x0DDF)
     if omission == 1 or vowel_sign_count >= 3:
-        return ERROR_VOWEL
+        return ERROR_VOWEL, "rule_based", 0.6
     if reversal == 1 or substitution == 1:
-        return ERROR_CONSONANT
+        return ERROR_CONSONANT, "rule_based", 0.6
     if mastery_vector:
         avg_mastery = sum(mastery_vector.values()) / max(len(mastery_vector), 1)
         if avg_mastery < 0.25:
-            return ERROR_UNFAMILIAR
-
-    return ERROR_VOWEL
+            return ERROR_UNFAMILIAR, "rule_based", 0.5
+    return ERROR_VOWEL, "rule_based", 0.5
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +242,7 @@ class InterventionEngine:
         self._strain_start: Dict[str, int] = {}
         # Track consecutive incorrect attempts per student for PAST frustration-stop rule
         self._consecutive_failures: Dict[str, int] = {}
-        
+
         # Load trained RF model if exists
         self.model = None
         if MODEL_PATH.exists():
@@ -200,6 +251,7 @@ class InterventionEngine:
                     self.model = pickle.load(f)
             except Exception as e:
                 print(f"[C4] Error loading RF model: {e}")
+        load_sinbert()
 
     async def check(
         self,
@@ -211,6 +263,7 @@ class InterventionEngine:
         mastery_vector: Optional[Dict[str, float]] = None,
         active_skill_id: Optional[str] = None,
         symptom_profile: Optional[Dict[str, int]] = None,
+        context_sentence: Optional[str] = None,
     ) -> dict:
         """
         Main trigger check. Returns stage + payload for Flutter.
@@ -252,8 +305,8 @@ class InterventionEngine:
             }
 
         # Stage 2: activity overlay (≥ 10s of strain)
-        error_type = classify_error_type(
-            current_word, error_pattern_vector, self.model, mastery_vector
+        error_type, classifier_model, confidence = classify_error_type(
+            current_word, error_pattern_vector, self.model, mastery_vector, context_sentence
         )
         activity_type, difficulty = select_activity(
             error_type, mastery_vector, active_skill_id
@@ -274,6 +327,8 @@ class InterventionEngine:
                 "sm2_quality_required": True,
                 "rti_alert": True,
                 "failure_count": failure_count,
+                "classifier_model": classifier_model,
+                "confidence": confidence,
             }
 
         return {
@@ -283,6 +338,8 @@ class InterventionEngine:
             "activity_type": activity_type,
             "activity_difficulty": difficulty,
             "sm2_quality_required": True,
+            "classifier_model": classifier_model,
+            "confidence": confidence,
         }
 
     # ------------------------------------------------------------------

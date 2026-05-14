@@ -105,6 +105,12 @@ class TelemetryPayload(BaseModel):
     # Optional: stylus trace deviation (RMS error vs. template path, px)
     stylus_deviation: Optional[float] = Field(None, description="RMS deviation from template trace (px)")
 
+    # Optional: raw audio for Whisper transcription (base64-encoded WAV/FLAC, ≤ 30s)
+    # If provided, C1 runs openai/whisper-base (language="si") → adds whisper_wer_proxy
+    # feature to MBSV computation. Degrades gracefully (0.0) when absent.
+    # Reference: Perera & Sumanathilaka (2025) arXiv:2510.04750 — 0.66 Sinhala STT accuracy.
+    audio_base64: Optional[str] = Field(None, description="Base64-encoded audio (WAV/FLAC) for Whisper WER proxy")
+
 
 # ---------------------------------------------------------------------------
 # C1 — CBME: MBSV Output
@@ -304,6 +310,10 @@ class InterventionCheckPayload(BaseModel):
     )
     strain_duration_ms: int = Field(0, ge=0, description="Continuous duration above threshold (ms)")
     mastery_vector: Optional[dict] = Field(None, description="From C3 /mastery endpoint")
+    # NEW (v5.0): full sentence context for SinBERT classification (§2.3)
+    # If provided, C4 uses SinBERT on the sentence instead of rule-based Unicode analysis on word alone.
+    # Reference: Perera & Sumanathilaka (2025) arXiv:2510.04750 — 0.70 error classification accuracy.
+    context_sentence: Optional[str] = Field(None, description="Full Sinhala sentence being read (for SinBERT classifier)")
 
 
 class ActivityContent(BaseModel):
@@ -335,6 +345,10 @@ class SM2UpdatePayload(BaseModel):
     student_id: str
     skill_id: str
     activity_accuracy_pct: float = Field(..., ge=0.0, le=100.0)
+    # NEW (v5.0): stroke accuracy from CNN/SSIM scorer for FINGER_TRACING activities (§3.3)
+    # Maps to SM-2 quality via accuracy_to_sm2_quality() — UCSC 21% improvement as baseline.
+    stroke_accuracy_pct: Optional[float] = Field(None, ge=0.0, le=100.0,
+        description="CNN/SSIM stroke similarity score for FINGER_TRACING (De Silva et al. 2025)")
 
 
 class SM2ScheduleResponse(BaseModel):

@@ -5,9 +5,15 @@ import '../models/mbsv.dart';
 class MonitoringService {
   final String baseUrl = "http://127.0.0.1:8011/api/v1";
 
+  /// Send behavioral telemetry to C1.
+  ///
+  /// [audioBase64] — optional base64-encoded WAV/FLAC from the mic capture.
+  /// When present, C1 runs the Whisper WER proxy and the result is reflected
+  /// in the returned MBSV's [whisperWerProxy] field.
   Future<MBSV> sendTelemetry({
     required String studentId,
     required Map<String, dynamic> telemetry,
+    String? audioBase64,
   }) async {
     try {
       final body = {
@@ -27,6 +33,8 @@ class MonitoringService {
         'read_aloud_pause_ms': telemetry['read_aloud_pause_ms'] ?? 0,
         'syllable_rate': telemetry['syllable_rate'] ?? 0.0,
         'disfluency_count': telemetry['disfluency_count'] ?? 0,
+        // Whisper WER proxy — null when no audio captured (web Speech API path)
+        if (audioBase64 != null) 'audio_base64': audioBase64,
       };
 
       final response = await http.post(

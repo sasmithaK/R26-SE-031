@@ -33,6 +33,7 @@ from shared.schemas import (
 )
 from core.intervention_engine import InterventionEngine
 from core.sm2_scheduler import SM2Scheduler
+from core.stroke_scorer import score_stroke, accuracy_to_sm2_quality
 
 # ── Configuration ──────────────────────────────────────────────────────────
 C3_BASE_URL = os.getenv("C3_BASE_URL", "http://localhost:8012")
@@ -113,6 +114,7 @@ async def check_intervention(payload: InterventionCheckPayload):
         strain_duration_ms=payload.strain_duration_ms,
         mastery_vector=mastery_vector,
         active_skill_id=active_skill_id,
+        context_sentence=payload.context_sentence,
     )
 
     stage = result.get("stage", 0)
@@ -138,6 +140,8 @@ async def check_intervention(payload: InterventionCheckPayload):
             "activity_difficulty": result.get("activity_difficulty"),
             "sm2_quality_required": True,
             "active_skill_id": active_skill_id,
+            "classifier_model": result.get("classifier_model"),
+            "confidence": result.get("confidence"),
         }
 
     # Stage 3 — RTI Tier 3
@@ -149,6 +153,8 @@ async def check_intervention(payload: InterventionCheckPayload):
         "activity_type": result.get("activity_type"),
         "activity_difficulty": result.get("activity_difficulty"),
         "sm2_quality_required": True,
+        "classifier_model": result.get("classifier_model"),
+        "confidence": result.get("confidence"),
         "rti_alert": {
             "student_id": payload.student_id,
             "skill_id": active_skill_id or "unknown",
@@ -204,6 +210,38 @@ def _suggest_home_activity(error_type: str) -> str:
         "UNFAMILIAR": "Read the word aloud 3 times together; then use it in a sentence.",
     }
     return suggestions.get(error_type, "Practice reading together for 10 minutes daily.")
+
+
+@app.post("/api/v1/intervention/stroke_score")
+async def score_stroke_endpoint(payload: dict):
+    """
+    Score a student stroke image against a template letter.
+    Input: { student_img_base64: str, template_img_base64: str }
+    Output: { accuracy_pct, sm2_quality, method, detail }
+    Reference: De Silva et al. (2025) UCSC — CNN stroke accuracy scorer.
+    """
+    student_img = payload.get("student_img_base64", "")
+    template_img = payload.get("template_img_base64", "")
+    if not student_img or not template_img:
+        raise HTTPException(status_code=422, detail="Both student_img_base64 and template_img_base64 required")
+    return score_stroke(student_img, template_img)
+
+
+@app.get("/api/v1/intervention/error_classifier/status")
+def get_classifier_status():
+    """
+    Return which error classifier is active: SinBERT or rule_based.
+    Used by demo UI to show classifier badge (Part 10.4).
+    """
+    from core.intervention_engine import _SINBERT_AVAILABLE, SINBERT_MODEL_PATH
+    return {
+        "model": "sinbert" if _SINBERT_AVAILABLE else "rule_based",
+        "model_loaded": bool(_SINBERT_AVAILABLE),
+        "model_path": str(SINBERT_MODEL_PATH),
+        "training_accuracy": 0.70 if _SINBERT_AVAILABLE else None,
+        "fallback": "rule_based",
+        "reference": "Perera & Sumanathilaka (2025) arXiv:2510.04750",
+    }
 
 
 if __name__ == "__main__":

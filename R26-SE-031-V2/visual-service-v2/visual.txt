@@ -1,0 +1,763 @@
+
+----- FILE: ./core/linucb.py -----
+"""
+visual-service-v2/core/linucb.py
+==================================
+LinUCB Contextual Bandit for typography adaptation in C2 (AVLI).
+
+Reference:
+    Li, L., Chu, W., Langford, J., & Schapire, R. E. (2010). A contextual-bandit
+    approach to personalized news article recommendation. WWW '10, 661–670.
+
+Arms (8 typography configurations):
+    Each arm is a pre-defined typography parameter combination stored in
+    data/arm_presets.json. The bandit learns which arm produces the highest
+    reading-fluency reward for each child, conditioned on the context vector.
+
+Context vector (d=7):
+    [visual_strain_index, engagement_index, session_number_normalized,
+     child_age_normalized, task_complexity_sovcm, crowding_load,
+     phonological_strain_index]
+
+Reward:
+    r = (visual_strain_before - visual_strain_after) + 0.3 * accuracy_delta
+    Range: approximately [-1.3, +1.3]; higher is better.
+
+Research novelty (Sinhala/Tamil):
+    Arms include diacritic_offset and glyph_padding parameters which are
+    Sinhala/Tamil abugida-specific (no prior work). These compensate for
+    vowel sign detachment when inter-character spacing increases.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import pickle
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+
+
+CONTEXT_DIM = 7   # d
+NUM_ARMS    = 8   # K
+ALPHA       = 0.1 # exploration parameter
+
+
+class LinUCBArm:
+    """
+    Per-arm parameters for LinUCB.
+
+    A: (d × d) positive definite matrix (initialized to identity).
+    b: (d × 1) vector.
+    theta: A^{-1} b (cached for efficient arm selection).
+    """
+
+    def __init__(self, arm_id: int, d: int = CONTEXT_DIM):
+        self.arm_id = arm_id
+        self.d = d
+        self.A: np.ndarray = np.identity(d)          # (d × d)
+        self.b: np.ndarray = np.zeros((d, 1))         # (d × 1)
+        self._A_inv: Optional[np.ndarray] = None      # cached inverse
+
+    def _get_A_inv(self) -> np.ndarray:
+        if self._A_inv is None:
+            self._A_inv = np.linalg.inv(self.A)
+        return self._A_inv
+
+    def ucb_score(self, context: np.ndarray, alpha: float = ALPHA) -> float:
+        """
+        Compute UCB score for this arm given context vector x (d × 1).
+        score = theta^T x + alpha * sqrt(x^T A^{-1} x)
+        """
+        x = context.reshape(-1, 1)   # (d × 1)
+        A_inv = self._get_A_inv()
+        theta = A_inv @ self.b       # (d × 1)
+        exploit = (theta.T @ x).item()
+        explore = alpha * float(np.sqrt((x.T @ A_inv @ x).item()))
+        return exploit + explore
+
+    def update(self, context: np.ndarray, reward: float) -> None:
+        """Update A and b given received reward. Invalidates A_inv cache."""
+        x = context.reshape(-1, 1)
+        self.A += x @ x.T
+        self.b += reward * x
+        self._A_inv = None  # invalidate cache
+
+    def to_dict(self) -> dict:
+        return {
+            "arm_id": self.arm_id,
+            "A": self.A.tolist(),
+            "b": self.b.tolist(),
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "LinUCBArm":
+        arm = cls(arm_id=d["arm_id"])
+        arm.A = np.array(d["A"])
+        arm.b = np.array(d["b"])
+        return arm
+
+
+class LinUCBAgent:
+    """
+    Disjoint LinUCB agent managing K arms for typography selection.
+
+    Usage:
+        agent = LinUCBAgent.load_or_create(state_path, presets_path)
+        arm_id = agent.select_arm(context_vector)
+        # ... Flutter renders typography for arm_id ...
+        agent.update(arm_id, context_vector, reward)
+        agent.save(state_path)
+    """
+
+    def __init__(self, arm_presets: List[dict]):
+        self.arms: List[LinUCBArm] = [
+            LinUCBArm(arm_id=i) for i in range(NUM_ARMS)
+        ]
+        self.arm_presets = arm_presets
+        self.total_steps = 0
+        self.cumulative_reward = 0.0
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def select_arm(self, context: np.ndarray) -> int:
+        """
+        Select arm with highest UCB score. Exploration parameter α=0.1.
+        Returns arm_id (0–7).
+        """
+        scores = [arm.ucb_score(context) for arm in self.arms]
+        return int(np.argmax(scores))
+
+    def update(self, arm_id: int, context: np.ndarray, reward: float) -> None:
+        """Update the selected arm with received reward."""
+        self.arms[arm_id].update(context, reward)
+        self.total_steps += 1
+        self.cumulative_reward += reward
+
+    def get_typography_config(self, arm_id: int) -> dict:
+        """Return the typography preset dict for a given arm_id."""
+        return self.arm_presets[arm_id]
+
+    def get_stats(self) -> dict:
+        return {
+            "total_steps": self.total_steps,
+            "cumulative_reward": round(self.cumulative_reward, 4),
+            "arm_selection_counts": self._arm_counts(),
+        }
+
+    # ------------------------------------------------------------------
+    # Persistence
+    # ------------------------------------------------------------------
+
+    def save(self, state_path: str) -> None:
+        state = {
+            "arms": [arm.to_dict() for arm in self.arms],
+            "total_steps": self.total_steps,
+            "cumulative_reward": self.cumulative_reward,
+            "arm_presets": self.arm_presets,
+        }
+        Path(state_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(state_path, "wb") as f:
+            pickle.dump(state, f)
+
+    @classmethod
+    def load_or_create(cls, state_path: str, presets_path: str) -> "LinUCBAgent":
+        """Load from pickle if exists, else initialize from arm presets JSON."""
+        presets = _load_presets(presets_path)
+        if os.path.exists(state_path):
+            try:
+                with open(state_path, "rb") as f:
+                    state = pickle.load(f)
+                agent = cls(arm_presets=presets)
+                agent.arms = [LinUCBArm.from_dict(d) for d in state["arms"]]
+                agent.total_steps = state.get("total_steps", 0)
+                agent.cumulative_reward = state.get("cumulative_reward", 0.0)
+                return agent
+            except Exception:
+                pass
+        return cls(arm_presets=presets)
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _arm_counts(self) -> Dict[int, int]:
+        """Proxy count from A diagonal (number of updates per arm)."""
+        counts = {}
+        for arm in self.arms:
+            # Diagonal of A minus identity gives number of outer product updates
+            counts[arm.arm_id] = int(round(np.trace(arm.A) - CONTEXT_DIM))
+        return counts
+
+
+# ---------------------------------------------------------------------------
+# Context Vector Builder
+# ---------------------------------------------------------------------------
+
+def build_context_vector(
+    visual_strain_index: float,
+    engagement_index: float,
+    session_number: int,
+    child_age_years: Optional[int],
+    task_complexity_sovcm: float,
+    crowding_load: float,
+    phonological_strain_index: float,
+) -> np.ndarray:
+    """
+    Build the (d=7) context vector for LinUCB.
+
+    Normalization:
+        session_number:    capped at 50, normalized to [0, 1]
+        child_age_years:   6–10 years → normalized to [0, 1]; default 0.5 if unknown
+        task_complexity:   already [0, 1] (SOVCM composite_score)
+        crowding_load:     already [0, 1]
+    """
+    session_norm = min(session_number / 50.0, 1.0)
+    age_norm = ((child_age_years or 7) - 6) / 4.0 if child_age_years else 0.5
+
+    return np.array([
+        visual_strain_index,
+        engagement_index,
+        session_norm,
+        age_norm,
+        task_complexity_sovcm,
+        crowding_load,
+        phonological_strain_index,
+    ], dtype=float)
+
+
+def compute_reward(
+    visual_strain_before: float,
+    visual_strain_after: float,
+    accuracy_delta: float,
+) -> float:
+    """
+    Reward = reduction in visual strain + weighted accuracy improvement.
+    r ∈ approximately [-1.3, +1.3].
+    """
+    strain_reduction = visual_strain_before - visual_strain_after
+    return strain_reduction + 0.3 * accuracy_delta
+
+
+# ---------------------------------------------------------------------------
+# Utility
+# ---------------------------------------------------------------------------
+
+def _load_presets(presets_path: str) -> List[dict]:
+    with open(presets_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data["arms"]
+
+----- FILE: ./core/sovcm.py -----
+"""
+visual-service-v2/core/sovcm.py
+=================================
+Sinhala Orthographic Visual Complexity Model (SOVCM) — C2 (AVLI).
+
+Per-character structural complexity lookup for Sinhala script (U+0D80–U+0DFF).
+Serves as the novel context feature for the LinUCB contextual bandit.
+
+composite_score = 0.30·stroke + 0.25·enclosed + 0.20·v_asym
+                + 0.15·h_asym + 0.10·pilla_density
+
+Reference:
+    Whitney, D. & Levi, D. M. (2011). Visual crowding. Trends in Cognitive
+    Sciences, 15(4), 160–168.
+"""
+
+from __future__ import annotations
+from typing import Dict, Optional
+import numpy as np
+
+
+# ---------------------------------------------------------------------------
+# SOVCM Lookup Table  (s=strokes, e=enclosed, va=vert_asym, ha=horiz_asym, p=pilla)
+# ---------------------------------------------------------------------------
+SOVCM_TABLE: Dict[str, dict] = {
+    # Vowels
+    "අ": {"s":3,"e":0,"va":0.3,"ha":0.4,"p":0}, "ආ": {"s":4,"e":0,"va":0.3,"ha":0.5,"p":0},
+    "ඇ": {"s":4,"e":1,"va":0.4,"ha":0.5,"p":0}, "ඈ": {"s":5,"e":1,"va":0.4,"ha":0.6,"p":0},
+    "ඉ": {"s":2,"e":0,"va":0.2,"ha":0.3,"p":0}, "ඊ": {"s":3,"e":0,"va":0.2,"ha":0.4,"p":0},
+    "උ": {"s":2,"e":0,"va":0.3,"ha":0.4,"p":0}, "ඌ": {"s":3,"e":0,"va":0.3,"ha":0.5,"p":0},
+    "එ": {"s":2,"e":0,"va":0.2,"ha":0.3,"p":0}, "ඒ": {"s":3,"e":0,"va":0.2,"ha":0.4,"p":0},
+    "ඔ": {"s":3,"e":1,"va":0.4,"ha":0.4,"p":0}, "ඕ": {"s":4,"e":1,"va":0.4,"ha":0.5,"p":0},
+    # Consonants
+    "ක": {"s":3,"e":0,"va":0.3,"ha":0.4,"p":0}, "ඛ": {"s":4,"e":1,"va":0.4,"ha":0.5,"p":0},
+    "ග": {"s":3,"e":1,"va":0.5,"ha":0.4,"p":0}, "ඝ": {"s":4,"e":1,"va":0.5,"ha":0.5,"p":0},
+    "ච": {"s":3,"e":0,"va":0.2,"ha":0.3,"p":0}, "ඡ": {"s":4,"e":0,"va":0.3,"ha":0.4,"p":0},
+    "ජ": {"s":3,"e":0,"va":0.3,"ha":0.5,"p":0}, "ඣ": {"s":4,"e":1,"va":0.4,"ha":0.5,"p":0},
+    "ට": {"s":2,"e":0,"va":0.2,"ha":0.2,"p":0}, "ඨ": {"s":3,"e":0,"va":0.2,"ha":0.3,"p":0},
+    "ඩ": {"s":3,"e":1,"va":0.4,"ha":0.4,"p":0}, "ඪ": {"s":4,"e":1,"va":0.4,"ha":0.5,"p":0},
+    "ණ": {"s":3,"e":1,"va":0.5,"ha":0.5,"p":0},
+    "ත": {"s":2,"e":0,"va":0.1,"ha":0.2,"p":0}, "ථ": {"s":3,"e":0,"va":0.2,"ha":0.3,"p":0},
+    "ද": {"s":3,"e":1,"va":0.4,"ha":0.5,"p":0}, "ධ": {"s":4,"e":1,"va":0.5,"ha":0.5,"p":0},
+    "න": {"s":3,"e":0,"va":0.3,"ha":0.4,"p":0},
+    "ප": {"s":3,"e":1,"va":0.4,"ha":0.3,"p":0}, "ඵ": {"s":4,"e":1,"va":0.4,"ha":0.4,"p":0},
+    "බ": {"s":3,"e":1,"va":0.5,"ha":0.4,"p":0}, "භ": {"s":4,"e":1,"va":0.5,"ha":0.5,"p":0},
+    "ම": {"s":4,"e":1,"va":0.5,"ha":0.4,"p":0},
+    "ය": {"s":3,"e":0,"va":0.3,"ha":0.5,"p":0}, "ර": {"s":2,"e":0,"va":0.2,"ha":0.3,"p":0},
+    "ල": {"s":2,"e":0,"va":0.1,"ha":0.2,"p":0}, "ව": {"s":3,"e":0,"va":0.2,"ha":0.3,"p":0},
+    "ශ": {"s":5,"e":2,"va":0.6,"ha":0.6,"p":0}, "ෂ": {"s":5,"e":2,"va":0.6,"ha":0.6,"p":0},
+    "ස": {"s":4,"e":1,"va":0.4,"ha":0.5,"p":0}, "හ": {"s":4,"e":1,"va":0.5,"ha":0.5,"p":0},
+    "ළ": {"s":3,"e":0,"va":0.2,"ha":0.3,"p":0}, "ෆ": {"s":3,"e":1,"va":0.4,"ha":0.4,"p":0},
+    # Vowel signs (pilla / matura)
+    "\u0DCF":{"s":1,"e":0,"va":0.1,"ha":0.1,"p":1},  # ා
+    "\u0DD0":{"s":1,"e":0,"va":0.1,"ha":0.2,"p":1},  # ැ
+    "\u0DD1":{"s":2,"e":0,"va":0.2,"ha":0.2,"p":1},  # ෑ
+    "\u0DD2":{"s":1,"e":0,"va":0.1,"ha":0.1,"p":1},  # ි
+    "\u0DD3":{"s":2,"e":0,"va":0.1,"ha":0.2,"p":1},  # ී
+    "\u0DD4":{"s":1,"e":0,"va":0.1,"ha":0.1,"p":1},  # ු
+    "\u0DD6":{"s":2,"e":0,"va":0.1,"ha":0.2,"p":1},  # ූ
+    "\u0DD8":{"s":2,"e":0,"va":0.2,"ha":0.2,"p":1},  # ෘ
+    "\u0DDA":{"s":2,"e":1,"va":0.3,"ha":0.3,"p":2},  # ෙ
+    "\u0DDB":{"s":3,"e":1,"va":0.3,"ha":0.3,"p":2},  # ේ
+    "\u0DDC":{"s":3,"e":1,"va":0.4,"ha":0.4,"p":2},  # ෝ  wraps both sides
+    "\u0DDD":{"s":4,"e":1,"va":0.4,"ha":0.5,"p":2},  # ෞ
+    "\u0DDE":{"s":3,"e":1,"va":0.4,"ha":0.4,"p":2},  # ෟ
+    "\u0DDF":{"s":2,"e":0,"va":0.2,"ha":0.3,"p":1},  # ෯
+    "\u0DCA":{"s":1,"e":0,"va":0.1,"ha":0.1,"p":0},  # ් hal/virama
+}
+
+_W = (0.30, 0.25, 0.20, 0.15, 0.10)   # weight vector
+_MAX = (5, 2, 1, 1, 2)                  # normalisation denominators
+
+
+def _composite(e: dict) -> float:
+    return (
+        _W[0] * e["s"]  / _MAX[0] +
+        _W[1] * e["e"]  / _MAX[1] +
+        _W[2] * e["va"]           +
+        _W[3] * e["ha"]           +
+        _W[4] * e["p"]  / _MAX[4]
+    )
+
+
+def compute_sovcm_score(char: str) -> Optional[dict]:
+    """Return SOVCM profile dict for one Sinhala character, or None."""
+    e = SOVCM_TABLE.get(char)
+    if e is None:
+        return None
+    return {
+        "stroke_count":         e["s"],
+        "enclosed_regions":     e["e"],
+        "vertical_asymmetry":   e["va"],
+        "horizontal_asymmetry": e["ha"],
+        "pilla_density":        e["p"],
+        "composite_score":      round(_composite(e), 4),
+    }
+
+
+def task_complexity(content_text: str) -> float:
+    """
+    Mean composite SOVCM score across all Sinhala characters in content_text.
+    Returns 0.5 (neutral) if no Sinhala characters found.
+    Used as `task_complexity_sovcm` context dimension in LinUCB.
+    """
+    scores = [_composite(SOVCM_TABLE[c]) for c in content_text if c in SOVCM_TABLE]
+    return float(np.mean(scores)) if scores else 0.5
+
+
+def crowding_load(content_text: str, current_letter_spacing_px: float) -> float:
+    """
+    Visual crowding load for a Sinhala string.
+    crowding_i = similarity(char_i, char_{i+1}) / (spacing + 1)
+    Returns 0.0 if fewer than 2 Sinhala characters present.
+    """
+    chars = [c for c in content_text if c in SOVCM_TABLE]
+    if len(chars) < 2:
+        return 0.0
+    scores = []
+    for i in range(len(chars) - 1):
+        sim = 1.0 - abs(_composite(SOVCM_TABLE[chars[i]]) - _composite(SOVCM_TABLE[chars[i+1]]))
+        scores.append(sim / (current_letter_spacing_px + 1.0))
+    return float(np.mean(scores))
+
+----- FILE: ./core/__init__.py -----
+# C2 AVLI — core package
+
+----- FILE: ./data/arm_presets.json -----
+{
+  "arms": [
+    {
+      "arm_id": 0,
+      "name": "Baseline (NIE Standard)",
+      "description": "Default NIE Grade 1 typography — no modifications",
+      "font_size": 20.0,
+      "letter_spacing": 1.0,
+      "word_spacing": 6.0,
+      "line_height": 1.5,
+      "background_contrast": "WCAG_AA",
+      "diacritic_offset": 0.0,
+      "glyph_padding": 0.0
+    },
+    {
+      "arm_id": 1,
+      "name": "Increased spacing",
+      "description": "Wider letter + word spacing to reduce crowding",
+      "font_size": 20.0,
+      "letter_spacing": 3.0,
+      "word_spacing": 10.0,
+      "line_height": 1.6,
+      "background_contrast": "WCAG_AA",
+      "diacritic_offset": 0.0,
+      "glyph_padding": 1.0
+    },
+    {
+      "arm_id": 2,
+      "name": "Large font",
+      "description": "Larger font size for visual strain reduction",
+      "font_size": 24.0,
+      "letter_spacing": 2.0,
+      "word_spacing": 8.0,
+      "line_height": 1.7,
+      "background_contrast": "WCAG_AA",
+      "diacritic_offset": 0.0,
+      "glyph_padding": 0.5
+    },
+    {
+      "arm_id": 3,
+      "name": "Diacritic-safe",
+      "description": "Positive diacritic_offset to prevent vowel sign overlap on Sinhala abugida",
+      "font_size": 22.0,
+      "letter_spacing": 2.5,
+      "word_spacing": 9.0,
+      "line_height": 1.8,
+      "background_contrast": "WCAG_AA",
+      "diacritic_offset": 2.0,
+      "glyph_padding": 2.0
+    },
+    {
+      "arm_id": 4,
+      "name": "High contrast",
+      "description": "WCAG AAA contrast with standard spacing",
+      "font_size": 20.0,
+      "letter_spacing": 2.0,
+      "word_spacing": 8.0,
+      "line_height": 1.6,
+      "background_contrast": "WCAG_AAA",
+      "diacritic_offset": 0.0,
+      "glyph_padding": 0.0
+    },
+    {
+      "arm_id": 5,
+      "name": "Maximum accessibility",
+      "description": "Large font + max spacing + AAA contrast + diacritic offset",
+      "font_size": 26.0,
+      "letter_spacing": 5.0,
+      "word_spacing": 14.0,
+      "line_height": 2.0,
+      "background_contrast": "WCAG_AAA",
+      "diacritic_offset": 3.0,
+      "glyph_padding": 4.0
+    },
+    {
+      "arm_id": 6,
+      "name": "Compact high-contrast",
+      "description": "Smaller spacing but high contrast — for low-engagement fast pace",
+      "font_size": 20.0,
+      "letter_spacing": 1.5,
+      "word_spacing": 7.0,
+      "line_height": 1.55,
+      "background_contrast": "WCAG_AAA",
+      "diacritic_offset": 1.0,
+      "glyph_padding": 0.5
+    },
+    {
+      "arm_id": 7,
+      "name": "Glyph-padded line",
+      "description": "Maximum glyph padding — for consonant-cluster crowding in 3+ syllable words",
+      "font_size": 22.0,
+      "letter_spacing": 4.0,
+      "word_spacing": 12.0,
+      "line_height": 1.9,
+      "background_contrast": "WCAG_AA",
+      "diacritic_offset": 1.5,
+      "glyph_padding": 6.0
+    }
+  ]
+}
+
+----- FILE: ./main.py -----
+"""
+visual-service-v2/main.py
+===========================
+C2 — Adaptive Visual Learning Interface (AVLI)
+FastAPI application — Port 8014
+
+Endpoints:
+    POST /api/v1/ui/typography               → LinUCB arm select → typography config
+    POST /api/v1/ui/reward                   → LinUCB update after reading attempt
+    GET  /api/v1/ui/gamification/status/{student_id} → Gamification trigger check
+    POST /api/v1/ui/preferences              → Store student onboarding preferences
+    GET  /api/v1/ui/linucb/stats             → Bandit performance stats
+    GET  /health
+"""
+
+import os
+import sys
+import time
+from pathlib import Path
+from typing import Optional
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
+
+import numpy as np
+
+from shared.schemas import (
+    TypographyRequest, TypographyResponse, TypographyConfig,
+    RewardPayload, StudentPreferences
+)
+from core.linucb import LinUCBAgent, build_context_vector, compute_reward
+from core.sovcm import task_complexity as sovcm_task_complexity, crowding_load as sovcm_crowding_load
+from shared.database import connect_to_mongo, close_mongo_connection, get_db
+
+# ── Configuration ──────────────────────────────────────────────────────────
+MODELS_DIR = Path(__file__).parent.parent / "models"
+DATA_DIR   = Path(__file__).parent / "data"
+STATE_PATH   = str(MODELS_DIR / "c2_linucb_agent_warmstart.pkl")
+PRESETS_PATH = str(DATA_DIR / "arm_presets.json")
+PORT = int(os.getenv("C2_PORT", "8014"))
+
+ENGAGEMENT_LOW_THRESHOLD = float(os.getenv("ENGAGEMENT_LOW_THRESHOLD", "0.30"))
+VISUAL_STRAIN_TRIGGER    = float(os.getenv("VISUAL_STRAIN_TRIGGER", "0.60"))
+
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+Path("./db").mkdir(parents=True, exist_ok=True)
+
+# ── LinUCB Agent ───────────────────────────────────────────────────────────
+agent = LinUCBAgent.load_or_create(STATE_PATH, PRESETS_PATH)
+
+# ── Gamification tracker (in-memory: {student_id: [timestamps of low engagement]}) ─
+_low_engagement_events: dict = {}
+
+# ── Context cache: stores the context vector used during arm selection so the
+#    reward update can use the exact same context (not reconstructed defaults).
+#    Keyed by (student_id, session_id) → (arm_id, context_ndarray)
+_arm_context_cache: dict = {}
+
+# ── DB helpers ─────────────────────────────────────────────────────────────
+
+async def _get_preferences(student_id: str) -> dict:
+    db = get_db()
+    row = await db.student_preferences.find_one({"student_id": student_id})
+    if row:
+        return {"font": row.get("preferred_font", "NotoSansSinhala"),
+                "theme": row.get("preferred_theme", "Calm Blue"),
+                "language": row.get("language", "si"),
+                "learner_type": row.get("learner_type", "V")}
+    return {"font": "NotoSansSinhala", "theme": "Calm Blue", "language": "si", "learner_type": "V"}
+
+
+def _check_gamification_trigger(student_id: str, engagement_index: float) -> bool:
+    """
+    Gamification trigger: engagement_index < 0.3 for 2 consecutive 30s windows.
+    """
+    now = time.time()
+    events = _low_engagement_events.setdefault(student_id, [])
+    if engagement_index < ENGAGEMENT_LOW_THRESHOLD:
+        events.append(now)
+    # Keep only events from last 90s (3 windows)
+    _low_engagement_events[student_id] = [t for t in events if now - t < 90]
+    # Count events in two consecutive 30s windows
+    recent = [t for t in _low_engagement_events[student_id] if now - t < 60]
+    return len(recent) >= 2  # ≥2 low-engagement events in 60s window
+
+
+# ── App ────────────────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await connect_to_mongo()
+    yield
+    await close_mongo_connection()
+
+app = FastAPI(
+    title="C2 — Adaptive Visual Learning Interface (AVLI)",
+    description="LinUCB contextual bandit for Sinhala-specific typography adaptation + gamification controller.",
+    version="2.0.0",
+    lifespan=lifespan
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "C2-AVLI", "linucb_steps": agent.total_steps}
+
+
+@app.post("/api/v1/ui/typography", response_model=TypographyResponse)
+async def get_typography(request: TypographyRequest):
+    """
+    Select typography configuration via LinUCB.
+    Uses visual_strain_index + engagement_index from MBSV (C2's dimensions only).
+    Context includes SOVCM complexity score (novel abugida-specific feature).
+    """
+    prefs = await _get_preferences(request.student_id)
+    content_text = request.current_content_text or ""
+
+    # Real SOVCM — mean composite score across all Sinhala chars in current content
+    task_complexity = sovcm_task_complexity(content_text)
+
+    # Real crowding load — uses the arm-0 baseline letter_spacing (2.0px) as prior;
+    # we compute before arm selection because the context informs the selection
+    baseline_spacing = 2.0
+    crowding = sovcm_crowding_load(content_text, baseline_spacing)
+
+    context = build_context_vector(
+        visual_strain_index=request.visual_strain_index,
+        engagement_index=request.engagement_index,
+        session_number=request.session_number,
+        child_age_years=request.child_age_years,
+        task_complexity_sovcm=task_complexity,
+        crowding_load=crowding,
+        phonological_strain_index=request.phonological_strain_index,
+    )
+
+    arm_id = agent.select_arm(context)
+    preset = agent.get_typography_config(arm_id)
+
+    # Cache context so the reward endpoint can use the exact same vector
+    _arm_context_cache[(request.student_id, request.session_id)] = (arm_id, context)
+
+    # Override font from student preferences
+    config = TypographyConfig(
+        font_size=preset.get("font_size", 20.0),
+        font_family=prefs["font"],
+        letter_spacing=preset.get("letter_spacing", 2.0),
+        word_spacing=preset.get("word_spacing", 8.0),
+        line_height=preset.get("line_height", 1.6),
+        background_contrast=preset.get("background_contrast", "WCAG_AA"),
+        diacritic_offset=preset.get("diacritic_offset", 0.0),
+        glyph_padding=preset.get("glyph_padding", 0.0),
+    )
+
+    game_trigger = _check_gamification_trigger(request.student_id, request.engagement_index)
+
+    # Dynamic game difficulty: easier game when very disengaged, harder when moderately engaged
+    if request.engagement_index < 0.2:
+        game_difficulty = 1
+    elif request.engagement_index > 0.6:
+        game_difficulty = 3
+    else:
+        game_difficulty = 2
+
+    return TypographyResponse(
+        student_id=request.student_id,
+        linucb_arm_selected=arm_id,
+        typography_config=config,
+        game_mode_trigger=game_trigger,
+        game_difficulty=game_difficulty,
+    )
+
+
+@app.post("/api/v1/ui/reward")
+async def update_reward(payload: RewardPayload):
+    """Update LinUCB with reward signal after a reading attempt."""
+    reward = compute_reward(
+        payload.visual_strain_before,
+        payload.visual_strain_after,
+        payload.reading_accuracy_delta,
+    )
+
+    # Retrieve the exact context used when this arm was selected; fall back to a
+    # visual-strain-only reconstruction if the session key has expired from cache
+    cached = _arm_context_cache.get((payload.student_id, payload.session_id))
+    if cached is not None:
+        _, context = cached
+    else:
+        context = build_context_vector(
+            visual_strain_index=payload.visual_strain_before,
+            engagement_index=0.5,
+            session_number=1,
+            child_age_years=None,
+            task_complexity_sovcm=0.5,
+            crowding_load=0.4,
+            phonological_strain_index=0.0,
+        )
+
+    agent.update(payload.arm_id, context, reward)
+    agent.save(STATE_PATH)
+
+    db = get_db()
+    await db.linucb_history.insert_one({
+        "student_id": payload.student_id,
+        "session_id": payload.session_id,
+        "arm_id": payload.arm_id,
+        "reward": float(reward),
+        "timestamp_ms": int(time.time() * 1000)
+    })
+
+    return {
+        "student_id": payload.student_id,
+        "arm_id": payload.arm_id,
+        "reward": round(reward, 4),
+        "cumulative_reward": round(agent.cumulative_reward, 4),
+    }
+
+
+@app.get("/api/v1/ui/gamification/status/{student_id}")
+def get_gamification_status(student_id: str, engagement_index: float = 0.5):
+    """Check if gamification mode should be triggered for a student."""
+    triggered = _check_gamification_trigger(student_id, engagement_index)
+    if triggered:
+        # Reset events after trigger to avoid repeated triggering
+        _low_engagement_events[student_id] = []
+    return {
+        "student_id": student_id,
+        "game_mode_trigger": triggered,
+        "game_difficulty": 2,
+    }
+
+
+@app.post("/api/v1/ui/preferences")
+async def store_preferences(prefs: StudentPreferences):
+    """Store student UI preferences from guardian onboarding."""
+    db = get_db()
+    await db.student_preferences.update_one(
+        {"student_id": prefs.student_id},
+        {"$set": {
+            "preferred_font": prefs.preferred_font,
+            "preferred_theme": prefs.preferred_theme,
+            "language": prefs.language,
+            "learner_type": prefs.learner_type.value,
+            "updated_ms": int(time.time() * 1000)
+        }},
+        upsert=True
+    )
+    return {"student_id": prefs.student_id, "message": "Preferences stored."}
+
+
+@app.get("/api/v1/ui/linucb/stats")
+def get_linucb_stats():
+    """Return LinUCB performance statistics for research evaluation."""
+    return agent.get_stats()
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)
+
+----- FILE: ./requirements.txt -----
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.1
+numpy==1.26.4
+httpx==0.27.0
+python-dotenv==1.0.1
+motor==3.4.0
+dnspython==2.6.1
+
+----- FILE: ./visual.txt -----
+
+[Could not read file: ./visual.txt]

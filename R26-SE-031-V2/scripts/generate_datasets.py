@@ -76,6 +76,9 @@ def generate_c1_dataset():
             syllable_rate       = rng.normal(1.4, 0.3)
             disfluency_count    = rng.poisson(4.2)
             kalman_innovation   = rng.normal(12.5, 3.5)
+            # Whisper WER proxy: at-risk → high WER (0.50–0.90)
+            # Perera & Sumanathilaka (2025) report 0.66 mean WER for dyslexic Sinhala
+            whisper_wer_proxy   = rng.beta(6, 3)  # mean ≈ 0.67
 
             CLI = _clip01(rng.normal(0.72, 0.12))
             PSI = _clip01(rng.normal(0.68, 0.13))
@@ -98,6 +101,8 @@ def generate_c1_dataset():
             syllable_rate       = rng.normal(3.2, 0.4)
             disfluency_count    = rng.poisson(0.6)
             kalman_innovation   = rng.normal(3.2, 1.0)
+            # Whisper WER proxy: typically-developing → low WER (0.10–0.35)
+            whisper_wer_proxy   = rng.beta(2, 7)  # mean ≈ 0.22
 
             CLI = _clip01(rng.normal(0.18, 0.09))
             PSI = _clip01(rng.normal(0.15, 0.08))
@@ -120,6 +125,8 @@ def generate_c1_dataset():
             syllable_rate       = rng.normal(2.1, 0.4)
             disfluency_count    = rng.poisson(2.0)
             kalman_innovation   = rng.normal(7.5, 2.0)
+            # Whisper WER proxy: mild difficulty → moderate WER (0.30–0.60)
+            whisper_wer_proxy   = rng.beta(3.5, 5)  # mean ≈ 0.41
 
             CLI = _clip01(rng.normal(0.45, 0.12))
             PSI = _clip01(rng.normal(0.42, 0.13))
@@ -129,7 +136,7 @@ def generate_c1_dataset():
             ERI = _clip01(rng.normal(0.44, 0.13))
 
         rows.append({
-            # Raw features (13)
+            # Raw features (14 — 13 original + whisper_wer_proxy)
             "hesitation_ms":       max(0, hesitation_ms),
             "correction_rate":     _clip01(correction_rate),
             "response_latency":    max(0, response_latency),
@@ -143,6 +150,7 @@ def generate_c1_dataset():
             "syllable_rate":       max(0.1, syllable_rate),
             "disfluency_count":    int(max(0, disfluency_count)),
             "kalman_innovation":   max(0, kalman_innovation),
+            "whisper_wer_proxy":   round(_clip01(float(whisper_wer_proxy)), 4),
             # MBSV target labels (6)
             "label_CLI": round(CLI, 4),
             "label_PSI": round(PSI, 4),

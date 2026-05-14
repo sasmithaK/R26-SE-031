@@ -6,6 +6,7 @@ class MBSV {
   final double sessionFatigueIndex;
   final double errorResilienceIndex;
   final List<double> errorPatternVector; // [reversal, omission, substitution, hesitation]
+  final double? whisperWerProxy; // Whisper WER proxy (Perera & Sumanathilaka 2025); null = not computed
 
   MBSV({
     required this.visualStrainIndex,
@@ -15,6 +16,7 @@ class MBSV {
     required this.sessionFatigueIndex,
     this.errorResilienceIndex = 0.0,
     required this.errorPatternVector,
+    this.whisperWerProxy,
   });
 
   factory MBSV.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,9 @@ class MBSV {
       sessionFatigueIndex: (json['session_fatigue_index'] ?? 0.0).toDouble(),
       errorResilienceIndex: (json['error_resilience_index'] ?? 0.0).toDouble(),
       errorPatternVector: _parseErrorPattern(json['error_pattern_vector']),
+      whisperWerProxy: json['whisper_wer_proxy'] != null
+          ? (json['whisper_wer_proxy'] as num).toDouble()
+          : null,
     );
   }
 
@@ -57,6 +62,7 @@ class MBSV {
     'session_fatigue_index': sessionFatigueIndex,
     'error_resilience_index': errorResilienceIndex,
     'error_pattern_vector': errorPatternVector,
+    if (whisperWerProxy != null) 'whisper_wer_proxy': whisperWerProxy,
   };
 
   factory MBSV.initial() => MBSV(
@@ -67,5 +73,6 @@ class MBSV {
     sessionFatigueIndex: 0.0,
     errorResilienceIndex: 0.0,
     errorPatternVector: [0.0, 0.0, 0.0, 0.0],
+    whisperWerProxy: null,
   );
 }

@@ -35,6 +35,7 @@ from shared.schemas import (
 from core.welford import get_baseline
 from core.kalman_filter import TouchKalmanFilter
 from shared.database import connect_to_mongo, close_mongo_connection, get_db
+from core.whisper_extractor import compute_whisper_wer_proxy
 
 # ── Configuration ─────────────────────────────────────────────────────────
 PORT = int(os.getenv("C1_PORT", "8011"))
@@ -142,6 +143,7 @@ def _extract_features(payload: TelemetryPayload) -> dict:
         "syllable_rate": float(payload.syllable_rate or 0.0),
         "disfluency_count": float(payload.disfluency_count or 0.0),
         "kalman_innovation": kalman_innovation,
+        "whisper_wer_proxy": 0.0,
     }
 
 
@@ -203,7 +205,7 @@ def _lgbm_mbsv(features: dict, z_scores: dict) -> MBSV:
             "hesitation_ms", "correction_rate", "response_latency", "touch_pressure",
             "swipe_velocity", "replay_count", "hint_request_count", "stylus_deviation",
             "inter_tap_interval", "read_aloud_pause_ms", "syllable_rate",
-            "disfluency_count", "kalman_innovation",
+            "disfluency_count", "kalman_innovation", "whisper_wer_proxy",
         ]
     ]])
     
@@ -240,6 +242,18 @@ async def receive_telemetry(payload: TelemetryPayload):
     Runs Welford's Z-score → LightGBM (or rule-based fallback) → stores MBSV.
     """
     features = _extract_features(payload)
+
+    # Whisper WER proxy (optional — requires audio_base64 in payload)
+    # Reference: Perera & Sumanathilaka (2025) arXiv:2510.04750
+    if hasattr(payload, 'audio_base64') and payload.audio_base64:
+        wer = compute_whisper_wer_proxy(
+            payload.audio_base64,
+            getattr(payload, 'current_content_text', '') or ''
+        )
+        features["whisper_wer_proxy"] = wer
+        if wer > 0:
+            print(f"[C1-Whisper] student={payload.student_id} WER={wer:.3f}")
+
     baseline = await get_baseline(payload.student_id)
     await baseline.update(features)
     z_scores = baseline.z_score_all(features)
@@ -300,6 +314,39 @@ async def get_baseline_summary(student_id: str):
         student_id=student_id,
         feature_states=baseline.feature_summary(),
     )
+
+
+@app.get("/api/v1/monitoring/acoustic_validation/{student_id}")
+async def get_acoustic_validation(student_id: str):
+    """
+    Return per-student acoustic feature statistics for research validation.
+
+    Exposes the Welford baseline mean/std for the three acoustic proxy features
+    (read_aloud_pause_ms, syllable_rate, disfluency_count) and the Whisper WER
+    proxy.  Used by scripts/validate_c1_acoustic_features.py to compare against
+    the peshalaperera articulation dataset ground truth.
+
+    Reference: Perera & Sumanathilaka (2025) arXiv:2510.04750.
+    """
+    baseline = await get_baseline(student_id)
+    summary = baseline.feature_summary()
+    acoustic_keys = [
+        "read_aloud_pause_ms",
+        "syllable_rate",
+        "disfluency_count",
+        "whisper_wer_proxy",
+    ]
+    return {
+        "student_id": student_id,
+        "observation_count": max(
+            summary.get(k, {}).get("count", 0) for k in acoustic_keys
+        ),
+        "acoustic_features": {
+            k: summary.get(k, {"count": 0, "mean": 0.0, "std": 0.0})
+            for k in acoustic_keys
+        },
+        "baseline_warm": baseline.is_warm(min_observations=3),
+    }
 
 
 @app.get("/api/v1/monitoring/shap/{student_id}")

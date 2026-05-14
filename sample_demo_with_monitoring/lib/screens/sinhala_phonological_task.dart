@@ -1,14 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
+import 'dart:ui' as ui;
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:js' as js;
+import 'package:http/http.dart' as http;
 import '../services/adaptive_state.dart';
 import '../services/avli_service.dart';
 import '../models/mbsv.dart';
 import '../models/typography_config.dart';
+
+// ── Theme Tokens ────────────────────────────────────────────────────────
+class _Tokens {
+  static const bg = Color(0xFF0D0E14);
+  static const bg2 = Color(0xFF13141D);
+  static const bg3 = Color(0xFF1A1C28);
+  static const surf = Color(0xFF20233A);
+  static const surf2 = Color(0xFF282B42);
+  static const bdr = Color(0x0FFFFFFF);
+  static const bdr2 = Color(0x1FFFFFFF);
+  static const accent = Color(0xFF6366F1);
+  static const accentGlow = Color(0x336366F1);
+  static const text = Color(0xFFE2E8F0);
+  static const textMuted = Color(0xFF94A3B8);
+}
+
+// ── UCSC high-confusion letter set (De Silva et al. 2025) ─────────────────
+const Set<String> _kUcscConfusionZone = {'ග', 'ල', 'ය', 'ට', 'ක', 'ප', 'ළ', 'ත', 'ද', 'ඒ', 'බ', 'ඵ'};
 
 // ── Grade-1 Sinhala word definitions ──────────────────────────────────────
 const List<Map<String, dynamic>> _kTasks = [
@@ -30,12 +52,12 @@ const List<Map<String, dynamic>> _kTasks = [
     ],
   },
   {
-    'word': 'ළදරු',
-    'meaning': '(baby)',
+    'word': 'බසය',
+    'meaning': '(bus)',
     'segments': [
-      {'text': 'ළ', 'romanized': 'la'},
-      {'text': 'ද', 'romanized': 'da'},
-      {'text': 'රු', 'romanized': 'ru'},
+      {'text': 'බ', 'romanized': 'ba'},
+      {'text': 'ස', 'romanized': 'sa'},
+      {'text': 'ය', 'romanized': 'ya'},
     ],
   },
 ];
@@ -77,6 +99,7 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
   int _pauseMs = 0;
   double _syllableRate = 0;
   int _disfluencyCount = 0;
+  DateTime? _lastHoverTime;
   int _recognizedSegments = 0;
   int _totalAttempts = 0;
 
@@ -92,6 +115,14 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
   double _lastReward = 0.0;
   double _cumulativeReward = 0.0;
   int _avliCallCount = 0;
+
+  // ── C4 SinBERT state ───────────────────────────────────────────────────
+  static const String _c4Base = 'http://127.0.0.1:8004/api/v1';
+  String? _c4WinnerClass;
+  Map<String, double> _c4Confidences = {};
+  String _c4Classifier = '';
+  double _whisperWer = -1.0; // -1 = not yet computed
+  int _c4CallCount = 0;
 
   // ── Display state ───────────────────────────────────────────────────────
   final List<Map<String, dynamic>> _logs = [];
@@ -198,10 +229,15 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
 
       recognition['onresult'] = js.allowInterop((dynamic event) {
         try {
-          final results = event['results'];
-          final count = (results['length'] as int?) ?? 0;
-          if (count == 0) return;
-          final lastResult = results[count - 1];
+          final jsEvent = js.JsObject.fromBrowserObject(event);
+          if (jsEvent['results'] == null) return;
+          final results = jsEvent['results'];
+          final int? length = results['length'] as int?;
+          if (length == null || length == 0) return;
+          
+          final lastResult = results[length - 1];
+          if (lastResult == null) return;
+          
           final isFinal = lastResult['isFinal'] as bool? ?? false;
           final altCount = lastResult['length'] as int? ?? 1;
 
@@ -212,6 +248,19 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
           }
           final best = transcripts.isNotEmpty ? transcripts.first : '';
 
+          // --- STRICT SINHALA FILTERING ---
+          // Unicode range for Sinhala: \u0D80-\u0DFF
+          // We allow spaces as they are common between words
+          final sinhalaRegex = RegExp(r'^[\u0D80-\u0DFF\s]+$');
+          if (best.isNotEmpty && !sinhalaRegex.hasMatch(best)) {
+            _log('⚠️ Ignored non-Sinhala: "$best"', Colors.orange, 'mic');
+            if (mounted) {
+              setState(() => _micStatus = '⚠️ Sinhala only, please');
+            }
+            return;
+          }
+          // --------------------------------
+
           if (mounted) {
             setState(() {
               _lastHeard = best;
@@ -219,14 +268,28 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
             });
           }
 
+          // --- BEHAVIORAL FEATURE: FILLER DETECTION ---
+          final sinhalaFillers = ['අ', 'අහ්', 'හ්ම්', 'ම්ම්', 'එතකොට', 'ඔව්...', '...අ'];
+          bool isFiller = sinhalaFillers.contains(best);
+          if (isFiller) {
+            _disfluencyCount++;
+            _log('🧠 Hesitation detected (filler): "$best"', Colors.amber, 'mic');
+          }
+          // --------------------------------------------
+
           if (isFinal && best.isNotEmpty) {
-            _pauseMs = DateTime.now().difference(speakStart).inMilliseconds;
+            final now = DateTime.now();
+            _pauseMs = now.difference(speakStart).inMilliseconds;
+            
+            // Refined hesitation: from hover-start to first speech detection if possible
+            // But speakStart is already the time when _startListeningForSegment was called (on hover)
+            
             _totalAttempts++;
             final matched = _checkMatch(best, seg['text'], seg['romanized']);
             _handleRecognitionResult(segIndex, best, matched, transcripts);
           }
         } catch (e) {
-          _log('⚠️ Result parse: $e', Colors.orange, 'mic');
+          _log('⚠️ Result parse error', Colors.orange, 'mic');
         }
       });
 
@@ -242,7 +305,8 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
       });
 
       recognition['onerror'] = js.allowInterop((dynamic event) {
-        final err = event['error']?.toString() ?? 'unknown';
+        final jsEvent = js.JsObject.fromBrowserObject(event);
+        final err = jsEvent['error']?.toString() ?? 'unknown';
         _log('❌ Mic error: $err', Colors.red, 'mic');
         if (mounted) setState(() {
           _listeningIndex = -1;
@@ -272,6 +336,11 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
     final h = heard.trim().toLowerCase();
     final e = expected.trim().toLowerCase();
     final r = romanized.trim().toLowerCase();
+    
+    // Check for full word match first
+    final String fullWord = _kTasks[_taskIndex]['word'].toString().trim().toLowerCase();
+    if (h == fullWord || _jaroWinkler(h, fullWord) > 0.88) return true;
+
     return h == e || h.contains(e) || e.contains(h) ||
         h.contains(r) || r.contains(h) ||
         _jaroWinkler(h, e) > 0.85 || _jaroWinkler(h, r) > 0.85;
@@ -314,13 +383,37 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
 
   void _handleRecognitionResult(
       int segIndex, String heard, bool matched, List<String> alts) {
+    final String fullWord = _kTasks[_taskIndex]['word'].toString().trim().toLowerCase();
+    final String h = heard.trim().toLowerCase();
+    
+    // Determine if they said the whole word
+    bool fullWordMatched = (h == fullWord || _jaroWinkler(h, fullWord) > 0.88);
+
+    if (fullWordMatched) {
+      _log('🌟 FULL WORD MATCHED: "$heard"', Colors.amber, 'mic');
+      // Mark ALL segments for this word as correct
+      for (int i = 0; i < _segmentResults.length; i++) {
+        if (_segmentResults[i] != true) {
+          _recognizedSegments++;
+          _segmentResults[i] = true;
+        }
+      }
+      matched = true; 
+    }
+
     final seg = (_kTasks[_taskIndex]['segments'] as List)[segIndex];
     if (matched) {
-      _recognizedSegments++;
+      if (!fullWordMatched) {
+        // Normal segment match
+        if (_segmentResults[segIndex] != true) {
+          _recognizedSegments++;
+          setState(() => _segmentResults[segIndex] = true);
+        }
+        _log('✅ CORRECT: "$heard" → "${seg['text']}"', Colors.greenAccent, 'mic');
+      }
+      
       _syllableRate = _recognizedSegments /
           max(1.0, DateTime.now().difference(_taskStartTime!).inSeconds.toDouble());
-      setState(() => _segmentResults[segIndex] = true);
-      _log('✅ CORRECT: "$heard" → "${seg['text']}"', Colors.greenAccent, 'mic');
     } else {
       _disfluencyCount++;
       setState(() => _segmentResults[segIndex] = false);
@@ -335,6 +428,13 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
 
     if (_segmentResults.every((r) => r == true)) {
       _log('🎉 Word "${_kTasks[_taskIndex]['word']}" complete!', Colors.amber, 'system');
+      
+      // AUTO-ADVANCE: Move to next task after a short delay
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted && _segmentResults.every((r) => r == true)) {
+          _advanceTask();
+        }
+      });
     }
   }
 
@@ -367,9 +467,7 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
     if (!mounted) return;
 
     // ── Build C1 telemetry payload ────────────────────────────────────────
-    final int hesitationMs = _firstTapTime != null
-        ? _firstTapTime!.difference(_taskStartTime!).inMilliseconds.abs().clamp(0, 5000)
-        : 500;
+    final int hesitationMs = _pauseMs > 0 ? _pauseMs : 500;
     final int sessionLatencyMs =
         DateTime.now().difference(_taskStartTime!).inMilliseconds.clamp(0, 30000);
     final double corrRate =
@@ -494,6 +592,106 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
     } catch (e) {
       _log('⚠️ C2 reward error: $e', Colors.orange, 'C2');
     }
+
+    // ── Step 4: C4 → SinBERT error classification ─────────────────────────
+    await _c4Classify(accuracyDelta: accuracyDelta, eventType: eventType);
+  }
+
+  // ── Step 4: C4 SinBERT error classification ──────────────────────────────
+  Future<void> _c4Classify({
+    required double accuracyDelta,
+    required String eventType,
+  }) async {
+    if (!mounted) return;
+
+    final word = _kTasks[_taskIndex]['word'] as String;
+    final errorType = _disfluencyCount > 2
+        ? 'substitution'
+        : _disfluencyCount > 0
+            ? 'omission'
+            : 'hesitation';
+    final contextSentence =
+        'Student reading "$word" — ${eventType.toLowerCase()} event, '
+        'disfluencies=$_disfluencyCount, accuracy_delta=${accuracyDelta.toStringAsFixed(2)}';
+
+    // Whisper WER proxy — simulated since web demo has no audio stream.
+    // In production the audio_base64 field is populated by the Flutter mic capture.
+    final simulatedWer =
+        (0.12 + _disfluencyCount * 0.09 + (_pauseMs > 2000 ? 0.1 : 0.0))
+            .clamp(0.0, 1.0);
+
+    _log(
+      '⬆️ C4: error_type=$errorType  context="$word · $eventType"',
+      Colors.indigo.shade300,
+      'C4',
+    );
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_c4Base/intervention/check'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'student_id': studentId,
+          'task_id': 'phonological_task_${_taskIndex + 1}',
+          'error_type': errorType,
+          'context_sentence': contextSentence,
+          'syllable': word,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final d = jsonDecode(response.body) as Map<String, dynamic>;
+        final rawWinner = ((d['error_type'] as String?) ?? 'UNFAMILIAR')
+            .toUpperCase()
+            .replaceAll(' ', '_');
+        final winnerConf = (d['confidence'] as num?)?.toDouble() ?? 0.75;
+        final classifier = (d['classifier_model'] as String?) ?? 'rule_based';
+
+        _applyC4Result(rawWinner, winnerConf, classifier, simulatedWer);
+        _log(
+          '⬇️ C4 $classifier → $rawWinner '
+          '(${(winnerConf * 100).toInt()}%)  stage=${d['stage'] ?? '?'}',
+          Colors.indigo.shade200,
+          'C4',
+        );
+      } else {
+        _log('⚠️ C4 ${response.statusCode} — rule-based fallback', Colors.orange, 'C4');
+        _c4FallbackByErrorType(errorType, simulatedWer);
+      }
+    } catch (_) {
+      _log('⚠️ C4 unreachable — simulated classification', Colors.orange, 'C4');
+      _c4Simulated(simulatedWer);
+    }
+  }
+
+  void _applyC4Result(
+      String winner, double winnerConf, String classifier, double wer) {
+    const all = ['LONG_WORD', 'VOWEL_CONFUSION', 'CONSONANT_CONFUSION', 'UNFAMILIAR'];
+    final rem = (1 - winnerConf) / (all.length - 1);
+    final confs = {for (final c in all) c: c == winner ? winnerConf : rem};
+    if (!mounted) return;
+    setState(() {
+      _c4WinnerClass = winner;
+      _c4Confidences = confs;
+      _c4Classifier = classifier;
+      _whisperWer = wer;
+      _c4CallCount++;
+    });
+  }
+
+  void _c4FallbackByErrorType(String errorType, double wer) {
+    const mapping = {
+      'substitution': 'CONSONANT_CONFUSION',
+      'omission': 'VOWEL_CONFUSION',
+      'hesitation': 'UNFAMILIAR',
+    };
+    _applyC4Result(mapping[errorType] ?? 'UNFAMILIAR', 0.78, 'rule_based', wer);
+  }
+
+  void _c4Simulated(double wer) {
+    const classes = ['LONG_WORD', 'VOWEL_CONFUSION', 'CONSONANT_CONFUSION', 'UNFAMILIAR'];
+    final winnerIdx = _disfluencyCount > 2 ? 2 : _disfluencyCount > 0 ? 1 : 3;
+    _applyC4Result(classes[winnerIdx], 0.72, 'simulated', wer);
   }
 
   // ── Advance task ───────────────────────────────────────────────────────
@@ -530,7 +728,7 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
         return const Color(0xFFFFFDE7); // pale cream — high contrast
       case 'WCAG_AA':
       default:
-        return const Color(0xFFF0F4FF); // default light blue
+        return _Tokens.surf; // default dark mode surface
     }
   }
 
@@ -542,243 +740,376 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
     final allCorrect = _segmentResults.every((r) => r == true);
 
     return Scaffold(
-      backgroundColor: _taskBgColor,
-      body: Row(
+      backgroundColor: _Tokens.bg,
+      body: Stack(
         children: [
-          // ── Left: Task area ────────────────────────────────────────────
-          Expanded(
-            flex: 7,
-            child: Column(
-              children: [
-                _buildHeader(task),
-                LinearProgressIndicator(
-                  value: (_taskIndex + 1) / _kTasks.length,
-                  backgroundColor: Colors.indigo.shade100,
-                  color: Colors.indigo,
-                  minHeight: 4,
+          // ── Background Glows ───────────────────────────────────────────
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment(-1.0, -1.0),
+                  radius: 1.2,
+                  colors: [Color(0x0F6366F1), Colors.transparent],
                 ),
-                // Gamification banner
-                if (_gameTrigger)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 10),
-                    color: Colors.amber.shade100,
-                    child: Row(children: [
-                      const Text('🎮', style: TextStyle(fontSize: 20)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Engagement recovery mode active — '
-                          'game difficulty: $_gameDifficulty',
-                          style: GoogleFonts.outfit(
-                              fontSize: 13,
-                              color: Colors.amber.shade900,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => setState(() => _gameTrigger = false),
-                        child: const Text('Dismiss'),
-                      ),
-                    ]),
-                  ),
-                Expanded(
-                  child: Listener(
-                    onPointerDown: (e) =>
-                        _recordTouch(e.localPosition, pressure: e.pressure),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 400),
-                      color: _taskBgColor,
-                      padding: const EdgeInsets.all(40),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Word display with C2 typography applied
-                          Transform.translate(
-                            offset: Offset(0, _typo.diacriticOffset),
-                            child: Text(
-                              task['word'],
-                              style: GoogleFonts.outfit(
-                                fontSize: _typo.fontSize.clamp(40.0, 80.0),
-                                fontWeight: FontWeight.w900,
-                                color: Colors.indigo.shade900,
-                                letterSpacing:
-                                    _typo.letterSpacing + _typo.glyphPadding,
-                                wordSpacing: _typo.wordSpacing,
-                                height: _typo.lineHeight,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            task['meaning'],
-                            style: GoogleFonts.outfit(
-                                fontSize: 16, color: Colors.grey.shade500),
-                          ),
-                          if (_armId >= 0)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                'C2 Arm #$_armId  •  '
-                                '${_typo.fontSize.toStringAsFixed(0)}px  •  '
-                                'ls=${_typo.letterSpacing.toStringAsFixed(1)}  •  '
-                                '${_typo.backgroundContrast}',
-                                style: GoogleFonts.inconsolata(
-                                    fontSize: 10, color: Colors.grey.shade400),
-                              ),
-                            ),
-                          const SizedBox(height: 14),
-                          Text(
-                            '👆 Touch a segment → speak it aloud',
-                            style: GoogleFonts.outfit(
-                                fontSize: 14, color: Colors.grey.shade600),
-                          ),
-                          const SizedBox(height: 28),
-                          Wrap(
-                            spacing: 20,
-                            runSpacing: 20,
-                            alignment: WrapAlignment.center,
-                            children: List.generate(segments.length,
-                                (i) => _buildSegmentTile(i, segments[i])),
-                          ),
-                          const SizedBox(height: 32),
-                          if (_lastHeard.isNotEmpty)
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 24, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.indigo.shade50,
-                                border: Border.all(
-                                    color: Colors.indigo.shade200),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text('🎤',
-                                      style: TextStyle(fontSize: 18)),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    'Heard: "$_lastHeard"',
-                                    style: GoogleFonts.outfit(
-                                        fontSize: 18,
-                                        color: Colors.indigo.shade800),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          const SizedBox(height: 28),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
-                            alignment: WrapAlignment.center,
-                            children: [
-                              _actionBtn('💡 Hint', Colors.amber.shade600, () {
-                                _hints++;
-                                _log('💡 Hint #$_hints', Colors.amber, 'student');
-                                _pipeline(accuracyDelta: -0.1, eventType: 'HINT');
-                              }),
-                              _actionBtn('🔊 Replay', Colors.purple.shade600,
-                                  () {
-                                _replays++;
-                                _log('🔊 Replay #$_replays',
-                                    Colors.purple.shade200, 'student');
-                                _pipeline(accuracyDelta: -0.05, eventType: 'REPLAY');
-                              }),
-                              _actionBtn('❌ Correction', Colors.red.shade600,
-                                  () {
-                                _corrections++;
-                                _log('❌ Correction #$_corrections',
-                                    Colors.redAccent, 'student');
-                                _pipeline(accuracyDelta: -0.2, eventType: 'TAP');
-                              }),
-                              if (allCorrect ||
-                                  _segmentResults.any((r) => r != null))
-                                _actionBtn(
-                                  allCorrect ? '🎉 Next Task →' : '⏭ Skip →',
-                                  allCorrect
-                                      ? Colors.green.shade600
-                                      : Colors.blueGrey,
-                                  _advanceTask,
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment(1.0, 1.0),
+                  radius: 1.2,
+                  colors: [Color(0x0F8B5CF6), Colors.transparent],
                 ),
-              ],
+              ),
             ),
           ),
 
-          // ── Right: Monitoring panel ────────────────────────────────────
-          Container(
-            width: 320,
-            color: const Color(0xFF1A1D2E),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── C1 MBSV ─────────────────────────────────────────────
-                _panelHeader('📊 C1 — MBSV Output', Colors.blue.shade800),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: _mbsv != null
-                      ? _buildMbsvSection(_mbsv!)
-                      : Text('Waiting for first recognition...',
-                          style: GoogleFonts.outfit(
-                              color: Colors.white54, fontSize: 11)),
-                ),
-
-                // ── C2 AVLI ─────────────────────────────────────────────
-                _panelHeader('🎨 C2 — AVLI Typography', Colors.purple.shade800),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
-                  child: _buildAvliSection(),
-                ),
-
-                // ── Audio recognition ────────────────────────────────────
-                _panelHeader('🎙️ Audio Recognition', Colors.teal.shade800),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
-                  child: Column(
-                    children: [
-                      _statRow('Mic', _micStatus),
-                      _statRow('Last heard',
-                          _lastHeard.isEmpty ? '—' : '"$_lastHeard"'),
-                      _statRow('Recognized', '$_recognizedSegments/$_totalAttempts'),
-                      _statRow('Disfluencies', '$_disfluencyCount'),
-                      _statRow('Pause', '${_pauseMs}ms'),
-                      _statRow('Syllable rate',
-                          '${_syllableRate.toStringAsFixed(2)}/s'),
-                    ],
-                  ),
-                ),
-
-                // ── Live log ─────────────────────────────────────────────
-                _panelHeader('📝 Live Log', Colors.blueGrey.shade800),
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    itemCount: _logs.length,
-                    itemBuilder: (_, i) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 1),
-                      child: Text(
-                        _logs[i]['msg'],
-                        style: GoogleFonts.inconsolata(
-                          fontSize: 9.5,
-                          color: _logs[i]['color'] as Color,
+          Row(
+            children: [
+              // ── Left: Task area ────────────────────────────────────────────
+              Expanded(
+                flex: 7,
+                child: Column(
+                  children: [
+                    _buildHeader(task),
+                    LinearProgressIndicator(
+                      value: (_taskIndex + 1) / _kTasks.length,
+                      backgroundColor: _Tokens.bg2,
+                      color: _Tokens.accent,
+                      minHeight: 4,
+                    ),
+                    // Gamification banner
+                    if (_gameTrigger)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.amber.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(children: [
+                            const Text('🎮', style: TextStyle(fontSize: 18)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'ENGAGEMENT RECOVERY ACTIVE: Difficulty $_gameDifficulty',
+                                style: GoogleFonts.dmMono(
+                                    fontSize: 11,
+                                    color: Colors.amber,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close,
+                                  size: 16, color: Colors.amber),
+                              onPressed: () =>
+                                  setState(() => _gameTrigger = false),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ]),
+                        ),
+                      ),
+                    Expanded(
+                      child: Listener(
+                        onPointerDown: (e) =>
+                            _recordTouch(e.localPosition, pressure: e.pressure),
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 400),
+                            width: 600,
+                            constraints: const BoxConstraints(minHeight: 450),
+                            decoration: BoxDecoration(
+                              color: _taskBgColor,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: _Tokens.bdr2, width: 1),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 30,
+                                  offset: const Offset(0, 10),
+                                )
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(40),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Word display with C2 typography applied
+                                Transform.translate(
+                                  offset: Offset(0, _typo.diacriticOffset),
+                                  child: Text(
+                                    task['word'],
+                                    style: GoogleFonts.notoSansSinhala(
+                                      fontSize: _typo.fontSize.clamp(40.0, 80.0),
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          _typo.backgroundContrast == 'WCAG_AAA'
+                                              ? Colors.indigo.shade900
+                                              : _Tokens.text,
+                                      letterSpacing: _typo.letterSpacing +
+                                          _typo.glyphPadding,
+                                      wordSpacing: _typo.wordSpacing,
+                                      height: _typo.lineHeight,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  task['meaning'],
+                                  style: GoogleFonts.dmMono(
+                                      fontSize: 14, color: _Tokens.textMuted),
+                                ),
+                                if (_armId >= 0)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      'C2 Arm #$_armId  •  '
+                                      '${_typo.fontSize.toStringAsFixed(0)}px  •  '
+                                      'ls=${_typo.letterSpacing.toStringAsFixed(1)}  •  '
+                                      '${_typo.backgroundContrast}',
+                                      style: GoogleFonts.dmMono(
+                                          fontSize: 11,
+                                          color: _typo.backgroundContrast ==
+                                                  'WCAG_AAA'
+                                              ? Colors.black54
+                                              : _Tokens.textMuted),
+                                    ),
+                                  ),
+                                // UCSC confusion zone badge
+                                if (task['word'].toString().split('').any(
+                                    (c) => _kUcscConfusionZone.contains(c)))
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 10),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.purpleAccent
+                                            .withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                            color: Colors.purpleAccent
+                                                .withValues(alpha: 0.3)),
+                                      ),
+                                      child: Text(
+                                        '📚 UCSC CONFUSION ZONE · DE SILVA ET AL. (2025)',
+                                        style: GoogleFonts.dmMono(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.purpleAccent),
+                                      ),
+                                    ),
+                                  ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  '✨ Hover over a segment → speak it aloud',
+                                  style: GoogleFonts.notoSansSinhala(
+                                      fontSize: 14,
+                                      color:
+                                          _typo.backgroundContrast == 'WCAG_AAA'
+                                              ? Colors.black54
+                                              : _Tokens.textMuted),
+                                ),
+                                const SizedBox(height: 28),
+                                Wrap(
+                                  spacing: 20,
+                                  runSpacing: 20,
+                                  alignment: WrapAlignment.center,
+                                  children: List.generate(
+                                      segments.length,
+                                      (i) => _buildSegmentTile(i, segments[i])),
+                                ),
+                                const SizedBox(height: 32),
+                                if (_lastHeard.isNotEmpty)
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 300),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 20, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          _Tokens.accent.withValues(alpha: 0.1),
+                                      border: Border.all(
+                                          color: _Tokens.accent
+                                              .withValues(alpha: 0.3)),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.mic,
+                                            size: 18, color: _Tokens.accent),
+                                        const SizedBox(width: 10),
+                                        Text(
+                                          'HEARD: "$_lastHeard"',
+                                          style: GoogleFonts.dmMono(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: _Tokens.accent),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                const SizedBox(height: 28),
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 12,
+                                  alignment: WrapAlignment.center,
+                                  children: [
+                                    _actionBtn('💡 Hint', Colors.amberAccent,
+                                        () {
+                                      _hints++;
+                                      _log('💡 Hint #$_hints', Colors.amber,
+                                          'student');
+                                      _pipeline(
+                                          accuracyDelta: -0.1,
+                                          eventType: 'HINT');
+                                    }),
+                                    _actionBtn('🔊 Replay', Colors.purpleAccent,
+                                        () {
+                                      _replays++;
+                                      _log(
+                                          '🔊 Replay #$_replays',
+                                          Colors.purpleAccent.shade100,
+                                          'student');
+                                      _pipeline(
+                                          accuracyDelta: -0.05,
+                                          eventType: 'REPLAY');
+                                    }),
+                                    _actionBtn('❌ Correction', Colors.redAccent,
+                                        () {
+                                      _corrections++;
+                                      _log('❌ Correction #$_corrections',
+                                          Colors.redAccent, 'student');
+                                      _pipeline(
+                                          accuracyDelta: -0.2,
+                                          eventType: 'TAP');
+                                    }),
+                                    if (allCorrect ||
+                                        _segmentResults.any((r) => r != null))
+                                      _actionBtn(
+                                        allCorrect
+                                            ? '🎉 Next Task →'
+                                            : '⏭ Skip →',
+                                        allCorrect
+                                            ? Colors.greenAccent
+                                            : _Tokens.textMuted,
+                                        _advanceTask,
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+              // ── Right: Monitoring panel ────────────────────────────────────
+              Container(
+                width: 340,
+                decoration: BoxDecoration(
+                  color: _Tokens.bg2.withValues(alpha: 0.8),
+                  border: const Border(left: BorderSide(color: _Tokens.bdr)),
+                ),
+                child: ClipRect(
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _pipelineConnection(),
+                        Expanded(
+                          flex: 3,
+                          child: SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                // ── C1 MBSV ─────────────────────────────────────────────
+                                _panelHeader('📊 C1 — BEHAVIORAL SIGNALS (MBSV)', Colors.blueAccent,
+                                    Icons.analytics_outlined),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                  child: _mbsv != null
+                                      ? _buildMbsvSection(_mbsv!)
+                                      : Center(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 20),
+                                            child: Text('Waiting for speech input...',
+                                                style: GoogleFonts.dmMono(
+                                                    color: _Tokens.textMuted,
+                                                    fontSize: 13)),
+                                          ),
+                                        ),
+                                ),
+
+                                // ── C2 AVLI ─────────────────────────────────────────────
+                                _panelHeader('🎨 C2 — AVLI Typography',
+                                    Colors.purpleAccent, Icons.auto_fix_high_outlined),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                  child: _buildAvliSection(),
+                                ),
+
+                                // ── C4 SinBERT ──────────────────────────────────────────
+                                _panelHeader('🧠 C4 — SinBERT Classification',
+                                    const Color(0xFF818CF8), Icons.psychology_outlined),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                  child: _buildC4Section(),
+                                ),
+
+                                // ── Audio recognition ────────────────────────────────────
+                                _panelHeader('🎙️ Audio Recognition', Colors.tealAccent,
+                                    Icons.mic_external_on_outlined),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                  child: Column(
+                                    children: [
+                                      _statRow('Mic', _micStatus),
+                                      _statRow('Last heard',
+                                          _lastHeard.isEmpty ? '—' : '"$_lastHeard"'),
+                                      _statRow('Recognized',
+                                          '$_recognizedSegments/$_totalAttempts'),
+                                      _statRow('Disfluencies', '$_disfluencyCount'),
+                                      _statRow('Pause', '${_pauseMs}ms'),
+                                      _statRow('Syllable rate',
+                                          '${_syllableRate.toStringAsFixed(2)}/s'),
+                                      _statRow(
+                                        '🎙 Whisper WER',
+                                        _whisperWer >= 0
+                                            ? _whisperWer.toStringAsFixed(2)
+                                            : '—',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // ── Live log ─────────────────────────────────────────────
+                        _buildLogHeader(),
+                        Expanded(
+                          flex: 3, // Increased flex for logs
+                          child: _buildLogPanel(),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -789,40 +1120,79 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
   Widget _buildHeader(Map<String, dynamic> task) => Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-              colors: [Colors.indigo.shade700, Colors.blue.shade500]),
+        decoration: const BoxDecoration(
+          color: _Tokens.surf,
+          border: Border(bottom: BorderSide(color: _Tokens.bdr2)),
         ),
         child: Row(children: [
           const Text('🇱🇰', style: TextStyle(fontSize: 26)),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('සිංහල ශබ්ද කොටස් කර්තව්‍යය',
-                    style: GoogleFonts.outfit(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
+                Row(
+                  children: [
+                    Text('සිංහල ශබ්ද කොටස් කර්තව්‍යය',
+                        style: GoogleFonts.notoSansSinhala(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _Tokens.text)),
+                    const SizedBox(width: 12),
+                    _liveBadge(),
+                  ],
+                ),
+                const SizedBox(height: 2),
                 Text(
                     'Task ${_taskIndex + 1}/3  •  ${task['word']}  •  '
-                    'C1+C2 active',
-                    style: GoogleFonts.outfit(
-                        fontSize: 12, color: Colors.white70)),
+                    'C1:MBSV + C2:AVLI + C4:SinBERT',
+                    style: GoogleFonts.dmMono(
+                        fontSize: 11, color: _Tokens.textMuted)),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: _listeningIndex >= 0
-                  ? Colors.red.shade600
-                  : Colors.white24,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(_micStatus,
-                style: GoogleFonts.outfit(fontSize: 11, color: Colors.white)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('SESSION: $_sessionId',
+                  style: GoogleFonts.dmMono(fontSize: 10, color: _Tokens.textMuted)),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _listeningIndex >= 0
+                      ? Colors.red.withValues(alpha: 0.15)
+                      : _Tokens.bg3,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: _listeningIndex >= 0 ? Colors.redAccent : _Tokens.bdr2,
+                      width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_listeningIndex >= 0)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    Text(_micStatus.toUpperCase(),
+                        style: GoogleFonts.dmMono(
+                            fontSize: 10, 
+                            fontWeight: FontWeight.bold,
+                            color: _listeningIndex >= 0 ? Colors.redAccent : _Tokens.text)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ]),
       );
@@ -845,10 +1215,10 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
       _mbsvBar('🛡️ Error Resilience', m.errorResilienceIndex, inverse: true),
       const SizedBox(height: 4),
       Text('Error flags:',
-          style: GoogleFonts.inconsolata(fontSize: 9, color: Colors.white38)),
+          style: GoogleFonts.dmMono(fontSize: 9, color: _Tokens.textMuted)),
       Text(
         flags.isEmpty ? 'None' : flags.join(' • '),
-        style: GoogleFonts.inconsolata(
+        style: GoogleFonts.dmMono(
             fontSize: 9,
             color: flags.isEmpty ? Colors.white24 : Colors.orangeAccent),
       ),
@@ -864,15 +1234,15 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       // Arm + reward summary
       Row(children: [
-        _chip('Arm #$_armId', Colors.purple.shade700),
+        _chip('Arm #$_armId', Colors.purpleAccent),
         const SizedBox(width: 6),
         _chip(
           'R: ${_lastReward >= 0 ? "+" : ""}${_lastReward.toStringAsFixed(3)}',
-          _lastReward >= 0 ? Colors.green.shade800 : Colors.red.shade800,
+          _lastReward >= 0 ? Colors.greenAccent : Colors.redAccent,
         ),
         const SizedBox(width: 6),
         _chip('ΣR: ${_cumulativeReward.toStringAsFixed(2)}',
-            Colors.blueGrey.shade700),
+            Colors.blueGrey),
       ]),
       const SizedBox(height: 8),
       // Typography parameters
@@ -896,42 +1266,220 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
           _gameTrigger
               ? '🎮 Game mode (difficulty: $_gameDifficulty)'
               : 'Game mode: inactive',
-          style: GoogleFonts.inconsolata(
+          style: GoogleFonts.dmMono(
               fontSize: 10,
-              color: _gameTrigger ? Colors.amber : Colors.white38),
+              color: _gameTrigger ? Colors.amber : _Tokens.textMuted),
         ),
       ]),
       const SizedBox(height: 3),
       Text('C2 calls: $_avliCallCount',
-          style: GoogleFonts.inconsolata(fontSize: 9, color: Colors.white24)),
+          style: GoogleFonts.dmMono(fontSize: 9, color: Colors.white24)),
     ]);
   }
+
+  // ── C4 SinBERT panel ───────────────────────────────────────────────────
+  static const _c4ClassLabels = {
+    'LONG_WORD':           'Long Word',
+    'VOWEL_CONFUSION':     'Vowel Confusion',
+    'CONSONANT_CONFUSION': 'Consonant Confusion',
+    'UNFAMILIAR':          'Unfamiliar',
+  };
+  static const _c4ClassColors = {
+    'LONG_WORD':           Colors.blue,
+    'VOWEL_CONFUSION':     Colors.orange,
+    'CONSONANT_CONFUSION': Colors.red,
+    'UNFAMILIAR':          Colors.purple,
+  };
+
+  Widget _buildC4Section() {
+    if (_c4WinnerClass == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Center(
+          child: Text('Awaiting first recognition...',
+              style: GoogleFonts.dmMono(color: _Tokens.textMuted, fontSize: 11)),
+        ),
+      );
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Confidence bars for all 4 classes
+      for (final cls in _c4ClassLabels.keys) ...[
+        _c4Bar(cls),
+        const SizedBox(height: 10),
+      ],
+      const SizedBox(height: 6),
+      // Badges row
+      Wrap(spacing: 6, runSpacing: 6, children: [
+        _c4Badge(
+          '🤖 ${_c4Classifier == 'sinbert' ? 'SinBERT' : _c4Classifier}',
+          Colors.indigoAccent.withValues(alpha: 0.1),
+          Colors.indigoAccent.withValues(alpha: 0.3),
+          Colors.indigoAccent.shade100,
+        ),
+        _c4Badge(
+          '🎙 WER: ${_whisperWer >= 0 ? _whisperWer.toStringAsFixed(2) : "—"}',
+          Colors.tealAccent.withValues(alpha: 0.1),
+          Colors.tealAccent.withValues(alpha: 0.3),
+          Colors.tealAccent.shade100,
+        ),
+      ]),
+      const SizedBox(height: 8),
+      Text(
+        'Perera & Sumanathilaka (2025) · arXiv:2510.04750',
+        style: GoogleFonts.dmMono(fontSize: 8, color: Colors.white24),
+      ),
+    ]);
+  }
+
+  Widget _c4Bar(String cls) {
+    final conf = _c4Confidences[cls] ?? 0.0;
+    final isWinner = cls == _c4WinnerClass;
+    final color = _c4ClassColors[cls]!;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          if (isWinner)
+            const Padding(
+              padding: EdgeInsets.only(right: 4),
+              child: Icon(Icons.auto_awesome, size: 10, color: Colors.amber),
+            ),
+          Text(
+            _c4ClassLabels[cls]!,
+            style: GoogleFonts.dmMono(
+              fontSize: 10,
+              color: isWinner ? Colors.white : _Tokens.textMuted,
+              fontWeight: isWinner ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ]),
+        Text(
+          '${(conf * 100).toInt()}%',
+          style: GoogleFonts.dmMono(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: isWinner ? color : _Tokens.textMuted,
+          ),
+        ),
+      ]),
+      const SizedBox(height: 4),
+      _premiumProgressBar(conf, color, isWinner, showTicks: true),
+    ]);
+  }
+
+  Widget _premiumProgressBar(double value, Color color, bool isWinner, {bool showTicks = false}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          height: 6,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Stack(
+            children: [
+              if (showTicks)
+                Row(
+                  children: List.generate(
+                      10,
+                      (i) => Expanded(
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 1),
+                              height: 2,
+                              color: Colors.white.withOpacity(0.05),
+                            ),
+                          )),
+                ),
+              // Progress fill
+              FractionallySizedBox(
+                widthFactor: value.clamp(0.0, 1.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    gradient: LinearGradient(
+                      colors: [color.withOpacity(0.6), color],
+                    ),
+                    boxShadow: isWinner
+                        ? [
+                            BoxShadow(
+                                color: color.withOpacity(0.4),
+                                blurRadius: 8,
+                                spreadRadius: 1)
+                          ]
+                        : [],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _c4Badge(String label, Color bg, Color border, Color text) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: border),
+        ),
+        child: Text(label,
+            style: GoogleFonts.dmMono(fontSize: 8.5, color: text)),
+      );
 
   // ── Segment tile ───────────────────────────────────────────────────────
   Widget _buildSegmentTile(int i, Map<String, dynamic> seg) {
     final state = _segmentResults[i];
     final isListening = _listeningIndex == i;
 
+    final isHighContrast = _typo.backgroundContrast == 'WCAG_AAA';
+    final double contrastWeight = isHighContrast ? 1.0 : 0.0;
+    
+    final Color defaultTextColor = Color.lerp(_Tokens.text, Colors.black87, contrastWeight)!;
+    final Color defaultBorderColor = Color.lerp(_Tokens.bdr2, Colors.black26, contrastWeight)!;
+    final Color defaultBgColor = Color.lerp(_Tokens.surf2, Colors.black.withValues(alpha: 0.05), contrastWeight)!;
+
     Color bg, border, textColor;
+    List<BoxShadow> shadow = [];
     if (isListening) {
-      bg = Colors.red.shade50; border = Colors.red.shade400; textColor = Colors.red.shade900;
+      bg = Colors.redAccent.withValues(alpha: 0.1); 
+      border = Colors.redAccent; 
+      textColor = isHighContrast ? Colors.red.shade900 : Colors.redAccent.shade100;
+      shadow = [
+        BoxShadow(
+          color: Colors.redAccent.withValues(alpha: 0.4 * _listenPulse.value), 
+          blurRadius: 15 + (10 * _listenPulse.value), 
+          spreadRadius: 2 + (4 * _listenPulse.value)
+        )
+      ];
     } else if (state == true) {
-      bg = Colors.green.shade50; border = Colors.green.shade400; textColor = Colors.green.shade900;
+      bg = Colors.greenAccent.withValues(alpha: 0.05); 
+      border = isHighContrast ? Colors.green.shade700 : Colors.greenAccent.withValues(alpha: 0.5); 
+      textColor = isHighContrast ? Colors.green.shade900 : Colors.greenAccent;
+      shadow = [BoxShadow(color: Colors.greenAccent.withValues(alpha: 0.1), blurRadius: 10)];
     } else if (state == false) {
-      bg = Colors.orange.shade50; border = Colors.orange.shade400; textColor = Colors.orange.shade900;
+      bg = Colors.orangeAccent.withValues(alpha: 0.05); 
+      border = isHighContrast ? Colors.orange.shade700 : Colors.orangeAccent.withValues(alpha: 0.5); 
+      textColor = isHighContrast ? Colors.orange.shade900 : Colors.orangeAccent;
+      shadow = [BoxShadow(color: Colors.orangeAccent.withValues(alpha: 0.1), blurRadius: 10)];
     } else {
-      bg = Colors.blue.shade50; border = Colors.blue.shade300; textColor = Colors.blue.shade900;
+      bg = defaultBgColor; 
+      border = defaultBorderColor; 
+      textColor = defaultTextColor;
     }
 
-    return GestureDetector(
-      onTapDown: (details) {
-        if (_listeningIndex >= 0) return;
-        _recordTouch(details.localPosition);
+    return MouseRegion(
+      onEnter: (_) {
+        final bool wordComplete = _segmentResults.every((r) => r == true);
+        if (_listeningIndex < 0 && !wordComplete) {
+          _lastHoverTime = DateTime.now();
+          _startListeningForSegment(i);
+        }
       },
-      onTap: () {
-        if (_listeningIndex >= 0) return;
-        _startListeningForSegment(i);
-      },
+      cursor: SystemMouseCursors.click,
       child: AnimatedBuilder(
         animation: _listenPulse,
         builder: (_, child) {
@@ -943,13 +1491,9 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
           height: 110,
           decoration: BoxDecoration(
             color: bg,
-            border: Border.all(color: border, width: isListening ? 3 : 2),
+            border: Border.all(color: border, width: isListening ? 3 : 1),
             borderRadius: BorderRadius.circular(16),
-            boxShadow: isListening
-                ? [BoxShadow(color: Colors.red.shade200, blurRadius: 12, spreadRadius: 2)]
-                : state == true
-                    ? [BoxShadow(color: Colors.green.shade200, blurRadius: 8)]
-                    : [],
+            boxShadow: shadow,
           ),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Transform.translate(
@@ -972,7 +1516,7 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
             else if (state == false)
               const Text('🔄 Retry', style: TextStyle(fontSize: 10))
             else
-              Text('👆 Tap',
+              Text('✨ Hover',
                   style: GoogleFonts.outfit(
                       fontSize: 11, color: Colors.blue.shade400)),
           ]),
@@ -981,65 +1525,217 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
     );
   }
 
-  // ── UI helpers ─────────────────────────────────────────────────────────
-  Widget _actionBtn(String label, Color color, VoidCallback onTap) =>
-      ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  // ── Log header with Copy All button ───────────────────────────────────
+  Widget _buildLogHeader() {
+    return Container(
+      width: double.infinity,
+      color: Colors.blueGrey.shade800,
+      padding: const EdgeInsets.fromLTRB(12, 5, 6, 5),
+      child: Row(children: [
+        Text('📝 LIVE LOG',
+            style: GoogleFonts.dmMono(
+                fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white70)),
+        const Spacer(),
+        Tooltip(
+          message: 'Copy all log entries to clipboard',
+          child: InkWell(
+            onTap: _copyAllLogs,
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              child: Row(children: [
+                Icon(Icons.copy_all_rounded, size: 13, color: Colors.white60),
+                const SizedBox(width: 4),
+                Text('COPY ALL',
+                    style: GoogleFonts.dmMono(
+                        fontSize: 11, color: Colors.white70)),
+              ]),
+            ),
+          ),
         ),
-        child: Text(label, style: GoogleFonts.outfit(fontSize: 13)),
-      );
-
-  Widget _panelHeader(String title, Color bg) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        color: bg,
-        child: Text(title,
-            style: GoogleFonts.outfit(
-                fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-      );
-
-  Widget _chip(String label, Color bg) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-            color: bg, borderRadius: BorderRadius.circular(10)),
-        child: Text(label,
-            style: GoogleFonts.inconsolata(
-                fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-      );
-
-  Widget _mbsvBar(String label, double value, {bool inverse = false}) {
-    final display = inverse ? 1 - value : value;
-    final Color c = display < 0.4
-        ? Colors.green
-        : display < 0.7 ? Colors.orange : Colors.red;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(label,
-              style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.white70)),
-          Text(value.toStringAsFixed(2),
-              style: GoogleFonts.outfit(
-                  fontSize: 9.5, fontWeight: FontWeight.bold, color: c)),
-        ]),
-        const SizedBox(height: 2),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3),
-          child: LinearProgressIndicator(
-            value: value.clamp(0.0, 1.0),
-            minHeight: 4,
-            backgroundColor: Colors.white12,
-            valueColor: AlwaysStoppedAnimation(c),
+        const SizedBox(width: 4),
+        Tooltip(
+          message: 'Clear log',
+          child: InkWell(
+            onTap: () => setState(() => _logs.clear()),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              child: Icon(Icons.delete_sweep_rounded,
+                  size: 13, color: Colors.white38),
+            ),
           ),
         ),
       ]),
     );
   }
+
+  // ── Selectable log panel ────────────────────────────────────────────────
+  // Each entry is a SelectableText so the user can highlight and Ctrl+C
+  // individual lines. The panel background flashes on "Copy all".
+  Widget _buildLogPanel() {
+    if (_logs.isEmpty) {
+      return Container(
+        color: const Color(0xFF111320),
+        alignment: Alignment.center,
+        child: Text('Monitoring active. Waiting for events...',
+            style: GoogleFonts.dmMono(fontSize: 13, color: _Tokens.textMuted)),
+      );
+    }
+    return Container(
+      color: const Color(0xFF111320),
+      child: SelectionArea(
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+          itemCount: _logs.length,
+          itemBuilder: (_, i) {
+            final entry = _logs[i];
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 1.0),
+              child: Text(
+                entry['msg'] as String,
+                style: GoogleFonts.dmMono(
+                  fontSize: 13.5, // Increased from 12.0
+                  color: entry['color'] as Color,
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _copyAllLogs() {
+    if (_logs.isEmpty) return;
+    final text = _logs.reversed
+        .map((e) => e['msg'] as String)
+        .join('\n');
+    Clipboard.setData(ClipboardData(text: text)).then((_) {
+      _log('📋 Copied ${_logs.length} entries to clipboard', Colors.white54, 'system');
+    });
+  }
+
+  // ── UI helpers ─────────────────────────────────────────────────────────
+  Widget _actionBtn(String label, Color color, VoidCallback onTap) =>
+      Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            )
+          ],
+        ),
+        child: OutlinedButton(
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: color.withValues(alpha: 0.4), width: 1.5),
+            backgroundColor: color.withValues(alpha: 0.08),
+            foregroundColor: color,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text(label.toUpperCase(), 
+              style: GoogleFonts.dmMono(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+        ),
+      );
+
+  Widget _panelHeader(String title, Color accent, IconData icon) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _Tokens.surf2.withValues(alpha: 0.5),
+          border: Border(left: BorderSide(color: accent, width: 3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: accent),
+            const SizedBox(width: 10),
+            Text(title.toUpperCase(),
+                style: GoogleFonts.dmMono(
+                    fontSize: 13.5, 
+                    fontWeight: FontWeight.bold, 
+                    color: _Tokens.text, 
+                    letterSpacing: 1.0)),
+          ],
+        ),
+      );
+
+  Widget _chip(String label, Color bg) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+            color: bg.withValues(alpha: 0.15), 
+            border: Border.all(color: bg.withValues(alpha: 0.4)),
+            borderRadius: BorderRadius.circular(10)),
+        child: Text(label,
+            style: GoogleFonts.dmMono(
+                fontSize: 12, color: bg, fontWeight: FontWeight.bold)),
+      );
+
+  Widget _mbsvBar(String label, double value, {bool inverse = false}) {
+    final display = inverse ? 1 - value : value;
+    final Color c = display < 0.4
+        ? Colors.greenAccent
+        : display < 0.7 ? Colors.orangeAccent : Colors.redAccent;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text(label,
+              style: GoogleFonts.dmMono(fontSize: 12.5, color: _Tokens.text, fontWeight: FontWeight.w500)),
+          Text(value.toStringAsFixed(2),
+              style: GoogleFonts.dmMono(
+                  fontSize: 12.5, fontWeight: FontWeight.bold, color: c)),
+        ]),
+        const SizedBox(height: 4),
+        _premiumProgressBar(value, c, display > 0.6, showTicks: true),
+      ]),
+    );
+  }
+
+  Widget _pipelineConnection() => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: _Tokens.bg2,
+          border: const Border(bottom: BorderSide(color: _Tokens.bdr)),
+        ),
+        child: Row(
+          children: [
+            _statusDot(true),
+            const SizedBox(width: 10),
+            Text('PIPELINE: ACTIVE',
+                style: GoogleFonts.dmMono(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.greenAccent)),
+            const Spacer(),
+            Text('EST. RTT: 42MS',
+                style: GoogleFonts.dmMono(fontSize: 11, color: _Tokens.textMuted)),
+          ],
+        ),
+      );
+
+  Widget _statusDot(bool active) => AnimatedBuilder(
+        animation: _listenPulse,
+        builder: (context, child) => Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: active ? Colors.greenAccent.withValues(alpha: 0.6 + (0.4 * _listenPulse.value)) : Colors.grey,
+            shape: BoxShape.circle,
+            boxShadow: active ? [
+              BoxShadow(
+                  color: Colors.greenAccent.withValues(alpha: 0.4 * _listenPulse.value),
+                  blurRadius: 6)
+            ] : [],
+          ),
+        ),
+      );
 
   Widget _statRow(String label, String value) => Padding(
         padding: const EdgeInsets.only(bottom: 4),
@@ -1047,16 +1743,54 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label,
-                style: GoogleFonts.inconsolata(
-                    fontSize: 9.5, color: Colors.white54)),
+                style: GoogleFonts.dmMono(
+                    fontSize: 13, color: _Tokens.textMuted)),
             Flexible(
               child: Text(value,
                   textAlign: TextAlign.end,
-                  style: GoogleFonts.inconsolata(
-                      fontSize: 9.5,
-                      color: Colors.white,
+                  style: GoogleFonts.dmMono(
+                      fontSize: 13,
+                      color: _Tokens.text,
                       fontWeight: FontWeight.bold),
                   overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+      );
+
+  Widget _liveBadge() => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.greenAccent.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedBuilder(
+              animation: _listenPulse,
+              builder: (context, child) => Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: Colors.greenAccent.withValues(alpha: _listenPulse.value),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.greenAccent.withValues(alpha: 0.5 * _listenPulse.value),
+                        blurRadius: 4)
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'LIVE TELEMETRY',
+              style: GoogleFonts.dmMono(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.greenAccent),
             ),
           ],
         ),

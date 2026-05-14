@@ -1,6 +1,1543 @@
 INFO:     Will watch for changes in these directories: ['D:\\01 ACADEMIA\\4th Year\\Y4.S1\\RP-IT4010\\00 - Implementation\\R26-SE-031\\R26-SE-031-V2\\monitoring-service-v2']
 INFO:     Uvicorn running on http://0.0.0.0:8011 (Press CTRL+C to quit)
-INFO:     Started reloader process [8836] using StatReload
-INFO:     Started server process [32828]
+INFO:     Started reloader process [37204] using StatReload
+INFO:     Started server process [30916]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
+[DB] Connected to MongoDB Atlas: dyslexia_platform
+INFO:     127.0.0.1:51458 - "OPTIONS /api/v1/telemetry HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51458 - "POST /api/v1/telemetry HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:50174 - "OPTIONS /api/v1/telemetry HTTP/1.1" 200 OK
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+INFO:     127.0.0.1:50174 - "POST /api/v1/telemetry HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 490, in _process_worker
+    r = call_item()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 291, in __call__
+    return self.fn(*self.args, **self.kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+            ~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\sklearn.py", line 1108, in predict
+    X = _LGBMValidateData(
+        self,
+    ...<11 lines>...
+        ensure_min_samples=1,
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2923, in validate_data
+    _check_n_features(_estimator, X, reset=reset)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2787, in _check_n_features
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+INFO:     127.0.0.1:53216 - "OPTIONS /api/v1/telemetry HTTP/1.1" 200 OK
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+INFO:     127.0.0.1:53217 - "POST /api/v1/telemetry HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 490, in _process_worker
+    r = call_item()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 291, in __call__
+    return self.fn(*self.args, **self.kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+            ~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\sklearn.py", line 1108, in predict
+    X = _LGBMValidateData(
+        self,
+    ...<11 lines>...
+        ensure_min_samples=1,
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2923, in validate_data
+    _check_n_features(_estimator, X, reset=reset)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2787, in _check_n_features
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+INFO:     127.0.0.1:53257 - "POST /api/v1/telemetry HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 490, in _process_worker
+    r = call_item()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 291, in __call__
+    return self.fn(*self.args, **self.kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+            ~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\sklearn.py", line 1108, in predict
+    X = _LGBMValidateData(
+        self,
+    ...<11 lines>...
+        ensure_min_samples=1,
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2923, in validate_data
+    _check_n_features(_estimator, X, reset=reset)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2787, in _check_n_features
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+INFO:     127.0.0.1:53268 - "POST /api/v1/telemetry HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 453, in _process_worker
+    call_item = call_queue.get(block=True, timeout=timeout)
+  File "C:\Python314\Lib\multiprocessing\queues.py", line 120, in get
+    return _ForkingPickler.loads(res)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\__init__.py", line 11, in <module>
+    from .basic import Booster, Dataset, Sequence, register_logger
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\basic.py", line 29, in <module>
+    from .compat import (
+    ...<17 lines>...
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\compat.py", line 191, in <module>
+    import matplotlib  # noqa: F401
+    ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\matplotlib\__init__.py", line 161, in <module>
+    from . import _api, _version, cbook, _docstring, rcsetup
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\matplotlib\rcsetup.py", line 28, in <module>
+    from matplotlib.colors import Colormap, is_color_like
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\matplotlib\colors.py", line 52, in <module>
+    from PIL import Image
+  File "<frozen importlib._bootstrap>", line 1371, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1342, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 938, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 755, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 851, in get_code
+  File "<frozen importlib._bootstrap_external>", line 951, in get_data
+MemoryError
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+joblib.externals.loky.process_executor.BrokenProcessPool: A task has failed to un-serialize. Please ensure that the arguments of the function are all picklable.
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+ERROR:    Exception in ASGI application
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 490, in _process_worker
+    r = call_item()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 291, in __call__
+    return self.fn(*self.args, **self.kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+            ~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\sklearn.py", line 1108, in predict
+    X = _LGBMValidateData(
+        self,
+    ...<11 lines>...
+        ensure_min_samples=1,
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2923, in validate_data
+    _check_n_features(_estimator, X, reset=reset)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2787, in _check_n_features
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+INFO:     127.0.0.1:54567 - "OPTIONS /api/v1/telemetry HTTP/1.1" 200 OK
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+INFO:     127.0.0.1:54567 - "POST /api/v1/telemetry HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 490, in _process_worker
+    r = call_item()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 291, in __call__
+    return self.fn(*self.args, **self.kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+            ~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\sklearn.py", line 1108, in predict
+    X = _LGBMValidateData(
+        self,
+    ...<11 lines>...
+        ensure_min_samples=1,
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2923, in validate_data
+    _check_n_features(_estimator, X, reset=reset)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2787, in _check_n_features
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+INFO:     127.0.0.1:56884 - "OPTIONS /api/v1/telemetry HTTP/1.1" 200 OK
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    from joblib.externals.loky.backend.popen_loky_win32 import main; main(pipe_handle=1808, parent_pid=30916)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\__init__.py", line 120, in <module>
+    from .memory import MemorizedResult, Memory, expires_after, register_store_backend
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\memory.py", line 18, in <module>
+    import pydoc
+MemoryError
+  File "<string>", line 1, in <module>
+    from joblib.externals.loky.backend.popen_loky_win32 import main; main(pipe_handle=2000, parent_pid=30916)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\__init__.py", line 120, in <module>
+    from .memory import MemorizedResult, Memory, expires_after, register_store_backend
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\memory.py", line 18, in <module>
+    import pydoc
+MemoryError
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    from joblib.externals.loky.backend.popen_loky_win32 import main; main(pipe_handle=1972, parent_pid=30916)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\__init__.py", line 120, in <module>
+    from .memory import MemorizedResult, Memory, expires_after, register_store_backend
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\memory.py", line 18, in <module>
+    import pydoc
+MemoryError
+INFO:     127.0.0.1:56884 - "POST /api/v1/telemetry HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+joblib.externals.loky.process_executor.TerminatedWorkerError: A worker process managed by the executor was unexpectedly terminated. This could be caused by a segmentation fault while calling the function or by an excessive memory usage causing the Operating System to kill the worker.
+
+Detailed tracebacks of the workers should have been printed to stderr in the executor process if faulthandler was not disabled.
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+INFO:     127.0.0.1:56885 - "POST /api/v1/telemetry HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 490, in _process_worker
+    r = call_item()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 291, in __call__
+    return self.fn(*self.args, **self.kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+            ~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\sklearn.py", line 1108, in predict
+    X = _LGBMValidateData(
+        self,
+    ...<11 lines>...
+        ensure_min_samples=1,
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2923, in validate_data
+    _check_n_features(_estimator, X, reset=reset)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2787, in _check_n_features
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+INFO:     127.0.0.1:56906 - "POST /api/v1/telemetry HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 490, in _process_worker
+    r = call_item()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 291, in __call__
+    return self.fn(*self.args, **self.kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+            ~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\sklearn.py", line 1108, in predict
+    X = _LGBMValidateData(
+        self,
+    ...<11 lines>...
+        ensure_min_samples=1,
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2923, in validate_data
+    _check_n_features(_estimator, X, reset=reset)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2787, in _check_n_features
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+INFO:     127.0.0.1:56919 - "POST /api/v1/telemetry HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 490, in _process_worker
+    r = call_item()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 291, in __call__
+    return self.fn(*self.args, **self.kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+            ~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\sklearn.py", line 1108, in predict
+    X = _LGBMValidateData(
+        self,
+    ...<11 lines>...
+        ensure_min_samples=1,
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2923, in validate_data
+    _check_n_features(_estimator, X, reset=reset)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2787, in _check_n_features
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+INFO:     127.0.0.1:56925 - "POST /api/v1/telemetry HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 490, in _process_worker
+    r = call_item()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 291, in __call__
+    return self.fn(*self.args, **self.kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+            ~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\sklearn.py", line 1108, in predict
+    X = _LGBMValidateData(
+        self,
+    ...<11 lines>...
+        ensure_min_samples=1,
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2923, in validate_data
+    _check_n_features(_estimator, X, reset=reset)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2787, in _check_n_features
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+INFO:     127.0.0.1:56979 - "POST /api/v1/telemetry HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 490, in _process_worker
+    r = call_item()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\externals\loky\process_executor.py", line 291, in __call__
+    return self.fn(*self.args, **self.kwargs)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+            ~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 184, in __call__
+    return self.function(*args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\lightgbm\sklearn.py", line 1108, in predict
+    X = _LGBMValidateData(
+        self,
+    ...<11 lines>...
+        ensure_min_samples=1,
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2923, in validate_data
+    _check_n_features(_estimator, X, reset=reset)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\validation.py", line 2787, in _check_n_features
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 261, in receive_telemetry
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "D:\01 ACADEMIA\4th Year\Y4.S1\RP-IT4010\00 - Implementation\R26-SE-031\R26-SE-031-V2\monitoring-service-v2\main.py", line 213, in _lgbm_mbsv
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\multioutput.py", line 306, in predict
+    y = Parallel(n_jobs=self.n_jobs)(
+        delayed(e.predict)(X) for e in self.estimators_
+    )
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\sklearn\utils\parallel.py", line 91, in __call__
+    return super().__call__(iterable_with_config_and_warning_filters)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ~~~~^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Sasmitha Kavindu\AppData\Roaming\Python\Python314\site-packages\joblib\parallel.py", line 773, in _return_or_raise
+    raise self._result
+ValueError: X has 14 features, but LGBMRegressor is expecting 13 features as input.

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Adaptive Dyslexia Platform - Monitoring Demo</title>
+    <title>Adaptive Dyslexia Platform – v5.0 Monitoring Demo</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Sinhala:wght@400;600&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -216,7 +216,7 @@
         .intervention-overlay p {
             font-size: 1.25rem;
         }
-        
+
         .overlay-btn {
             margin-top: 1.5rem;
             padding: 0.75rem 1.5rem;
@@ -227,13 +227,164 @@
             font-size: 1rem;
             cursor: pointer;
         }
+
+        /* ── Service Status Bar ── */
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1.25rem;
+            flex-wrap: wrap;
+            margin-top: 0.75rem;
+        }
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.78rem;
+            font-weight: 500;
+            padding: 0.2rem 0.75rem;
+            border-radius: 20px;
+            background: #F3F4F6;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #9CA3AF;
+        }
+        .status-dot.online  { background: var(--success); }
+        .status-dot.offline { background: var(--danger); }
+        .status-dot.checking { background: var(--warning); animation: pulse 1s infinite; }
+
+        /* ── C4 Panel ── */
+        .c4-panel {
+            grid-column: 1 / -1;
+            background: #1E1B4B;
+            color: #C7D2FE;
+            border-radius: var(--radius);
+            padding: 1.25rem 1.5rem;
+            box-shadow: var(--shadow);
+        }
+        .c4-panel h2 {
+            color: #A5B4FC;
+            border-bottom-color: #3730A3;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+        .c4-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .c4-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(165,180,252,0.25);
+            border-radius: 8px;
+            padding: 0.75rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .c4-card.active {
+            background: rgba(99,102,241,0.25);
+            border-color: #818CF8;
+            box-shadow: 0 0 12px rgba(99,102,241,0.4);
+        }
+        .c4-card .c4-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #7C86D0;
+            margin-bottom: 0.35rem;
+        }
+        .c4-card .c4-conf {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #E0E7FF;
+        }
+        .c4-meta {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            font-size: 0.82rem;
+        }
+        .c4-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: rgba(99,102,241,0.2);
+            border: 1px solid #6366F1;
+            border-radius: 12px;
+            padding: 0.15rem 0.6rem;
+            font-size: 0.72rem;
+            color: #A5B4FC;
+        }
+        .wer-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: rgba(5,150,105,0.15);
+            border: 1px solid #059669;
+            border-radius: 12px;
+            padding: 0.15rem 0.6rem;
+            font-size: 0.72rem;
+            color: #6EE7B7;
+        }
+        .c4-winner {
+            font-weight: 700;
+            color: #818CF8;
+        }
+
+        /* ── UCSC confusion hint ── */
+        .confusion-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 0.5rem;
+        }
+        .ucsc-badge {
+            display: inline-block;
+            font-size: 0.68rem;
+            background: #EDE9FE;
+            color: #5B21B6;
+            border: 1px solid #C4B5FD;
+            border-radius: 10px;
+            padding: 0.1rem 0.5rem;
+            margin-left: 0.4rem;
+        }
     </style>
 </head>
 <body>
 
     <header>
         <h1>Adaptive Dyslexia Platform</h1>
-        <p>Real-time Monitoring & Cognitive Load Detection Demo</p>
+        <p>Real-time Monitoring &amp; Cognitive Load Detection Demo &nbsp;·&nbsp; <strong>v5.0</strong></p>
+        <div class="status-bar" id="status-bar">
+            <span class="status-chip">
+                <span class="status-dot checking" id="dot-c1"></span>
+                <span id="lbl-c1">C1 Monitoring</span>
+            </span>
+            <span class="status-chip">
+                <span class="status-dot checking" id="dot-c2"></span>
+                <span id="lbl-c2">C2 Visual</span>
+            </span>
+            <span class="status-chip">
+                <span class="status-dot checking" id="dot-c4"></span>
+                <span id="lbl-c4">C4 Intervention</span>
+            </span>
+            <span class="status-chip">
+                <span class="status-dot checking" id="dot-whisper"></span>
+                <span>Whisper WER Proxy</span>
+            </span>
+            <span class="status-chip">
+                <span class="status-dot checking" id="dot-sinbert"></span>
+                <span>SinBERT C4</span>
+            </span>
+        </div>
     </header>
 
     <div class="container">
@@ -269,8 +420,12 @@
                     <button class="overlay-btn" onclick="resumeGame()">Resume</button>
                 </div>
 
-                <div style="font-weight: 500; color: var(--text-muted);">Match the sound to the syllable:</div>
+                <div style="font-weight: 500; color: var(--text-muted);">
+                    Match the sound to the syllable:
+                    <span class="ucsc-badge" title="De Silva et al. (2025) UCSC confusion pairs">📚 UCSC</span>
+                </div>
                 <div class="sinhala-text" id="target-word">ක</div>
+                <div class="confusion-hint" id="confusion-hint"></div>
                 
                 <div class="options-grid" id="options-container">
                     <button class="option-btn" onclick="checkAnswer('ka', this)">ka</button>
@@ -281,11 +436,46 @@
             </div>
         </div>
 
+        <!-- C4 SinBERT Intervention Panel -->
+        <div class="c4-panel">
+            <h2>🧠 C4 Intervention Engine — SinBERT Error Classification</h2>
+            <div class="c4-grid">
+                <div class="c4-card" id="c4-long-word">
+                    <div class="c4-label">Long Word</div>
+                    <div class="c4-conf" id="c4-conf-lw">—</div>
+                </div>
+                <div class="c4-card" id="c4-vowel">
+                    <div class="c4-label">Vowel Confusion</div>
+                    <div class="c4-conf" id="c4-conf-vc">—</div>
+                </div>
+                <div class="c4-card" id="c4-consonant">
+                    <div class="c4-label">Consonant Confusion</div>
+                    <div class="c4-conf" id="c4-conf-cc">—</div>
+                </div>
+                <div class="c4-card" id="c4-unfamiliar">
+                    <div class="c4-label">Unfamiliar</div>
+                    <div class="c4-conf" id="c4-conf-uf">—</div>
+                </div>
+            </div>
+            <div class="c4-meta">
+                <span>Predicted: <span class="c4-winner" id="c4-winner">Awaiting first response…</span></span>
+                <span class="c4-badge" id="sinbert-badge">
+                    🤖 SinBERT · keshan3252/sinbert
+                </span>
+                <span class="wer-badge" id="wer-badge">
+                    🎙 Whisper WER: <span id="wer-value">—</span>
+                </span>
+                <span style="margin-left: auto; font-size: 0.75rem; color: #7C86D0;">
+                    Perera &amp; Sumanathilaka (2025) · arXiv:2510.04750
+                </span>
+            </div>
+        </div>
+
         <!-- Bottom Panel: Telemetry Logs -->
         <div class="telemetry-panel" id="log-console">
             <div class="log-entry">
                 <span class="log-time">[System]</span>
-                <span class="log-info">Monitoring Service Connected. Awaiting interactions...</span>
+                <span class="log-info">v5.0 · Monitoring + SinBERT C4 + Whisper WER · Awaiting interactions…</span>
             </div>
         </div>
 

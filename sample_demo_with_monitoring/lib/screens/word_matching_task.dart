@@ -212,8 +212,15 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
     final adaptiveState = Provider.of<AdaptiveState>(context);
     final config = adaptiveState.currentConfig;
 
+    Color bgColor = Colors.white;
+    if (config.backgroundContrast == 'WCAG_AAA' || config.backgroundContrast == 'HIGH') {
+      bgColor = const Color(0xFFFFFDE7);
+    } else if (config.backgroundContrast == 'LOW') {
+      bgColor = const Color(0xFFF0F4FF);
+    }
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: bgColor,
       body: Stack(
         children: [
           Row(
@@ -405,7 +412,10 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
           duration: const Duration(milliseconds: 600),
           curve: Curves.easeInOut,
           style: _getAdaptiveStyle(config, isSelected),
-          child: Text(option),
+          child: Transform.translate(
+            offset: Offset(0, config.diacriticOffset),
+            child: Text(option),
+          ),
         ),
       ),
     );
@@ -431,9 +441,6 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
         height: config.lineHeight,
         color: textColor,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-        shadows: config.diacriticOffset > 0 ? [
-          Shadow(offset: Offset(0, config.diacriticOffset), color: Colors.black12, blurRadius: 1)
-        ] : null,
       );
     } catch (e) {
       return GoogleFonts.notoSansSinhala(
@@ -443,9 +450,6 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
         height: config.lineHeight,
         color: textColor,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-        shadows: config.diacriticOffset > 0 ? [
-          Shadow(offset: Offset(0, config.diacriticOffset), color: Colors.black12, blurRadius: 1)
-        ] : null,
       );
     }
   }
