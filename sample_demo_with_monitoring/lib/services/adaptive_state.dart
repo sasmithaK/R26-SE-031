@@ -133,4 +133,23 @@ class AdaptiveState extends ChangeNotifier {
     addLog("Gamification Session Completed", "system");
     notifyListeners();
   }
+
+  Future<MBSV> sendTelemetry({
+    required Map<String, dynamic> telemetry,
+  }) async {
+    try {
+      final mbsv = await _monitoring.sendTelemetry(
+        studentId: telemetry['student_id'] ?? 'DEMO_STUDENT_001',
+        telemetry: telemetry,
+      );
+      _currentMbsv = mbsv;
+      addLog("MBSV Received: CLI=${mbsv.cognitiveLoadIndex.toStringAsFixed(2)}, PSI=${mbsv.phonologicalStrainIndex.toStringAsFixed(2)}", "mbsv");
+      notifyListeners();
+      return mbsv;
+    } catch (e) {
+      addLog("C1 Error: $e", "system");
+      notifyListeners();
+      return MBSV.initial();
+    }
+  }
 }

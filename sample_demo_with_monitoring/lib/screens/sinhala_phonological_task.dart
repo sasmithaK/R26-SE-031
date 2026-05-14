@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
+import 'dart:math';
 import '../services/adaptive_state.dart';
 import '../models/mbsv.dart';
 
@@ -167,7 +168,7 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask> with 
     if (tapIntervals.isNotEmpty) {
       double mean = tapIntervals.reduce((a, b) => a + b) / tapIntervals.length;
       double variance = tapIntervals.map((x) => (x - mean) * (x - mean)).reduce((a, b) => a + b) / tapIntervals.length;
-      interTapStd = variance.isNaN ? 0.0 : variance.sqrt();
+      interTapStd = variance.isNaN ? 0.0 : sqrt(variance);
     }
 
     final telemetry = {
@@ -209,7 +210,7 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask> with 
     _addLog('📊 C1 බනින්න... (MBSV ගණනය කිරීම)');
 
     final adaptiveState = Provider.of<AdaptiveState>(context, listen: false);
-    final mbsv = await adaptiveState.sendTelemetry(telemetry);
+    final mbsv = await adaptiveState.sendTelemetry(telemetry: telemetry);
 
     setState(() {
       currentMBSV = mbsv;
