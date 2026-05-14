@@ -26,11 +26,14 @@ from fastapi.middleware.cors import CORSMiddleware
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent))
 
+import numpy as np
+
 from shared.schemas import (
     TypographyRequest, TypographyResponse, TypographyConfig,
     RewardPayload, StudentPreferences
 )
 from core.linucb import LinUCBAgent, build_context_vector, compute_reward
+from core.sovcm import task_complexity as sovcm_task_complexity, crowding_load as sovcm_crowding_load
 from shared.database import connect_to_mongo, close_mongo_connection, get_db
 
 # ── Configuration ──────────────────────────────────────────────────────────
@@ -52,33 +55,22 @@ agent = LinUCBAgent.load_or_create(STATE_PATH, PRESETS_PATH)
 # ── Gamification tracker (in-memory: {student_id: [timestamps of low engagement]}) ─
 _low_engagement_events: dict = {}
 
+# ── Context cache: stores the context vector used during arm selection so the
+#    reward update can use the exact same context (not reconstructed defaults).
+#    Keyed by (student_id, session_id) → (arm_id, context_ndarray)
+_arm_context_cache: dict = {}
+
 # ── DB helpers ─────────────────────────────────────────────────────────────
 
 async def _get_preferences(student_id: str) -> dict:
     db = get_db()
     row = await db.student_preferences.find_one({"student_id": student_id})
     if row:
-        return {"font": row.get("preferred_font", "NotoSansSinhala"), 
-                "theme": row.get("preferred_theme", "Calm Blue"), 
-                "language": row.get("language", "si"), 
+        return {"font": row.get("preferred_font", "NotoSansSinhala"),
+                "theme": row.get("preferred_theme", "Calm Blue"),
+                "language": row.get("language", "si"),
                 "learner_type": row.get("learner_type", "V")}
     return {"font": "NotoSansSinhala", "theme": "Calm Blue", "language": "si", "learner_type": "V"}
-
-
-def _sovcm_score(text: Optional[str]) -> float:
-    """
-    Simplified SOVCM composite score for a text string.
-    Full implementation reads from sovcm_table.json (Milestone B).
-    Approximation: average character codepoint complexity proxy.
-    """
-    if not text:
-        return 0.5
-    sinhala_chars = [c for c in text if 0x0D80 <= ord(c) <= 0x0DFF]
-    if not sinhala_chars:
-        return 0.3
-    # Proxy: vowel sign density as complexity indicator
-    vowel_signs = sum(1 for c in sinhala_chars if 0x0DCF <= ord(c) <= 0x0DDF)
-    return min(1.0, vowel_signs / max(len(sinhala_chars), 1) * 2.5)
 
 
 def _check_gamification_trigger(student_id: str, engagement_index: float) -> bool:
@@ -125,22 +117,34 @@ async def get_typography(request: TypographyRequest):
     """
     Select typography configuration via LinUCB.
     Uses visual_strain_index + engagement_index from MBSV (C2's dimensions only).
+    Context includes SOVCM complexity score (novel abugida-specific feature).
     """
     prefs = await _get_preferences(request.student_id)
-    sovcm = _sovcm_score(request.current_content_text)
+    content_text = request.current_content_text or ""
+
+    # Real SOVCM — mean composite score across all Sinhala chars in current content
+    task_complexity = sovcm_task_complexity(content_text)
+
+    # Real crowding load — uses the arm-0 baseline letter_spacing (2.0px) as prior;
+    # we compute before arm selection because the context informs the selection
+    baseline_spacing = 2.0
+    crowding = sovcm_crowding_load(content_text, baseline_spacing)
 
     context = build_context_vector(
         visual_strain_index=request.visual_strain_index,
         engagement_index=request.engagement_index,
         session_number=request.session_number,
         child_age_years=request.child_age_years,
-        task_complexity_sovcm=sovcm,
-        crowding_load=sovcm * 0.8,  # proxy: crowding correlated with complexity
+        task_complexity_sovcm=task_complexity,
+        crowding_load=crowding,
         phonological_strain_index=request.phonological_strain_index,
     )
 
     arm_id = agent.select_arm(context)
     preset = agent.get_typography_config(arm_id)
+
+    # Cache context so the reward endpoint can use the exact same vector
+    _arm_context_cache[(request.student_id, request.session_id)] = (arm_id, context)
 
     # Override font from student preferences
     config = TypographyConfig(
@@ -156,35 +160,47 @@ async def get_typography(request: TypographyRequest):
 
     game_trigger = _check_gamification_trigger(request.student_id, request.engagement_index)
 
+    # Dynamic game difficulty: easier game when very disengaged, harder when moderately engaged
+    if request.engagement_index < 0.2:
+        game_difficulty = 1
+    elif request.engagement_index > 0.6:
+        game_difficulty = 3
+    else:
+        game_difficulty = 2
+
     return TypographyResponse(
         student_id=request.student_id,
         linucb_arm_selected=arm_id,
         typography_config=config,
         game_mode_trigger=game_trigger,
-        game_difficulty=2,
+        game_difficulty=game_difficulty,
     )
 
 
 @app.post("/api/v1/ui/reward")
 async def update_reward(payload: RewardPayload):
     """Update LinUCB with reward signal after a reading attempt."""
-    prefs = await _get_preferences(payload.student_id)
     reward = compute_reward(
         payload.visual_strain_before,
         payload.visual_strain_after,
         payload.reading_accuracy_delta,
     )
 
-    # Reconstruct context (simplified; ideally pass full context)
-    context = build_context_vector(
-        visual_strain_index=payload.visual_strain_before,
-        engagement_index=0.5,
-        session_number=1,
-        child_age_years=None,
-        task_complexity_sovcm=0.5,
-        crowding_load=0.4,
-        phonological_strain_index=0.0,
-    )
+    # Retrieve the exact context used when this arm was selected; fall back to a
+    # visual-strain-only reconstruction if the session key has expired from cache
+    cached = _arm_context_cache.get((payload.student_id, payload.session_id))
+    if cached is not None:
+        _, context = cached
+    else:
+        context = build_context_vector(
+            visual_strain_index=payload.visual_strain_before,
+            engagement_index=0.5,
+            session_number=1,
+            child_age_years=None,
+            task_complexity_sovcm=0.5,
+            crowding_load=0.4,
+            phonological_strain_index=0.0,
+        )
 
     agent.update(payload.arm_id, context, reward)
     agent.save(STATE_PATH)

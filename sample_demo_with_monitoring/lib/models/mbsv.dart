@@ -22,8 +22,29 @@ class MBSV {
       phonologicalStrainIndex: (json['phonological_strain_index'] ?? 0.0).toDouble(),
       engagementIndex: (json['engagement_index'] ?? 0.0).toDouble(),
       sessionFatigueIndex: (json['session_fatigue_index'] ?? 0.0).toDouble(),
-      errorPatternVector: List<double>.from(json['error_pattern_vector'] ?? [0.0, 0.0, 0.0]),
+      errorPatternVector: _parseErrorPattern(json['error_pattern_vector']),
     );
+  }
+
+  // Backend serialises ErrorPatternVector as a JSON object
+  // {"reversal": 0, "omission": 0, "substitution": 0, "hesitation": 0}.
+  // Handle both dict (normal) and list (legacy) formats gracefully.
+  static List<double> _parseErrorPattern(dynamic raw) {
+    if (raw == null) return [0.0, 0.0, 0.0, 0.0];
+    if (raw is List) {
+      final list = raw.map((e) => (e as num).toDouble()).toList();
+      while (list.length < 4) list.add(0.0);
+      return list;
+    }
+    if (raw is Map) {
+      return [
+        (raw['reversal'] ?? 0).toDouble(),
+        (raw['omission'] ?? 0).toDouble(),
+        (raw['substitution'] ?? 0).toDouble(),
+        (raw['hesitation'] ?? 0).toDouble(),
+      ];
+    }
+    return [0.0, 0.0, 0.0, 0.0];
   }
 
   Map<String, dynamic> toJson() {
@@ -44,7 +65,7 @@ class MBSV {
       phonologicalStrainIndex: 0.1,
       engagementIndex: 0.9,
       sessionFatigueIndex: 0.0,
-      errorPatternVector: [0.0, 0.0, 0.0],
+      errorPatternVector: [0.0, 0.0, 0.0, 0.0],
     );
   }
 }

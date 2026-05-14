@@ -39,6 +39,9 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
   DateTime? startTime;
   int errorCount = 0;
 
+  // Touch event tracking for Kalman filter feature in C1
+  final List<Map<String, dynamic>> _touchEvents = [];
+
   late AnimationController _controller;
   late Animation<double> _animation;
 
@@ -98,11 +101,15 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
 
   void _triggerAdaptation({bool initial = false}) {
     if (!mounted) return;
-    
+
     final adaptiveState = Provider.of<AdaptiveState>(context, listen: false);
     final duration = DateTime.now().difference(startTime!).inMilliseconds;
-    
-    // Comprehensive telemetry as required for monitoring-service-v2
+    final currentWord = rounds[currentRoundIndex].targetWord;
+
+    // Snapshot captured touch events for Kalman filter; clear for next round
+    final touchSnapshot = List<Map<String, dynamic>>.from(_touchEvents);
+    if (!initial) _touchEvents.clear();
+
     Map<String, dynamic> telemetry = {
       'hesitation_ms': initial ? 0 : (duration > 3000 ? duration : 800),
       'correction_rate': initial ? 0.0 : errorCount / rounds[currentRoundIndex].options.length,
@@ -116,23 +123,37 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
       'read_aloud_pause_ms': 550,
       'syllable_rate': 3.1,
       'disfluency_count': errorCount,
-      'is_initial_load': initial ? 1 : 0,
-      'selected_index': selectedIndex,
-      'error_count': errorCount,
-      'round_index': currentRoundIndex,
+      // Actual touch coordinates → Kalman filter in C1
+      'touch_events': touchSnapshot,
     };
 
     adaptiveState.processInteraction(
       studentId: studentId,
       telemetry: telemetry,
       context: {
+        'session_id': 'DEMO_SESSION',   // must match reward submission session_id
+        'session_number': 1,
+        'child_age_years': 7,
         'current_task': 'word_matching',
-        'target': rounds[currentRoundIndex].targetWord,
+        'target': currentWord,
+        // Sinhala text fed to C2 SOVCM for per-character visual complexity scoring
+        'current_content_text': currentWord,
         'phase': initial ? 'calibration' : 'active',
         'total_rounds': rounds.length,
         'current_round': currentRoundIndex + 1,
       },
     );
+  }
+
+  void _recordTouchAt(Offset position) {
+    _touchEvents.add({
+      'x': position.dx,
+      'y': position.dy,
+      'pressure': 0.5,
+      'timestamp_ms': DateTime.now().millisecondsSinceEpoch,
+    });
+    // Keep last 30 events to avoid unbounded growth between telemetry sends
+    if (_touchEvents.length > 30) _touchEvents.removeAt(0);
   }
 
   void _handleOptionSelect(int index) {
@@ -227,7 +248,15 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
 
   Widget _buildTaskArea(TypographyConfig config) {
     final round = rounds[currentRoundIndex];
-    
+
+    return Listener(
+      onPointerDown: (e) => _recordTouchAt(e.localPosition),
+      onPointerMove: (e) => _recordTouchAt(e.localPosition),
+      child: _buildTaskContent(round, config),
+    );
+  }
+
+  Widget _buildTaskContent(WordMatchingRound round, TypographyConfig config) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 30.0),
       child: Column(

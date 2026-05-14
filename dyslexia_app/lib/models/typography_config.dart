@@ -24,7 +24,7 @@ class TypographyConfig {
   factory TypographyConfig.fromJson(Map<String, dynamic> json) {
     return TypographyConfig(
       fontSize: (json['font_size'] ?? 20.0).toDouble(),
-      fontFamily: json['font_family'] ?? 'NotoSansSinhala',
+      fontFamily: json['font_family'] ?? 'Noto Sans',
       letterSpacing: (json['letter_spacing'] ?? 2.0).toDouble(),
       wordSpacing: (json['word_spacing'] ?? 8.0).toDouble(),
       lineHeight: (json['line_height'] ?? 1.6).toDouble(),

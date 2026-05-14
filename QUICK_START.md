@@ -1,263 +1,193 @@
-# ✅ MongoDB Migration - COMPLETE
+# R26-SE-031 Quick Start — Sinhala Dyslexia Screening Platform
 
-## Summary
+## Prerequisites
 
-Your questionnaires and task data are now successfully migrated to **MongoDB**! 
+- Python 3.8+ installed
+- Flutter 3.0+ with web support enabled
+- Git (for cloning if needed)
 
-**Important**: ✅ **All content remains EXACTLY the same** - nothing changed except where it's stored.
+## Step 1: Start Backend Services (5 minutes)
 
----
+Open a terminal and run:
 
-## 📊 What Was Done
-
-### ✅ Backend (Python Flask)
-- Added MongoDB support with fallback to SQLite for mastery tracking
-- Created 3 new API endpoints for fetching questionnaires and tasks
-- Automatic data seeding script with ALL your existing content
-- Error handling and logging
-
-### ✅ Frontend (Flutter)
-- New content service for fetching from MongoDB
-- Updated questionnaire screen to load from MongoDB
-- Updated syllable train game to load from MongoDB
-- Both screens show loading spinners and error states
-- Automatic fallback to hardcoded data if MongoDB unavailable
-
-### ✅ Documentation & Scripts
-- Complete setup guides for Windows/macOS/Linux
-- Quick-start batch and shell scripts
-- Configuration options guide
-- Troubleshooting guide
-- API documentation
-
----
-
-## 🚀 How to Run (Pick One)
-
-### Option 1: Quick Start (Easiest) ⭐
-
-**Windows:**
 ```bash
-start_mongodb_backend.bat
+cd R26-SE-031-V2
+python start_services.py
 ```
 
-**macOS/Linux:**
-```bash
-chmod +x start_mongodb_backend.sh
-./start_mongodb_backend.sh
+You should see:
+```
+[OK] C1-CBME: Running on port 8011
+[OK] C2-AVLI: Running on port 8014
+[WAIT] C3-PLCE: Running on port 8012 but not yet responding
+[WAIT] C4-IIGE: Running on port 8013 but not yet responding
 ```
 
-✅ This will:
-- Start MongoDB service
-- Install dependencies
-- Seed all your data
-- Start the backend server
+Keep this terminal open. Services will continue running in the background.
 
-Then run your Flutter app normally!
+## Step 2: Start Flutter Web (3 minutes)
 
----
+Open a NEW terminal and run:
 
-### Option 2: Manual Setup
-
-**Step 1: Install MongoDB**
-- Windows: Download from mongodb.com
-- macOS: `brew install mongodb-community`
-- Linux: `sudo apt-get install mongodb`
-
-**Step 2: Start MongoDB**
 ```bash
-# Windows
-net start MongoDB
-
-# macOS
-brew services start mongodb-community
-
-# Linux
-sudo systemctl start mongodb
+cd sample_demo_with_monitoring
+flutter clean
+flutter pub get
+flutter run -d web
 ```
 
-**Step 3: Install dependencies**
-```bash
-cd content-service
-pip install -r requirements.txt
+Wait for the message:
+```
+Launching lib/main.dart on Chrome...
 ```
 
-**Step 4: Seed database**
+Your browser should open automatically. If not, open the URL shown (usually http://localhost:5173).
+
+## Step 3: Interact with the App
+
+You should see:
+- **Left panel**: Word matching task with Sinhala words
+- **Right panel**: Real-time MBSV monitoring (6 dimensions)
+  - Cognitive Load Index
+  - Phonological Strain Index
+  - Visual Strain Index
+  - Session Fatigue Index
+  - Engagement Index
+  - Error Resilience Index
+
+Click on words in the task. Watch the MBSV values update in real-time from C1!
+
+## Step 4: Verify Integration (Optional)
+
+In a new terminal:
+
 ```bash
-python seed_mongodb.py
+cd R26-SE-031-V2
+python start_services.py --test
 ```
 
-**Step 5: Start backend**
-```bash
-python -m uvicorn main:app --reload --port 5000
+Expected output:
+```
+[OK] C1-CBME  http://127.0.0.1:8011/health
+[OK] C2-AVLI  http://127.0.0.1:8014/health
+[OK] C3-PLCE  http://127.0.0.1:8012/health
+[OK] C4-IIGE  http://127.0.0.1:8013/health
+
+4/4 services responding
 ```
 
-**Step 6: Run Flutter**
+## Step 5: Run Integration Tests (Optional)
+
 ```bash
-cd ../dyslexia_app
-flutter run
+cd R26-SE-031-V2
+python COMPLETE_INTEGRATION_TEST.py
 ```
 
----
-
-## ✨ Key Features
-
-### ✅ All Content Preserved
-- 14 Part 1 questions with exact weights
-- 8 Part 2 behavior questions  
-- 5 Part 3 observation questions
-- 5 syllable training rounds
-- 15 reading fluency sentences
-- 9 reading comprehension tasks
-- 5 drawing interpretation tasks
-- 1 word matching task
-
-### ✅ Zero Content Changes
-- Questions are IDENTICAL
-- UI is IDENTICAL
-- Functionality is IDENTICAL
-- Only storage location changed
-
-### ✅ Fallback Protection
-- If MongoDB unavailable: loads from hardcoded data
-- If API fails: shows error with retry button
-- App never crashes or loses data
-
-### ✅ Easy to Modify
-- Update questions in MongoDB without touching code
-- Changes take effect immediately on app reload
-- No code recompilation needed
-
----
-
-## 📋 Files Changed/Created
-
-### Backend Changes
-- `content-service/requirements.txt` - Added MongoDB
-- `content-service/database.py` - MongoDB functions
-- `content-service/main.py` - API endpoints
-- `content-service/seed_mongodb.py` - **NEW** Data seeding
-
-### Frontend Changes
-- `dyslexia_app/lib/services/content_service.dart` - **NEW** API client
-- `dyslexia_app/lib/screens/questionnaire_screen.dart` - Updated
-- `dyslexia_app/lib/screens/syllable_train_game.dart` - Updated
-
-### Documentation/Scripts - **ALL NEW**
-- `MONGODB_README.md` - Quick start
-- `MONGODB_SETUP.md` - Detailed setup guide
-- `MONGODB_IMPLEMENTATION_SUMMARY.md` - Technical details
-- `MONGODB_CONFIG.md` - Configuration options
-- `start_mongodb_backend.bat` - Windows script
-- `start_mongodb_backend.sh` - Unix script
-
----
-
-## 🔍 Verify It Works
-
-### Test Backend
-```bash
-curl http://127.0.0.1:5000/health
+Should show:
+```
+C1: 3 passed
+C2: 2 passed
+C3: 3 passed
+C4: 3 passed
 ```
 
-### Test API
-```bash
-# Get all questionnaire data
-curl http://127.0.0.1:5000/api/questionnaires/dyslexia_screening
+## Step 6: Train ML Model (Optional)
 
-# Get syllable train data
-curl http://127.0.0.1:5000/api/tasks/syllable_train
+To train the MBSV prediction model with real or synthetic data:
+
+```bash
+cd R26-SE-031-V2
+python scripts/train_c1_lgbm_real_data.py
 ```
 
-### Test Flutter App
-1. Open questionnaire screen → should show all questions loading
-2. Open syllable train game → should show syllables loading
-3. Answer questions → everything should work smoothly
-4. If offline → fallback data loads automatically
+This trains on HuggingFace Sinhala dyslexia datasets (or synthetic fallback).
+
+## Troubleshooting
+
+### Services Won't Start
+
+**Error**: "Port 8011 is already in use"
+
+Windows:
+```bash
+netstat -ano | findstr "801"
+taskkill /PID <pid> /F
+```
+
+Linux/Mac:
+```bash
+lsof -i :8011 | grep LISTEN | awk '{print $2}' | xargs kill -9
+```
+
+### Flutter Web Shows Errors
+
+**Error**: "Failed to connect to Monitoring Service"
+
+1. Make sure services are running: `python start_services.py --test`
+2. Check that ports 8011-8014 are open
+3. Try refreshing the browser
+4. Check browser console (F12) for CORS errors
+
+### MongoDB Not Connecting
+
+**This is OK!** Services automatically fall back to in-memory storage for demo mode. Data won't persist between restarts, but the system will work fine for testing.
+
+## System Architecture
+
+```
+Flutter Web App (localhost:5173)
+    |
+    +---> C1: Monitoring Service (8011)
+    |     - Processes touch telemetry
+    |     - Computes 6D MBSV
+    |     - Uses Kalman filter for motor precision
+    |
+    +---> C2: Visual Service (8014)
+    |     - LinUCB contextual bandit
+    |     - Typography adaptation
+    |     - Gamification control
+    |
+    +---> C3: Content Service (8012)
+    |     - Bayesian Knowledge Tracing
+    |     - Mastery estimation
+    |
+    +---> C4: Intervention Service (8013)
+    |     - SM-2 spaced repetition
+    |     - RTI escalation
+```
+
+## Service Ports
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| C1-CBME | 8011 | Behavioral monitoring |
+| C2-AVLI | 8014 | Visual adaptation |
+| C3-PLCE | 8012 | Content sequencing |
+| C4-IIGE | 8013 | Intervention logic |
+
+## Key Features
+
+- **Real-time MBSV**: 6-dimensional behavioral signal from touch kinematics
+- **Adaptive Typography**: LinUCB bandit learning Sinhala-specific fonts
+- **Kalman Filter**: Motor-control uncertainty as cognitive load proxy
+- **Acoustic Validation**: Disfluency detection from on-device audio
+- **LightGBM Model**: Predicts MBSV from behavioral features
+
+## Next Steps
+
+1. Train the ML model: `python scripts/train_c1_lgbm_real_data.py`
+2. Conduct validation study with real children
+3. Deploy to production with MongoDB Atlas
+4. Integrate with C3 & C4 for full system
+
+## Documentation
+
+- **STARTUP_GUIDE.md** — Detailed setup & troubleshooting
+- **TRAINING_METHODOLOGY.md** — ML model training with real Sinhala data
+- **SERVICE_GUIDE.md** — Service architecture & API documentation
 
 ---
 
-## 📚 Documentation Guide
-
-| Document | Read This For |
-|----------|-----------------|
-| **MONGODB_README.md** | Quick start overview |
-| **MONGODB_SETUP.md** | Complete setup instructions |
-| **MONGODB_CONFIG.md** | Configuration and deployment options |
-| **MONGODB_IMPLEMENTATION_SUMMARY.md** | Technical details |
-
----
-
-## ❓ FAQ
-
-**Q: Did the content change?**
-A: ✅ No! All questions are exactly the same. Only storage changed.
-
-**Q: What if MongoDB is not available?**
-A: ✅ App loads from hardcoded data and continues working.
-
-**Q: Do I need to modify code to change questions?**
-A: ✅ No! Edit directly in MongoDB, changes apply immediately.
-
-**Q: Will my screens break?**
-A: ✅ No! All screens work exactly as before, just load from MongoDB now.
-
-**Q: How do I add new questions?**
-A: ✅ Insert new documents into MongoDB, API automatically serves them.
-
-**Q: Is this production ready?**
-A: ✅ Yes! Includes error handling, retry logic, and fallback mechanisms.
-
----
-
-## 🎯 Next Steps
-
-1. **Run quick start script** → Sets up everything automatically
-2. **Verify everything works** → Test with Flutter app
-3. **Read the guides** → Understand the architecture
-4. **Manage content** → Update questions without code
-5. **Deploy** → Ready for production
-
----
-
-## 🎉 You're All Set!
-
-Your app now has:
-- ✅ Professional content management
-- ✅ Scalable database backend
-- ✅ Easy modification without code changes
-- ✅ Production-ready error handling
-- ✅ All original functionality preserved
-- ✅ Ready for future admin panel
-
-**Everything is working. All screens continue to function perfectly.** 
-
-Run the quick start script and you're done! 🚀
-
----
-
-## 📞 Quick Troubleshooting
-
-**MongoDB won't start?**
-- Download from mongodb.com if not installed
-- Check it's in PATH: `mongod --version`
-
-**Port 5000 in use?**
-- Change port: `python -m uvicorn main:app --port 8000`
-- Update in content_service.dart: `baseUrl = 'http://127.0.0.1:8000/api'`
-
-**App not loading data?**
-- Check backend running: `curl http://127.0.0.1:5000/health`
-- Check seeding worked: `python seed_mongodb.py`
-- Check network/firewall
-
-**Need more help?**
-- See MONGODB_SETUP.md Troubleshooting section
-- Check MONGODB_CONFIG.md for connection issues
-- Read MONGODB_IMPLEMENTATION_SUMMARY.md for details
-
----
-
-**✅ Status: Complete and Ready to Deploy**
-
-Your team leader will be happy - all data is now in MongoDB, easily modifiable without code changes! 🎊
+**Status**: Ready to run ✓
+**Last Updated**: May 2026
+**Contact**: R26-SE-031 Research Team
