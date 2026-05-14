@@ -1,6 +1,6 @@
 INFO:     Will watch for changes in these directories: ['D:\\01 ACADEMIA\\4th Year\\Y4.S1\\RP-IT4010\\00 - Implementation\\R26-SE-031\\R26-SE-031-V2\\monitoring-service-v2']
 INFO:     Uvicorn running on http://0.0.0.0:8011 (Press CTRL+C to quit)
-INFO:     Started reloader process [22752] using StatReload
-INFO:     Started server process [10184]
+INFO:     Started reloader process [29488] using StatReload
+INFO:     Started server process [11504]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.

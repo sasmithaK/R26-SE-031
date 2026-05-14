@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'word_matching_task.dart';
 import 'word_matching_avli_screen.dart';
 import 'letter_puzzle_game.dart';
+import 'sinhala_phonological_task.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -93,6 +94,17 @@ class HomeScreen extends StatelessWidget {
                 );
               },
             ),
+            _buildDrawerItem(
+              icon: Icons.auto_stories_rounded,
+              title: 'Sinhala Phonological Task',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SinhalaPhonologicalTask()),
+                );
+              },
+            ),
             const Divider(),
             _buildDrawerItem(
               icon: Icons.settings_input_component_rounded,
@@ -132,6 +144,18 @@ class HomeScreen extends StatelessWidget {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const WordMatchingAVLIScreen()),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildActivityCard(
+              context,
+              title: 'Sinhala Phonological (Monitoring)',
+              description: 'Comprehensive task monitoring all 12 behavioral features with real-time MBSV visualization and C1 processing.',
+              icon: Icons.auto_stories_rounded,
+              color: Colors.purpleAccent,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SinhalaPhonologicalTask()),
               ),
             ),
             const SizedBox(height: 32),
