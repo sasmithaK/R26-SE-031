@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/logger.dart';
 
 class SkipService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api/v1';
+  static const String baseUrl = 'http://127.0.0.1:5001/api/v1';
 
   /// Record a skip event for the current student and task by inserting
   /// a task score document with a numeric `skip_count` field.
@@ -37,7 +38,7 @@ class SkipService {
 
       return resp.statusCode == 200 || resp.statusCode == 201;
     } catch (e) {
-      print('Error recording skip: $e');
+      AppLogger.error('Error recording skip: $e');
       return false;
     }
   }

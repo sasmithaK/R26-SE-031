@@ -1,9 +1,10 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:dyslexia_app/models/comprehension_progress.dart';
+import '../utils/logger.dart';
 
 class ComprehensionService {
-  static const String baseUrl = 'http://localhost:8004/api/v1';
+  static const String baseUrl = 'http://127.0.0.1:5001/api/v1';
 
   /// Save or update comprehension progress in MongoDB
   static Future<bool> saveComprehensionProgress(
@@ -18,7 +19,7 @@ class ComprehensionService {
 
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print('Error saving comprehension progress: $e');
+      AppLogger.error('Error saving comprehension progress', error: e);
       return false;
     }
   }
@@ -38,7 +39,7 @@ class ComprehensionService {
       }
       return null;
     } catch (e) {
-      print('Error fetching comprehension progress: $e');
+      AppLogger.error('Error fetching comprehension progress', error: e);
       return null;
     }
   }
@@ -56,7 +57,7 @@ class ComprehensionService {
 
       return response.statusCode == 200;
     } catch (e) {
-      print('Error updating comprehension progress: $e');
+      AppLogger.error('Error updating comprehension progress', error: e);
       return false;
     }
   }
@@ -70,7 +71,7 @@ class ComprehensionService {
 
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      print('Error deleting comprehension progress: $e');
+      AppLogger.error('Error deleting comprehension progress', error: e);
       return false;
     }
   }
@@ -92,7 +93,7 @@ class ComprehensionService {
       }
       return [];
     } catch (e) {
-      print('Error fetching class comprehension data: $e');
+      AppLogger.error('Error fetching class comprehension data', error: e);
       return [];
     }
   }

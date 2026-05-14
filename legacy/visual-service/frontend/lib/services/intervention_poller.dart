@@ -13,8 +13,9 @@ import 'dart:convert';
 /// Usage:
 ///   class _MySreenState extends State<MyScreen> with InterventionPollerMixin { ... }
 mixin InterventionPollerMixin<T extends StatefulWidget> on State<T> {
-  final String _visualServiceBase = 'http://127.0.0.1:8004';
-  final String _interventionServiceBase = 'http://127.0.0.1:8003';
+  // Updated to use local visual-service running on port 5001
+  final String _visualServiceBase = 'http://127.0.0.1:5001';
+  final String _interventionServiceBase = 'http://127.0.0.1:5001';
   final FlutterTts _flutterTts = FlutterTts();
 
   Timer?           _pollTimer;

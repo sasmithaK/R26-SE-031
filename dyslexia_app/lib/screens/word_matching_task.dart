@@ -1,5 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:dyslexia_app/widgets/skip_button.dart';
+import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import '../services/adaptive_state.dart';
+import '../services/learner_profile_service.dart';
+import '../models/mbsv.dart';
+import '../models/typography_config.dart';
+import '../widgets/skip_button.dart';
+import 'letter_puzzle_game.dart';
+
+class WordMatchingRound {
+  final String targetWord;
+  final String imagePath;
+  final List<String> options;
+
+  WordMatchingRound({
+    required this.targetWord,
+    required this.imagePath,
+    required this.options,
+  });
+}
 
 class WordMatchingTask extends StatefulWidget {
   final VoidCallback? onComplete;
@@ -11,17 +31,153 @@ class WordMatchingTask extends StatefulWidget {
 }
 
 class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProviderStateMixin {
-  final String targetWord = 'ගහ'; // Tree
-  final String imagePath = 'assets/images/tree_character.png';
-  
-  final List<String> options = ['මල', 'ගහ', 'කොළය', 'පලතුර']; // Flower, Tree, Leaf, Fruit
-
-  bool? isCorrect;
-  
-  late AnimationController _controller;
-  late Animation<double> _animation;
+  late List<WordMatchingRound> rounds;
+  int currentRoundIndex = 0;
   
   int selectedIndex = -1;
+  bool? isCorrect;
+  DateTime? startTime;
+  int errorCount = 0;
+
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  String get studentId => LearnerProfileService.currentProfile?.studentId ?? "DEMO_STUDENT_001";
+
+  @override
+  void initState() {
+    super.initState();
+    
+    rounds = [
+      WordMatchingRound(
+        targetWord: 'ගහ',
+        imagePath: 'assets/images/tree_character.png',
+        options: ['මල', 'ගහ', 'කොළය', 'පලතුර'],
+      ),
+      WordMatchingRound(
+        targetWord: 'ඇපල්',
+        imagePath: 'assets/images/apple_character.png',
+        options: ['කෙසෙල්', 'දොඩම්', 'ඇපල්', 'මිදි'],
+      ),
+      WordMatchingRound(
+        targetWord: 'අලියා',
+        imagePath: 'assets/images/elephant.png',
+        options: ['කොටියා', 'අලියා', 'සිංහයා', 'වලසා'],
+      ),
+      WordMatchingRound(
+        targetWord: 'බල්ලා',
+        imagePath: 'assets/images/dog_character.png',
+        options: ['පූසා', 'බල්ලා', 'හරකා', 'එළුවා'],
+      ),
+      WordMatchingRound(
+        targetWord: 'පූසා',
+        imagePath: 'assets/images/cat_character.png',
+        options: ['මීයා', 'පූසා', 'සිංහයා', 'කොටියා'],
+      ),
+    ];
+
+    startTime = DateTime.now();
+    
+    _controller = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _animation = Tween<double>(begin: 1.0, end: 1.1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _triggerAdaptation(initial: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _triggerAdaptation({bool initial = false}) {
+    if (!mounted) return;
+    
+    final adaptiveState = Provider.of<AdaptiveState>(context, listen: false);
+    final duration = DateTime.now().difference(startTime!).inMilliseconds;
+    
+    Map<String, dynamic> telemetry = {
+      'hesitation_ms': initial ? 0 : (duration > 3000 ? duration : 800),
+      'correction_rate': initial ? 0.0 : errorCount / rounds[currentRoundIndex].options.length,
+      'response_latency': duration,
+      'touch_pressure': 0.45,
+      'swipe_velocity': 0.12,
+      'replay_count': 0,
+      'hint_request_count': 0,
+      'stylus_deviation': 0.02,
+      'inter_tap_interval': initial ? 0 : 450,
+      'read_aloud_pause_ms': 550,
+      'syllable_rate': 3.1,
+      'disfluency_count': errorCount,
+      'is_initial_load': initial ? 1 : 0,
+      'selected_index': selectedIndex,
+      'error_count': errorCount,
+      'round_index': currentRoundIndex,
+    };
+
+    adaptiveState.processInteraction(
+      studentId: studentId,
+      telemetry: telemetry,
+      context: {
+        'current_task': 'word_matching',
+        'target': rounds[currentRoundIndex].targetWord,
+        'phase': initial ? 'calibration' : 'active',
+        'total_rounds': rounds.length,
+        'current_round': currentRoundIndex + 1,
+      },
+    );
+  }
+
+  void _handleOptionSelect(int index) {
+    if (isCorrect == true) return;
+
+    setState(() {
+      selectedIndex = index;
+      String option = rounds[currentRoundIndex].options[index];
+      
+      if (option == rounds[currentRoundIndex].targetWord) {
+        isCorrect = true;
+        final adaptiveState = Provider.of<AdaptiveState>(context, listen: false);
+        adaptiveState.submitReward(
+          studentId: studentId,
+          armId: adaptiveState.currentArmId,
+          reward: 1.0,
+        );
+        _triggerAdaptation();
+        
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (currentRoundIndex < rounds.length - 1) {
+            setState(() {
+              currentRoundIndex++;
+              selectedIndex = -1;
+              isCorrect = null;
+              errorCount = 0;
+              startTime = DateTime.now();
+            });
+            _triggerAdaptation(initial: true);
+          } else {
+            if (widget.onComplete != null) {
+              widget.onComplete!();
+            } else if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          }
+        });
+      } else {
+        isCorrect = false;
+        errorCount++;
+        _triggerAdaptation();
+      }
+    });
+  }
 
   void _skipAndContinue() {
     if (widget.onComplete != null) {
@@ -32,322 +188,556 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
   }
 
   @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
-    _animation = Tween<double>(begin: -5.0, end: 5.0).animate(_controller);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.green.shade50,
-            Colors.teal.shade50,
-            Colors.cyan.shade50,
-          ],
-        ),
+    final adaptiveState = Provider.of<AdaptiveState>(context);
+    final config = adaptiveState.currentConfig;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                flex: 6,
+                child: _buildTaskArea(config),
+              ),
+              Container(width: 1, color: Colors.grey[100]),
+              Expanded(
+                flex: 4,
+                child: _buildMonitoringPanel(adaptiveState),
+              ),
+            ],
+          ),
+          if (adaptiveState.gameModeTrigger)
+            LetterPuzzleGame(
+              onComplete: () {
+                adaptiveState.resetGameTrigger();
+                setState(() {
+                  startTime = DateTime.now();
+                });
+              },
+            ),
+        ],
       ),
-          child: Scaffold(
-            backgroundColor: Colors.transparent,
-            appBar: AppBar(
-              title: const Text('වචන ගලපමු 🎯', 
-                style: TextStyle(
-                  fontSize: 28, 
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1,
+    );
+  }
+
+  Widget _buildTaskArea(TypographyConfig config) {
+    final round = rounds[currentRoundIndex];
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 30.0),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "වචනය තෝරන්න",
+                    style: GoogleFonts.outfit(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  Text(
+                    "Select the matching word (${currentRoundIndex + 1}/${rounds.length})",
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+              SkipButton(onPressed: _skipAndContinue),
+            ],
+          ),
+          
+          const Spacer(),
+          
+          ScaleTransition(
+            scale: _animation,
+            child: Container(
+              height: 240,
+              width: 240,
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(30),
+                child: Image.asset(
+                  round.imagePath,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => 
+                    const Icon(Icons.image_not_supported, size: 80, color: Colors.grey),
                 ),
               ),
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              foregroundColor: Colors.green.shade900,
-              centerTitle: true,
-              actions: [SkipButton(taskName: 'word_matching', onSkipped: _skipAndContinue)],
             ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+          ),
+          
+          const SizedBox(height: 60),
+          
+          Wrap(
+            spacing: 24,
+            runSpacing: 24,
+            alignment: WrapAlignment.center,
+            children: List.generate(round.options.length, (index) => _buildOptionCard(index, config)),
+          ),
+          
+          const Spacer(),
+          
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 500),
+            opacity: isCorrect != null ? 1.0 : 0.0,
+            child: _buildFeedbackWidget(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeedbackWidget() {
+    bool success = isCorrect == true;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      decoration: BoxDecoration(
+        color: success ? Colors.green[50] : Colors.red[50],
+        borderRadius: BorderRadius.circular(40),
+        border: Border.all(color: success ? Colors.green[100]! : Colors.red[100]!),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            success ? Icons.stars_rounded : Icons.info_outline_rounded,
+            color: success ? Colors.green : Colors.red,
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            success ? "මරු! (Excellent!)" : "නැවත උත්සාහ කරන්න (Try Again)",
+            style: GoogleFonts.outfit(
+              color: success ? Colors.green[800] : Colors.red[800],
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOptionCard(int index, TypographyConfig config) {
+    bool isSelected = selectedIndex == index;
+    final round = rounds[currentRoundIndex];
+    String option = round.options[index];
+    
+    Color borderColor = Colors.grey[200]!;
+    if (isSelected) {
+      if (isCorrect == true && option == round.targetWord) borderColor = Colors.green;
+      else if (isCorrect == false) borderColor = Colors.red;
+    }
+
+    return GestureDetector(
+      onTap: () => _handleOptionSelect(index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+        decoration: BoxDecoration(
+          color: isSelected && isCorrect == true && option == round.targetWord 
+              ? Colors.green[50] 
+              : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: borderColor, width: 3),
+          boxShadow: [
+            BoxShadow(
+              color: isSelected ? borderColor.withOpacity(0.2) : Colors.black.withOpacity(0.02),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+          style: _getAdaptiveStyle(config, isSelected),
+          child: Text(option),
+        ),
+      ),
+    );
+  }
+
+  TextStyle _getAdaptiveStyle(TypographyConfig config, bool isSelected) {
+    Color textColor = Colors.black87;
+    
+    // Simple contrast mapping for demonstration
+    if (config.backgroundContrast == 'HIGH') {
+      textColor = Colors.black;
+    } else if (config.backgroundContrast == 'LOW') {
+      textColor = Colors.grey[800]!;
+    }
+
+    // Default Sinhala Font Fallback
+    const String fallbackFont = 'Noto Sans Sinhala';
+
+    try {
+      return GoogleFonts.getFont(
+        config.fontFamily,
+        fontSize: config.fontSize + 4,
+        letterSpacing: config.letterSpacing,
+        wordSpacing: config.wordSpacing,
+        height: config.lineHeight,
+        color: textColor,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+        shadows: config.diacriticOffset > 0 ? [
+          Shadow(offset: Offset(0, config.diacriticOffset), color: Colors.black12, blurRadius: 1)
+        ] : null,
+      );
+    } catch (e) {
+      return GoogleFonts.notoSansSinhala(
+        fontSize: config.fontSize + 4,
+        letterSpacing: config.letterSpacing,
+        wordSpacing: config.wordSpacing,
+        height: config.lineHeight,
+        color: textColor,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+        shadows: config.diacriticOffset > 0 ? [
+          Shadow(offset: Offset(0, config.diacriticOffset), color: Colors.black12, blurRadius: 1)
+        ] : null,
+      );
+    }
+  }
+
+  Widget _buildMonitoringPanel(AdaptiveState state) {
+    return Container(
+      color: const Color(0xFFFBFBFB),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildPanelHeader(state),
+          _buildMBSVDashboard(state.currentMbsv),
+          _buildRewardHistory(state.rewardHistory),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 12, 24, 8),
+            child: Text(
+              "GRANULAR TELEMETRY & ADAPTATION LOG",
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.black45,
+                letterSpacing: 1.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              itemCount: state.logs.length,
+              separatorBuilder: (_, __) => Divider(color: Colors.grey[100], height: 1),
+              itemBuilder: (context, index) {
+                final log = state.logs[state.logs.length - 1 - index];
+                return _buildLogEntry(log);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPanelHeader(AdaptiveState state) {
+    bool isAdaptive = state.evaluationMode == EvaluationMode.adaptive;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.analytics_outlined, color: Colors.indigo, size: 28),
+              const SizedBox(width: 12),
+              Text(
+                "PEDAGOGICAL MONITOR",
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  color: Colors.black87,
+                ),
+              ),
+              const Spacer(),
+              _buildStatusBadge(),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
               children: [
-                // Animated owl with bounce
-                AnimatedBuilder(
-                  animation: _animation,
-                  builder: (context, child) {
-                    return Transform.translate(
-                      offset: Offset(0, _animation.value * 3),
-                      child: ScaleTransition(
-                        scale: Tween<double>(begin: 0.95, end: 1.05)
-                            .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut)),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.green.shade100,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.green.shade300.withOpacity(0.4),
-                          blurRadius: 16,
-                          spreadRadius: 3,
-                        ),
-                      ],
-                    ),
-                    child: Image.asset(
-                      'assets/images/welcome_owl.png',
-                      height: 160,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => 
-                          const Icon(Icons.pets, size: 160, color: Colors.green),
-                    ),
+                Expanded(
+                  child: _buildModeToggleBtn(
+                    label: "FIXED (Baseline)",
+                    isActive: !isAdaptive,
+                    onTap: () => state.setEvaluationMode(EvaluationMode.fixed),
                   ),
                 ),
-                const SizedBox(height: 20),
-                
-                // Question with animation
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.green.shade100, Colors.teal.shade100],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.green.shade300, width: 2),
-                  ),
-                  child: const Text(
-                    'මේ මොකක්ද?',
-                    style: TextStyle(
-                      fontSize: 36, 
-                      fontWeight: FontWeight.w900, 
-                      color: Colors.green,
-                      shadows: [
-                        Shadow(color: Colors.white, blurRadius: 5, offset: Offset(2, 2))
-                      ],
-                    ),
-                    textAlign: TextAlign.center,
+                Expanded(
+                  child: _buildModeToggleBtn(
+                    label: "ADAPTIVE (LinUCB)",
+                    isActive: isAdaptive,
+                    onTap: () => state.setEvaluationMode(EvaluationMode.adaptive),
                   ),
                 ),
-                const SizedBox(height: 28),
-                
-                // Target Image Container with enhanced styling
-                Container(
-                  width: 220,
-                  height: 220,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.white, Colors.green.shade50],
-                    ),
-                    borderRadius: BorderRadius.circular(40),
-                    border: Border.all(
-                      color: Colors.green.shade400,
-                      width: 8,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.shade300,
-                        offset: const Offset(0, 12),
-                        blurRadius: 8,
-                        spreadRadius: 2,
-                      ),
-                      BoxShadow(
-                        color: Colors.green.shade200.withOpacity(0.3),
-                        offset: const Offset(0, 20),
-                        blurRadius: 16,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Image.asset(
-                      imagePath,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.park_rounded, size: 100, color: Colors.green),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Feedback animation
-                if (isCorrect != null)
-                  ScaleTransition(
-                    scale: AlwaysStoppedAnimation<double>(1.0),
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 10.0),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: isCorrect!
-                                ? [Colors.amber.shade300, Colors.orange.shade400]
-                                : [Colors.red.shade200, Colors.red.shade300],
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: isCorrect! 
-                                  ? Colors.orange.withOpacity(0.4)
-                                  : Colors.red.withOpacity(0.3),
-                              blurRadius: 12,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isCorrect! ? Icons.star_rounded : Icons.close_rounded,
-                              color: Colors.white,
-                              size: 44,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              isCorrect! ? 'නියමයි! 🎉' : 'නැවත උත්සාහ කරන්න',
-                              style: const TextStyle(
-                                fontSize: 24, 
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
-                              ),
-                            )
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.teal.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.teal.shade300, width: 2),
-                    ),
-                    child: const Text(
-                      '🔽 පහතින් තෝරන්න',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.teal,
-                      ),
-                    ),
-                  ),
-
-                const SizedBox(height: 28),
-
-                // Options with enhanced animations
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
-                  alignment: WrapAlignment.center,
-                  children: List.generate(options.length, (index) {
-                    final word = options[index];
-                    final isSelected = selectedIndex == index;
-                    
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedIndex = index;
-                          isCorrect = word == targetWord;
-                        });
-                        
-                        if (word == targetWord && widget.onComplete != null) {
-                          Future.delayed(const Duration(milliseconds: 1500), () {
-                            if (mounted) {
-                              widget.onComplete!();
-                            }
-                          });
-                        }
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                          width: 140,
-                          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
-                          decoration: BoxDecoration(
-                            gradient: isSelected
-                                ? (isCorrect == true
-                                    ? LinearGradient(
-                                        colors: [
-                                          Colors.green.shade400,
-                                          Colors.green.shade600,
-                                        ],
-                                      )
-                                    : LinearGradient(
-                                        colors: [
-                                          Colors.red.shade300,
-                                          Colors.red.shade400,
-                                        ],
-                                      ))
-                                : LinearGradient(
-                                    colors: [
-                                      Colors.white,
-                                      Colors.green.shade50,
-                                    ],
-                                  ),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: isSelected
-                                  ? (isCorrect == true
-                                      ? Colors.green.shade600
-                                      : Colors.red.shade600)
-                                  : Colors.green.shade400,
-                              width: isSelected ? 4 : 3,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: isSelected
-                                    ? (isCorrect == true
-                                        ? Colors.green.withOpacity(0.5)
-                                        : Colors.red.withOpacity(0.5))
-                                    : Colors.green.shade200.withOpacity(0.3),
-                                offset: const Offset(0, 8),
-                                blurRadius: isSelected ? 12 : 6,
-                                spreadRadius: isSelected ? 2 : 0,
-                              )
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              word,
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.green.shade800,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 28),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.green[50],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            "SYNCED",
+            style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeToggleBtn({required String label, required bool isActive, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isActive ? [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+          ] : [],
         ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: isActive ? Colors.indigo : Colors.black45,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRewardHistory(List<double> rewards) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "LEARNING REWARD PROGRESS",
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.black38,
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 40,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: rewards.isEmpty 
+                ? [Text("No reward data yet...", style: TextStyle(fontSize: 10, color: Colors.black26))]
+                : rewards.map((r) => Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      height: 40 * r.clamp(0.1, 1.0),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  )).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMBSVDashboard(MBSV mbsv) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildMetricRow("Visual Strain", mbsv.visualStrainIndex, Colors.orange),
+          const SizedBox(height: 18),
+          _buildMetricRow("Engagement", mbsv.engagementIndex, Colors.green),
+          const SizedBox(height: 18),
+          _buildMetricRow("Cognitive Load", mbsv.cognitiveLoadIndex, Colors.purple),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricRow(String label, double value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: GoogleFonts.inter(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w500)),
+            Text(
+              "${(value * 100).toInt()}%",
+              style: GoogleFonts.jetBrainsMono(fontSize: 13, color: color, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: LinearProgressIndicator(
+            value: value,
+            backgroundColor: color.withOpacity(0.08),
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 8,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogEntry(LogEntry log) {
+    IconData icon;
+    Color color;
+    switch (log.type) {
+      case 'telemetry':
+        icon = Icons.bolt_rounded;
+        color = Colors.blue;
+        break;
+      case 'mbsv':
+        icon = Icons.psychology_alt_rounded;
+        color = Colors.purple;
+        break;
+      case 'typography':
+        icon = Icons.format_paint_rounded;
+        color = Colors.green;
+        break;
+      case 'system':
+        icon = Icons.warning_amber_rounded;
+        color = Colors.orange;
+        break;
+      default:
+        icon = Icons.info_outline_rounded;
+        color = Colors.grey;
+    }
+  
+    bool isParameterLog = log.message.trim().startsWith('>');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isParameterLog ? Colors.indigo[50] : color.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              isParameterLog ? Icons.tune_rounded : icon, 
+              size: 16, 
+              color: isParameterLog ? Colors.indigo : color
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  log.message,
+                  style: GoogleFonts.inter(
+                    fontSize: isParameterLog ? 14 : 12, 
+                    color: isParameterLog ? Colors.indigo[900] : Colors.black87, 
+                    fontWeight: isParameterLog ? FontWeight.w800 : (log.type == 'telemetry' ? FontWeight.w400 : FontWeight.w600),
+                    letterSpacing: isParameterLog ? 0.5 : 0,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  DateFormat('HH:mm:ss.SSS').format(log.timestamp),
+                  style: GoogleFonts.jetBrainsMono(fontSize: 9, color: Colors.black26),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+                  style: GoogleFonts.jetBrainsMono(fontSize: 10, color: Colors.black26),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

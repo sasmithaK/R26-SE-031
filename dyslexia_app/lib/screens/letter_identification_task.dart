@@ -11,6 +11,10 @@ import '../models/letter_picture_task.dart';
 import '../services/letter_identification_service.dart';
 import '../services/task_score_service.dart';
 import 'package:dyslexia_app/widgets/skip_button.dart';
+import 'package:dyslexia_app/utils/logger.dart';
+import 'package:dyslexia_app/services/visual_service.dart';
+import 'package:dyslexia_app/utils/visual_training_loop.dart';
+import 'package:dyslexia_app/models/visual_config.dart';
 
 class LetterTask {
   final String targetLetter;
@@ -101,6 +105,7 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
   List<LetterIdentificationScore> sessionScores = [];
   late LetterPictureTask currentPictureTask;
   late List<PictureOption> randomizedPictures;
+  TypographyConfig _typographyConfig = TypographyConfig.defaultConfig();
 
   void checkAnswer(String selectedLetter) {
     setState(() {
@@ -133,6 +138,11 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
     setState(() {
       phonologicalCorrect = selectedPicture.isCorrect;
     });
+
+    if (phonologicalCorrect == true) {
+      // Trigger MAB training loop reward
+      VisualTrainingLoop().endLevel(accuracyDelta: 1.0);
+    }
     
     // Save score
     final score = LetterIdentificationScore(
@@ -158,7 +168,7 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
       durationSeconds: score.totalTime.toDouble(),
       metadata: {'letter': score.letter},
     ).then((ok) {
-      if (ok) print('Task score saved for letter_identification');
+      if (ok) AppLogger.info('Task score saved for letter_identification');
     });
     
     // Show result for 1 second then proceed
@@ -201,6 +211,31 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
     setState(() {
       studentId = prefs.getString('student_id') ?? 'student_${DateTime.now().millisecondsSinceEpoch}';
     });
+    _fetchAdaptiveTypography();
+  }
+
+  Future<void> _fetchAdaptiveTypography() async {
+    try {
+      final adaptiveData = await VisualService.getAdaptiveTypography('LetterIdentificationTask');
+      if (adaptiveData != null && mounted) {
+        final response = adaptiveData['response'] as TypographyResponse;
+        final visualStrain = adaptiveData['visualStrain'] as double;
+        
+        setState(() {
+          _typographyConfig = response.config;
+        });
+
+        // Start MAB training loop
+        VisualTrainingLoop().startLevel(
+          armId: response.armSelected,
+          visualStrainBefore: visualStrain,
+          sessionId: 'letter_id_${DateTime.now().millisecondsSinceEpoch}',
+          studentId: response.studentId,
+        );
+      }
+    } catch (e) {
+      AppLogger.error('Error fetching typography for Letter ID Task: $e');
+    }
   }
 
   Future<void> speakLetter(String letter) async {
@@ -220,7 +255,7 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
         await flutterTts.speak(letter);
       }
     } catch (e) {
-      print('Error speaking letter: $e');
+      AppLogger.error('Error speaking letter: $e');
       final played = await playSinhalaLetterAudio(letter);
       if (!played) {
         await speakSinhalaLetterOnWeb(letter);
@@ -305,12 +340,17 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
                         borderRadius: BorderRadius.circular(40),
                         border: Border.all(color: currentTask.primaryColor, width: 8),
                         boxShadow: [
-                          BoxShadow(color: currentTask.primaryColor.withOpacity(0.3), offset: const Offset(0, 10), blurRadius: 0)
+                          BoxShadow(color: currentTask.primaryColor.withValues(alpha: 0.3), offset: const Offset(0, 10), blurRadius: 0)
                         ],
                       ),
                       child: Text(
                         currentTask.targetLetter,
-                        style: const TextStyle(fontSize: 80, fontWeight: FontWeight.w900, color: Colors.black87),
+                        style: TextStyle(
+                          fontSize: _typographyConfig.fontSize + 56, // Large display
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: _typographyConfig.letterSpacing,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 25),
@@ -361,10 +401,10 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: currentTask.primaryColor.withOpacity(0.5), width: 5),
+                                border: Border.all(color: currentTask.primaryColor.withValues(alpha: 0.5), width: 5),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: currentTask.primaryColor.withOpacity(0.3),
+                                    color: currentTask.primaryColor.withValues(alpha: 0.3),
                                     offset: const Offset(0, 6),
                                     blurRadius: 0,
                                   )
@@ -482,10 +522,10 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(25),
-                                border: Border.all(color: currentTask.primaryColor.withOpacity(0.5), width: 5),
+                                border: Border.all(color: currentTask.primaryColor.withValues(alpha: 0.5), width: 5),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: currentTask.primaryColor.withOpacity(0.3),
+                                    color: currentTask.primaryColor.withValues(alpha: 0.3),
                                     offset: const Offset(0, 6),
                                     blurRadius: 0,
                                   )
@@ -494,7 +534,12 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
                               child: Center(
                                 child: Text(
                                   letter,
-                                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Colors.black87),
+                                  style: TextStyle(
+                                    fontSize: _typographyConfig.fontSize + 16, // Letter options
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: _typographyConfig.letterSpacing,
+                                    color: Colors.black87,
+                                  ),
                                 ),
                               ),
                             ),
@@ -528,8 +573,9 @@ class _LetterIdentificationTaskState extends State<LetterIdentificationTask> wit
                             Text(
                               currentTask.exampleWord,
                               style: TextStyle(
-                                fontSize: 38,
+                                fontSize: _typographyConfig.fontSize + 14,
                                 fontWeight: FontWeight.w900,
+                                letterSpacing: _typographyConfig.letterSpacing,
                                 color: currentTask.primaryColor,
                                 shadows: const [
                                   Shadow(color: Colors.white, blurRadius: 8, offset: Offset(2, 2)),

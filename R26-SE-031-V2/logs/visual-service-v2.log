@@ -1,8 +1,6 @@
 INFO:     Will watch for changes in these directories: ['D:\\01 ACADEMIA\\4th Year\\Y4.S1\\RP-IT4010\\00 - Implementation\\R26-SE-031\\R26-SE-031-V2\\visual-service-v2']
 INFO:     Uvicorn running on http://0.0.0.0:8014 (Press CTRL+C to quit)
-INFO:     Started reloader process [29064] using StatReload
-INFO:     Started server process [1388]
+INFO:     Started reloader process [7532] using StatReload
+INFO:     Started server process [1712]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-Connected to MongoDB Atlas: dyslexia_platform
-INFO:     127.0.0.1:52347 - "GET /health HTTP/1.1" 200 OK

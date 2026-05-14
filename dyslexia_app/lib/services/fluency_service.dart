@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:dyslexia_app/models/fluency_progress.dart';
+import '../utils/logger.dart';
 
 class FluencyService {
   // Replace with your backend API base URL
-  static const String baseUrl = 'http://localhost:8004/api/v1';
+  static const String baseUrl = 'http://127.0.0.1:5001/api/v1';
 
   /// Save or update fluency progress to MongoDB via backend API.
   static Future<bool> saveFluencyProgress(FluencyProgress progress) async {
@@ -20,11 +21,11 @@ class FluencyService {
       if (response.statusCode == 201 || response.statusCode == 200) {
         return true;
       } else {
-        print('Failed to save fluency progress: ${response.statusCode}');
+        AppLogger.error('Failed to save fluency progress: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('Error saving fluency progress: $e');
+      AppLogger.error('Error saving fluency progress: $e');
       return false;
     }
   }
@@ -46,11 +47,11 @@ class FluencyService {
         // New student, no record yet
         return null;
       } else {
-        print('Failed to retrieve fluency progress: ${response.statusCode}');
+        AppLogger.error('Failed to retrieve fluency progress: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error retrieving fluency progress: $e');
+      AppLogger.error('Error retrieving fluency progress: $e');
       return null;
     }
   }
@@ -69,11 +70,11 @@ class FluencyService {
       if (response.statusCode == 200) {
         return true;
       } else {
-        print('Failed to update fluency progress: ${response.statusCode}');
+        AppLogger.error('Failed to update fluency progress: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('Error updating fluency progress: $e');
+      AppLogger.error('Error updating fluency progress: $e');
       return false;
     }
   }
@@ -91,11 +92,11 @@ class FluencyService {
       if (response.statusCode == 200) {
         return true;
       } else {
-        print('Failed to delete fluency progress: ${response.statusCode}');
+        AppLogger.error('Failed to delete fluency progress: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('Error deleting fluency progress: $e');
+      AppLogger.error('Error deleting fluency progress: $e');
       return false;
     }
   }

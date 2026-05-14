@@ -1,4 +1,6 @@
 import 'dart:html' as html;
+import 'logger.dart';
+
 
 String _buildTtsUrl(String letter) {
   final query = Uri.encodeComponent(letter);
@@ -13,7 +15,7 @@ Future<bool> playSinhalaLetterAudio(String letter) async {
     await audio.play();
     return true;
   } catch (e) {
-    print('Web audio playback failed: $e');
+    AppLogger.error('Web audio playback failed', error: e, tag: 'SinhalaAudioWeb');
     return false;
   }
 }

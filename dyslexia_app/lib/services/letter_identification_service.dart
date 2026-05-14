@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:dyslexia_app/models/letter_identification_score.dart';
+import '../utils/logger.dart';
 
 class LetterIdentificationService {
   // Replace with your backend API base URL
-  static const String baseUrl = 'http://localhost:8004/api/v1';
+  static const String baseUrl = 'http://127.0.0.1:5001/api/v1';
 
   /// Save a single letter identification score to MongoDB.
   static Future<bool> saveLetterScore(LetterIdentificationScore score) async {
@@ -20,11 +21,11 @@ class LetterIdentificationService {
       if (response.statusCode == 201 || response.statusCode == 200) {
         return true;
       } else {
-        print('Failed to save letter score: ${response.statusCode}');
+        AppLogger.error('Failed to save letter score: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('Error saving letter score: $e');
+      AppLogger.error('Error saving letter score: $e');
       return false;
     }
   }
@@ -43,11 +44,11 @@ class LetterIdentificationService {
       if (response.statusCode == 201 || response.statusCode == 200) {
         return true;
       } else {
-        print('Failed to save letter session: ${response.statusCode}');
+        AppLogger.error('Failed to save letter session: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('Error saving letter session: $e');
+      AppLogger.error('Error saving letter session: $e');
       return false;
     }
   }
@@ -74,11 +75,11 @@ class LetterIdentificationService {
       } else if (response.statusCode == 404) {
         return [];
       } else {
-        print('Failed to retrieve scores: ${response.statusCode}');
+        AppLogger.error('Failed to retrieve scores: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error retrieving scores: $e');
+      AppLogger.error('Error retrieving scores: $e');
       return null;
     }
   }
@@ -102,11 +103,11 @@ class LetterIdentificationService {
       } else if (response.statusCode == 404) {
         return [];
       } else {
-        print('Failed to retrieve student scores: ${response.statusCode}');
+        AppLogger.error('Failed to retrieve student scores: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error retrieving student scores: $e');
+      AppLogger.error('Error retrieving student scores: $e');
       return null;
     }
   }
@@ -124,11 +125,11 @@ class LetterIdentificationService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       } else {
-        print('Failed to retrieve statistics: ${response.statusCode}');
+        AppLogger.error('Failed to retrieve statistics: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error retrieving statistics: $e');
+      AppLogger.error('Error retrieving statistics: $e');
       return null;
     }
   }

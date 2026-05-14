@@ -1,11 +1,12 @@
-import sqlite3
-from pymongo import MongoClient
-from typing import Optional, List, Dict, Any
+import datetime
+import math
 import os
+import sqlite3
+from typing import Any, Dict, List, Optional
 
-MONGO_URI = "mongodb+srv://kavindugunasena_db_user:2Vp8ipkprifuEH8t@cluster0.ypxuqen.mongodb.net/"
-client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
-db = client.content_db
+from pymongo import MongoClient
+
+DB_PATH = os.getenv('SQLITE_DB_PATH', 'student_mastery.db')
 
 # async def init_db():
 #     # Create indexes for fast lookup
@@ -55,7 +56,7 @@ def init_mongo():
         return False
 
 
-def init_db():
+async def init_db():
     """Initialize all databases - SQLite and MongoDB"""
     # Initialize SQLite for mastery tracking
     conn = sqlite3.connect(DB_PATH)
@@ -66,54 +67,148 @@ def init_db():
             skill_id TEXT,
             mastery_level REAL,
             last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_practiced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            attempt_count INTEGER DEFAULT 0,
             PRIMARY KEY (student_id, skill_id)
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mastery_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT,
+            skill_id TEXT,
+            mastery_level REAL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Lightweight migration for older local DBs.
+    cursor.execute("PRAGMA table_info(mastery)")
+    existing_cols = {row[1] for row in cursor.fetchall()}
+    if 'last_practiced_at' not in existing_cols:
+        cursor.execute('ALTER TABLE mastery ADD COLUMN last_practiced_at DATETIME DEFAULT CURRENT_TIMESTAMP')
+    if 'attempt_count' not in existing_cols:
+        cursor.execute('ALTER TABLE mastery ADD COLUMN attempt_count INTEGER DEFAULT 0')
     conn.commit()
     conn.close()
     
     # Initialize MongoDB for questions and tasks
     init_mongo()
 
+def _apply_forgetting(mastery_level: float, last_practiced_at_iso: str) -> float:
+    """Apply a simple Ebbinghaus-style decay on mastery over elapsed days."""
+    try:
+        last_practiced = datetime.datetime.fromisoformat(last_practiced_at_iso)
+    except Exception:
+        return float(mastery_level)
+
+    if last_practiced.tzinfo is None:
+        last_practiced = last_practiced.replace(tzinfo=datetime.timezone.utc)
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    elapsed_days = max(0.0, (now - last_practiced).total_seconds() / 86400.0)
+    decay_lambda = 0.02
+    decayed = float(mastery_level) * math.exp(-decay_lambda * elapsed_days)
+    return round(max(0.0, min(1.0, decayed)), 4)
+
+
 async def update_mastery(student_id: str, skill_id: str, mastery_level: float):
-    now = datetime.datetime.now(datetime.UTC)
-    
-    # Update current mastery
-    await db.mastery.update_one(
-        {"student_id": student_id, "skill_id": skill_id},
-        {
-            "$set": {
-                "mastery_level": mastery_level,
-                "last_practiced_at": now
-            },
-            "$inc": {"attempt_count": 1}
-        },
-        upsert=True
-    )
-    
-    # Log history for curve analysis
-    await db.mastery_history.insert_one({
-        "student_id": student_id,
-        "skill_id": skill_id,
-        "mastery_level": mastery_level,
-        "timestamp": now
-    })
-
-async def get_mastery(student_id: str, skill_id: str) -> float:
-    doc = await db.mastery.find_one({"student_id": student_id, "skill_id": skill_id})
-    if not doc:
-        return 0.0
-    
-    # Apply forgetting curve logic (Ebbinghaus)
-    return _apply_forgetting(doc["mastery_level"], doc["last_practiced_at"])
-
-def get_all_mastery(student_id: str):
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('SELECT skill_id, mastery_level FROM mastery WHERE student_id = ?', (student_id,))
+
+    cursor.execute(
+        'SELECT attempt_count FROM mastery WHERE student_id = ? AND skill_id = ?',
+        (student_id, skill_id),
+    )
+    row = cursor.fetchone()
+    attempt_count = (row[0] + 1) if row else 1
+
+    cursor.execute(
+        '''
+        INSERT OR REPLACE INTO mastery (student_id, skill_id, mastery_level, last_updated, last_practiced_at, attempt_count)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ''',
+        (student_id, skill_id, float(mastery_level), now, now, attempt_count),
+    )
+    cursor.execute(
+        '''
+        INSERT INTO mastery_history (student_id, skill_id, mastery_level, timestamp)
+        VALUES (?, ?, ?, ?)
+        ''',
+        (student_id, skill_id, float(mastery_level), now),
+    )
+    conn.commit()
+    conn.close()
+
+async def get_mastery(student_id: str, skill_id: str) -> float:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT mastery_level, last_practiced_at FROM mastery WHERE student_id = ? AND skill_id = ?',
+        (student_id, skill_id),
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return 0.0
+
+    mastery_level, last_practiced_at = row
+    if last_practiced_at is None:
+        return float(mastery_level)
+
+    return _apply_forgetting(float(mastery_level), last_practiced_at)
+
+async def get_all_mastery(student_id: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT skill_id, mastery_level, last_practiced_at FROM mastery WHERE student_id = ?',
+        (student_id,),
+    )
     results = cursor.fetchall()
     conn.close()
-    return {skill: level for skill, level in results}
+    output: Dict[str, float] = {}
+    for skill, level, last_practiced_at in results:
+        if last_practiced_at:
+            output[skill] = _apply_forgetting(float(level), last_practiced_at)
+        else:
+            output[skill] = float(level)
+    return output
+
+
+async def get_mastery_history(student_id: str) -> List[Dict[str, Any]]:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        '''
+        SELECT m.skill_id, m.mastery_level, m.attempt_count, m.last_practiced_at
+        FROM mastery m
+        WHERE m.student_id = ?
+        ORDER BY m.last_updated DESC
+        ''',
+        (student_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    history: List[Dict[str, Any]] = []
+    for skill_id, mastery_level, attempt_count, last_practiced_at in rows:
+        decayed = (
+            _apply_forgetting(float(mastery_level), last_practiced_at)
+            if last_practiced_at
+            else float(mastery_level)
+        )
+        history.append(
+            {
+                'skill_id': skill_id,
+                'mastery_level': decayed,
+                'attempt_count': int(attempt_count or 0),
+                'last_practiced_at': last_practiced_at,
+            }
+        )
+    return history
 
 
 # MongoDB Query Functions

@@ -7,6 +7,10 @@ import 'package:dyslexia_app/services/difficulty_profile_service.dart';
 import 'package:dyslexia_app/services/fluency_service.dart';
 import 'package:dyslexia_app/widgets/skip_button.dart';
 import 'package:dyslexia_app/services/task_score_service.dart';
+import 'package:dyslexia_app/utils/logger.dart';
+import 'package:dyslexia_app/services/visual_service.dart';
+import 'package:dyslexia_app/utils/visual_training_loop.dart';
+import 'package:dyslexia_app/models/visual_config.dart';
 
 class ReadingFluencyTask extends StatefulWidget {
   final VoidCallback? onComplete;
@@ -67,6 +71,7 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
   int breakdownLevel = 0; // Level where fluency broke down
 
   late AnimationController _pulseController;
+  TypographyConfig _typographyConfig = TypographyConfig.defaultConfig();
 
   @override
   void initState() {
@@ -108,6 +113,32 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
         avgWpm = progress.avgWpm;
         currentLevel = currentLevel > progress.fluencyLevel ? currentLevel : progress.fluencyLevel;
       });
+    }
+
+    _fetchAdaptiveTypography();
+  }
+
+  Future<void> _fetchAdaptiveTypography() async {
+    try {
+      final adaptiveData = await VisualService.getAdaptiveTypography('ReadingFluencyTask');
+      if (adaptiveData != null && mounted) {
+        final response = adaptiveData['response'] as TypographyResponse;
+        final visualStrain = adaptiveData['visualStrain'] as double;
+        
+        setState(() {
+          _typographyConfig = response.config;
+        });
+
+        // Start MAB training loop
+        VisualTrainingLoop().startLevel(
+          armId: response.armSelected,
+          visualStrainBefore: visualStrain,
+          sessionId: 'fluency_${DateTime.now().millisecondsSinceEpoch}',
+          studentId: response.studentId,
+        );
+      }
+    } catch (e) {
+      AppLogger.error('Error fetching typography for Fluency Task: $e');
     }
   }
 
@@ -169,7 +200,7 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
     // Try to save to MongoDB (non-blocking)
     FluencyService.saveFluencyProgress(progress).then((success) {
       if (success) {
-        print('Fluency progress saved to MongoDB');
+        AppLogger.info('Fluency progress saved to MongoDB');
       }
     });
 
@@ -184,7 +215,7 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
         'breakdownLevel': newBreakdownLevel,
       },
     ).then((ok) {
-      if (ok) print('Task score saved for reading_fluency');
+      if (ok) AppLogger.info('Task score saved for reading_fluency');
     });
 
     setState(() {
@@ -312,6 +343,9 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
   }
 
   void _showFinalResults() {
+    // Trigger MAB training loop reward
+    VisualTrainingLoop().endLevel(accuracyDelta: 1.0);
+
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -368,7 +402,7 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
     final seconds = elapsed.inMilliseconds / 1000.0;
     final minutes = seconds / 60.0;
     final currentWpm = minutes > 0 ? (words.length / minutes) : 0.0;
-    final currentWer = (errorCount / (words.length > 0 ? words.length : 1)) * 100;
+    final currentWer = (errorCount / (words.isNotEmpty ? words.length : 1)) * 100;
 
     return Scaffold(
       appBar: AppBar(
@@ -473,8 +507,10 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
                             child: Text(
                               words[i],
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: _typographyConfig.fontSize,
                                 fontWeight: FontWeight.w700,
+                                letterSpacing: _typographyConfig.letterSpacing,
+                                height: _typographyConfig.lineHeight,
                                 color: read ? Colors.brown : Colors.black87,
                               ),
                             ),
@@ -530,7 +566,7 @@ class _ReadingFluencyTaskState extends State<ReadingFluencyTask>
                           children: [
                             const Text('වචන/මිනිත්තු',
                                 style: TextStyle(fontSize: 12, color: Colors.black54)),
-                            Text('${currentWpm.toStringAsFixed(1)}',
+                            Text(currentWpm.toStringAsFixed(1),
                                 style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,

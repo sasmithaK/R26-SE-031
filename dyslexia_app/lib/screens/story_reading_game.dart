@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:dyslexia_app/data/reading_passages.dart';
 import 'dart:async';
 import 'package:dyslexia_app/services/difficulty_profile_service.dart';
-import 'package:characters/characters.dart';
 import 'package:dyslexia_app/widgets/skip_button.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dyslexia_app/services/mbsv_listener_service.dart';
+import 'package:dyslexia_app/services/inline_intervention_service.dart';
+import 'package:dyslexia_app/widgets/intervention_overlay.dart';
+import 'package:dyslexia_app/utils/telemetry_collector.dart';
+import 'package:dyslexia_app/models/telemetry.dart';
 
 class StoryReadingGame extends StatefulWidget {
   final VoidCallback? onComplete;
 
-  const StoryReadingGame({Key? key, this.onComplete}) : super(key: key);
+  const StoryReadingGame({super.key, this.onComplete});
 
   @override
   State<StoryReadingGame> createState() => _StoryReadingGameState();
@@ -30,7 +35,17 @@ class _StoryReadingGameState extends State<StoryReadingGame>
   Timer? _inactivityTimer;
   final Duration _tapTimeout = const Duration(milliseconds: 3500);
   int? _letterModeWordIndex; // which word index is currently split into letters
-  Map<int, int> _letterProgress = {}; // wordIndex -> next letter index to tap
+  final Map<int, int> _letterProgress = {}; // wordIndex -> next letter index to tap
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // C1-C4 INTEGRATION: MBSV listening, telemetry, and intervention
+  // ═══════════════════════════════════════════════════════════════════════════
+  late String _studentId;
+  late MBSVListenerService _mbsvListener;
+  late TelemetryCollector? _telemetryCollector;
+  bool _interventionActive = false;
+  List<String> _interventionSyllables = [];
+  String _interventionWord = '';
 
   @override
   void initState() {
@@ -44,6 +59,102 @@ class _StoryReadingGameState extends State<StoryReadingGame>
       vsync: this,
     );
     _initializeSentence();
+
+    // ═══ Initialize C1-C4 integration ═══
+    _initializeMonitoring();
+  }
+
+  Future<void> _initializeMonitoring() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _studentId = prefs.getString('student_id') ?? 'demo_student_${DateTime.now().millisecondsSinceEpoch}';
+
+      // Start MBSV listening (C1)
+      _mbsvListener = MBSVListenerService();
+      _mbsvListener.addListener(_onMBSVUpdate);
+      _mbsvListener.start(_studentId);
+
+      // Initialize telemetry collector
+      final sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
+      _telemetryCollector = TelemetryCollector(
+        studentId: _studentId,
+        taskId: 'story_reading_game',
+        sessionId: sessionId,
+      );
+
+      debugPrint('[Story] Monitoring initialized for student: $_studentId');
+    } catch (e) {
+      debugPrint('[Story] Monitoring init error: $e');
+    }
+  }
+
+  /// Called when MBSV updates - check if intervention should trigger
+  void _onMBSVUpdate() {
+    if (!mounted || _interventionActive) return;
+
+    final mbsv = _mbsvListener.current;
+
+    // Trigger intervention if phonological strain exceeds threshold
+    if (mbsv.phonologicalStrainIndex > 0.45) {
+      _triggerIntervention();
+    }
+  }
+
+  /// Trigger the intervention overlay with syllable splitting
+  Future<void> _triggerIntervention() async {
+    if (_interventionActive) return;
+
+    setState(() => _interventionActive = true);
+
+    try {
+      // Pick a challenging word (longest word in current sentence)
+      final sentence = grade1Passages[currentPassageIndex].sentences[currentSentenceIndex];
+      final words = sentence.split(' ').where((w) => w.isNotEmpty).toList();
+
+      if (words.isEmpty) {
+        setState(() => _interventionActive = false);
+        return;
+      }
+
+      final challengeWord = words.reduce((a, b) => a.length > b.length ? a : b);
+
+      // Request syllable split from C4
+      final syllables = await InlineInterventionService.splitSyllables(challengeWord);
+
+      if (!mounted) return;
+
+      setState(() {
+        _interventionSyllables = syllables;
+        _interventionWord = challengeWord;
+      });
+
+      // Show intervention overlay
+      _showInterventionOverlay();
+    } catch (e) {
+      debugPrint('[Story] Intervention trigger error: $e');
+      setState(() => _interventionActive = false);
+    }
+  }
+
+  /// Display the intervention overlay
+  void _showInterventionOverlay() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => InterventionOverlay(
+        syllables: _interventionSyllables,
+        fullWord: _interventionWord,
+        onDismiss: () {
+          Navigator.pop(context);
+          setState(() {
+            _interventionActive = false;
+            _interventionSyllables = [];
+            _interventionWord = '';
+          });
+          debugPrint('[Story] Intervention dismissed');
+        },
+      ),
+    );
   }
 
   void _initializeSentence() {
@@ -70,6 +181,20 @@ class _StoryReadingGameState extends State<StoryReadingGame>
     if (_letterModeWordIndex == index) {
       _letterModeWordIndex = null;
       _letterProgress.remove(index);
+    }
+
+    // ═══ Send telemetry to C1 ═══
+    final sentence = grade1Passages[currentPassageIndex].sentences[currentSentenceIndex];
+    final words = sentence.split(' ');
+    if (index < words.length) {
+      final word = words[index];
+      final elapsed = DateTime.now().difference(sessionStartTime).inMilliseconds;
+      _telemetryCollector?.recordTouch(0, 0); // Record touch event
+      // Send payload to C1
+      final payload = _telemetryCollector?.finalize('word_tap');
+      if (payload != null) {
+        _telemetryCollector?.send(payload);
+      }
     }
 
     // restart timer for next words
@@ -312,6 +437,11 @@ class _StoryReadingGameState extends State<StoryReadingGame>
   void dispose() {
     _highlightController.dispose();
     _cancelInactivityTimer();
+
+    // ═══ Clean up monitoring ═══
+    _mbsvListener.removeListener(_onMBSVUpdate);
+    _mbsvListener.stop();
+
     super.dispose();
   }
 
@@ -377,7 +507,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.blue.withOpacity(0.3),
+                  color: Colors.blue.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -439,7 +569,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                         boxShadow: index == currentPassageIndex
                             ? [
                                 BoxShadow(
-                                  color: Colors.blue.shade400.withOpacity(0.6),
+                                  color: Colors.blue.shade400.withValues(alpha: 0.6),
                                   blurRadius: 8,
                                   spreadRadius: 2,
                                 ),
@@ -468,7 +598,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.2),
+            color: Colors.blue.withValues(alpha: 0.2),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -495,7 +625,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                         color: Colors.blue.shade100,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.blue.withOpacity(0.3),
+                            color: Colors.blue.withValues(alpha: 0.3),
                             blurRadius: 12,
                             spreadRadius: 2,
                           ),
@@ -540,7 +670,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   transform: Matrix4.identity()
-                    ..scale(showHint ? 1.1 : 1.0),
+                    ..scaleByDouble(showHint ? 1.1 : 1.0, showHint ? 1.1 : 1.0, 1.0, 1.0),
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
@@ -553,8 +683,8 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                     boxShadow: [
                       BoxShadow(
                         color: showHint
-                            ? Colors.orange.withOpacity(0.4)
-                            : Colors.blue.withOpacity(0.3),
+                            ? Colors.orange.withValues(alpha: 0.4)
+                            : Colors.blue.withValues(alpha: 0.3),
                         blurRadius: 12,
                         spreadRadius: 2,
                       ),
@@ -650,10 +780,10 @@ class _StoryReadingGameState extends State<StoryReadingGame>
           boxShadow: [
             BoxShadow(
               color: isHighlighted
-                  ? Colors.yellow.withOpacity(0.5)
+                  ? Colors.yellow.withValues(alpha: 0.5)
                   : isTapped
-                      ? Colors.green.withOpacity(0.3)
-                      : Colors.blue.withOpacity(0.2),
+                      ? Colors.green.withValues(alpha: 0.3)
+                      : Colors.blue.withValues(alpha: 0.2),
               blurRadius: isHighlighted ? 12 : 6,
               spreadRadius: isHighlighted ? 2 : 0,
             ),
@@ -713,7 +843,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
                 boxShadow: tapped
                     ? [
                         BoxShadow(
-                          color: Colors.orange.shade300.withOpacity(0.4),
+                          color: Colors.orange.shade300.withValues(alpha: 0.4),
                           blurRadius: 6,
                           offset: const Offset(0, 3),
                         )
@@ -759,7 +889,7 @@ class _StoryReadingGameState extends State<StoryReadingGame>
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.orange.withOpacity(0.3),
+                  color: Colors.orange.withValues(alpha: 0.3),
                   blurRadius: 12,
                   spreadRadius: 2,
                 ),

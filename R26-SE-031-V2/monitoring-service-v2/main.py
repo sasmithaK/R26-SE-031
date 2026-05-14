@@ -20,6 +20,8 @@ import math
 from pathlib import Path
 from contextlib import asynccontextmanager
 
+import numpy as np
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -31,30 +33,32 @@ from shared.schemas import (
     TelemetryPayload, MBSVOutput, MBSV, ErrorPatternVector, WelfordState
 )
 from core.welford import get_baseline
+from core.kalman_filter import TouchKalmanFilter
 from shared.database import connect_to_mongo, close_mongo_connection, get_db
 
 # ── Configuration ─────────────────────────────────────────────────────────
 PORT = int(os.getenv("C1_PORT", "8011"))
 
+# Output dimension names — matches LightGBM training target order
+DIMENSION_NAMES = [
+    "cognitive_load_index", "phonological_strain_index", "visual_strain_index",
+    "session_fatigue_index", "engagement_index", "error_resilience_index"
+]
+
 # ── Try to load LightGBM models ────────────────────────────────────────────
 try:
     import pickle
     import joblib  # MultiOutputRegressor often requires joblib or pickle
-    import numpy as np
-    
+
     MODELS_DIR = Path(__file__).parent.parent / "models"
     MODEL_PATH = MODELS_DIR / "c1_lgbm_mbsv.pkl"
-    
+
     LGBM_MODEL = None
     if MODEL_PATH.exists():
         with open(MODEL_PATH, "rb") as f:
             LGBM_MODEL = pickle.load(f)
-    
+
     MODELS_LOADED = LGBM_MODEL is not None
-    DIMENSION_NAMES = [
-        "cognitive_load_index", "phonological_strain_index", "visual_strain_index",
-        "session_fatigue_index", "engagement_index", "error_resilience_index"
-    ]
 except Exception as e:
     print(f"[C1] Model load error: {e}")
     LGBM_MODEL = None
@@ -111,6 +115,19 @@ def _extract_features(payload: TelemetryPayload) -> dict:
         if payload.touch_events else 0.5
     )
 
+    # Kalman Filter: motor-control uncertainty proxy from touch trajectory
+    # High innovation norm = degraded fine-motor precision = cognitive load signal
+    # Grounded in Sweller (1988) CLT: high load degrades motor control precision
+    kalman_innovation = 0.0
+    if len(payload.touch_events) >= 3:
+        kf = TouchKalmanFilter(dt=0.016)
+        for i, ev in enumerate(payload.touch_events):
+            z = np.array([ev.x, ev.y])
+            if i == 0:
+                kf.x = np.array([ev.x, ev.y, 0.0, 0.0])
+            kf.update(z)
+        kalman_innovation = kf.session_mean_innovation()
+
     return {
         "hesitation_ms": float(payload.hesitation_ms),
         "correction_rate": float(payload.correction_rate),
@@ -124,7 +141,7 @@ def _extract_features(payload: TelemetryPayload) -> dict:
         "read_aloud_pause_ms": float(payload.read_aloud_pause_ms or 0.0),
         "syllable_rate": float(payload.syllable_rate or 0.0),
         "disfluency_count": float(payload.disfluency_count or 0.0),
-        "kalman_innovation": 0.0,   # Milestone B: Kalman Filter
+        "kalman_innovation": kalman_innovation,
     }
 
 
@@ -181,7 +198,6 @@ def _rule_based_mbsv(features: dict, z_scores: dict) -> MBSV:
 
 def _lgbm_mbsv(features: dict, z_scores: dict) -> MBSV:
     """Compute MBSV using trained LightGBM MultiOutput model."""
-    import numpy as np
     feature_vector = np.array([[
         z_scores.get(k, 0.0) for k in [
             "hesitation_ms", "correction_rate", "response_latency", "touch_pressure",
@@ -287,13 +303,64 @@ async def get_baseline_summary(student_id: str):
 
 
 @app.get("/api/v1/monitoring/shap/{student_id}")
-def get_shap(student_id: str):
-    """SHAP explanation placeholder — full implementation in Milestone B."""
-    return {
-        "student_id": student_id,
-        "available": False,
-        "message": "SHAP explanations available after Milestone B Kalman Filter integration.",
-    }
+async def get_shap(student_id: str):
+    """
+    SHAP feature importance for the most recent MBSV computation.
+    Validates that audio features (read_aloud_pause_ms, syllable_rate, disfluency_count)
+    rank alongside touch features in the LightGBM explanation.
+    """
+    if not MODELS_LOADED:
+        return {"student_id": student_id, "available": False,
+                "message": "LightGBM model not loaded — run scripts/train_c1_lgbm.py first."}
+
+    baseline = await get_baseline(student_id)
+    if not baseline.is_warm(min_observations=3):
+        return {"student_id": student_id, "available": False,
+                "message": "Baseline not yet warm (need ≥3 telemetry events for this student)."}
+
+    try:
+        import shap
+
+        feature_names = baseline.FEATURES  # 13 features in canonical order
+        # Use the student's current mean as a representative sample (z-score = 0 at mean)
+        feature_vector = np.zeros((1, len(feature_names)))
+
+        explainer = shap.TreeExplainer(LGBM_MODEL)
+        shap_values = explainer.shap_values(feature_vector)
+
+        # shap_values: list of arrays [n_outputs × n_samples × n_features]
+        # or single array for single output — normalise to list form
+        if not isinstance(shap_values, list):
+            shap_values = [shap_values]
+
+        result: dict = {}
+        for i, dim in enumerate(DIMENSION_NAMES):
+            if i < len(shap_values):
+                vals = shap_values[i][0]
+            else:
+                vals = shap_values[0][0]
+            result[dim] = {feature_names[j]: round(float(vals[j]), 5)
+                           for j in range(len(feature_names))}
+
+        # Rank features by absolute mean SHAP across all dimensions
+        mean_abs = {
+            f: round(float(np.mean([abs(result[d][f]) for d in DIMENSION_NAMES])), 5)
+            for f in feature_names
+        }
+        ranked = sorted(mean_abs.items(), key=lambda x: x[1], reverse=True)
+
+        return {
+            "student_id": student_id,
+            "available": True,
+            "shap_per_dimension": result,
+            "feature_importance_ranked": [{"feature": f, "mean_abs_shap": v} for f, v in ranked],
+        }
+
+    except ImportError:
+        return {"student_id": student_id, "available": False,
+                "message": "Install 'shap' library: pip install shap"}
+    except Exception as e:
+        return {"student_id": student_id, "available": False, "message": str(e)}
 
 
 if __name__ == "__main__":

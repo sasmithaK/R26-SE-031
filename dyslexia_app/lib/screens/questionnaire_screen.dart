@@ -4,6 +4,7 @@ import '../services/difficulty_profile_service.dart';
 
 import '../services/content_service.dart';
 import '../utils/questionnaire_db.dart';
+import '../utils/logger.dart';
 
 class QuestionnaireScreen extends StatefulWidget {
   const QuestionnaireScreen({super.key});
@@ -119,7 +120,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
         _loadError = null;
       });
     } catch (e) {
-      print('Error loading questionnaire: $e');
+      AppLogger.error('Error loading questionnaire', error: e);
       setState(() {
         _isLoading = false;
         _loadError = 'Error loading questionnaire: $e';
@@ -255,6 +256,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
 
       await DifficultyProfileService.saveAssignedTier(tier);
 
+      if (!mounted) return;
+
       // After questionnaire, go to student preferences so they can choose color/font
       Navigator.pushReplacementNamed(context, '/student_preferences', arguments: {
         'studentName': _studentNameController.text.trim(),
@@ -328,7 +331,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
                     children: [
             _buildSectionHeader('ගුරු/දෙමාපිය තොරතුරු'),
             DropdownButtonFormField<String>(
-              value: _respondentRole,
+              initialValue: _respondentRole,
               decoration: const InputDecoration(
                 labelText: 'පුරවන්නාගේ භූමිකාව',
                 border: OutlineInputBorder(),
@@ -418,7 +421,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.teal.withOpacity(0.1),
+                color: Colors.teal.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.teal),
               ),
@@ -522,22 +525,18 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
                 '${index + 1}. $question [$weight]',
                 style: const TextStyle(fontSize: 16),
               ),
-              Row(
-                children: [
-                  Radio<int>(
-                    value: 1,
-                    groupValue: _partOneScores[index],
-                    onChanged: (val) => setState(() => _partOneScores[index] = val!),
-                  ),
-                  const Text('ඔව්'),
-                  const SizedBox(width: 20),
-                  Radio<int>(
-                    value: 0,
-                    groupValue: _partOneScores[index],
-                    onChanged: (val) => setState(() => _partOneScores[index] = val!),
-                  ),
-                  const Text('නැහැ'),
-                ],
+              RadioGroup<int>(
+                groupValue: _partOneScores[index],
+                onChanged: (val) => setState(() => _partOneScores[index] = val!),
+                child: Row(
+                  children: [
+                    Radio<int>(value: 1),
+                    const Text('ඔව්'),
+                    const SizedBox(width: 20),
+                    Radio<int>(value: 0),
+                    const Text('නැහැ'),
+                  ],
+                ),
               ),
             ],
           ),

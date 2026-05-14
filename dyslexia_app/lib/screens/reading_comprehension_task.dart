@@ -10,6 +10,11 @@ import 'package:dyslexia_app/services/learner_profile_service.dart';
 import 'package:dyslexia_app/services/comprehension_service.dart';
 import 'package:dyslexia_app/services/task_score_service.dart';
 import 'package:dyslexia_app/widgets/skip_button.dart';
+import 'package:dyslexia_app/utils/logger.dart';
+import 'package:dyslexia_app/services/visual_service.dart';
+import 'package:dyslexia_app/utils/visual_training_loop.dart';
+import 'package:dyslexia_app/models/visual_config.dart';
+
 
 class ReadingComprehensionTask extends StatefulWidget {
   final VoidCallback? onComplete;
@@ -95,6 +100,7 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
   int? selectedImageIndex;
 
   late AnimationController _pulseController;
+  TypographyConfig _typographyConfig = TypographyConfig.defaultConfig();
 
   List<Map<String, dynamic>> get _activeSentenceSet {
     return sentencesByLevel[assignedLevel] ?? sentencesByLevel[currentLevel] ?? sentencesByLevel[1]!;
@@ -132,6 +138,31 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
       setState(() {
         currentLevel = currentLevel > progress.highestLevelReached ? currentLevel : progress.highestLevelReached;
       });
+    }
+    _fetchAdaptiveTypography();
+  }
+
+  Future<void> _fetchAdaptiveTypography() async {
+    try {
+      final adaptiveData = await VisualService.getAdaptiveTypography('ReadingComprehensionTask');
+      if (adaptiveData != null && mounted) {
+        final response = adaptiveData['response'] as TypographyResponse;
+        final visualStrain = adaptiveData['visualStrain'] as double;
+        
+        setState(() {
+          _typographyConfig = response.config;
+        });
+
+        // Start MAB training loop
+        VisualTrainingLoop().startLevel(
+          armId: response.armSelected,
+          visualStrainBefore: visualStrain,
+          sessionId: 'comprehension_${DateTime.now().millisecondsSinceEpoch}',
+          studentId: response.studentId,
+        );
+      }
+    } catch (e) {
+      AppLogger.error('Error fetching typography for Comprehension Task: $e');
     }
   }
 
@@ -189,6 +220,8 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
 
     if (isCorrect) {
       correctAnswers++;
+      // Trigger MAB training loop reward
+      VisualTrainingLoop().endLevel(accuracyDelta: 1.0);
     }
     totalAnswers++;
 
@@ -226,9 +259,9 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('මට්ටම: $currentLevel'),
-            Text('නිවැරදි පිළිතුරු: $correctAnswers/${totalAnswers}'),
+            Text('නිවැරදි පිළිතුරු: $correctAnswers/$totalAnswers'),
             Text('නිවැරදි ප්‍රතිශතය: $accuracy%'),
-            Text('සාමාන්‍ය කියවීමේ වේලාව: ${avgReadingTime}s'),
+            Text('සාමාන්‍ය කියවීමේ වේලාව: $avgReadingTime s'),
           ],
         ),
         actions: [
@@ -281,7 +314,7 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
       durationSeconds: avgReadingTime,
       metadata: {'level': currentLevel},
     ).then((ok) {
-      if (ok) print('Task score saved for reading_comprehension');
+      AppLogger.info('Task score saved for reading_comprehension');
     });
 
     // Save assessment after the assigned level is completed
@@ -320,7 +353,7 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
 
       final saved = await AssessmentResultsService.saveAssessmentResults(results);
       if (saved) {
-        print('Assessment results saved for $studentIdValue');
+        AppLogger.info('Assessment results saved for $studentIdValue');
 
         final learnerProfile = await LearnerProfileService.buildAndSave(
           studentId: studentIdValue,
@@ -329,10 +362,10 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
           comprehensionScore: comprehensionScore,
           wordErrorCount: wordErrorCount,
         );
-        print('✅ Learner profile saved: tier ${learnerProfile.profileTier}, start level ${learnerProfile.startingGameLevel}');
+        AppLogger.info('✅ Learner profile saved: tier ${learnerProfile.profileTier}, start level ${learnerProfile.startingGameLevel}');
       }
     } catch (e) {
-      print('Failed to save assessment summary: $e');
+      AppLogger.error('Failed to save assessment summary', error: e);
     }
   }
 
@@ -385,11 +418,12 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
                 spacing: 8,
                 runSpacing: 8,
                 children: List.generate(words.length, (index) {
+                  final read = wordRead[index];
                   return GestureDetector(
                     onTap: () => _toggleWord(index),
                     child: ScaleTransition(
-                      scale: wordRead[index]
-                          ? AlwaysStoppedAnimation(1.0)
+                      scale: read
+                          ? const AlwaysStoppedAnimation(1.0)
                           : _pulseController,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -397,12 +431,12 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: wordRead[index]
+                          color: read
                               ? Colors.green.shade200
                               : Colors.blue.shade100,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: wordRead[index]
+                            color: read
                                 ? Colors.green
                                 : Colors.blue.shade400,
                             width: 2,
@@ -411,9 +445,11 @@ class _ReadingComprehensionTaskState extends State<ReadingComprehensionTask>
                         child: Text(
                           words[index],
                           style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: wordRead[index] ? Colors.green.shade900 : Colors.blue.shade900,
+                            fontSize: _typographyConfig.fontSize + 4,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: _typographyConfig.letterSpacing,
+                            height: _typographyConfig.lineHeight,
+                            color: read ? Colors.brown : Colors.black87,
                           ),
                         ),
                       ),

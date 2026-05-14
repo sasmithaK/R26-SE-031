@@ -61,7 +61,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           )
@@ -135,7 +135,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
           border: Border.all(color: color, width: 4),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.4),
+              color: color.withValues(alpha: 0.4),
               offset: const Offset(0, 8), // Hard shadow for 3D cartoon effect
               blurRadius: 0,
             )
@@ -149,7 +149,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
+                  color: color.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: ClipOval(
