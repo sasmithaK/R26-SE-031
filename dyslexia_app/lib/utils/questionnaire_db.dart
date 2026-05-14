@@ -7,7 +7,7 @@ class QuestionnaireDb {
 
   static final QuestionnaireDb instance = QuestionnaireDb._();
 
-  static const String baseUrl = 'http://127.0.0.1:5000/api';
+  static const String baseUrl = 'http://10.73.171.253:5000/api';
 
   Future<int> insertSubmission({
     required String respondentRole,

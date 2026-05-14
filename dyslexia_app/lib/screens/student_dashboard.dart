@@ -27,7 +27,7 @@ class _StudentScoreItem {
 
 class _StudentDashboardState extends State<StudentDashboard> {
   static const String _scoresBaseUrl =
-      'http://127.0.0.1:5001/api/v1/scores/task';
+  'http://10.73.171.253:5001/api/v1/scores/task';
 
   late Future<List<_StudentScoreItem>> _scoresFuture;
   int _savedColorIndex = 0;

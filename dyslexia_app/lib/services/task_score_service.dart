@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class TaskScoreService {
-  static const String baseUrl = 'http://127.0.0.1:5001/api/v1';
+  static const String baseUrl = 'http://10.73.171.253:5001/api/v1';
 
   /// Save a generic task score to the backend which records it to MongoDB.
   static Future<bool> saveTaskScore({

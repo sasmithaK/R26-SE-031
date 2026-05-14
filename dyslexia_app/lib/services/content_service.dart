@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ContentService {
-  static const String baseUrl = 'http://127.0.0.1:5000/api';
+  static const String baseUrl = 'http://10.73.171.253:5000/api';
 
   /// Fetch questionnaire data by category
   static Future<Map<String, dynamic>?> getQuestionnaire(String category) async {
