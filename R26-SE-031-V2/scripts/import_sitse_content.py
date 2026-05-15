@@ -73,8 +73,9 @@ def run(dry_run: bool = False):
         with open(CONTENT_PATH, encoding="utf-8") as f:
             repo = json.load(f)
     else:
-        repo = []
-    existing_texts = {item.get("sinhala_text", "") for item in repo}
+        repo = {"meta": {}, "items": []}
+    repo_items = repo.get("items", repo) if isinstance(repo, dict) else repo
+    existing_texts = {item.get("sinhala_text", "") for item in repo_items}
     print(f"[SiTSE] Existing items: {len(repo)}")
 
     new_items = []
@@ -119,11 +120,12 @@ def run(dry_run: bool = False):
         print(f"  {sk}: {cnt} items")
 
     if not dry_run:
-        repo.extend(new_items)
+        repo_items = repo.setdefault("items", []) if isinstance(repo, dict) else repo
+        repo_items.extend(new_items)
         CONTENT_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(CONTENT_PATH, "w", encoding="utf-8") as f:
             json.dump(repo, f, ensure_ascii=False, indent=2)
-        print(f"[SiTSE] Saved {len(repo)} total items to {CONTENT_PATH}")
+        print(f"[SiTSE] Saved {len(repo_items)} total items to {CONTENT_PATH}")
     else:
         print("[SiTSE] Dry run — no changes written")
 

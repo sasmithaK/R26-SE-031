@@ -205,7 +205,7 @@ def _lgbm_mbsv(features: dict, z_scores: dict) -> MBSV:
             "hesitation_ms", "correction_rate", "response_latency", "touch_pressure",
             "swipe_velocity", "replay_count", "hint_request_count", "stylus_deviation",
             "inter_tap_interval", "read_aloud_pause_ms", "syllable_rate",
-            "disfluency_count", "kalman_innovation", "whisper_wer_proxy",
+            "disfluency_count", "kalman_innovation"
         ]
     ]])
     

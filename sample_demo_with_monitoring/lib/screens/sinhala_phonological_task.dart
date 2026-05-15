@@ -1016,7 +1016,7 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
               ),
               // ── Right: Monitoring panel ────────────────────────────────────
               Container(
-                width: 340,
+                width: 380, // Increased from 340
                 decoration: BoxDecoration(
                   color: _Tokens.bg2.withValues(alpha: 0.8),
                   border: const Border(left: BorderSide(color: _Tokens.bdr)),
@@ -1595,7 +1595,7 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
               child: Text(
                 entry['msg'] as String,
                 style: GoogleFonts.dmMono(
-                  fontSize: 13.5, // Increased from 12.0
+                  fontSize: 14.5, // Increased from 13.5
                   color: entry['color'] as Color,
                   height: 1.4,
                   fontWeight: FontWeight.w500,
@@ -1707,15 +1707,23 @@ class _SinhalaPhonologicalTaskState extends State<SinhalaPhonologicalTask>
         child: Row(
           children: [
             _statusDot(true),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Text('PIPELINE: ACTIVE',
                 style: GoogleFonts.dmMono(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: Colors.greenAccent)),
+            const SizedBox(width: 12),
+            _statusDot(true),
+            const SizedBox(width: 8),
+            Text('DB SYNC: ACTIVE',
+                style: GoogleFonts.dmMono(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.cyanAccent)),
             const Spacer(),
-            Text('EST. RTT: 42MS',
-                style: GoogleFonts.dmMono(fontSize: 11, color: _Tokens.textMuted)),
+            Text('42MS',
+                style: GoogleFonts.dmMono(fontSize: 10, color: _Tokens.textMuted)),
           ],
         ),
       );

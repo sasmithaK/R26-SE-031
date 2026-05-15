@@ -89,9 +89,10 @@ def run(dry_run: bool = False):
     with open(CONTENT_PATH, encoding="utf-8") as f:
         repo = json.load(f)
 
-    print(f"[IRT] Processing {len(repo)} content items...")
+    repo_items = repo.get("items", repo) if isinstance(repo, dict) else repo
+    print(f"[IRT] Processing {len(repo_items)} content items...")
     updated = 0
-    for item in repo:
+    for item in repo_items:
         text = item.get("sinhala_text", "")
         if not text:
             continue
