@@ -29,7 +29,8 @@ class WordMatchingTask extends StatefulWidget {
   State<WordMatchingTask> createState() => _WordMatchingTaskState();
 }
 
-class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProviderStateMixin {
+class _WordMatchingTaskState extends State<WordMatchingTask>
+    with TickerProviderStateMixin {
   final String studentId = "DEMO_STUDENT_001";
   late List<WordMatchingRound> rounds;
   int currentRoundIndex = 0;
@@ -38,6 +39,7 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
   bool? isCorrect;
   DateTime? startTime;
   int errorCount = 0;
+  bool _localGameModeTrigger = false;
 
   // Touch event tracking for Kalman filter feature in C1
   final List<Map<String, dynamic>> _touchEvents = [];
@@ -48,7 +50,7 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
   @override
   void initState() {
     super.initState();
-    
+
     rounds = [
       WordMatchingRound(
         targetWord: 'ගහ',
@@ -57,7 +59,7 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
       ),
       WordMatchingRound(
         targetWord: 'ඇපල්',
-        imagePath: 'assets/images/apple_character.png',
+        imagePath: 'assets/images/apple.jpg',
         options: ['කෙසෙල්', 'දොඩම්', 'ඇපල්', 'මිදි'],
       ),
       WordMatchingRound(
@@ -67,26 +69,27 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
       ),
       WordMatchingRound(
         targetWord: 'බල්ලා',
-        imagePath: 'assets/images/dog_character.png',
+        imagePath: 'assets/images/DogRunning.jpg',
         options: ['පූසා', 'බල්ලා', 'හරකා', 'එළුවා'],
       ),
       WordMatchingRound(
         targetWord: 'පූසා',
-        imagePath: 'assets/images/cat_character.png',
+        imagePath: 'assets/images/cat.jpg',
         options: ['මීයා', 'පූසා', 'සිංහයා', 'කොටියා'],
       ),
     ];
 
     startTime = DateTime.now();
-    
+
     _controller = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
-    
-    _animation = Tween<double>(begin: 1.0, end: 1.1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+
+    _animation = Tween<double>(
+      begin: 1.0,
+      end: 1.1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _triggerAdaptation(initial: true);
@@ -112,7 +115,9 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
 
     Map<String, dynamic> telemetry = {
       'hesitation_ms': initial ? 0 : (duration > 3000 ? duration : 800),
-      'correction_rate': initial ? 0.0 : errorCount / rounds[currentRoundIndex].options.length,
+      'correction_rate': initial
+          ? 0.0
+          : errorCount / rounds[currentRoundIndex].options.length,
       'response_latency': duration,
       'touch_pressure': 0.45,
       'swipe_velocity': 0.12,
@@ -131,7 +136,7 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
       studentId: studentId,
       telemetry: telemetry,
       context: {
-        'session_id': 'DEMO_SESSION',   // must match reward submission session_id
+        'session_id': 'DEMO_SESSION', // must match reward submission session_id
         'session_number': 1,
         'child_age_years': 7,
         'current_task': 'word_matching',
@@ -162,17 +167,20 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
     setState(() {
       selectedIndex = index;
       String option = rounds[currentRoundIndex].options[index];
-      
+
       if (option == rounds[currentRoundIndex].targetWord) {
         isCorrect = true;
-        final adaptiveState = Provider.of<AdaptiveState>(context, listen: false);
+        final adaptiveState = Provider.of<AdaptiveState>(
+          context,
+          listen: false,
+        );
         adaptiveState.submitReward(
           studentId: studentId,
           armId: adaptiveState.currentArmId,
           reward: 1.0,
         );
         _triggerAdaptation();
-        
+
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (currentRoundIndex < rounds.length - 1) {
             setState(() {
@@ -194,6 +202,9 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
       } else {
         isCorrect = false;
         errorCount++;
+        if (errorCount >= 3) {
+          _localGameModeTrigger = true;
+        }
         _triggerAdaptation();
       }
     });
@@ -219,24 +230,19 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
           Row(
             children: [
               // 60% Task Area
-              Expanded(
-                flex: 6,
-                child: _buildTaskArea(config),
-              ),
+              Expanded(flex: 6, child: _buildTaskArea(config)),
               Container(width: 1, color: Colors.grey[100]),
               // 40% Monitoring Panel
-              Expanded(
-                flex: 4,
-                child: _buildMonitoringPanel(adaptiveState),
-              ),
+              Expanded(flex: 4, child: _buildMonitoringPanel(adaptiveState)),
             ],
           ),
           // Gamification Overlay
-          if (adaptiveState.gameModeTrigger)
+          if (adaptiveState.gameModeTrigger || _localGameModeTrigger)
             LetterPuzzleGame(
               onComplete: () {
                 adaptiveState.resetGameTrigger();
                 setState(() {
+                  _localGameModeTrigger = false;
                   startTime = DateTime.now();
                 });
               },
@@ -287,9 +293,9 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
               SkipButton(onPressed: _skipAndContinue),
             ],
           ),
-          
+
           const Spacer(),
-          
+
           ScaleTransition(
             scale: _animation,
             child: Container(
@@ -311,24 +317,30 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
                 child: Image.asset(
                   round.imagePath,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => 
-                    const Icon(Icons.image_not_supported, size: 80, color: Colors.grey),
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.image_not_supported,
+                    size: 80,
+                    color: Colors.grey,
+                  ),
                 ),
               ),
             ),
           ),
-          
+
           const SizedBox(height: 60),
-          
+
           Wrap(
             spacing: 24,
             runSpacing: 24,
             alignment: WrapAlignment.center,
-            children: List.generate(round.options.length, (index) => _buildOptionCard(index, config)),
+            children: List.generate(
+              round.options.length,
+              (index) => _buildOptionCard(index, config),
+            ),
           ),
-          
+
           const Spacer(),
-          
+
           AnimatedOpacity(
             duration: const Duration(milliseconds: 500),
             opacity: isCorrect != null ? 1.0 : 0.0,
@@ -346,7 +358,9 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
       decoration: BoxDecoration(
         color: success ? Colors.green[50] : Colors.red[50],
         borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: success ? Colors.green[100]! : Colors.red[100]!),
+        border: Border.all(
+          color: success ? Colors.green[100]! : Colors.red[100]!,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -374,11 +388,13 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
     bool isSelected = selectedIndex == index;
     final round = rounds[currentRoundIndex];
     String option = round.options[index];
-    
+
     Color borderColor = Colors.grey[200]!;
     if (isSelected) {
-      if (isCorrect == true && option == round.targetWord) borderColor = Colors.green;
-      else if (isCorrect == false) borderColor = Colors.red;
+      if (isCorrect == true && option == round.targetWord)
+        borderColor = Colors.green;
+      else if (isCorrect == false)
+        borderColor = Colors.red;
     }
 
     return GestureDetector(
@@ -388,14 +404,16 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
         decoration: BoxDecoration(
-          color: isSelected && isCorrect == true && option == round.targetWord 
-              ? Colors.green[50] 
+          color: isSelected && isCorrect == true && option == round.targetWord
+              ? Colors.green[50]
               : Colors.white,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: borderColor, width: 3),
           boxShadow: [
             BoxShadow(
-              color: isSelected ? borderColor.withOpacity(0.2) : Colors.black.withOpacity(0.02),
+              color: isSelected
+                  ? borderColor.withOpacity(0.2)
+                  : Colors.black.withOpacity(0.02),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -413,14 +431,13 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
 
   TextStyle _getAdaptiveStyle(TypographyConfig config, bool isSelected) {
     Color textColor = Colors.black87;
-    
-    if (config.backgroundContrast == 'HIGH' || config.backgroundContrast == 'WCAG_AAA') {
+
+    if (config.backgroundContrast == 'HIGH' ||
+        config.backgroundContrast == 'WCAG_AAA') {
       textColor = Colors.black;
     } else if (config.backgroundContrast == 'LOW') {
       textColor = Colors.grey[800]!;
     }
-
-    const String fallbackFont = 'Noto Sans Sinhala';
 
     try {
       return GoogleFonts.getFont(
@@ -431,9 +448,15 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
         height: config.lineHeight,
         color: textColor,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-        shadows: config.diacriticOffset > 0 ? [
-          Shadow(offset: Offset(0, config.diacriticOffset), color: Colors.black12, blurRadius: 1)
-        ] : null,
+        shadows: config.diacriticOffset > 0
+            ? [
+                Shadow(
+                  offset: Offset(0, config.diacriticOffset),
+                  color: Colors.black12,
+                  blurRadius: 1,
+                ),
+              ]
+            : null,
       );
     } catch (e) {
       return GoogleFonts.notoSansSinhala(
@@ -443,9 +466,15 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
         height: config.lineHeight,
         color: textColor,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-        shadows: config.diacriticOffset > 0 ? [
-          Shadow(offset: Offset(0, config.diacriticOffset), color: Colors.black12, blurRadius: 1)
-        ] : null,
+        shadows: config.diacriticOffset > 0
+            ? [
+                Shadow(
+                  offset: Offset(0, config.diacriticOffset),
+                  color: Colors.black12,
+                  blurRadius: 1,
+                ),
+              ]
+            : null,
       );
     }
   }
@@ -475,7 +504,8 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               itemCount: state.logs.length,
-              separatorBuilder: (_, __) => Divider(color: Colors.grey[100], height: 1),
+              separatorBuilder: (_, __) =>
+                  Divider(color: Colors.grey[100], height: 1),
               itemBuilder: (context, index) {
                 final log = state.logs[state.logs.length - 1 - index];
                 return _buildLogEntry(log);
@@ -500,7 +530,11 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
         children: [
           Row(
             children: [
-              const Icon(Icons.analytics_outlined, color: Colors.indigo, size: 28),
+              const Icon(
+                Icons.analytics_outlined,
+                color: Colors.indigo,
+                size: 28,
+              ),
               const SizedBox(width: 12),
               Text(
                 "PEDAGOGICAL MONITOR",
@@ -534,7 +568,8 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
                   child: _buildModeToggleBtn(
                     label: "ADAPTIVE",
                     isActive: isAdaptive,
-                    onTap: () => state.setEvaluationMode(EvaluationMode.adaptive),
+                    onTap: () =>
+                        state.setEvaluationMode(EvaluationMode.adaptive),
                   ),
                 ),
               ],
@@ -557,19 +592,30 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
           Container(
             width: 8,
             height: 8,
-            decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+              color: Colors.green,
+              shape: BoxShape.circle,
+            ),
           ),
           const SizedBox(width: 6),
           const Text(
             "SYNCED",
-            style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Colors.green,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildModeToggleBtn({required String label, required bool isActive, required VoidCallback onTap}) {
+  Widget _buildModeToggleBtn({
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -578,9 +624,15 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
         decoration: BoxDecoration(
           color: isActive ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
-          boxShadow: isActive ? [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
-          ] : [],
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
         ),
         child: Center(
           child: Text(
@@ -616,18 +668,29 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
             height: 40,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: rewards.isEmpty 
-                ? [Expanded(child: Text("Waiting for task completion...", style: TextStyle(fontSize: 10, color: Colors.black26)))]
-                : rewards.map((r) => Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      height: 40 * r.clamp(0.1, 1.0),
-                      decoration: BoxDecoration(
-                        color: Colors.indigo.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(2),
+              children: rewards.isEmpty
+                  ? [
+                      Expanded(
+                        child: Text(
+                          "Waiting for task completion...",
+                          style: TextStyle(fontSize: 10, color: Colors.black26),
+                        ),
                       ),
-                    ),
-                  )).toList(),
+                    ]
+                  : rewards
+                        .map(
+                          (r) => Expanded(
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 2),
+                              height: 40 * r.clamp(0.1, 1.0),
+                              decoration: BoxDecoration(
+                                color: Colors.indigo.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
             ),
           ),
         ],
@@ -652,11 +715,19 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
       ),
       child: Column(
         children: [
-          _buildMetricRow("Visual Strain", mbsv.visualStrainIndex, Colors.orange),
+          _buildMetricRow(
+            "Visual Strain",
+            mbsv.visualStrainIndex,
+            Colors.orange,
+          ),
           const SizedBox(height: 18),
           _buildMetricRow("Engagement", mbsv.engagementIndex, Colors.green),
           const SizedBox(height: 18),
-          _buildMetricRow("Cognitive Load", mbsv.cognitiveLoadIndex, Colors.purple),
+          _buildMetricRow(
+            "Cognitive Load",
+            mbsv.cognitiveLoadIndex,
+            Colors.purple,
+          ),
         ],
       ),
     );
@@ -669,10 +740,21 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: GoogleFonts.inter(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w500)),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: Colors.black54,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             Text(
               "${(value * 100).toInt()}%",
-              style: GoogleFonts.jetBrainsMono(fontSize: 13, color: color, fontWeight: FontWeight.bold),
+              style: GoogleFonts.jetBrainsMono(
+                fontSize: 13,
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
@@ -714,7 +796,7 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
         icon = Icons.info_outline_rounded;
         color = Colors.grey;
     }
-  
+
     bool isParameterLog = log.message.trim().startsWith('>');
 
     return Padding(
@@ -725,13 +807,15 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isParameterLog ? Colors.indigo[50] : color.withOpacity(0.08),
+              color: isParameterLog
+                  ? Colors.indigo[50]
+                  : color.withOpacity(0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              isParameterLog ? Icons.tune_rounded : icon, 
-              size: 16, 
-              color: isParameterLog ? Colors.indigo : color
+              isParameterLog ? Icons.tune_rounded : icon,
+              size: 16,
+              color: isParameterLog ? Colors.indigo : color,
             ),
           ),
           const SizedBox(width: 12),
@@ -742,16 +826,23 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
                 Text(
                   log.message,
                   style: GoogleFonts.inter(
-                    fontSize: isParameterLog ? 13 : 12, 
-                    color: isParameterLog ? Colors.indigo[900] : Colors.black87, 
-                    fontWeight: isParameterLog ? FontWeight.w800 : (log.type == 'telemetry' ? FontWeight.w400 : FontWeight.w600),
+                    fontSize: isParameterLog ? 13 : 12,
+                    color: isParameterLog ? Colors.indigo[900] : Colors.black87,
+                    fontWeight: isParameterLog
+                        ? FontWeight.w800
+                        : (log.type == 'telemetry'
+                              ? FontWeight.w400
+                              : FontWeight.w600),
                     letterSpacing: isParameterLog ? 0.5 : 0,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   DateFormat('HH:mm:ss.SSS').format(log.timestamp),
-                  style: GoogleFonts.jetBrainsMono(fontSize: 9, color: Colors.black26),
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 9,
+                    color: Colors.black26,
+                  ),
                 ),
               ],
             ),

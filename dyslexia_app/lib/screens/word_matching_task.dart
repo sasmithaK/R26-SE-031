@@ -253,7 +253,10 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
                   ),
                 ],
               ),
-              SkipButton(onPressed: _skipAndContinue),
+              SkipButton(
+                taskName: 'word_matching',
+                onSkipped: _skipAndContinue,
+              ),
             ],
           ),
           
@@ -723,16 +726,6 @@ class _WordMatchingTaskState extends State<WordMatchingTask> with TickerProvider
                 Text(
                   DateFormat('HH:mm:ss.SSS').format(log.timestamp),
                   style: GoogleFonts.jetBrainsMono(fontSize: 9, color: Colors.black26),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-                  style: GoogleFonts.jetBrainsMono(fontSize: 10, color: Colors.black26),
                 ),
               ],
             ),

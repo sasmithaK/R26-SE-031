@@ -1,10 +1,37 @@
-INFO:     Will watch for changes in these directories: ['D:\\01 ACADEMIA\\4th Year\\Y4.S1\\RP-IT4010\\00 - Implementation\\R26-SE-031\\R26-SE-031-V2\\intervention-service-v2']
+INFO:     Will watch for changes in these directories: ['d:\\XAMPP\\htdocs\\appointment-ms\\R26-SE-031\\R26-SE-031-V2\\intervention-service-v2']
 INFO:     Uvicorn running on http://0.0.0.0:8013 (Press CTRL+C to quit)
-INFO:     Started reloader process [13844] using StatReload
-INFO:     Started server process [32016]
+INFO:     Started reloader process [29028] using StatReload
+INFO:     Started server process [35476]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-[DB] Connected to MongoDB Atlas: dyslexia_platform
-INFO:     127.0.0.1:56350 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56351 - "POST /api/v1/intervention/check HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56354 - "GET /api/v1/intervention/sm2/schedule/test_student HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "<frozen ntpath>", line 694, in realpath
+OSError: [WinError 1450] Insufficient system resources exist to complete the requested service: 'd:\\XAMPP\\htdocs\\appointment-ms\\R26-SE-031\\R26-SE-031-V2\\intervention-service-v2\\main.py'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "d:\XAMPP\htdocs\appointment-ms\R26-SE-031\R26-SE-031-V2\intervention-service-v2\main.py", line 211, in <module>
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\perer\AppData\Local\Programs\Python\Python314\Lib\site-packages\uvicorn\main.py", line 612, in run
+    ChangeReload(config, target=server.run, sockets=[sock]).run()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\perer\AppData\Local\Programs\Python\Python314\Lib\site-packages\uvicorn\supervisors\basereload.py", line 52, in run
+    for changes in self:
+                   ^^^^
+  File "C:\Users\perer\AppData\Local\Programs\Python\Python314\Lib\site-packages\uvicorn\supervisors\basereload.py", line 71, in __next__
+    return self.should_restart()
+           ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\perer\AppData\Local\Programs\Python\Python314\Lib\site-packages\uvicorn\supervisors\statreload.py", line 31, in should_restart
+    for file in self.iter_py_files():
+                ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\perer\AppData\Local\Programs\Python\Python314\Lib\site-packages\uvicorn\supervisors\statreload.py", line 52, in iter_py_files
+    yield path.resolve()
+          ~~~~~~~~~~~~^^
+  File "C:\Users\perer\AppData\Local\Programs\Python\Python314\Lib\pathlib\__init__.py", line 938, in resolve
+    return self.with_segments(os.path.realpath(self, strict=strict))
+                              ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen ntpath>", line 706, in realpath
+  File "<frozen ntpath>", line 631, in _getfinalpathname_nonstrict
+OSError: [WinError 1450] Insufficient system resources exist to complete the requested service: 'd:\\XAMPP\\htdocs\\appointment-ms\\R26-SE-031\\R26-SE-031-V2\\intervention-service-v2\\main.py'
