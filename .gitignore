@@ -81,3 +81,19 @@ DerivedData/
 *.swo
 "__pycache__/" 
 "*.pyc" 
+
+# ========================= 
+# Merged from R26-SE-031-V2/.gitignore
+# =========================
+*.env
+*.joblib
+*.pt
+Thumbs.db
+.coverage
+htmlcov/
+*/db/
+logs/
+
+test_output.log
+test_summary.txt
+

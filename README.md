@@ -1,61 +1,69 @@
-# Dyslexia Microservices - MongoDB Atlas & Demo
+# R26-SE-031 — Sinhala Dyslexia Screening & Intervention Platform (Backend & ML)
 
-This repository contains a 4-service microservice architecture migrated to **MongoDB Atlas** for high-fidelity cognitive load monitoring and intervention.
+Research platform (RP-IT4010) for screening and intervention of dyslexia in
+Sinhala-speaking children. Four FastAPI microservices process behavioral
+telemetry from client tasks into the **MBSV** (Multi-Dimensional Behavioral
+Signal Vector — six indices: cognitive load, phonological strain, visual
+strain, fatigue, engagement, error resilience), drive UI adaptation policy,
+personalize content, and trigger interventions. This repository contains the
+backend services and ML pipeline; client applications consume the REST APIs.
 
-## 🚀 Services Overview
+## Architecture
 
-1.  **Monitoring Service (Port 8001)**: Core telemetry processing and ML-based cognitive load estimation. Includes the **Side-by-Side Demo Dashboard**.
-2.  **Content Service (Port 8002)**: Mastery tracking and forgetting curve logic (Ebbinghaus algorithm).
-3.  **Intervention Service (Port 8003)**: Random Forest model for selecting optimal intervention types (Audio, Visual, Break).
-4.  **Visual Service (Port 8004)**: UI adaptation and RL-based layout optimization (Multi-Armed Bandit).
+| Component | Directory | Port | Core algorithms |
+|---|---|---|---|
+| C1 Monitoring (CBME) | `monitoring-service-v1/` | 8011 | Kalman filter, Welford baselines, Whisper acoustics, LightGBM MBSV regressor |
+| C3 Content (PLCE) | `content-service-v1/` | 8012 | Bayesian Knowledge Tracing, content selector, guardian-intake onboarding |
+| C4 Intervention (IIGE) | `intervention-service-v1/` | 8013 | Intervention engine, SM-2 scheduler, stroke scorer, Sinhala syllable splitter |
+| C2 Visual (AVLI) | `visual-service-v1/` | 8014 | LinUCB contextual bandit, SOVCM visual-complexity model |
 
-## 🛠 Setup & Run
+Shared Pydantic schemas and the async MongoDB layer live in `shared/`.
+All tunables (BKT priors, LinUCB alpha, strain thresholds) are configured via `.env`.
 
-### 1. Prerequisites
-- Python 3.9+
-- MongoDB Atlas cluster (already configured in code)
-- Dependencies: `pip install fastapi uvicorn motor pymongo joblib pandas numpy requests`
+## Setup
 
-### 2. Seed Data
-Populate the cloud database with demo data:
 ```bash
-python simulate_demo_data.py
+# Python 3.10+
+pip install -r monitoring-service-v1/requirements.txt \
+            -r visual-service-v1/requirements.txt \
+            -r content-service-v1/requirements.txt \
+            -r intervention-service-v1/requirements.txt
 ```
 
-### 3. Start Services
-Run each service in a separate terminal from the root directory:
+Create a `.env` in the repo root with `MONGO_URI`, `MONGO_DB_NAME`, and the
+algorithm tunables (see `SERVICE_GUIDE.md`).
 
-**Monitoring:**
+## Train models
+
+Required on first run or after dataset changes — generates the `.pkl`
+artifacts in `models/` (C1 LightGBM/RF, C2 LinUCB warm-start, C4 RF):
+
 ```bash
-uvicorn monitoring-service.main:app --port 8001 --reload
+python scripts/run_all_training.py
 ```
 
-**Content:**
+## Run
+
 ```bash
-uvicorn content-service.main:app --port 8002 --reload
+python run_all_services.py     # all four services; logs in ./logs/; Ctrl+C stops all
 ```
 
-**Intervention:**
+Or one service at a time: `cd monitoring-service-v1 && python main.py`.
+
+## Test
+
 ```bash
-uvicorn intervention-service.main:app --port 8003 --reload
+python tests/test_smoke.py        # 11 offline module checks (no DB, no services)
+python tests/test_integration.py  # model loading + end-to-end pipeline (offline)
+python tests/test_api_e2e.py      # live HTTP endpoint suite (services must be running)
 ```
 
-**Visual:**
-```bash
-uvicorn visual-service.main:app --port 8004 --reload
-```
+Health check: `GET http://localhost:8011/health` (same for 8012–8014).
 
-## 📺 Demo Dashboard
-Once the services are running, access the premium demo interface at:
-**[http://127.0.0.1:8001/demo/index.html](http://127.0.0.1:8001/demo/index.html)**
+## Documentation
 
-### Dashboard Features:
-- **Side-by-Side View**: Live camera feed (biometric scan) vs. student interaction telemetry.
-- **Real-time Prediction**: ML model predicts cognitive load level (Low/Medium/High) instantly.
-- **Automatic Intervention**: Triggers intervention events when load spikes.
-- **Log Stream**: Full visibility into telemetry parameters and system events.
-
-## ☁️ Database Configuration
-The system uses a shared MongoDB Atlas cluster:
-- **URI**: `mongodb+srv://kavindugunasena_db_user:2Vp8ipkprifuEH8t@cluster0.ypxuqen.mongodb.net/`
-- **Driver**: `motor` (Asynchronous)
+- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** — consolidated overview: architecture, MBSV, run/test guide, ML methodology
+- [SERVICE_GUIDE.md](SERVICE_GUIDE.md) — detailed service execution & testing
+- [TRAINING_METHODOLOGY.md](TRAINING_METHODOLOGY.md) — three-tier real-data training strategy (SPEAK-PP, acoustic validation, synthetic MBSV) with formulas & references
+- [docs/](docs) — academic proposals, architecture notes, viva material
+- [audit/](audit) — viva validation notebooks (C1/C2/C3 + MBSV scientific validation)
