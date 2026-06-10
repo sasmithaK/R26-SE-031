@@ -1,0 +1,510 @@
+# System Architecture & AI Model Reference (v2.0)
+## Adaptive Sinhala Dyslexia Screening & Guidance Platform — R26-SE-031
+
+> **v2.0 Revision:** Reflects the Multi-Dimensional Behavioral Signal Vector (MBSV) architecture.
+> The previous ε-Greedy bandit, EMA-DKT, and RSI scalar have been replaced. Component ownership
+> conflicts (BKT, gamification, content delivery) are fully resolved. Refer to the conflict
+> resolution table in §2 before making any cross-component changes.
+
+---
+
+## 1. Full System Flow (MBSV Architecture)
+
+```mermaid
+flowchart TD
+    subgraph Flutter["📱 Flutter App"]
+        OB["Guardian Onboarding\n(profile + VARK questionnaire)"]
+        CALIB["Baseline Calibration\n(4 tasks, 10–12 min)"]
+        TASKS["Learning Task Screens\n(Letter ID, Syllable Train,\nWord Match, Reading Fluency\nStory Sequence, Draw-a-Man...)"]
+        WARMUP["SM-2 Warm-Up\n(session start, 2 min)"]
+        STAGE1["Stage 1 Overlay\n(syllable split + audio)"]
+        STAGE2["Stage 2 Activity\n(Tapping / Tracing /\nPicture-Word / Song)"]
+        GAMEMODE["Gamification Overlay\n(mini-game, 2–3 min)"]
+        GDASH["Guardian Dashboard\n(Mastery Heatmap + Alerts)"]
+    end
+
+    subgraph C1["🔍 C1 — CBME (Port 8011)"]
+        TEL["/api/v1/telemetry\nReceive raw event batch"]
+        WELF["Welford's Algorithm\nPersonalized Z-score baseline"]
+        KALF["Kalman Filter\nTouch kinematics → kalman_innovation"]
+        LGBM["LightGBM × 6\nOne model per MBSV dimension\n(Platt-scaled)"]
+        SHAP_EP["/api/v1/monitoring/shap\nSHAP explanation endpoint"]
+        ISO["Isolation Forest\nSession outlier flag (100%)"]
+        MBSV_OUT["MBSV Output\nvisual_strain_index\ncognitive_load_index\nphonological_strain_index\nengagement_index\nsession_fatigue_index\nerror_pattern_vector"]
+        TEL --> WELF --> KALF --> LGBM --> MBSV_OUT
+        LGBM --> SHAP_EP
+        LGBM --> ISO
+    end
+
+    subgraph C2["🎨 C2 — AVLI (Port 8014)"]
+        SOVCM["SOVCM\nSinhala char complexity table"]
+        LINUCB["LinUCB Contextual Bandit\nTypography arm selection"]
+        TYPO["/api/v1/ui/typography\nReturn typography config\n(font, spacing, diacritic_offset,\nglyph_padding)"]
+        GSTATE["Gamification State Machine\nengagement_index < 0.3 for 30s\n→ trigger mini-game"]
+        SOVCM --> LINUCB
+        LINUCB --> TYPO
+    end
+
+    subgraph C3["📚 C3 — PLCE (Port 8012)"]
+        BKT["BKT Engine\nHidden Markov Model\n9-node Sinhala skill graph"]
+        IRT["IRT 2PL\nContent difficulty calibration"]
+        EBB["Ebbinghaus Decay\nMastery de-rating over time"]
+        REPO["Content Repository\n~135 items × 9 skills"]
+        NEXTI["/api/v1/content/next\nZPD-targeted content selection"]
+        MAST["/api/v1/mastery\nmastery_vector endpoint"]
+        BKT --> EBB --> NEXTI
+        IRT --> NEXTI
+        REPO --> NEXTI
+        BKT --> MAST
+    end
+
+    subgraph C4["🧠 C4 — IIGE (Port 8013)"]
+        SPLIT["Sinhala Unicode\nSyllable Splitter"]
+        ERRCLF["Phoneme Error Analyser\n(Unicode + error_pattern_vector)"]
+        RFWORD["Random Forest\nWord Difficulty Classifier"]
+        SM2["SM-2 Scheduler\nPer-child, per-skill"]
+        ACT["Activity Selection Matrix\nerror_type × mastery_level"]
+        RTI["/api/v1/intervention/rti_alert\nTier 3 guardian alert"]
+        SPLIT --> ERRCLF --> RFWORD --> ACT
+        SM2 --> ACT
+        ACT --> RTI
+    end
+
+    OB --> CALIB --> TASKS
+    TASKS -->|"POST /telemetry\n(touch_events, audio_buffer,\nsession_latency, hint_count)"| TEL
+    TASKS -->|"POST /mastery/update\n(skill_id, is_correct, latency_ms)"| BKT
+
+    MBSV_OUT -->|"visual_strain_index\nengagement_index"| C2
+    MBSV_OUT -->|"cognitive_load_index\nsession_fatigue_index"| C3
+    MBSV_OUT -->|"phonological_strain_index\nerror_pattern_vector"| C4
+
+    TYPO -->|"typography_config"| TASKS
+    GSTATE -->|"game_mode_trigger"| GAMEMODE
+
+    MAST -->|"mastery_vector"| C4
+    NEXTI -->|"next_content_item"| TASKS
+
+    C4 -->|"stage=1 syllable_segments"| STAGE1
+    C4 -->|"stage=2 activity_type"| STAGE2
+    SM2 -->|"sm2_review_words"| WARMUP
+    RTI -->|"tier3_alert"| GDASH
+```
+
+---
+
+## 2. Component Ownership — Conflict Resolution Table
+
+> This table is the authoritative source of truth. Before adding any feature, verify that it
+> falls within the component's ownership boundary.
+
+| Feature / Responsibility | C1 CBME | C2 AVLI | C3 PLCE | C4 IIGE |
+| :--- | :---: | :---: | :---: | :---: |
+| Producing MBSV | **✅ OWNS** | ❌ | ❌ | ❌ |
+| Typography adaptation | ❌ | **✅ OWNS** | ❌ | ❌ |
+| Gamification controller | ❌ | **✅ OWNS** | ❌ | ❌ |
+| BKT mastery modeling | ❌ | ❌ | **✅ OWNS** | ❌ |
+| Content recommendation | ❌ | ❌ | **✅ OWNS** | ❌ |
+| Ebbinghaus decay | ❌ | ❌ | **✅ OWNS** | ❌ |
+| Syllable splitting | ❌ | ❌ | ❌ | **✅ OWNS** |
+| Error type classification | ❌ | ❌ | ❌ | **✅ OWNS** |
+| SM-2 scheduling | ❌ | ❌ | ❌ | **✅ OWNS** |
+| Activity delivery (Stage 2) | ❌ | ❌ | ❌ | **✅ OWNS** |
+| RTI Tier 3 alert | ❌ | ❌ | ❌ | **✅ OWNS** |
+| SHAP explanations | **✅ OWNS** | ❌ | ❌ | ❌ |
+| Welford's baseline | **✅ OWNS** | ❌ | ❌ | ❌ |
+
+---
+
+## 3. Component-by-Component Breakdown
+
+### 🔍 C1 — Cognitive Behavioral Monitoring Engine (CBME) — Port 8011
+
+**Role:** Sensory cortex — converts raw Flutter interaction streams into a calibrated
+6-dimension MBSV. The only component allowed to produce MBSV.
+
+**Owner:** IT22125798 (Gunasena)
+
+#### Endpoint Contracts
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/v1/telemetry` | POST | Receive raw touch events + audio buffer |
+| `/api/v1/mbsv/{student_id}` | GET | Return latest MBSV for a student |
+| `/api/v1/monitoring/shap/{student_id}` | GET | Return SHAP explanation for latest MBSV |
+| `/api/v1/monitoring/baseline/{student_id}` | GET | Return Welford state (mean ± SD) |
+
+#### Input from Flutter (Telemetry Payload)
+
+```json
+{
+  "student_id": "stu_001",
+  "task_id": "syllable_train_001",
+  "timestamp_ms": 1715500000000,
+  "touch_events": [
+    {"x": 120.5, "y": 340.2, "pressure": 0.65, "timestamp": 1715500001000}
+  ],
+  "event_type": "TAP",
+  "session_latency_ms": 2340,
+  "replay_count": 2,
+  "hint_request_count": 0,
+  "audio_buffer": null
+}
+```
+
+#### MBSV Output Structure
+
+```json
+{
+  "student_id": "stu_001",
+  "session_id": "sess_20260512_001",
+  "timestamp_ms": 1715500002000,
+  "mbsv": {
+    "visual_strain_index": 0.71,
+    "cognitive_load_index": 0.58,
+    "phonological_strain_index": 0.83,
+    "engagement_index": 0.42,
+    "session_fatigue_index": 0.29,
+    "error_pattern_vector": [0, 1, 0, 1]
+  },
+  "shap_available": true,
+  "session_outlier": false
+}
+```
+
+`error_pattern_vector` positions: `[reversal_flag, omission_flag, substitution_flag, hesitation_flag]`
+
+#### Model Pipeline
+
+```
+Flutter Telemetry
+        │
+        ▼
+Welford Z-score (per student, per feature)
+        │
+        ├──→ Kalman Filter (x,y stream) → kalman_innovation
+        │
+        ▼
+12 Features: hesitation_ms, correction_rate, response_latency,
+             touch_pressure, swipe_velocity, replay_count,
+             hint_request_count, stylus_deviation, inter_tap_interval,
+             read_aloud_pause_ms, syllable_rate, disfluency_count,
+             kalman_innovation
+
+        │
+        ├──→ LightGBM_visual   → visual_strain_index
+        ├──→ LightGBM_cogload  → cognitive_load_index
+        ├──→ LightGBM_phonol   → phonological_strain_index
+        ├──→ LightGBM_engage   → engagement_index
+        ├──→ LightGBM_fatigue  → session_fatigue_index
+        └──→ Rule Engine       → error_pattern_vector
+```
+
+#### Research Contribution (C1)
+- **Primary:** First study to apply multi-task LightGBM + Welford's incremental baselining
+  to produce a multi-dimensional behavioral signal vector for Sinhala dyslexia screening without
+  any labeled clinical data or speech recognition.
+- **Evaluation:** Cohen's d between MBSV distributions under easy vs. hard task conditions;
+  SHAP top-3 feature consistency with cited literature benchmarks.
+
+---
+
+### 🎨 C2 — Adaptive Visual Learning Interface (AVLI) — Port 8014
+
+**Role:** Rendering engine — translates `visual_strain_index` and `engagement_index` into
+typography configurations and gamification mode state.
+
+**Owner:** IT22642882 (Dinithi Perera)
+
+#### Endpoint Contracts
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/v1/ui/typography` | POST | Compute + return typography config via LinUCB |
+| `/api/v1/ui/reward` | POST | Submit reward signal for LinUCB update |
+| `/api/v1/ui/gamification/status/{student_id}` | GET | Return gamification trigger state |
+| `/api/v1/ui/preferences` | POST | Store student onboarding preferences |
+
+#### Typography Config Output
+
+```json
+{
+  "student_id": "stu_001",
+  "linucb_arm_selected": 5,
+  "typography_config": {
+    "font_size": 22.0,
+    "font_family": "OpenDyslexic",
+    "letter_spacing": 4.0,
+    "word_spacing": 12.0,
+    "line_height": 1.8,
+    "background_contrast": "WCAG_AAA",
+    "diacritic_offset": 2.0,
+    "glyph_padding": 3.0
+  },
+  "game_mode_trigger": false,
+  "game_difficulty": 2
+}
+```
+
+#### Gamification State Machine
+
+```
+engagement_index >= 0.3 for every 30s window  ──→  Normal reading mode
+engagement_index < 0.3 for 2 consecutive windows:
+    ├─→ Flutter: Load gamification overlay (mini-game)
+    ├─→ C3: Notify to prepare slightly easier re-entry content
+    └─→ After 2–3 min completion: Return to reading, load new item
+```
+
+#### Novel Research Contribution (C2)
+- **LinUCB vs. WCAG static:** Tests whether a contextual bandit learning Sinhala-specific
+  typographic parameters (including novel `diacritic_offset` and `glyph_padding`) outperforms
+  fixed WCAG 2.1 AA/AAA accessibility presets.
+- **SOVCM:** A novel per-character visual complexity model for Sinhala/Tamil abugida scripts,
+  used as LinUCB context to allow character-specific typographic adaptation.
+
+---
+
+### 📚 C3 — Personalized Learning Content Engine (PLCE) — Port 8012
+
+**Role:** Knowledge tracker and content library. Sole owner of BKT. Selects the right content
+item in the right difficulty for each child at each moment.
+
+**Owner:** IT22154880 (Ekanayake)
+
+#### Endpoint Contracts
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/v1/mastery/update` | POST | BKT update for a skill node |
+| `/api/v1/mastery/{student_id}` | GET | Return full mastery_vector |
+| `/api/v1/content/next/{student_id}` | GET | Return next content item |
+| `/api/v1/content/learner_type` | POST | Set VARK-proxy learner tag |
+
+#### Mastery Update Payload
+
+```json
+{
+  "student_id": "stu_001",
+  "skill_id": "S3_syllable_formation",
+  "is_correct": true,
+  "response_latency_ms": 1840,
+  "cognitive_load_index": 0.58,
+  "session_fatigue_index": 0.29
+}
+```
+
+#### Content Item Response
+
+```json
+{
+  "student_id": "stu_001",
+  "content_item": {
+    "item_id": "S3_cv_kata",
+    "skill_id": "S3_syllable_formation",
+    "irt_difficulty": 0.12,
+    "sinhala_text": "කටෙ",
+    "audio_url": "content/S3/kata.mp3",
+    "image_url": "content/S3/kata.png",
+    "modality": "AUDITORY"
+  },
+  "bkt_p_know": 0.61,
+  "zpd_active": true,
+  "fatigue_override": false
+}
+```
+
+#### Sinhala Phonological Skill Graph
+
+```
+                  S0: Akshara Shape Recognition
+                 /                              \
+   S1: Vowel ID                          S2: Basic Consonant Recognition
+                 \                              /
+                    S3: CV Syllable Formation
+                           |
+                    S4: Syllable Counting
+                           |
+              S5: 2-Syllable Word Reading
+              /                        \
+   S6: 3-Syllable Reading         S7: Word-Picture Match
+              \                        /
+              S8: Simple Sentence Reading
+                           |
+              S9: Sentence Comprehension
+```
+
+**BKT thresholds:** Mastery `p_know > 0.80` → advance. ZPD window `0.45 ≤ p_know ≤ 0.80`.
+Fatigue override: if `session_fatigue_index > 0.70` → select consolidation item (`0.60–0.85`).
+Difficulty modulation: `target_b = 0.5 − (cognitive_load_index × 0.3)`.
+
+#### Research Contribution (C3)
+- **BKT on NIE-derived skill graph:** Tests BKT mastery estimation on a Sinhala phonological
+  prerequisite sequence derived from the national curriculum, using ASSISTments priors as the
+  universal starting point and VARK-tagged modality preferences.
+- **Evaluation:** Mastery curve slope per child vs. fixed NIE curriculum order.
+
+---
+
+### 🧠 C4 — Intelligent Intervention & Guidance Engine (IIGE) — Port 8013
+
+**Role:** Word-level intervention engine. Triggers inline assistance and phonological activities
+at the right moment. Owns SM-2 scheduling and RTI escalation. Does NOT own BKT or gamification.
+
+**Owner:** IT22267740 (Olivea)
+
+#### Endpoint Contracts
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/v1/intervention/check` | POST | Check trigger; return stage + segments |
+| `/api/v1/intervention/activity` | POST | Select + return Stage 2 activity |
+| `/api/v1/intervention/sm2/schedule` | GET | Return today's SM-2 review words |
+| `/api/v1/intervention/sm2/update` | POST | Update SM-2 after activity completion |
+| `/api/v1/intervention/rti_alert` | POST | Generate Tier 3 guardian alert |
+
+#### Intervention Check Payload
+
+```json
+{
+  "student_id": "stu_001",
+  "current_word": "කළු",
+  "phonological_strain_index": 0.83,
+  "error_pattern_vector": [0, 1, 0, 1],
+  "strain_duration_ms": 8000
+}
+```
+
+#### Intervention Stage Response
+
+```json
+{
+  "stage": 2,
+  "syllable_segments": ["කළ", "ු"],
+  "error_type": "VOWEL_CONFUSION",
+  "activity_type": "TEMPLATE_SONG",
+  "activity_difficulty": 2,
+  "activity_content": {
+    "target_vowel_sign": "ු",
+    "song_url": "activities/song_u_pilla.mp3"
+  },
+  "sm2_quality_required": true
+}
+```
+
+#### Two-Stage Pipeline
+
+```
+phonological_strain_index < 0.45                → STAGE 0: No action
+phonological_strain_index ≥ 0.45 for >5s:
+    │
+    ├──→ STAGE 1 (inline, 0-disruption):
+    │       Syllable splitter → segments
+    │       gTTS plays each segment
+    │       Timer: 10s
+    │
+    └──→ After 10s or 3rd failure → STAGE 2 (overlay):
+            Phoneme error analyser → error_type
+            Activity selection matrix → activity_type + difficulty
+            Activity overlay runs (2–5 min)
+            SM-2 quality score recorded on completion
+            If same word fails 3× across sessions → RTI Tier 3 alert
+```
+
+#### Activity Selection Matrix
+
+| Error Type | Mastery < 0.4 | Mastery 0.4–0.7 | Mastery > 0.7 |
+| :--- | :--- | :--- | :--- |
+| `LONG_WORD` | Tapping Game (slow tempo) | Tapping Game (normal) | Syllable reading drill |
+| `VOWEL_CONFUSION` | Finger Tracing Game | Template Song | Quick match drill |
+| `CONSONANT_CONFUSION` | Picture-Word Match (easy) | Picture-Word Match (hard) | Minimal pair exercise |
+| `UNFAMILIAR` | Audio + image presentation | Context sentence | Spaced repetition card |
+
+#### Research Contribution (C4)
+- **Sinhala Unicode syllable splitter:** First rule-based Sinhala syllable boundary engine
+  validated on a NIE Grade 1–2 curriculum word set (target F1 ≥ 0.95).
+- **SM-2 per-skill scheduling:** SM-2 applied at the skill-node level (not per word) as a
+  phonological unit, with quality scores derived from activity accuracy.
+- **Evaluation:** 4-week skill retention (SM-2-scheduled vs. unscheduled, within-child design).
+
+---
+
+## 4. Data Flow Summary (v2.0)
+
+| Step | From → To | Payload Key Fields |
+| :--- | :--- | :--- |
+| 1 | Flutter → C1 | `touch_events`, `session_latency_ms`, `replay_count`, `audio_buffer` |
+| 2 | Flutter → C3 | `skill_id`, `is_correct`, `response_latency_ms` |
+| 3 | C1 → MBSV Store | `mbsv` (6 dimensions) |
+| 4 | C1 MBSV → C2 | `visual_strain_index`, `engagement_index` |
+| 5 | C1 MBSV → C3 | `cognitive_load_index`, `session_fatigue_index` |
+| 6 | C1 MBSV → C4 | `phonological_strain_index`, `error_pattern_vector` |
+| 7 | C3 → C4 | `mastery_vector` (`{skill_id: p_know}`) |
+| 8 | C2 → Flutter | `typography_config`, `game_mode_trigger` |
+| 9 | C3 → Flutter | `next_content_item` |
+| 10 | C4 → Flutter | `stage`, `syllable_segments`, `activity_type` |
+| 11 | C4 → Guardian Dashboard | `tier3_alert`, `sm2_review_words` |
+
+---
+
+## 5. What Each Model Solves (Research-Grounded)
+
+| Research Problem | Dyslexia Indicator | Model | Component |
+| :--- | :--- | :--- | :--- |
+| Detect visual processing effort | Increased letter scanning fixations | `LightGBM → visual_strain_index` | C1 |
+| Detect phonological decoding difficulty | Slow naming speed, phoneme errors | `LightGBM → phonological_strain_index` | C1 |
+| Detect cognitive overload | Processing speed deficit | `LightGBM → cognitive_load_index` | C1 |
+| Personalize sensitivity per child | High between-child variability | `Welford's baseline` | C1 |
+| Motor-control uncertainty as proxy | Fine-motor deficit | `Kalman Filter → kalman_innovation` | C1 |
+| Adapt typography to visual stress | Wilkins visual stress | `LinUCB bandit` | C2 |
+| Abugida-specific spacing | Diacritic detachment in Sinhala | `SOVCM + diacritic_offset arm` | C2 |
+| Re-engage disengaged learner | Low motivation / fatigue | `Gamification state machine` | C2 |
+| Track phonological skill mastery | Skill-level learning progression | `BKT (HMM)` | C3 |
+| Schedule spaced review | Long-term forgetting curve | `Ebbinghaus decay + SM-2` | C3, C4 |
+| Split Sinhala words into syllables | Phonological segmentation difficulty | `Unicode syllable splitter` | C4 |
+| Classify phonological error type | Specific deficit: vowel vs. consonant | `Random Forest + Unicode features` | C4 |
+
+---
+
+## 6. Session State Machine
+
+```
+App Launch
+    │
+    ▼
+[Session 0] Guardian Onboarding
+    ├─ Profile creation
+    ├─ VARK questionnaire (guardian-answered) ──→ C3: set learner tag
+    └─ Baseline calibration (4 tasks, 10–12 min) ──→ C1: Welford initialization
+                                                   ──→ C3: BKT init (all skills p_know=0.3)
+                                                   ──→ Screening report → Guardian Dashboard
+    │
+    ▼
+[Sessions 1+] Learning Session (20–25 min)
+    │
+    ├─ START ──→ C4: SM-2 warm-up (if any words due today)
+    │         ──→ C3: select first content item (ZPD, VARK modality)
+    │         ──→ C2: apply current typography config
+    │
+    ├─ DURING TASK (every 5s):
+    │    ├─ C1: compute MBSV snapshot
+    │    ├─ C2: if visual_strain > 0.6 for 10s → LinUCB step → new typography
+    │    │       if engagement < 0.3 for 30s → gamification overlay → notify C3
+    │    └─ C4: if phonological_strain > 0.45 for 5s → Stage 1
+    │               still ≥ 0.45 after 10s → Stage 2 activity
+    │
+    ├─ TASK COMPLETE:
+    │    ├─ C3: BKT update; select next content item
+    │    ├─ C4: SM-2 update for Stage 2 words
+    │    └─ C2: log reward signal for LinUCB
+    │
+    └─ SESSION END:
+         ├─ C1: MBSV trend flagging (for next session)
+         ├─ C3: session summary (skills attempted, mastery delta)
+         ├─ C4: RTI Tier 3 alerts if any
+         └─ Guardian Dashboard: updated with all session data
+```
+
+---
+
+*Document version 2.0 — revised per R26-SE-031 Optimization Plan (2026-05-12).*
+*Previous version (v1.0) preserved in git history.*

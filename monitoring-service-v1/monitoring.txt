@@ -1,0 +1,890 @@
+
+----- FILE: ./core/kalman_filter.py -----
+"""
+monitoring-service-v1/core/kalman_filter.py
+============================================
+Kalman Filter for touch trajectory smoothing in C1 (CBME).
+
+Models touch interaction as a Linear Dynamical System with a constant-velocity
+motion model. The Kalman innovation (predicted position − observed position)
+is used as a **motor-control uncertainty proxy** — a theoretically grounded
+cognitive load indicator.
+
+Theoretical grounding:
+    Sweller (1988) Cognitive Load Theory: high cognitive load degrades
+    fine-motor control precision. The Kalman innovation captures this
+    degradation as a scalar `kalman_innovation` feature fed into the
+    `visual_strain_index` computation via the multi-task LightGBM pipeline.
+
+State vector: [x, y, dx, dy]  (position + velocity, in screen pixels)
+Observation:  [x, y]          (raw touch coordinates)
+
+Reference:
+    Kalman, R. E. (1960). A New Approach to Linear Filtering and Prediction
+    Problems. Journal of Basic Engineering, 82(1), 35–45.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+
+
+class TouchKalmanFilter:
+    """
+    4-state Kalman Filter for touch trajectory kinematic smoothing.
+
+    Usage (per task interaction session):
+        kf = TouchKalmanFilter(dt=0.016)   # 60 Hz touch sampling
+        for touch_event in events:
+            z = np.array([touch_event.x, touch_event.y])
+            innovation_norm = kf.update(z)
+            # innovation_norm → feature: kalman_innovation (add to telemetry)
+
+    The returned `innovation_norm` is the L2 norm of the Kalman residual
+    (predicted position minus observed position). A high norm over a task
+    indicates unstable, cognitively loaded fine-motor control.
+    """
+
+    def __init__(self, dt: float = 0.016):
+        """
+        Args:
+            dt: Time step between touch samples in seconds.
+                0.016 ≈ 60 Hz (Flutter GestureDetector default refresh).
+        """
+        self.dt = dt
+
+        # State transition matrix (constant-velocity model)
+        self.A = np.array([
+            [1, 0, dt,  0],
+            [0, 1,  0, dt],
+            [0, 0,  1,  0],
+            [0, 0,  0,  1],
+        ], dtype=float)
+
+        # Observation matrix — we only observe x, y (not velocities)
+        self.H = np.array([
+            [1, 0, 0, 0],
+            [0, 1, 0, 0],
+        ], dtype=float)
+
+        # Process noise covariance (tunable; small = trust model more)
+        self.Q = np.eye(4) * 0.01
+
+        # Observation noise covariance (tunable; larger = trust sensor less)
+        self.R = np.eye(2) * 0.5
+
+        # Error covariance matrix
+        self.P = np.eye(4)
+
+        # State estimate [x, y, dx, dy]
+        self.x = np.zeros(4)
+
+        # Track cumulative innovation for session-level feature
+        self._innovations: list[float] = []
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def update(self, z: np.ndarray) -> float:
+        """
+        Process one touch observation and return the Kalman innovation norm.
+
+        Args:
+            z: np.ndarray of shape (2,) — observed [x, y] in screen pixels.
+
+        Returns:
+            float — L2 norm of the innovation vector. High values indicate
+                     motor precision degradation (cognitive load proxy).
+        """
+        z = z.reshape(2)
+
+        # ── Prediction step ──────────────────────────────────────────
+        x_pred = self.A @ self.x            # prior state estimate
+        P_pred = self.A @ self.P @ self.A.T + self.Q   # prior error covariance
+
+        # ── Innovation ───────────────────────────────────────────────
+        y_innov = z - self.H @ x_pred       # measurement residual
+        S = self.H @ P_pred @ self.H.T + self.R   # innovation covariance
+        K = P_pred @ self.H.T @ np.linalg.inv(S)  # Kalman gain
+
+        # ── Update step ──────────────────────────────────────────────
+        self.x = x_pred + K @ y_innov
+        self.P = (np.eye(4) - K @ self.H) @ P_pred
+
+        innovation_norm = float(np.linalg.norm(y_innov))
+        self._innovations.append(innovation_norm)
+        return innovation_norm
+
+    def session_mean_innovation(self) -> float:
+        """
+        Returns the mean innovation norm across all updates in this session.
+        Use as the `kalman_innovation` feature value for C1's LightGBM input.
+        """
+        if not self._innovations:
+            return 0.0
+        return float(np.mean(self._innovations))
+
+    def reset(self) -> None:
+        """Reset state for a new task or session."""
+        self.P = np.eye(4)
+        self.x = np.zeros(4)
+        self._innovations.clear()
+
+----- FILE: ./core/welford.py -----
+"""
+monitoring-service-v1/core/welford.py
+======================================
+Welford's Online Algorithm for per-student incremental mean and variance.
+
+Reference:
+    Welford, B. P. (1962). Note on a method for calculating corrected sums
+    of squares and products. Technometrics, 4(3), 419–420.
+
+Why Welford's instead of a naive running mean?
+    1. Numerically stable — avoids catastrophic cancellation for large samples.
+    2. No stored history — only count, mean, and M2 needed per feature.
+    3. Online — updates in O(1) per observation.
+
+Architecture note:
+    Each of C1's 12 input features maintains a separate WelfordFeatureState.
+    The Z-score transforms raw feature values into child-specific deviations,
+    so the same LightGBM weights can be applied across all children without
+    child-specific model retraining.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from dataclasses import dataclass, field
+from typing import Dict, Optional
+
+from shared.database import get_db
+
+
+@dataclass
+class WelfordFeatureState:
+    """
+    Incremental state for one (student, feature) pair.
+
+    Attributes:
+        count:  Number of observations seen so far.
+        mean:   Running mean.
+        M2:     Running sum of squared deviations from the mean.
+                Variance = M2 / count; Std = sqrt(M2 / count).
+    """
+    count: int = 0
+    mean: float = 0.0
+    M2: float = 0.0
+
+    def update(self, new_value: float) -> None:
+        """Welford's online update step — O(1), numerically stable."""
+        self.count += 1
+        delta = new_value - self.mean
+        self.mean += delta / self.count
+        delta2 = new_value - self.mean
+        self.M2 += delta * delta2
+
+    @property
+    def variance(self) -> float:
+        """Population variance (uses count, not count-1)."""
+        if self.count < 2:
+            return 1.0  # fallback to prevent division by zero
+        return self.M2 / self.count
+
+    @property
+    def std(self) -> float:
+        """Population standard deviation."""
+        return math.sqrt(self.variance)
+
+    def z_score(self, value: float) -> float:
+        """
+        Standardized deviation of value from this student's personal baseline.
+
+        Returns 0.0 if fewer than 3 observations (baseline not yet stable).
+        Clamps to [-4.0, +4.0] to limit the influence of single extreme outliers.
+        """
+        if self.count < 3:
+            return 0.0
+        z = (value - self.mean) / (self.std + 1e-8)
+        return max(-4.0, min(4.0, z))
+
+    def to_dict(self) -> dict:
+        return {"count": self.count, "mean": self.mean, "M2": self.M2}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "WelfordFeatureState":
+        state = cls()
+        state.count = d.get("count", 0)
+        state.mean = d.get("mean", 0.0)
+        state.M2 = d.get("M2", 0.0)
+        return state
+
+
+class WelfordBaseline:
+    """
+    Per-student baseline for all 12 C1 input features.
+
+    Usage:
+        baseline = WelfordBaseline(student_id="stu_001", db_path="./db/monitoring.db")
+        baseline.update({"hesitation_ms": 2300, "replay_count": 2, ...})
+        z_scores = baseline.z_score_all({"hesitation_ms": 3500, "replay_count": 5, ...})
+    """
+
+    FEATURES = [
+        "hesitation_ms",
+        "correction_rate",
+        "response_latency",
+        "touch_pressure",
+        "swipe_velocity",
+        "replay_count",
+        "hint_request_count",
+        "stylus_deviation",
+        "inter_tap_interval",
+        "read_aloud_pause_ms",
+        "syllable_rate",
+        "disfluency_count",
+        "kalman_innovation",   # Kalman Filter output — added by feature_extractor
+        "whisper_wer_proxy",   # Whisper STT WER proxy (Perera & Sumanathilaka 2025)
+    ]
+
+    def __init__(self, student_id: str):
+        self.student_id = student_id
+        self._states: Dict[str, WelfordFeatureState] = {
+            f: WelfordFeatureState() for f in self.FEATURES
+        }
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    async def update(self, feature_values: Dict[str, float]) -> None:
+        """Update baseline with one observation per feature."""
+        for feature, value in feature_values.items():
+            if feature in self._states:
+                self._states[feature].update(value)
+        await self._save()
+
+    def z_score(self, feature: str, value: float) -> float:
+        """Return Z-score for a single feature value."""
+        if feature not in self._states:
+            return 0.0
+        return self._states[feature].z_score(value)
+
+    def z_score_all(self, feature_values: Dict[str, float]) -> Dict[str, float]:
+        """Return Z-scores for all provided features."""
+        return {
+            feature: self.z_score(feature, value)
+            for feature, value in feature_values.items()
+            if feature in self._states
+        }
+
+    def feature_summary(self) -> dict:
+        """Return {feature: {count, mean, std}} for monitoring endpoint."""
+        return {
+            f: {
+                "count": s.count,
+                "mean": round(s.mean, 3),
+                "std": round(s.std, 3),
+            }
+            for f, s in self._states.items()
+        }
+
+    def is_warm(self, min_observations: int = 3) -> bool:
+        """True if all features have at least min_observations updates."""
+        return all(s.count >= min_observations for s in self._states.values())
+
+    # ------------------------------------------------------------------
+    # Persistence (MongoDB)
+    # ------------------------------------------------------------------
+
+    async def _load(self) -> None:
+        try:
+            db = get_db()
+            cursor = db.welford_states.find({"student_id": self.student_id})
+            async for row in cursor:
+                feature = row["feature"]
+                if feature in self._states:
+                    self._states[feature] = WelfordFeatureState(
+                        count=row.get("count", 0),
+                        mean=row.get("mean", 0.0),
+                        M2=row.get("M2", 0.0)
+                    )
+        except Exception:
+            pass  # First-run: states stay at zero defaults
+
+    async def _save(self) -> None:
+        db = get_db()
+        for feature, state in self._states.items():
+            await db.welford_states.update_one(
+                {"student_id": self.student_id, "feature": feature},
+                {"$set": {"count": state.count, "mean": state.mean, "M2": state.M2}},
+                upsert=True
+            )
+
+
+# ---------------------------------------------------------------------------
+# Module-level cache (avoids repeated DB round-trips per request)
+# ---------------------------------------------------------------------------
+_baseline_cache: Dict[str, WelfordBaseline] = {}
+
+
+async def get_baseline(student_id: str) -> WelfordBaseline:
+    """Return cached WelfordBaseline for a student, loading from DB on first call."""
+    if student_id not in _baseline_cache:
+        baseline = WelfordBaseline(student_id)
+        await baseline._load()
+        _baseline_cache[student_id] = baseline
+    return _baseline_cache[student_id]
+
+----- FILE: ./core/whisper_extractor.py -----
+"""
+monitoring-service-v1/core/whisper_extractor.py
+================================================
+Whisper-based STT + WER proxy for C1 acoustic feature enrichment.
+Reference: Perera & Sumanathilaka (2025) arXiv:2510.04750
+           openai/whisper-base achieves 0.66 WER on Sinhala read-aloud.
+
+Usage:
+    wer = compute_whisper_wer_proxy(audio_base64, expected_text)
+    # Returns float [0, 1] — higher = more error = higher phonological strain
+    # Returns 0.0 when Whisper unavailable (graceful degradation)
+"""
+
+import base64
+import tempfile
+import os
+from typing import Optional
+
+# ── Lazy-loaded Whisper model ──────────────────────────────────────────────
+_whisper_model = None
+_whisper_available = None  # None = untested, True/False = tested
+
+
+def _is_whisper_available() -> bool:
+    global _whisper_available
+    if _whisper_available is None:
+        try:
+            import whisper  # noqa: F401
+            _whisper_available = True
+        except ImportError:
+            _whisper_available = False
+            print("[C1-Whisper] openai-whisper not installed — WER proxy disabled. "
+                  "Install: pip install openai-whisper")
+    return _whisper_available
+
+
+def _get_model():
+    global _whisper_model
+    if _whisper_model is None and _is_whisper_available():
+        import whisper
+        _whisper_model = whisper.load_model("base")  # ~140 MB, multilingual
+        print("[C1-Whisper] whisper-base loaded")
+    return _whisper_model
+
+
+def _levenshtein(a: str, b: str) -> int:
+    """Character-level edit distance."""
+    m, n = len(a), len(b)
+    dp = list(range(n + 1))
+    for i in range(1, m + 1):
+        prev = dp[:]
+        dp[0] = i
+        for j in range(1, n + 1):
+            if a[i - 1] == b[j - 1]:
+                dp[j] = prev[j - 1]
+            else:
+                dp[j] = 1 + min(prev[j], dp[j - 1], prev[j - 1])
+    return dp[n]
+
+
+def transcribe_sinhala(audio_bytes: bytes) -> str:
+    """
+    Transcribe Sinhala audio bytes (WAV/FLAC) using Whisper.
+    Returns empty string on any failure.
+    """
+    model = _get_model()
+    if model is None:
+        return ""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            f.write(audio_bytes)
+            tmp_path = f.name
+        result = model.transcribe(tmp_path, language="si", fp16=False)
+        return result.get("text", "").strip()
+    except Exception as e:
+        print(f"[C1-Whisper] Transcription error: {e}")
+        return ""
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+
+def compute_whisper_wer_proxy(audio_base64: Optional[str], expected_text: str) -> float:
+    """
+    Main entry point for C1.
+    Returns character-level WER proxy [0, 1]:
+        0.0 = perfect match (or Whisper unavailable / no audio)
+        1.0 = complete mismatch
+
+    Args:
+        audio_base64: Base64-encoded WAV/FLAC bytes from Flutter TelemetryPayload.audio_base64
+        expected_text: The Sinhala word/sentence shown on screen (current_content_text)
+    """
+    if not audio_base64 or not expected_text:
+        return 0.0
+    if not _is_whisper_available():
+        return 0.0
+    try:
+        audio_bytes = base64.b64decode(audio_base64)
+        transcription = transcribe_sinhala(audio_bytes)
+        if not transcription:
+            return 0.0
+        dist = _levenshtein(transcription.lower(), expected_text.lower())
+        wer = min(1.0, dist / max(len(expected_text), 1))
+        return round(wer, 4)
+    except Exception as e:
+        print(f"[C1-Whisper] WER proxy error: {e}")
+        return 0.0
+
+----- FILE: ./core/__init__.py -----
+# C1 CBME — core package
+
+----- FILE: ./main.py -----
+"""
+monitoring-service-v1/main.py
+================================
+C1 — Cognitive Behavioral Monitoring Engine (CBME)
+FastAPI application — Port 8011
+
+Endpoints:
+    POST /api/v1/telemetry               → Compute MBSV from telemetry payload
+    GET  /api/v1/mbsv/{student_id}       → Return latest stored MBSV
+    GET  /api/v1/monitoring/baseline/{student_id} → Welford feature summary
+    GET  /api/v1/monitoring/shap/{student_id}      → SHAP explanation (placeholder)
+    GET  /health                         → Health check
+"""
+
+import os
+import sys
+import time
+import json
+import math
+from pathlib import Path
+from contextlib import asynccontextmanager
+
+import numpy as np
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
+# Allow importing from shared/ and local core/
+sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
+
+from shared.schemas import (
+    TelemetryPayload, MBSVOutput, MBSV, ErrorPatternVector, WelfordState
+)
+from core.welford import get_baseline
+from core.kalman_filter import TouchKalmanFilter
+from shared.database import connect_to_mongo, close_mongo_connection, get_db
+from core.whisper_extractor import compute_whisper_wer_proxy
+
+# ── Configuration ─────────────────────────────────────────────────────────
+PORT = int(os.getenv("C1_PORT", "8011"))
+
+# Output dimension names — matches LightGBM training target order
+DIMENSION_NAMES = [
+    "cognitive_load_index", "phonological_strain_index", "visual_strain_index",
+    "session_fatigue_index", "engagement_index", "error_resilience_index"
+]
+
+# ── Try to load LightGBM models ────────────────────────────────────────────
+try:
+    import pickle
+    import joblib  # MultiOutputRegressor often requires joblib or pickle
+
+    MODELS_DIR = Path(__file__).parent.parent / "models"
+    MODEL_PATH = MODELS_DIR / "c1_lgbm_mbsv.pkl"
+
+    LGBM_MODEL = None
+    if MODEL_PATH.exists():
+        with open(MODEL_PATH, "rb") as f:
+            LGBM_MODEL = pickle.load(f)
+
+    MODELS_LOADED = LGBM_MODEL is not None
+except Exception as e:
+    print(f"[C1] Model load error: {e}")
+    LGBM_MODEL = None
+    MODELS_LOADED = False
+
+# ── Feature storage (latest MBSV per student) ──────────────────────────────
+# Moved to MongoDB using motor collections
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await connect_to_mongo()
+    yield
+    await close_mongo_connection()
+
+# ── App ────────────────────────────────────────────────────────────────────
+app = FastAPI(
+    title="C1 — Cognitive Behavioral Monitoring Engine (CBME)",
+    description="Produces the 6-dimension MBSV from Flutter behavioral telemetry.",
+    version="2.0.0",
+    lifespan=lifespan
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+)
+
+
+# ── Helper: extract feature dict from telemetry payload ───────────────────
+def _extract_features(payload: TelemetryPayload) -> dict:
+    """Extract raw feature values from telemetry payload."""
+    # Compute swipe velocity from touch_events if available
+    swipe_velocity = 0.0
+    if len(payload.touch_events) >= 2:
+        first, last = payload.touch_events[0], payload.touch_events[-1]
+        dt = max((last.timestamp_ms - first.timestamp_ms) / 1000.0, 0.001)
+        dist = math.hypot(last.x - first.x, last.y - first.y)
+        swipe_velocity = dist / dt
+
+    # Inter-tap interval (std dev of timestamps)
+    inter_tap_interval = 0.0
+    if len(payload.touch_events) >= 3:
+        intervals = [
+            payload.touch_events[i + 1].timestamp_ms - payload.touch_events[i].timestamp_ms
+            for i in range(len(payload.touch_events) - 1)
+        ]
+        mean_int = sum(intervals) / len(intervals)
+        inter_tap_interval = math.sqrt(
+            sum((x - mean_int) ** 2 for x in intervals) / len(intervals)
+        )
+
+    # Average touch pressure
+    touch_pressure = (
+        sum(e.pressure for e in payload.touch_events) / len(payload.touch_events)
+        if payload.touch_events else 0.5
+    )
+
+    # Kalman Filter: motor-control uncertainty proxy from touch trajectory
+    # High innovation norm = degraded fine-motor precision = cognitive load signal
+    # Grounded in Sweller (1988) CLT: high load degrades motor control precision
+    kalman_innovation = 0.0
+    if len(payload.touch_events) >= 3:
+        kf = TouchKalmanFilter(dt=0.016)
+        for i, ev in enumerate(payload.touch_events):
+            z = np.array([ev.x, ev.y])
+            if i == 0:
+                kf.x = np.array([ev.x, ev.y, 0.0, 0.0])
+            kf.update(z)
+        kalman_innovation = kf.session_mean_innovation()
+
+    return {
+        "hesitation_ms": float(payload.hesitation_ms),
+        "correction_rate": float(payload.correction_rate),
+        "response_latency": float(payload.session_latency_ms),
+        "touch_pressure": touch_pressure,
+        "swipe_velocity": swipe_velocity,
+        "replay_count": float(payload.replay_count),
+        "hint_request_count": float(payload.hint_request_count),
+        "stylus_deviation": float(payload.stylus_deviation or 0.0),
+        "inter_tap_interval": inter_tap_interval,
+        "read_aloud_pause_ms": float(payload.read_aloud_pause_ms or 0.0),
+        "syllable_rate": float(payload.syllable_rate or 0.0),
+        "disfluency_count": float(payload.disfluency_count or 0.0),
+        "kalman_innovation": kalman_innovation,
+        "whisper_wer_proxy": 0.0,
+    }
+
+
+def _compute_error_pattern(features: dict, z_scores: dict) -> ErrorPatternVector:
+    """Rule-based error pattern vector from feature values and Z-scores."""
+    # Reversal: high correction_rate + high hesitation
+    reversal = 1 if (features["correction_rate"] > 0.3 and features["hesitation_ms"] > 2000) else 0
+    # Omission: high disfluency + replay
+    omission = 1 if (features["disfluency_count"] > 2 or features["replay_count"] >= 3) else 0
+    # Substitution: high correction_rate alone
+    substitution = 1 if (features["correction_rate"] > 0.5 and reversal == 0) else 0
+    # Hesitation: just high hesitation
+    hesitation = 1 if features["hesitation_ms"] > 2500 else 0
+    return ErrorPatternVector(
+        reversal=reversal, omission=omission,
+        substitution=substitution, hesitation=hesitation
+    )
+
+
+def _rule_based_mbsv(features: dict, z_scores: dict) -> MBSV:
+    """
+    Fallback MBSV computation when LightGBM models are not loaded.
+    Uses Z-score normalization + research-calibrated sigmoid mapping.
+    """
+    def sigmoid(x: float) -> float:
+        return 1.0 / (1.0 + math.exp(-x))
+
+    def clamp(v: float) -> float:
+        return max(0.0, min(1.0, v))
+
+    hesitation_z = z_scores.get("hesitation_ms", 0.0)
+    replay_z = z_scores.get("replay_count", 0.0)
+    correction_z = z_scores.get("correction_rate", 0.0)
+    swipe_z = z_scores.get("swipe_velocity", 0.0)
+    latency_z = z_scores.get("response_latency", 0.0)
+    hint_z = z_scores.get("hint_request_count", 0.0)
+
+    # Raw score: normalized Z-score combinations per dimension
+    visual_raw     = 0.4 * (-swipe_z) + 0.3 * hesitation_z + 0.2 * z_scores.get("stylus_deviation", 0.0) + 0.1 * latency_z
+    cogload_raw    = 0.35 * hesitation_z + 0.3 * latency_z + 0.2 * correction_z + 0.15 * z_scores.get("disfluency_count", 0.0)
+    phonol_raw     = 0.35 * replay_z + 0.3 * z_scores.get("inter_tap_interval", 0.0) + 0.2 * z_scores.get("read_aloud_pause_ms", 0.0) + 0.15 * z_scores.get("syllable_rate", 0.0)
+    engage_raw     = -(0.4 * hint_z + 0.3 * correction_z + 0.3 * swipe_z)  # inverted
+    fatigue_raw    = 0.4 * latency_z + 0.35 * hesitation_z + 0.25 * z_scores.get("syllable_rate", 0.0)
+
+    return MBSV(
+        visual_strain_index=clamp(sigmoid(visual_raw)),
+        cognitive_load_index=clamp(sigmoid(cogload_raw)),
+        phonological_strain_index=clamp(sigmoid(phonol_raw)),
+        engagement_index=clamp(sigmoid(engage_raw)),
+        session_fatigue_index=clamp(sigmoid(fatigue_raw)),
+        error_pattern_vector=_compute_error_pattern(features, z_scores),
+    )
+
+
+def _lgbm_mbsv(features: dict, z_scores: dict) -> MBSV:
+    """Compute MBSV using trained LightGBM MultiOutput model."""
+    feature_vector = np.array([[
+        z_scores.get(k, 0.0) for k in [
+            "hesitation_ms", "correction_rate", "response_latency", "touch_pressure",
+            "swipe_velocity", "replay_count", "hint_request_count", "stylus_deviation",
+            "inter_tap_interval", "read_aloud_pause_ms", "syllable_rate",
+            "disfluency_count", "kalman_innovation", "whisper_wer_proxy",
+        ]
+    ]])
+    
+    # Predict all 6 dimensions
+    preds = LGBM_MODEL.predict(feature_vector)[0]
+    
+    # Mapping based on train_c1_lgbm.py: 
+    # TARGETS = ["label_CLI", "label_PSI", "label_VSI", "label_FI", "label_ES", "label_ERI"]
+    def clamp(v: float) -> float:
+        return float(max(0.0, min(1.0, v)))
+
+    return MBSV(
+        cognitive_load_index=clamp(preds[0]),
+        phonological_strain_index=clamp(preds[1]),
+        visual_strain_index=clamp(preds[2]),
+        session_fatigue_index=clamp(preds[3]),
+        engagement_index=clamp(preds[4]),
+        error_resilience_index=clamp(preds[5]),
+        error_pattern_vector=_compute_error_pattern(features, z_scores),
+    )
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "C1-CBME", "models_loaded": MODELS_LOADED}
+
+
+@app.post("/api/v1/telemetry", response_model=MBSVOutput)
+async def receive_telemetry(payload: TelemetryPayload):
+    """
+    Main telemetry ingestion endpoint.
+    Runs Welford's Z-score → LightGBM (or rule-based fallback) → stores MBSV.
+    """
+    features = _extract_features(payload)
+
+    # Whisper WER proxy (optional — requires audio_base64 in payload)
+    # Reference: Perera & Sumanathilaka (2025) arXiv:2510.04750
+    if hasattr(payload, 'audio_base64') and payload.audio_base64:
+        wer = compute_whisper_wer_proxy(
+            payload.audio_base64,
+            getattr(payload, 'current_content_text', '') or ''
+        )
+        features["whisper_wer_proxy"] = wer
+        if wer > 0:
+            print(f"[C1-Whisper] student={payload.student_id} WER={wer:.3f}")
+
+    baseline = await get_baseline(payload.student_id)
+    await baseline.update(features)
+    z_scores = baseline.z_score_all(features)
+
+    mbsv = _lgbm_mbsv(features, z_scores) if MODELS_LOADED else _rule_based_mbsv(features, z_scores)
+
+    timestamp_ms = int(time.time() * 1000)
+    mbsv_json = mbsv.model_dump_json()
+
+    db = get_db()
+    await db.mbsv_events.update_one(
+        {
+            "student_id": payload.student_id,
+            "session_id": payload.session_id,
+            "timestamp_ms": timestamp_ms
+        },
+        {"$set": {"mbsv_json": mbsv_json}},
+        upsert=True
+    )
+
+    return MBSVOutput(
+        student_id=payload.student_id,
+        session_id=payload.session_id,
+        timestamp_ms=timestamp_ms,
+        mbsv=mbsv,
+        shap_available=False,
+        session_outlier=False,
+    )
+
+
+@app.get("/api/v1/mbsv/{student_id}", response_model=MBSVOutput)
+async def get_latest_mbsv(student_id: str):
+    """Return the most recent MBSV for a student."""
+    db = get_db()
+    row = await db.mbsv_events.find_one(
+        {"student_id": student_id},
+        sort=[("timestamp_ms", -1)]
+    )
+
+    if not row:
+        raise HTTPException(status_code=404, detail=f"No MBSV found for student {student_id}")
+
+    session_id = row["session_id"]
+    timestamp_ms = row["timestamp_ms"]
+    mbsv_json = row["mbsv_json"]
+    mbsv = MBSV.model_validate_json(mbsv_json)
+    return MBSVOutput(
+        student_id=student_id, session_id=session_id,
+        timestamp_ms=timestamp_ms, mbsv=mbsv,
+    )
+
+
+@app.get("/api/v1/monitoring/baseline/{student_id}", response_model=WelfordState)
+async def get_baseline_summary(student_id: str):
+    """Return Welford feature summary (mean ± std) for a student."""
+    baseline = await get_baseline(student_id)
+    return WelfordState(
+        student_id=student_id,
+        feature_states=baseline.feature_summary(),
+    )
+
+
+@app.get("/api/v1/monitoring/acoustic_validation/{student_id}")
+async def get_acoustic_validation(student_id: str):
+    """
+    Return per-student acoustic feature statistics for research validation.
+
+    Exposes the Welford baseline mean/std for the three acoustic proxy features
+    (read_aloud_pause_ms, syllable_rate, disfluency_count) and the Whisper WER
+    proxy.  Used by scripts/validate_c1_acoustic_features.py to compare against
+    the peshalaperera articulation dataset ground truth.
+
+    Reference: Perera & Sumanathilaka (2025) arXiv:2510.04750.
+    """
+    baseline = await get_baseline(student_id)
+    summary = baseline.feature_summary()
+    acoustic_keys = [
+        "read_aloud_pause_ms",
+        "syllable_rate",
+        "disfluency_count",
+        "whisper_wer_proxy",
+    ]
+    return {
+        "student_id": student_id,
+        "observation_count": max(
+            summary.get(k, {}).get("count", 0) for k in acoustic_keys
+        ),
+        "acoustic_features": {
+            k: summary.get(k, {"count": 0, "mean": 0.0, "std": 0.0})
+            for k in acoustic_keys
+        },
+        "baseline_warm": baseline.is_warm(min_observations=3),
+    }
+
+
+@app.get("/api/v1/monitoring/shap/{student_id}")
+async def get_shap(student_id: str):
+    """
+    SHAP feature importance for the most recent MBSV computation.
+    Validates that audio features (read_aloud_pause_ms, syllable_rate, disfluency_count)
+    rank alongside touch features in the LightGBM explanation.
+    """
+    if not MODELS_LOADED:
+        return {"student_id": student_id, "available": False,
+                "message": "LightGBM model not loaded — run scripts/train_c1_lgbm.py first."}
+
+    baseline = await get_baseline(student_id)
+    if not baseline.is_warm(min_observations=3):
+        return {"student_id": student_id, "available": False,
+                "message": "Baseline not yet warm (need ≥3 telemetry events for this student)."}
+
+    try:
+        import shap
+
+        feature_names = baseline.FEATURES  # 13 features in canonical order
+        # Use the student's current mean as a representative sample (z-score = 0 at mean)
+        feature_vector = np.zeros((1, len(feature_names)))
+
+        explainer = shap.TreeExplainer(LGBM_MODEL)
+        shap_values = explainer.shap_values(feature_vector)
+
+        # shap_values: list of arrays [n_outputs × n_samples × n_features]
+        # or single array for single output — normalise to list form
+        if not isinstance(shap_values, list):
+            shap_values = [shap_values]
+
+        result: dict = {}
+        for i, dim in enumerate(DIMENSION_NAMES):
+            if i < len(shap_values):
+                vals = shap_values[i][0]
+            else:
+                vals = shap_values[0][0]
+            result[dim] = {feature_names[j]: round(float(vals[j]), 5)
+                           for j in range(len(feature_names))}
+
+        # Rank features by absolute mean SHAP across all dimensions
+        mean_abs = {
+            f: round(float(np.mean([abs(result[d][f]) for d in DIMENSION_NAMES])), 5)
+            for f in feature_names
+        }
+        ranked = sorted(mean_abs.items(), key=lambda x: x[1], reverse=True)
+
+        return {
+            "student_id": student_id,
+            "available": True,
+            "shap_per_dimension": result,
+            "feature_importance_ranked": [{"feature": f, "mean_abs_shap": v} for f, v in ranked],
+        }
+
+    except ImportError:
+        return {"student_id": student_id, "available": False,
+                "message": "Install 'shap' library: pip install shap"}
+    except Exception as e:
+        return {"student_id": student_id, "available": False, "message": str(e)}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)
+
+----- FILE: ./monitoring.txt -----
+
+[Could not read file: ./monitoring.txt]
+
+----- FILE: ./requirements.txt -----
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.1
+numpy==1.26.4
+lightgbm==4.3.0
+scikit-learn==1.4.2
+httpx==0.27.0
+python-dotenv==1.0.1
+motor==3.4.0
+dnspython==2.6.1
+# v5.0 additions — Whisper WER proxy (C1 acoustic feature)
+openai-whisper>=20231117
+soundfile>=0.12.1

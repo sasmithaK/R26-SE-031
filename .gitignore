@@ -1,0 +1,99 @@
+# =========================
+# Python & FastAPI Backends
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+.env
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.claude/
+# =========================
+# Machine Learning & Data
+# =========================
+# Ignore all generic model and data files
+*.pth
+*.pkl
+*.h5
+*.csv
+
+# EXCEPT models specifically placed in the final_models directory for the viva
+!final_models/
+!final_models/**
+# Ignore locally generated XAI reports
+*_intervention_report.html
+
+# =========================
+# Databases
+# =========================
+# Ignore SQLite persistence files
+*.db
+*.sqlite3
+*.db-journal
+
+# =========================
+# Jupyter Notebooks
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Flutter & Dart Frontends
+# =========================
+# General Dart/Flutter
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+
+# Avoid ignoring the frontend folder itself, just ignore its build outputs
+**/build/
+
+# Android
+**/android/.gradle/
+**/android/local.properties
+**/android/app/build/
+*.jks
+*.keystore
+
+# iOS/macOS
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.podspec
+**/macos/Pods/
+**/macos/Flutter/ephemeral/
+.DS_Store
+xcuserdata/
+DerivedData/
+
+# =========================
+# IDEs & Editor Configs
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+"__pycache__/" 
+"*.pyc" 
+
+# ========================= 
+# Merged from R26-SE-031-V2/.gitignore
+# =========================
+*.env
+*.joblib
+*.pt
+Thumbs.db
+.coverage
+htmlcov/
+*/db/
+logs/
+
+test_output.log
+test_summary.txt
+
