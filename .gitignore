@@ -13,14 +13,6 @@ dist/
 *.egg-info/
 .pytest_cache/
 .claude/
-# =========================
-# Machine Learning & Data
-# =========================
-# Ignore all generic model and data files
-*.pth
-*.pkl
-*.h5
-*.csv
 
 # EXCEPT models specifically placed in the final_models directory for the viva
 !final_models/
