@@ -138,7 +138,8 @@ Top expected features: `hesitation_ms`, `disfluency_count`, `correction_rate`,
 
 ```
 R26-SE-031/  (repository root)
-├── docs/                     # Academic docs, architecture, SHAP visuals
+├── docs/                     # All project docs (this file, SERVICE_GUIDE, TRAINING_METHODOLOGY,
+│                             #  academic material, architecture notes, SHAP visuals)
 ├── monitoring-service-v1/    # C1 — Kalman, Welford, Whisper extractor
 ├── visual-service-v1/        # C2 — LinUCB, SOVCM, arm presets
 ├── content-service-v1/       # C3 — BKT, onboarding, content selector
@@ -149,10 +150,9 @@ R26-SE-031/  (repository root)
 ├── datasets/                 # Cached/extracted feature data
 ├── audit/                    # Viva audit notebooks (C1/C2/C3 + MBSV scientific validation)
 ├── logs/                     # Service runtime logs
-├── run_all_services.py       # Master runner
 ├── tests/                    # test_smoke.py, test_integration.py, test_api_e2e.py
-├── SERVICE_GUIDE.md          # (superseded by this file)
-└── TRAINING_METHODOLOGY.md   # (full formulas & references; summarized above)
+├── run_all_services.py       # Master runner
+└── README.md
 ```
 
 ### Key references

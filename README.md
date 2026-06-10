@@ -31,7 +31,7 @@ pip install -r monitoring-service-v1/requirements.txt \
 ```
 
 Create a `.env` in the repo root with `MONGO_URI`, `MONGO_DB_NAME`, and the
-algorithm tunables (see `SERVICE_GUIDE.md`).
+algorithm tunables (see [docs/SERVICE_GUIDE.md](docs/SERVICE_GUIDE.md)).
 
 ## Train models
 
@@ -62,8 +62,13 @@ Health check: `GET http://localhost:8011/health` (same for 8012–8014).
 
 ## Documentation
 
-- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** — consolidated overview: architecture, MBSV, run/test guide, ML methodology
-- [SERVICE_GUIDE.md](SERVICE_GUIDE.md) — detailed service execution & testing
-- [TRAINING_METHODOLOGY.md](TRAINING_METHODOLOGY.md) — three-tier real-data training strategy (SPEAK-PP, acoustic validation, synthetic MBSV) with formulas & references
-- [docs/](docs) — academic proposals, architecture notes, viva material
+All project documentation lives in [docs/](docs):
+
+- **[docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md)** — consolidated overview: architecture, MBSV, run/test guide, ML methodology
+- [docs/SERVICE_GUIDE.md](docs/SERVICE_GUIDE.md) — detailed service execution & testing
+- [docs/TRAINING_METHODOLOGY.md](docs/TRAINING_METHODOLOGY.md) — three-tier real-data training strategy (SPEAK-PP, acoustic validation, synthetic MBSV) with formulas & references
+- [docs/SINHALA_PHONOLOGICAL_TASK.md](docs/SINHALA_PHONOLOGICAL_TASK.md) — Sinhala phonological task design
+- [docs/VIVA_TALKING_POINTS.md](docs/VIVA_TALKING_POINTS.md) — viva preparation notes
+- [docs/architecture/](docs/architecture) — ML model notes, system functionality & analysis roadmap
+- [docs/academic/](docs/academic) — proposal reports and marking rubric
 - [audit/](audit) — viva validation notebooks (C1/C2/C3 + MBSV scientific validation)
