@@ -1,0 +1,14 @@
+feature,importance
+kalman_innovation,435.5
+hesitation_ms,425.0
+response_latency,417.3333333333333
+correction_rate,409.6666666666667
+swipe_velocity,409.5
+read_aloud_pause_ms,405.8333333333333
+stylus_deviation,403.0
+syllable_rate,400.1666666666667
+inter_tap_interval,400.1666666666667
+touch_pressure,391.6666666666667
+disfluency_count,139.83333333333334
+replay_count,117.5
+hint_request_count,93.0
