@@ -123,6 +123,11 @@ class _LetterBubbleGameState extends State<LetterBubbleGame> with SingleTickerPr
   final Random _random = Random();
   bool _initialized = false;
   
+  // Intro Sequence State
+  bool _isIntroMode = true;
+  Timer? _introTimer;
+  double _introAnimationProgress = 0.0;
+  
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   void _playSound(String fileName) async {
@@ -136,9 +141,45 @@ class _LetterBubbleGameState extends State<LetterBubbleGame> with SingleTickerPr
   @override
   void initState() {
     super.initState();
+    _startIntroSequence();
+  }
+
+  void _startIntroSequence() {
+    _playSound('intro.mp3'); // Play custom intro music
+    _isIntroMode = true;
+    _isOwlCheering = true;
+    
+    // Intro animation loop (for fast cheering/dancing)
+    _introTimer = Timer.periodic(const Duration(milliseconds: 30), (timer) {
+      setState(() {
+        _introAnimationProgress += 0.15;
+        _owlCheerAnimation = (sin(_introAnimationProgress) + 1) / 2;
+      });
+    });
+
+    // End intro after 4 seconds
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) {
+        _endIntroSequence();
+      }
+    });
+  }
+
+  void _endIntroSequence() {
+    _introTimer?.cancel();
+    _audioPlayer.stop(); // Stop intro music when the game starts
+    
+    setState(() {
+      _isIntroMode = false;
+      _isOwlCheering = false;
+      _owlCheerAnimation = 0.0;
+    });
+    
     _gameStartTime = DateTime.now();
     _lastActionTime = DateTime.now();
     
+    _resetGame();
+
     // Start game loop
     _gameTimer = Timer.periodic(const Duration(milliseconds: 30), (timer) {
       _updateGame();
@@ -147,6 +188,7 @@ class _LetterBubbleGameState extends State<LetterBubbleGame> with SingleTickerPr
 
   @override
   void dispose() {
+    _introTimer?.cancel();
     _gameTimer?.cancel();
     _audioPlayer.dispose();
     super.dispose();
@@ -645,6 +687,100 @@ class _LetterBubbleGameState extends State<LetterBubbleGame> with SingleTickerPr
     }
 
     double progress = (currentHits / totalHitsRequired).clamp(0.0, 1.0);
+
+    if (_isIntroMode) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF0F9FF),
+        body: SafeArea(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background sky gradient
+              Positioned.fill(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFFD0EFFE), Color(0xFFF0F9FF)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ),
+              // Dancing Owl and Text
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      "'අ' අකුර ඉගෙන ගනිමු",
+                      style: TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF01579B),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 70),
+                    Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        Transform.translate(
+                          offset: Offset(0, -sin(_owlCheerAnimation * pi) * 30),
+                          child: SizedBox(
+                            width: 200,
+                            height: 200,
+                            child: CustomPaint(
+                              painter: DuoOwlPainter(
+                                breathing: sin(DateTime.now().millisecondsSinceEpoch * 0.005),
+                                animProgress: _owlCheerAnimation,
+                                isBlowing: false,
+                                isCheering: true,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // The letter 'අ' held by the Owl
+                        Positioned(
+                          top: -50,
+                          child: Transform.translate(
+                            offset: Offset(0, -sin(_owlCheerAnimation * pi) * 40),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF64B5F6), // Calm soft blue
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.white, width: 4),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.blue.withOpacity(0.3),
+                                    blurRadius: 12,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: const Text(
+                                "අ",
+                                style: TextStyle(
+                                  fontSize: 70,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F9FF), 

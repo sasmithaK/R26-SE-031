@@ -5,6 +5,12 @@ import 'firefly_tracking_game.dart';
 import 'letter_identification_task.dart';
 import 'syllable_train_game.dart';
 import 'letter_bubble_game.dart';
+import 'letter_bubble_game_i.dart';
+import 'letter_bubble_game_ga.dart';
+import 'letter_bubble_game_ka.dart';
+import 'letter_bubble_game_ma.dart';
+import 'letter_bubble_game_la.dart';
+import 'letter_bubble_game_sa.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String userName;
@@ -38,6 +44,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
       color1: Color(0xFF00ACC1),
       color2: Color(0xFF00838F),
       screenKey: 'letter_bubbles',
+    ),
+    _Card(
+      title: 'බුබුලු සෙල්ලම - ඉ',
+      subtitle: 'ස්වර හඳුනාගනිමු',
+      tag: 'ක්‍රීඩාව',
+      category: 'game',
+      assetImage: 'assets/thumbnails/drawing_game.jpg',
+      fallbackEmoji: '🫧',
+      color1: Color(0xFF00ACC1),
+      color2: Color(0xFF00838F),
+      screenKey: 'letter_bubbles_i',
+    ),
+    _Card(
+      title: 'බුබුලු සෙල්ලම - ග',
+      subtitle: 'ස්වර හඳුනාගනිමු',
+      tag: 'ක්‍රීඩාව',
+      category: 'game',
+      assetImage: 'assets/thumbnails/drawing_game.jpg',
+      fallbackEmoji: '🫧',
+      color1: Color(0xFF00ACC1),
+      color2: Color(0xFF00838F),
+      screenKey: 'letter_bubbles_ga',
+    ),
+    _Card(
+      title: 'බුබුලු සෙල්ලම - ක',
+      subtitle: 'ස්වර හඳුනාගනිමු',
+      tag: 'ක්‍රීඩාව',
+      category: 'game',
+      assetImage: 'assets/thumbnails/drawing_game.jpg',
+      fallbackEmoji: '🫧',
+      color1: Color(0xFF00ACC1),
+      color2: Color(0xFF00838F),
+      screenKey: 'letter_bubbles_ka',
+    ),
+    _Card(
+      title: 'බුබුලු සෙල්ලම - ම',
+      subtitle: 'ස්වර හඳුනාගනිමු',
+      tag: 'ක්‍රීඩාව',
+      category: 'game',
+      assetImage: 'assets/thumbnails/drawing_game.jpg',
+      fallbackEmoji: '🫧',
+      color1: Color(0xFF00ACC1),
+      color2: Color(0xFF00838F),
+      screenKey: 'letter_bubbles_ma',
+    ),
+    _Card(
+      title: 'බුබුලු සෙල්ලම - ල',
+      subtitle: 'ස්වර හඳුනාගනිමු',
+      tag: 'ක්‍රීඩාව',
+      category: 'game',
+      assetImage: 'assets/thumbnails/drawing_game.jpg',
+      fallbackEmoji: '🫧',
+      color1: Color(0xFF00ACC1),
+      color2: Color(0xFF00838F),
+      screenKey: 'letter_bubbles_la',
+    ),
+    _Card(
+      title: 'බුබුලු සෙල්ලම - ස',
+      subtitle: 'ස්වර හඳුනාගනිමු',
+      tag: 'ක්‍රීඩාව',
+      category: 'game',
+      assetImage: 'assets/thumbnails/drawing_game.jpg',
+      fallbackEmoji: '🫧',
+      color1: Color(0xFF00ACC1),
+      color2: Color(0xFF00838F),
+      screenKey: 'letter_bubbles_sa',
     ),
     _Card(
       title: 'Story Sequencing',
@@ -126,6 +198,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'letter_id':    LetterIdentificationTask(),
       'syllable':     SyllableTrainGame(),
       'letter_bubbles': const LetterBubbleGame(),
+      'letter_bubbles_i': const LetterBubbleGameI(),
+      'letter_bubbles_ga': const LetterBubbleGameGa(),
+      'letter_bubbles_ka': const LetterBubbleGameKa(),
+      'letter_bubbles_ma': const LetterBubbleGameMa(),
+      'letter_bubbles_la': const LetterBubbleGameLa(),
+      'letter_bubbles_sa': const LetterBubbleGameSa(),
     };
     final screen = map[key];
     if (screen != null) {
