@@ -11,6 +11,8 @@ import 'letter_bubble_game_ka.dart';
 import 'letter_bubble_game_ma.dart';
 import 'letter_bubble_game_la.dart';
 import 'letter_bubble_game_sa.dart';
+import 'alapilla_learning_screen.dart';
+import 'kombuwa_learning_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String userName;
@@ -180,6 +182,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
       color2: Color(0xFF263238),
       screenKey: 'syllable',
     ),
+    _Card(
+      title: 'ඇලපිල්ල (ා) ඉගෙන ගමු',
+      subtitle: 'Pillam Learning',
+      tag: 'Activity',
+      category: 'activity',
+      assetImage: 'assets/thumbnails/alapilla.jpg',
+      fallbackEmoji: '🦉',
+      color1: Color(0xFFE91E63),
+      color2: Color(0xFFC2185B),
+      screenKey: 'alapilla_learn',
+    ),
+    _Card(
+      title: 'කොම්බුව ඉගෙන ගමු',
+      subtitle: 'Pillam Learning',
+      tag: 'Activity',
+      category: 'activity',
+      assetImage: 'assets/thumbnails/alapilla.jpg',
+      fallbackEmoji: '🦉',
+      color1: Color(0xFF9C27B0),
+      color2: Color(0xFF7B1FA2),
+      screenKey: 'kombuwa_learn',
+    ),
   ];
 
   // ── Tab filtering ──────────────────────────────────────────────────────────
@@ -204,6 +228,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'letter_bubbles_ma': const LetterBubbleGameMa(),
       'letter_bubbles_la': const LetterBubbleGameLa(),
       'letter_bubbles_sa': const LetterBubbleGameSa(),
+      'alapilla_learn': const AlapillaLearningScreen(),
+      'kombuwa_learn': const KombuwaLearningScreen(),
     };
     final screen = map[key];
     if (screen != null) {
