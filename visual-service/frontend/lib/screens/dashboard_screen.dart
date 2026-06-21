@@ -11,6 +11,8 @@ import 'letter_bubble_game_ka.dart';
 import 'letter_bubble_game_ma.dart';
 import 'letter_bubble_game_la.dart';
 import 'letter_bubble_game_sa.dart';
+import 'letter_bubble_game_pa.dart';
+import 'letter_bubble_game_wa.dart';
 import 'alapilla_learning_screen.dart';
 import 'kombuwa_learning_screen.dart';
 
@@ -112,6 +114,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
       color1: Color(0xFF00ACC1),
       color2: Color(0xFF00838F),
       screenKey: 'letter_bubbles_sa',
+    ),
+    _Card(
+      title: 'බුබුලු සෙල්ලම - ප',
+      subtitle: 'ස්වර හඳුනාගනිමු',
+      tag: 'ක්‍රීඩාව',
+      category: 'game',
+      assetImage: 'assets/thumbnails/drawing_game.jpg',
+      fallbackEmoji: '🫧',
+      color1: Color(0xFF00ACC1),
+      color2: Color(0xFF00838F),
+      screenKey: 'letter_bubbles_pa',
+    ),
+    _Card(
+      title: 'බුබුලු සෙල්ලම - ව',
+      subtitle: 'ස්වර හඳුනාගනිමු',
+      tag: 'ක්‍රීඩාව',
+      category: 'game',
+      assetImage: 'assets/thumbnails/drawing_game.jpg',
+      fallbackEmoji: '🫧',
+      color1: Color(0xFF00ACC1),
+      color2: Color(0xFF00838F),
+      screenKey: 'letter_bubbles_wa',
     ),
     _Card(
       title: 'Story Sequencing',
@@ -228,6 +252,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'letter_bubbles_ma': const LetterBubbleGameMa(),
       'letter_bubbles_la': const LetterBubbleGameLa(),
       'letter_bubbles_sa': const LetterBubbleGameSa(),
+      'letter_bubbles_pa': const LetterBubbleGamePa(),
+      'letter_bubbles_wa': const LetterBubbleGameWa(),
       'alapilla_learn': const AlapillaLearningScreen(),
       'kombuwa_learn': const KombuwaLearningScreen(),
     };
