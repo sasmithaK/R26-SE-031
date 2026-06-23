@@ -1085,7 +1085,7 @@ class _LetterBubbleGamePaState extends State<LetterBubbleGamePa> with SingleTick
                     children: [
                       const Flexible(
                         child: Text(
-                          "මෙම අකුර ඇති බුබුප තෝරන්න:  ",
+                          "මෙම අකුර ඇති බුබුල තෝරන්න:  ",
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 22,

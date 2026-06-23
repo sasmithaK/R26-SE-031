@@ -13,6 +13,9 @@ import 'letter_bubble_game_la.dart';
 import 'letter_bubble_game_sa.dart';
 import 'letter_bubble_game_pa.dart';
 import 'letter_bubble_game_wa.dart';
+import 'letter_balloon_game_tha.dart';
+import 'letter_balloon_game_e.dart';
+import 'letter_balloon_game_u.dart';
 import 'alapilla_learning_screen.dart';
 import 'kombuwa_learning_screen.dart';
 
@@ -138,6 +141,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
       screenKey: 'letter_bubbles_wa',
     ),
     _Card(
+      title: 'බැලූන් සෙල්ලම - උ',
+      subtitle: 'ස්වර හඳුනාගනිමු',
+      tag: 'ක්‍රීඩාව',
+      category: 'game',
+      assetImage: 'assets/thumbnails/drawing_game.jpg',
+      fallbackEmoji: '🎈',
+      color1: Color(0xFF00ACC1),
+      color2: Color(0xFF00838F),
+      screenKey: 'letter_balloons_u',
+    ),
+    _Card(
+      title: 'බැලූන් සෙල්ලම - එ',
+      subtitle: 'ස්වර හඳුනාගනිමු',
+      tag: 'ක්‍රීඩාව',
+      category: 'game',
+      assetImage: 'assets/thumbnails/drawing_game.jpg',
+      fallbackEmoji: '🎈',
+      color1: Color(0xFF00ACC1),
+      color2: Color(0xFF00838F),
+      screenKey: 'letter_balloons_e',
+    ),
+    _Card(
+      title: 'බැලූන් සෙල්ලම - ත',
+      subtitle: 'ස්වර හඳුනාගනිමු',
+      tag: 'ක්‍රීඩාව',
+      category: 'game',
+      assetImage: 'assets/thumbnails/drawing_game.jpg',
+      fallbackEmoji: '🎈',
+      color1: Color(0xFF00ACC1),
+      color2: Color(0xFF00838F),
+      screenKey: 'letter_balloons_tha',
+    ),
+    _Card(
       title: 'Story Sequencing',
       subtitle: 'Order & Logic',
       tag: 'Game',
@@ -254,6 +290,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'letter_bubbles_sa': const LetterBubbleGameSa(),
       'letter_bubbles_pa': const LetterBubbleGamePa(),
       'letter_bubbles_wa': const LetterBubbleGameWa(),
+      'letter_balloons_tha': const LetterBalloonGameTha(),
+      'letter_balloons_e': const LetterBalloonGameE(),
+      'letter_balloons_u': const LetterBalloonGameU(),
       'alapilla_learn': const AlapillaLearningScreen(),
       'kombuwa_learn': const KombuwaLearningScreen(),
     };

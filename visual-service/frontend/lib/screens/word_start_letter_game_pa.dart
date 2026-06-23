@@ -173,7 +173,7 @@ class _WordStartLetterGamePaState extends State<WordStartLetterGamePa> with Tick
           style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.green),
         ),
         content: const Text(
-          "ඔබ සියපුම වචන නිවැරදිව හඳුනාගත්තා!", 
+          "ඔබ සියලුම වචන නිවැරදිව හඳුනාගත්තා!", 
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 24),
         ),
@@ -239,7 +239,7 @@ class _WordStartLetterGamePaState extends State<WordStartLetterGamePa> with Tick
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                "රූපයට ගැපපෙන මුප් අකුර තෝරන්න:", 
+                "රූපයට ගැලපෙන මුල් අකුර තෝරන්න:", 
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black87),
                 textAlign: TextAlign.center,
               ),
