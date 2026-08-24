@@ -5,6 +5,7 @@ import 'therapist_students_screen.dart';
 import 'therapist_messages_screen.dart';
 import 'therapist_profile_screen.dart';
 import 'therapist_student_detail_screen.dart';
+import '../../services/localization_service.dart';
 
 class TherapistDashboardScreen extends StatefulWidget {
   const TherapistDashboardScreen({super.key});
@@ -63,15 +64,15 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.dashboard_rounded, 'home'),
-                _buildNavItem(1, Icons.people_outline_rounded, 'students'),
+                _buildNavItem(0, Icons.dashboard_rounded, LocalizationService.instance.t('home')),
+                _buildNavItem(1, Icons.people_outline_rounded, LocalizationService.instance.t('students')),
                 _buildNavItem(
                   2,
                   Icons.chat_bubble_outline_rounded,
-                  'messages',
+                  LocalizationService.instance.t('messages'),
                   badgeCount: 3,
                 ),
-                _buildNavItem(3, Icons.person_outline_rounded, 'profile'),
+                _buildNavItem(3, Icons.person_outline_rounded, LocalizationService.instance.t('profile')),
               ],
             ),
           ),
@@ -198,14 +199,14 @@ class _DashboardHome extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'good morning,',
+                              LocalizationService.instance.t('good_morning'),
                               style: AppTypography.body(
                                 fontSize: 16,
                                 color: AppColors.textSecondary,
                               ),
                             ),
                             Text(
-                              'Dr. $name 👋',
+                              '${LocalizationService.instance.t('Dr')} $name 👋',
                               style: AppTypography.heading(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w700,
@@ -270,28 +271,28 @@ class _DashboardHome extends StatelessWidget {
                 children: [
                   _buildQuickStat(
                     '12',
-                    'students',
+                    LocalizationService.instance.t('students'),
                     Icons.people_outline_rounded,
                     AppColors.calmBlue,
                   ),
                   const SizedBox(width: 10),
                   _buildQuickStat(
                     '3',
-                    'today',
+                    LocalizationService.instance.t('today'),
                     Icons.event_available_rounded,
                     AppColors.gentleGreen,
                   ),
                   const SizedBox(width: 10),
                   _buildQuickStat(
                     '76%',
-                    'avg score',
+                    LocalizationService.instance.t('Avg_Score'),
                     Icons.insights_rounded,
                     AppColors.warmAmber,
                   ),
                   const SizedBox(width: 10),
                   _buildQuickStat(
                     '3',
-                    'messages',
+                    LocalizationService.instance.t('messages'),
                     Icons.mail_outline_rounded,
                     AppColors.softCoral,
                   ),
@@ -305,7 +306,7 @@ class _DashboardHome extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'needs attention',
+                    LocalizationService.instance.t('Need_Attention'),
                     style: AppTypography.heading(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -322,7 +323,7 @@ class _DashboardHome extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '2 flagged',
+                      '2 ${LocalizationService.instance.t('flagged')}',
                       style: AppTypography.caption(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -356,7 +357,7 @@ class _DashboardHome extends StatelessWidget {
 
               // Recent Activity
               Text(
-                'recent activity',
+                LocalizationService.instance.t('Recent_Activities'),
                 style: AppTypography.heading(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -400,7 +401,7 @@ class _DashboardHome extends StatelessWidget {
 
               // Today's Schedule
               Text(
-                'today\'s schedule',
+                LocalizationService.instance.t('Today’s_Schedule'),
                 style: AppTypography.heading(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -412,13 +413,13 @@ class _DashboardHome extends StatelessWidget {
               _buildScheduleItem(
                 '9:00 AM',
                 'Kavitha Perera',
-                'Phonological Awareness',
+                LocalizationService.instance.t('phonological_awareness'),
                 AppColors.calmBlue,
               ),
               _buildScheduleItem(
                 '10:30 AM',
                 'Ashan Fernando',
-                'Reading Fluency',
+                LocalizationService.instance.t('Reading_Fluency'),
                 AppColors.gentleGreen,
               ),
               _buildScheduleItem(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'therapist_chat_screen.dart';
+import '../../services/localization_service.dart';
 
 class TherapistMessagesScreen extends StatefulWidget {
   const TherapistMessagesScreen({super.key});
@@ -91,7 +92,7 @@ class _TherapistMessagesScreenState extends State<TherapistMessagesScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'messages',
+                    LocalizationService.instance.t('messages'),
                     style: AppTypography.heading(
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
@@ -105,7 +106,7 @@ class _TherapistMessagesScreenState extends State<TherapistMessagesScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '${_conversations.where((c) => (c['unread'] as int) > 0).length} new',
+                      '${_conversations.where((c) => (c['unread'] as int) > 0).length} ${LocalizationService.instance.t('New')}',
                       style: AppTypography.caption(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -140,7 +141,7 @@ class _TherapistMessagesScreenState extends State<TherapistMessagesScreen> {
                   controller: _searchController,
                   style: AppTypography.body(fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: 'search conversations...',
+                    hintText: LocalizationService.instance.t('Search_Conversations'),
                     hintStyle: AppTypography.body(fontSize: 14, color: AppColors.textHint),
                     prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textHint, size: 20),
                     prefixIconConstraints: const BoxConstraints(minWidth: 36),

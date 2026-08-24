@@ -3,6 +3,7 @@ import '../../widgets/app_loading_indicator.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import 'therapist_student_detail_screen.dart';
+import '../../services/localization_service.dart';
 
 class TherapistStudentsScreen extends StatefulWidget {
   const TherapistStudentsScreen({super.key});
@@ -43,7 +44,7 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
               child: Text(
-                'my students',
+                LocalizationService.instance.t('my_students'),
                 style: AppTypography.heading(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
@@ -149,7 +150,7 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          'Connected: ${conn['connected_at'] != null ? conn['connected_at'].split('T')[0] : 'Recently'}',
+                                          '${LocalizationService.instance.t('Connected_Since')}: ${conn['connected_at'] != null ? conn['connected_at'].split('T')[0] : LocalizationService.instance.t('recent')}',
                                           style: AppTypography.caption(
                                             color: AppColors.textSecondary,
                                           ),

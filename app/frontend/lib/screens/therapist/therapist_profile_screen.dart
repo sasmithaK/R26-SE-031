@@ -7,6 +7,7 @@ import 'dart:io';
 import '../../services/auth_service.dart';
 import '../welcome_screen.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../../services/localization_service.dart';
 
 class TherapistProfileScreen extends StatefulWidget {
   const TherapistProfileScreen({super.key});
@@ -449,7 +450,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
             ),
           if (Navigator.canPop(context)) const SizedBox(width: 14),
           Text(
-            'therapist account',
+            LocalizationService.instance.t('Therapist_Account'),
             style: AppTypography.heading(
               fontSize: 22,
               fontWeight: FontWeight.w700,
@@ -623,13 +624,13 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
           children: [
             _buildExpansionSection(
               icon: Icons.local_hospital_rounded,
-              title: 'clinic connection',
+              title: LocalizationService.instance.t('Clinic_Connection'),
               child: _buildClinicContent(),
             ),
             _divider(),
             _buildExpansionSection(
               icon: Icons.person_outline_rounded,
-              title: 'account & security',
+              title: LocalizationService.instance.t('Account_and_Security'),
               child: _buildAccountContent(),
             ),
             _divider(),
@@ -641,7 +642,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
             _divider(),
             _buildExpansionSection(
               icon: Icons.help_outline_rounded,
-              title: 'help & support',
+              title: LocalizationService.instance.t('Help_and_Support'),
               child: _buildHelpContent(),
             ),
           ],
@@ -659,7 +660,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
       child: Column(
         children: [
           Text(
-            'Have parents scan this QR code',
+            LocalizationService.instance.t('Have_parents_scan_this_QR_code'),
             style: AppTypography.caption(
               fontSize: 13,
               color: AppColors.textSecondary,
@@ -698,7 +699,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'or enter code: ',
+                  LocalizationService.instance.t('Or_enter_Code'),
                   style: AppTypography.caption(
                     fontSize: 14,
                     color: AppColors.textSecondary,
@@ -732,7 +733,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                 color: Colors.white,
               ),
               label: Text(
-                'share invite code',
+                LocalizationService.instance.t('Share_invite_code'),
                 style: AppTypography.button(fontSize: 14),
               ),
               style: ElevatedButton.styleFrom(
