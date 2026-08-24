@@ -1280,9 +1280,9 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Text('Update Name', style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary)),
+                  Text(LocalizationService.instance.t('update_name'), style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary)),
                   const SizedBox(height: 8),
-                  Text('Enter your full name to update your profile.', style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary)),
+                  Text(LocalizationService.instance.t('update_name_desc'), style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary)),
                   const SizedBox(height: 24),
                   if (errorMessage != null) ...[
                     Container(
@@ -1345,8 +1345,8 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                                 setState(() => _userName = newName);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Name updated successfully!'),
-                                    backgroundColor: AppColors.gentleGreen,
+                                  content: Text(LocalizationService.instance.t('name_updated_success')),
+                                  backgroundColor: AppColors.gentleGreen,
                                   ),
                                 );
                               }
@@ -1358,7 +1358,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                       ),
                       child: isLoading
                           ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : Text('Save Changes', style: AppTypography.button(fontSize: 16, color: Colors.white)),
+                          : Text(LocalizationService.instance.t('save_changes'), style: AppTypography.button(fontSize: 16, color: Colors.white)),
                     ),
                   ),
                 ],
@@ -1410,9 +1410,9 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Text('Update Email', style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary)),
+                  Text(LocalizationService.instance.t('update_email_title'), style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary)),
                   const SizedBox(height: 8),
-                  Text('Enter a new email address. We will send a verification code to confirm.', style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary)),
+                  Text(LocalizationService.instance.t('update_email_desc'), style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary)),
                   const SizedBox(height: 24),
                   if (errorMessage != null) ...[
                     Container(
@@ -1483,7 +1483,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                       ),
                       child: isLoading
                           ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : Text('Send Verification Code', style: AppTypography.button(fontSize: 16, color: Colors.white)),
+                          : Text(LocalizationService.instance.t('send_verification_code'), style: AppTypography.button(fontSize: 16, color: Colors.white)),
                     ),
                   ),
                 ],
@@ -1536,9 +1536,9 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Text('Verify Email', style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary)),
+                  Text(LocalizationService.instance.t('verify_email'), style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary)),
                   const SizedBox(height: 8),
-                  Text('We sent a 6-digit verification code to $newEmail.', style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary)),
+                  Text('${LocalizationService.instance.t('verify_email_desc')}$newEmail.', style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary)),
                   const SizedBox(height: 24),
                   if (errorMessage != null) ...[
                     Container(
@@ -1604,8 +1604,8 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                                 setState(() => _userEmail = newEmail);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Email updated successfully!'),
-                                    backgroundColor: AppColors.gentleGreen,
+                                  content: Text(LocalizationService.instance.t('email_updated_success')),
+                                  backgroundColor: AppColors.gentleGreen,
                                   ),
                                 );
                               }
@@ -1617,7 +1617,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                       ),
                       child: isLoading
                           ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : Text('Verify & Update', style: AppTypography.button(fontSize: 16, color: Colors.white)),
+                          : Text(LocalizationService.instance.t('verify_and_update'), style: AppTypography.button(fontSize: 16, color: Colors.white)),
                     ),
                   ),
                 ],
@@ -1670,9 +1670,9 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Text('Change Password', style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary)),
+                  Text(LocalizationService.instance.t('change_password_title'), style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary)),
                   const SizedBox(height: 8),
-                  Text('Protect your account with a strong new password.', style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary)),
+                  Text(LocalizationService.instance.t('change_password_desc'), style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary)),
                   const SizedBox(height: 24),
                   if (errorMessage != null) ...[
                     Container(
@@ -1747,7 +1747,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                                 Navigator.pop(ctx);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Password changed!'),
+                                    content: Text(LocalizationService.instance.t('password_changed')),
                                     backgroundColor: AppColors.gentleGreen,
                                   ),
                                 );
@@ -1760,7 +1760,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                       ),
                       child: isLoading
                           ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : Text('Update Password', style: AppTypography.button(fontSize: 16, color: Colors.white)),
+                          : Text(LocalizationService.instance.t('update_password'), style: AppTypography.button(fontSize: 16, color: Colors.white)),
                     ),
                   ),
                 ],
@@ -1787,7 +1787,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
               backgroundColor: AppColors.cream,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Text(
-                'Delete Account',
+                LocalizationService.instance.t('delete_account'),
                 style: AppTypography.heading(fontSize: 22, color: Colors.redAccent),
               ),
               content: Column(
@@ -1795,7 +1795,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'This action is irreversible. All your data and student profiles will be permanently deleted.',
+                    LocalizationService.instance.t('delete_account_desc'),
                     style: AppTypography.body(fontSize: 15),
                   ),
                   const SizedBox(height: 16),
