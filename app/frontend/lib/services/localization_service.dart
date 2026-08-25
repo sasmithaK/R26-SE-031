@@ -156,9 +156,18 @@ class LocalizationService extends ChangeNotifier {
       'app_updates': 'යෙදුම් යාවත්කාලීන සහ විශේෂාංග',
       'app_updates_desc': 'නව අධ්‍යාපනික මෙවලම් පිළිබඳ වැදගත් නිවේදන ලබා ගන්න.',
       'email_support': 'විද්‍යුත් තැපැල් සහාය',
+      'contact_support': 'සහාය අමතන්න',
       'phone_support': 'දුරකථන සහාය',
       'faq': 'නිතර අසන ප්‍රශ්න',
       'logout': 'ඉවත් වන්න',
+      'full_name': 'සම්පූර්ණ නම',
+      'specialization': 'විශේෂත්වය',
+      'clinic_name': 'සායනයේ නම',
+      'password': 'මුරපදය',
+      'delete_account': 'ගිණුම මකා දමන්න',
+      'edit': 'සංස්කරණය',
+      'change': 'වෙනස් කරන්න',
+      'not_set': 'සකසා නැත',
       'activities': 'ක්‍රියාකාරකම්',
       'accuracy': 'නිරවද්‍යතාව',
       'day_streak': 'අඛණ්ඩව ඉගෙනගත් දින',
@@ -346,9 +355,7 @@ class LocalizationService extends ChangeNotifier {
       'no_attempts_yet': 'තවමත් උත්සාහ කර නොමැත',
       'parent_label': 'මව්පියන්',
       'generating_report': 'වාර්තාව ජනනය කරමින්...',
-      'download_clinical_report': 'සායනික වාර්තාව බාගන්න',
       'generating_assessment': 'තක්සේරුව ජනනය කරමින්...',
-      'download_assessment_pdf': 'තක්සේරු PDF බාගන්න',
       'touch_precision_tracking': 'ස්පර්ශ නිරවද්‍යතා ලුහුබැඳීම',
       'strategy': 'ක්‍රමෝපාය',
 
@@ -429,7 +436,7 @@ class LocalizationService extends ChangeNotifier {
 
       //dashboard 
       'Avg_Score':'සාමානය ලකුණු',
-      'Need_Attention':'අව‍ානය අවශ්‍යයි',
+      'Need_Attention':'විශේෂ අවධානය අවශ්‍යයි ',
       'Recent_Activities': 'මෑත ක්‍රියාකාරකම්',
 
       //therapist profile 
@@ -444,30 +451,19 @@ class LocalizationService extends ChangeNotifier {
       'Share_invite_code' :'ආරාධනා කේතය බෙදාගන්න',
 
       //therapist messages
-       'Search_Conversations':'සංවාද දසායන්න',
+       'Search_Conversations':'සංවාද සෙවීම',
         'New':'නව',
       //students profile 
       'Connected_Since':'සම්බන්ධ වූ දිනය',
+      'View_Interaction_Heatmaps':'අන්තර්ක්‍රියා තාප සිතියම් බලන්න',
       'download_clinical_report':'සායනික වාර්තාව බාගත කරන්න',
-      'download_assessment_pdf': 'ඇගයීම් PDF බාගත කරන්න',
-      'View_Interaction_Heatmaps':'අන්තර්ියා තාප සිතියම් බලන්න',
-
-      // Cognitive fallback (no data yet)
-      'cognitive_breakdown':'සංජානන විේදල්ෂණය',
-      'waiting_for_data': 'දත්ත ලැදබන තුරු රැඳී සිටින්න',
-      'needs_more_play': 'තවත් ක්‍රියාකාරකම් අවශ්‍යයි',
+      'download_assessment_pdf':'ඇගයීම් වාර්තාව එක බාගත කරන්න',
+      'reading_fluency':'කියවීමේ හැකියාව',
+      'comprehension':'අවබෝධය',
+      'at_risk':'අවදානමක් ඇති',
+      'in_app_notifications':'යෙදුම් දැනුම්දීම්', 
 
       'Today’s_Schedule' : 'අදට නියමිත කාලසටහන',
-
-      //sessions
-      'phonological_awareness': 'ශබ්ද හඳුනා ගැනීම',
-      'Reading_Fluency':'කියවීමේ ප්‍රවීණතාව',
-
-      //plan 
-      'provide_clinical_label':'සායනික වර්ගීකරණය ලබා දෙන්න',
-      'Your_assessment_feeds_our_models.Please_select_the_ground-truth_risk_level_for_this_student_based_on_their_data.': 'ඔබගේ ඇගයීම අපගේ ආකෘති වැඩිදියුණු කිරීමට භාවිතා වේ. මෙම ශිෂ්‍යයාගේ දත්ත මත පදනම්ව, ඔහු/ඇය සඳහා නිවැරදි අවදානම් මට්ටම තෝරන්න',
-      'Submit_Ground_Truth_Label': 'නිවැරදි අවදානම් මට්ටම ඉදිරිපත් කරන්න.',
-      'no_interventions': 'නිර්දේශිත උපකාරක ක්‍රියාමාර්ග,තවමත් උපකාරක ක්‍රියාමාර්ගයක් ලබා දී නොමැත.',
       'good_morning': 'සුබ උදෑසනක්,',
       'Dr': 'වෛද්‍ය',
       'students': 'සිසුන්',
@@ -577,9 +573,18 @@ class LocalizationService extends ChangeNotifier {
       'app_updates': 'app updates & features',
       'app_updates_desc': 'receive important announcements about new educational tools.',
       'email_support': 'email support',
+      'contact_support': 'contact support',
       'phone_support': 'phone support',
       'faq': 'FAQ',
       'logout': 'logout',
+      'full_name': 'full name',
+      'specialization': 'specialization',
+      'clinic_name': 'clinic name',
+      'password': 'password',
+      'delete_account': 'delete account',
+      'edit': 'edit',
+      'change': 'change',
+      'not_set': 'not set',
       'activities': 'activities',
       'accuracy': 'accuracy',
       'day_streak': 'day streak',
@@ -766,6 +771,8 @@ class LocalizationService extends ChangeNotifier {
       'sessions_tab': 'sessions',
       'student_profile_title': 'student profile',
       'weekly_progress': 'weekly progress',
+      'reading_fluency':'Reading Fluency',
+      'comprehension':'Comprehension',
       
       'activity': 'Activity',
       'attempt': 'Attempt',
@@ -784,6 +791,9 @@ class LocalizationService extends ChangeNotifier {
       'risk_moderate': 'Moderate Risk',
       'risk_high': 'Needs Attention',
       'risk_pending': 'Collecting Data...',
+      'at_risk':'at risk',
+
+      'in_app_notifications':'in-app notifications',
 
       // Cognitive index display names
       'visual_processing_score': 'Visual Processing Speed',
@@ -871,26 +881,9 @@ class LocalizationService extends ChangeNotifier {
         'New':'New',
       //students profile 
       'Connected_Since':'Connected Since',
-      'download_clinical_report':'Download Clinical Report',
-      'download_assessment_pdf': 'Download Assessment PDF',
       'View_Interaction_Heatmaps':'View Interaction Heatmaps',
 
-      // Cognitive fallback (no data yet)
-      'cognitive_breakdown':'Cognitive Breakdown',
-      'waiting_for_data': 'Waiting for data',
-      'needs_more_play': 'Needs more activities',
-
       'Today’s_Schedule' : 'Today’s Schedule',
-
-      //sessions
-      'phonological_awareness': 'Phonological Awareness',
-      'Reading_Fluency':'Reading Fluency',
-
-      //plan 
-      'provide_clinical_label':'Provide Clinical Label',
-      'Your_assessment_feeds_our_models.Please_select_the_ground-truth_risk_level_for_this_student_based_on_their_data.': 'Your assessment feeds our models. Please select the ground-truth risk level for this student based on their data.',
-      'Submit_Ground_Truth_Label': 'Submit Ground Truth Label',
-      'no_interventions': 'Recommended interventions, no intervention provided yet.',
     }
   };
 }

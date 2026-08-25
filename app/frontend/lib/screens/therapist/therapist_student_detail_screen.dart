@@ -5,6 +5,7 @@ import '../../theme/app_theme.dart';
 import '../../services/student_service.dart';
 import '../../services/telemetry_service.dart';
 import '../../widgets/telemetry_heatmap.dart';
+import '../../services/localization_service.dart';
 
 class TherapistStudentDetailScreen extends StatefulWidget {
   final Map<String, dynamic> student;
@@ -363,9 +364,8 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'connected since ${student['connected'] ?? student['connected_at']?.toString().split('T')[0] ?? 'N/A'}',
+                                '${LocalizationService.instance.t('Connected_Since')} ${student['connected'] ?? student['connected_at']?.toString().split('T')[0] ?? 'N/A'}',
                                 style: AppTypography.caption(
-                                  fontSize: 12,
                                   color: AppColors.textHint,
                                 ),
                               ),
@@ -484,7 +484,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                   : const Icon(Icons.picture_as_pdf_rounded, size: 20),
               label: Text(
-                _isDownloadingReport ? 'Generating Report...' : 'Download Clinical Report',
+                _isDownloadingReport ? LocalizationService.instance.t('generating_report') : LocalizationService.instance.t('download_clinical_report'),
                 style: AppTypography.body(fontSize: 15, fontWeight: FontWeight.w700),
               ),
               style: ElevatedButton.styleFrom(
@@ -507,7 +507,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.calmBlue, strokeWidth: 2))
                   : const Icon(Icons.assessment_rounded, size: 20),
               label: Text(
-                _isDownloadingAssessment ? 'Generating Assessment...' : 'Download Assessment PDF',
+                _isDownloadingAssessment ? LocalizationService.instance.t('generating_assessment') : LocalizationService.instance.t('download_assessment_pdf'),
                 style: AppTypography.body(fontSize: 15, fontWeight: FontWeight.w700),
               ),
               style: ElevatedButton.styleFrom(
@@ -529,7 +529,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
               onPressed: _showHeatmapsModal,
               icon: const Icon(Icons.touch_app_rounded, size: 20),
               label: Text(
-                'View Interaction Heatmaps',
+                LocalizationService.instance.t('View_Interaction_Heatmaps'),
                 style: AppTypography.body(fontSize: 15, fontWeight: FontWeight.w700),
               ),
               style: ElevatedButton.styleFrom(

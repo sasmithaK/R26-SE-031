@@ -12,6 +12,7 @@ import '../dashboard_screen.dart';
 import '../../services/auth_service.dart';
 import '../../services/student_service.dart';
 import '../../services/progress_service.dart';
+import '../../services/localization_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 /// Parent Account Screen — Frontend Redesign with World-Class UX
@@ -1344,7 +1345,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                                 Navigator.pop(ctx);
                                 setState(() => _userName = newName);
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
+                                  SnackBar(
                                   content: Text(LocalizationService.instance.t('name_updated_success')),
                                   backgroundColor: AppColors.gentleGreen,
                                   ),
@@ -1603,7 +1604,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                                 Navigator.pop(ctx);
                                 setState(() => _userEmail = newEmail);
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
+                                  SnackBar(
                                   content: Text(LocalizationService.instance.t('email_updated_success')),
                                   backgroundColor: AppColors.gentleGreen,
                                   ),
@@ -1746,7 +1747,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                                 if (!ctx.mounted) return;
                                 Navigator.pop(ctx);
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
+                                  SnackBar(
                                     content: Text(LocalizationService.instance.t('password_changed')),
                                     backgroundColor: AppColors.gentleGreen,
                                   ),

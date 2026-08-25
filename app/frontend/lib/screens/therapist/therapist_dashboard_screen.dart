@@ -340,7 +340,7 @@ class _DashboardHome extends StatelessWidget {
                 name: 'Dinuka Bandara',
                 avatar: '👦',
                 issue: 'comprehension score dropped 18% this week',
-                risk: 'At Risk',
+                risk: LocalizationService.instance.t('at_risk'),
                 progress: 42,
               ),
               const SizedBox(height: 10),
@@ -349,7 +349,7 @@ class _DashboardHome extends StatelessWidget {
                 name: 'Ishara Gamage',
                 avatar: '👧',
                 issue: 'no sessions completed in 6 days',
-                risk: 'At Risk',
+                risk: LocalizationService.instance.t('at_risk'),
                 progress: 50,
               ),
 
@@ -419,13 +419,13 @@ class _DashboardHome extends StatelessWidget {
               _buildScheduleItem(
                 '10:30 AM',
                 'Ashan Fernando',
-                LocalizationService.instance.t('Reading_Fluency'),
+                LocalizationService.instance.t('reading_fluency'),
                 AppColors.gentleGreen,
               ),
               _buildScheduleItem(
                 '2:00 PM',
                 'Nethmi Silva',
-                'Comprehension',
+                LocalizationService.instance.t('comprehension'),
                 AppColors.warmAmber,
               ),
 

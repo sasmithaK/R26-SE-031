@@ -636,7 +636,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
             _divider(),
             _buildExpansionSection(
               icon: Icons.notifications_none_rounded,
-              title: 'notifications',
+              title: LocalizationService.instance.t('notifications'),
               child: _buildNotificationsContent(),
             ),
             _divider(),
@@ -754,30 +754,30 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
     return Column(
       children: [
         _buildEditableRow(
-          label: 'full name',
+          label: LocalizationService.instance.t('full_name'),
           value: _userName,
           onEdit: () => _showEditNameDialog(),
         ),
         _buildEditableRow(
-          label: 'specialization',
-          value: _specialization.isEmpty ? 'not set' : _specialization,
+          label: LocalizationService.instance.t('specialization'),
+          value: _specialization.isEmpty ? LocalizationService.instance.t('not_set') : _specialization,
           onEdit: () => _showEditSpecializationDialog(),
         ),
         _buildEditableRow(
-          label: 'clinic name',
-          value: _clinicName.isEmpty ? 'not set' : _clinicName,
+          label: LocalizationService.instance.t('clinic_name'),
+          value: _clinicName.isEmpty ? LocalizationService.instance.t('not_set') : _clinicName,
           onEdit: () => _showEditClinicDialog(),
         ),
         _buildEditableRow(
-          label: 'email',
+          label: LocalizationService.instance.t('email'),
           value: _userEmail,
           onEdit: _isSocialLogin ? null : () => _showEditEmailDialog(),
           subtitle: _isSocialLogin ? 'managed by $_authProvider' : null,
         ),
         _buildEditableRow(
-          label: 'password',
+          label: LocalizationService.instance.t('password'),
           value: '••••••••',
-          editLabel: 'change',
+          editLabel: LocalizationService.instance.t('change'),
           onEdit: _isSocialLogin ? null : () => _showChangePasswordDialog(),
           subtitle: _isSocialLogin ? 'managed by $_authProvider' : null,
         ),
@@ -793,7 +793,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
               size: 20,
             ),
             label: Text(
-              'delete account',
+              LocalizationService.instance.t('delete_account'),
               style: AppTypography.body(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -816,9 +816,9 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
       child: Column(
         children: [
           _buildEditableRow(
-            label: 'contact support',
+            label: LocalizationService.instance.t('contact_support'),
             value: 'support@sipsara.app',
-            editLabel: 'email',
+            editLabel: LocalizationService.instance.t('email'),
             onEdit: () {},
           ),
         ],
@@ -934,7 +934,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  editLabel ?? 'edit',
+                  editLabel ?? LocalizationService.instance.t('edit'),
                   style: AppTypography.caption(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -964,7 +964,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
             );
           },
           icon: const Icon(Icons.logout_rounded, size: 20),
-          label: Text('logout', style: AppTypography.button(fontSize: 15)),
+          label: Text(LocalizationService.instance.t('logout'), style: AppTypography.button(fontSize: 15)),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.redAccent,
             foregroundColor: Colors.white,
@@ -1504,13 +1504,13 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
     return Column(
       children: [
         _buildNotifToggle(
-          'login alerts',
+          LocalizationService.instance.t('login_alerts'),
           'get notified when your account is accessed from a new device.',
           _loginAlertsEnabled,
           (v) => _toggleLoginAlerts(v),
         ),
         _buildNotifToggle(
-          'in-app notifications',
+          LocalizationService.instance.t('in_app_notifications'),
           'receive important alerts within the app.',
           _inAppNotifications,
           (v) => setState(() => _inAppNotifications = v),
