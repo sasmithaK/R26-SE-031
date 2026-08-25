@@ -84,7 +84,7 @@ class LocalizationService extends ChangeNotifier {
       'parent_name_hint': 'ඔබගේ නම',
       'role_parent': 'දෙමාපිය',
       'role_therapist': 'චිකිත්සක',
-      'specialization_hint': 'විශේෂඥතාව (කථන චිකිත්සක)',
+      //'specialization_hint': 'විශේෂඥතාව (කථන චිකිත්සක)',
       'clinic_hint': 'සායනයේ නම (විකල්ප)',
       'or': 'හෝ',
       'mobile_number': 'දුරකථන අංකය',
@@ -160,13 +160,35 @@ class LocalizationService extends ChangeNotifier {
       'phone_support': 'දුරකථන සහාය',
       'faq': 'නිතර අසන ප්‍රශ්න',
       'logout': 'ඉවත් වන්න',
-      'full_name': 'සම්පූර්ණ නම',
-      'specialization': 'විශේෂත්වය',
+      'alerts': 'ඇඟවීම්',
+
+      'character_shop': 'චරිත සාප්පුව',
+      'humans': 'මිනිසුන්',
+      'mascots': 'සුරතලුන්',
+      'select_character': 'චරිතය තෝරන්න',
+      'unlocked': 'අගුළු හැර ඇත',
+
+
+      'new_notifications': 'නව',
+      'activity_breakdown': 'ක්‍රියාකාරකම් බිඳවැටීම',
+      'profile_photo': 'පැතිකඩ ඡායාරූපය',
+      'change_photo': 'ඡායාරූපය වෙනස් කරන්න',
+      'remove_photo': 'ඡායාරූපය ඉවත් කරන්න',
+      'soon': 'ළඟදීම',
+      'skill_progress': 'කුසලතා ප්‍රගතිය',
+
+
+      'account_and_security': 'ගිණුම සහ ආරක්ෂාව',
+      'help_and_support': 'උදව් සහ සහාය',
+      'home': 'මුල් පිටුව',
+      'shop': 'සාප්පුව',
+      'parents': 'දෙමාපියන්',
+      'learning_path': 'ඉගෙනුම් මාර්ගය',
+      'good_morning': 'සුබ උදෑසනක්',
+      'good_afternoon': 'සුබ සන්ධ්‍යාවක්',
+      'good_evening': 'සුබ රාත්‍රියක්',
+
       'clinic_name': 'සායනයේ නම',
-      'password': 'මුරපදය',
-      'delete_account': 'ගිණුම මකා දමන්න',
-      'edit': 'සංස්කරණය',
-      'change': 'වෙනස් කරන්න',
       'not_set': 'සකසා නැත',
       'activities': 'ක්‍රියාකාරකම්',
       'accuracy': 'නිරවද්‍යතාව',
@@ -273,7 +295,6 @@ class LocalizationService extends ChangeNotifier {
       'hour': 'පැය',
 
       //home titles 
-      'learning_path' : 'ඉගෙනුම් මාර්ගය',
       'reading_practice': 'කියවීමේ පුහුණුව',
       'continue' : 'ඉදිරියට යමු',
       'play_again' : 'නැවත සෙල්ලම් කරන්න', 
@@ -432,7 +453,7 @@ class LocalizationService extends ChangeNotifier {
 
       //therapist screens start from here 
       //create account
-      'specialization':'විගේෂඥතාව (කථන චිකිත්සක)',
+     'specialization':'විගේෂඥතාව (කථන චිකිත්සක)',
 
       //dashboard 
       'Avg_Score':'සාමානය ලකුණු',
@@ -464,10 +485,8 @@ class LocalizationService extends ChangeNotifier {
       'in_app_notifications':'යෙදුම් දැනුම්දීම්', 
 
       'Today’s_Schedule' : 'අදට නියමිත කාලසටහන',
-      'good_morning': 'සුබ උදෑසනක්,',
       'Dr': 'වෛද්‍ය',
       'students': 'සිසුන්',
-      'home': 'මුල් පිටුව',
       'profile': 'ගිණුම',
       'flagged': 'අවධානය යොමුකළ යුතු',
     },
@@ -504,7 +523,7 @@ class LocalizationService extends ChangeNotifier {
       'parent_name_hint': 'your name',
       'role_parent': 'parent',
       'role_therapist': 'therapist',
-      'specialization_hint': 'specialization (e.g. speech therapist)',
+      //'specialization_hint': 'specialization (e.g. speech therapist)',
       'clinic_hint': 'clinic name (optional)',
       'or': 'or',
       'mobile_number': 'mobile number',
@@ -577,13 +596,38 @@ class LocalizationService extends ChangeNotifier {
       'phone_support': 'phone support',
       'faq': 'FAQ',
       'logout': 'logout',
-      'full_name': 'full name',
-      'specialization': 'specialization',
+      'alerts': 'alerts',
+
+      'character_shop': 'character shop',
+      'humans': 'Humans',
+      'mascots': 'Mascots',
+      'select_character': 'Select Character',
+      'unlocked': 'Unlocked',
+
+
+      'new_notifications': 'new',
+      'activity_breakdown': 'activity breakdown',
+      'profile_photo': 'Profile Photo',
+      'change_photo': 'Change Photo',
+      'remove_photo': 'Remove Photo',
+      'soon': 'soon',
+      'show_less': 'show less',
+      'skill_progress': 'skill progress',
+      'no_students_yet': 'no students yet',
+
+
+      'account_and_security': 'account & security',
+      'help_and_support': 'help & support',
+      'home': 'home',
+      'shop': 'shop',
+      'parents': 'parents',
+      'learning_path': 'learning path',
+      'good_morning': 'Good morning',
+      'good_afternoon': 'Good afternoon',
+      'good_evening': 'Good evening',
+
+      //'specialization': 'Specialization',
       'clinic_name': 'clinic name',
-      'password': 'password',
-      'delete_account': 'delete account',
-      'edit': 'edit',
-      'change': 'change',
       'not_set': 'not set',
       'activities': 'activities',
       'accuracy': 'accuracy',
@@ -617,7 +661,6 @@ class LocalizationService extends ChangeNotifier {
       'Get_started' : 'Get started',
 
       //home titles 
-      'learning_path' : 'Learning Path',
       'reading_practice': 'Reading Practice',
       'continue' : 'Continue',
       'play_again' : 'Play Again', 
@@ -751,10 +794,8 @@ class LocalizationService extends ChangeNotifier {
       'gt_label_success': 'Ground Truth Label submitted successfully!',
       'interaction_heatmaps': 'Interaction Heatmaps',
       'no_interventions': 'No interventions generated yet.\nStudent needs more play.',
-      'good_morning': 'good morning,',
       'Dr': 'Dr.',
       'students': 'students',
-      'home': 'home',
       'profile': 'profile',
       'flagged': 'flagged',
       'no_telemetry_data': 'No telemetry data available for this student yet.',
@@ -858,7 +899,7 @@ class LocalizationService extends ChangeNotifier {
 
       //therapist screens start from here 
       //create account
-      'specialization':'Specialization (Speech Therapist)',
+       'specialization':'Specialization (Speech Therapist)',
 
       //dashboard 
       'Avg_Score':'Avg Score',

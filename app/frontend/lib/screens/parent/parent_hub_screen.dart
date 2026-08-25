@@ -10,6 +10,7 @@ import 'child_progress_screen.dart';
 import 'therapist_management_screen.dart';
 import 'notifications_screen.dart';
 import 'parent_settings_screen.dart';
+import '../../services/localization_service.dart';
 
 /// Parent Hub Screen — The heart of the parent experience.
 /// A beautifully designed central dashboard showing children overview,
@@ -151,7 +152,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'parent hub',
+                  LocalizationService.instance.t('parent_hub'),
                   style: AppTypography.caption(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -160,7 +161,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'hello, $_parentName!',
+                  '${LocalizationService.instance.t('hello_parent')}, $_parentName!',
                   style: AppTypography.heading(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
@@ -239,21 +240,21 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           _buildStatCard(
             icon: FontAwesomeIcons.userGroup,
             value: '$totalChildren',
-            label: 'children',
+            label: LocalizationService.instance.t('children'),
             color: AppColors.calmBlue,
           ),
           const SizedBox(width: 12),
           _buildStatCard(
             icon: FontAwesomeIcons.gamepad,
             value: '$weeklyActivities',
-            label: 'this week',
+            label: LocalizationService.instance.t('this_week'),
             color: AppColors.gentleGreen,
           ),
           const SizedBox(width: 12),
           _buildStatCard(
             icon: FontAwesomeIcons.userDoctor,
             value: '$connectedTherapists',
-            label: 'therapist',
+            label: LocalizationService.instance.t('therapists'),
             color: AppColors.warmAmber,
           ),
         ],
@@ -324,7 +325,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
     final navItems = [
       {
         'icon': FontAwesomeIcons.chartLine,
-        'label': 'progress',
+        'label': LocalizationService.instance.t('progress_tab'),
         'color': AppColors.calmBlue,
         'bgColor': AppColors.slateBg,
         'onTap': () {
@@ -342,13 +343,13 @@ class _ParentHubScreenState extends State<ParentHubScreen>
               _showChildSelectionModal(context);
             }
           } else {
-            _showSnackBar('add a student first to view progress');
+            _showSnackBar(LocalizationService.instance.t('add_student_first_msg'));
           }
         },
       },
       {
         'icon': FontAwesomeIcons.userDoctor,
-        'label': 'therapist',
+        'label': LocalizationService.instance.t('therapists'),
         'color': AppColors.gentleGreen,
         'bgColor': AppColors.mintBg,
         'onTap': () {
@@ -362,7 +363,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
       },
       {
         'icon': FontAwesomeIcons.bell,
-        'label': 'alerts',
+        'label': LocalizationService.instance.t('alerts'),
         'color': AppColors.warmAmber,
         'bgColor': const Color(0xFFFFF3E0),
         'onTap': () {
@@ -376,7 +377,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
       },
       {
         'icon': FontAwesomeIcons.gear,
-        'label': 'settings',
+        'label': LocalizationService.instance.t('settings'),
         'color': AppColors.softCoral,
         'bgColor': const Color(0xFFFDE8E4),
         'onTap': () {
@@ -451,7 +452,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'your children',
+            LocalizationService.instance.t('your_children'),
             style: AppTypography.heading(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -485,7 +486,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
               size: 48, color: AppColors.textHint),
           const SizedBox(height: 16),
           Text(
-            'no students added yet',
+            LocalizationService.instance.t('no_students_yet'),
             style: AppTypography.body(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -494,7 +495,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'go to settings to add your first student',
+            LocalizationService.instance.t('add_student_settings_hint'),
             style: AppTypography.caption(
               fontSize: 14,
               color: AppColors.textHint,
@@ -523,7 +524,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'select a child',
+              LocalizationService.instance.t('select_a_child'),
               style: AppTypography.heading(
                 fontSize: 20,
                 color: AppColors.calmBlue,
@@ -705,7 +706,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'weekly progress',
+                      LocalizationService.instance.t('weekly_progress'),
                       style: AppTypography.caption(
                         fontWeight: FontWeight.w600,
                       ),

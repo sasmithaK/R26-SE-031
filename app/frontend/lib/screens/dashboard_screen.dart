@@ -14,6 +14,7 @@ import 'character_shop_screen.dart';
 import 'progress_analytics_screen.dart';
 import '../models/curriculum_models.dart';
 import '../services/progress_service.dart';
+import '../services/localization_service.dart';
 import 'loading_skill_screen.dart';
 
 /// Dashboard Screen
@@ -108,7 +109,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 child: Row(
                   children: [
                     Text(
-                      '🚀 learning path',
+                      '''🚀 ${LocalizationService.instance.t('learning_path')}''',
                       style: AppTypography.heading(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -139,7 +140,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final hour = DateTime.now().hour;
     final greeting = config != null
         ? config.greetingFor(hour, name)
-        : (hour < 12 ? 'Good morning, $name! ☀️' : hour < 17 ? 'Good afternoon, $name! 🌤️' : 'Good evening, $name! 🌙');
+        : (hour < 12 ? '''${LocalizationService.instance.t('good_morning')}, $name! ☀️''' : hour < 17 ? '''${LocalizationService.instance.t('good_afternoon')}, $name! 🌤️''' : '''${LocalizationService.instance.t('good_evening')}, $name! 🌙''');
     final subtitle = _streak > 1 ? (config?.subtitleFor(_streak) ?? '🔥 $_streak day streak! Keep going!') : '';
 
     return Padding(
@@ -353,27 +354,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  static const List<Map<String, dynamic>> _navItems = [
+  static List<Map<String, dynamic>> get _navItems => [
     {
-      'label': 'home',
+      'label': LocalizationService.instance.t('home'),
       'icon': FontAwesomeIcons.house,
       'color': AppColors.calmBlue,
       'route': null,
     },
     {
-      'label': 'shop',
+      'label': LocalizationService.instance.t('shop'),
       'icon': FontAwesomeIcons.store,
       'color': AppColors.softCoral,
       'route': CharacterShopScreen(),
     },
     {
-      'label': 'progress',
+      'label': LocalizationService.instance.t('progress_tab'),
       'icon': FontAwesomeIcons.trophy,
       'color': AppColors.warmAmber,
       'route': ProgressAnalyticsScreen(),
     },
     {
-      'label': 'parents',
+      'label': LocalizationService.instance.t('parents'),
       'icon': FontAwesomeIcons.userGroup,
       'color': AppColors.gentleGreen,
       'route': ParentHubScreen(),

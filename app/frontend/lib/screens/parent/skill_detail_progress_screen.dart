@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../services/localization_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../theme/app_theme.dart';
 
@@ -177,7 +178,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'accuracy',
+                      LocalizationService.instance.t('accuracy'),
                       style: AppTypography.caption(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
@@ -220,7 +221,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'performance trend',
+              LocalizationService.instance.t('performance_trend'),
               style: AppTypography.heading(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -229,7 +230,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'accuracy over last 7 sessions',
+              LocalizationService.instance.t('accuracy_over_sessions'),
               style: AppTypography.caption(
                 fontSize: 12,
                 color: AppColors.textHint,
@@ -274,7 +275,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'activity breakdown',
+            LocalizationService.instance.t('activity_breakdown'),
             style: AppTypography.heading(
               fontSize: 20,
               fontWeight: FontWeight.w700,

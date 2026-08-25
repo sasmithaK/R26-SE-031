@@ -84,13 +84,13 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Profile Photo',
+                LocalizationService.instance.t('profile_photo'),
                 style: AppTypography.heading(fontSize: 18),
               ),
               const SizedBox(height: 24),
               ListTile(
                 leading: const Icon(Icons.photo_library, color: AppColors.calmBlue),
-                title: const Text('Change Photo'),
+                title: Text(LocalizationService.instance.t('change_photo')),
                 onTap: () {
                   Navigator.pop(context);
                   _openPicker();
@@ -98,7 +98,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
               ),
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
+                title: Text(LocalizationService.instance.t('remove_photo'), style: TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(context);
                   _removePhoto();
@@ -236,7 +236,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
             ),
           if (Navigator.canPop(context)) const SizedBox(width: 14),
           Text(
-            'parent account',
+            LocalizationService.instance.t('parent_account'),
             style: AppTypography.heading(
               fontSize: 22,
               fontWeight: FontWeight.w700,
@@ -413,13 +413,13 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
           children: [
             _buildExpansionSection(
               icon: Icons.person_outline_rounded,
-              title: 'account & security',
+              title: LocalizationService.instance.t('account_and_security'),
               child: _buildAccountContent(),
             ),
             _divider(),
             _buildExpansionSection(
               icon: Icons.school_rounded,
-              title: 'my students',
+              title: LocalizationService.instance.t('my_students'),
               trailing: _students.isNotEmpty
                   ? Container(
                       padding: const EdgeInsets.symmetric(
@@ -443,7 +443,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
             _divider(),
             _buildExpansionSection(
               icon: Icons.diamond_outlined,
-              title: 'subscription',
+              title: LocalizationService.instance.t('subscription'),
               trailing: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -452,7 +452,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  'coming soon',
+                  LocalizationService.instance.t('coming_soon'),
                   style: AppTypography.caption(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -465,13 +465,13 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
             _divider(),
             _buildExpansionSection(
               icon: Icons.notifications_none_rounded,
-              title: 'notifications',
+              title: LocalizationService.instance.t('notifications'),
               child: _buildNotificationsContent(),
             ),
             _divider(),
             _buildExpansionSection(
               icon: Icons.help_outline_rounded,
-              title: 'help & support',
+              title: LocalizationService.instance.t('help_and_support'),
               child: _buildHelpContent(),
             ),
           ],
@@ -566,7 +566,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
             icon: const Icon(Icons.delete_forever_rounded,
                 color: Colors.redAccent, size: 20),
             label: Text(
-              'delete account',
+              LocalizationService.instance.t('delete_account'),
               style: AppTypography.body(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -696,7 +696,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      'soon',
+                      LocalizationService.instance.t('soon'),
                       style: AppTypography.caption(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -744,7 +744,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                     color: AppColors.textHint, size: 36),
                 const SizedBox(height: 8),
                 Text(
-                  'no students yet',
+                  LocalizationService.instance.t('no_students_yet'),
                   style: AppTypography.body(
                     fontSize: 14,
                     color: AppColors.textSecondary,
@@ -854,7 +854,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                                         size: 13, color: AppColors.warmAmber),
                                     const SizedBox(width: 4),
                                     Text(
-                                      'Pending',
+                                      LocalizationService.instance.t('pending'),
                                       style: AppTypography.caption(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w700,
@@ -894,7 +894,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                                         size: 13, color: AppColors.gentleGreen),
                                     const SizedBox(width: 4),
                                     Text(
-                                      'Completed',
+                                      LocalizationService.instance.t('completed'),
                                       style: AppTypography.caption(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w700,
@@ -964,7 +964,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
             child: TextButton(
               onPressed: () => setState(() => _showAllStudents = false),
               child: Text(
-                'show less',
+                LocalizationService.instance.t('show_less'),
                 style: AppTypography.body(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -1012,7 +1012,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
           ).then((_) => _loadData());
         },
         icon: const Icon(Icons.add_rounded, size: 18),
-        label: Text('add student',
+        label: Text(LocalizationService.instance.t('add_student'),
             style: AppTypography.body(
                 fontSize: 14, fontWeight: FontWeight.w600)),
         style: OutlinedButton.styleFrom(
@@ -1212,7 +1212,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
             );
           },
           icon: const Icon(Icons.logout_rounded, size: 20),
-          label: Text('logout',
+          label: Text(LocalizationService.instance.t('logout'),
               style: AppTypography.button(fontSize: 15)),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.redAccent,
@@ -1828,7 +1828,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
               actions: [
                 TextButton(
                   onPressed: isLoading ? null : () => Navigator.pop(ctx),
-                  child: Text('Cancel', style: AppTypography.body(color: AppColors.textSecondary)),
+                  child: Text(LocalizationService.instance.t(LocalizationService.instance.t('cancel')), style: AppTypography.body(color: AppColors.textSecondary)),
                 ),
                 ElevatedButton(
                   onPressed: (!isMatch || isLoading)
@@ -1865,7 +1865,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                           height: 20,
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : Text('Delete Permanently', style: AppTypography.body(color: Colors.white, fontWeight: FontWeight.w600)),
+                      : Text(LocalizationService.instance.t('delete_permanently'), style: AppTypography.body(color: Colors.white, fontWeight: FontWeight.w600)),
                 ),
               ],
             );
@@ -1936,7 +1936,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
             actions: [
               TextButton(
                 onPressed: isResetting ? null : () => Navigator.pop(ctx),
-                child: Text('cancel',
+                child: Text(LocalizationService.instance.t('cancel'),
                     style: AppTypography.body(
                         fontSize: 14, color: AppColors.textSecondary)),
               ),
@@ -1976,7 +1976,7 @@ class _ParentSettingsScreenState extends State<ParentSettingsScreen>
                         width: 16,
                         child: CircularProgressIndicator(
                             color: Colors.white, strokeWidth: 2))
-                    : Text('reset skills',
+                    : Text(LocalizationService.instance.t('reset_skills'),
                         style: AppTypography.button(fontSize: 14)),
               ),
             ],
@@ -2100,7 +2100,7 @@ class _DeleteStudentDialogState extends State<_DeleteStudentDialog> {
       actions: [
         TextButton(
           onPressed: _isDeleting ? null : () => Navigator.pop(context),
-          child: Text('cancel', style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary)),
+          child: Text(LocalizationService.instance.t('cancel'), style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary)),
         ),
         ElevatedButton(
           onPressed: _isDeleting
@@ -2140,7 +2140,7 @@ class _DeleteStudentDialogState extends State<_DeleteStudentDialog> {
                   height: 20,
                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                 )
-              : Text('delete', style: AppTypography.button(fontSize: 14)),
+              : Text(LocalizationService.instance.t('delete'), style: AppTypography.button(fontSize: 14)),
         ),
       ],
     );

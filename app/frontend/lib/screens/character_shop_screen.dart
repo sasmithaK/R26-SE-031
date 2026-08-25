@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../services/localization_service.dart';
 import '../../theme/app_theme.dart';
 
 enum CharacterType {
@@ -102,7 +103,7 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'character shop',
+          LocalizationService.instance.t('character_shop'),
           style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary),
         ),
         centerTitle: true,
@@ -152,8 +153,8 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
                     ),
                     child: Row(
                       children: [
-                        _buildTab('Humans', CharacterType.human),
-                        _buildTab('Mascots', CharacterType.mascot),
+                        _buildTab(LocalizationService.instance.t('humans'), CharacterType.human),
+                        _buildTab(LocalizationService.instance.t('mascots'), CharacterType.mascot),
                       ],
                     ),
                   ),
@@ -242,7 +243,7 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Select Character',
+                                LocalizationService.instance.t('select_character'),
                                 style: AppTypography.heading(
                                   fontSize: 22,
                                   color: AppColors.textPrimary,

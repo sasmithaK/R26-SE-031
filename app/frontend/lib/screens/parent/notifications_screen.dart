@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/localization_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../theme/app_theme.dart';
 
@@ -120,7 +121,7 @@ class NotificationsScreen extends StatelessWidget {
           const SizedBox(width: 16),
           Expanded(
             child: Text(
-              'notifications',
+              LocalizationService.instance.t('notifications'),
               style: AppTypography.heading(
                 fontSize: 24,
                 fontWeight: FontWeight.w700,
@@ -136,7 +137,7 @@ class NotificationsScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              '3 new',
+              '3 ${LocalizationService.instance.t('new_notifications')}',
               style: AppTypography.caption(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
