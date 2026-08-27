@@ -27,17 +27,17 @@ class LocalizationService extends ChangeNotifier {
   Future<void> setLocale(String localeCode) async {
     if (_currentLocale == localeCode) return;
     _currentLocale = localeCode;
-    
+
     // Once they explicitly change the language, mark it as set
     _hasSetLanguage = true;
-    
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_localeKey, _currentLocale);
     await prefs.setBool(_hasSetLanguageKey, true);
-    
+
     notifyListeners();
   }
-  
+
   Future<void> markLanguageAsSet() async {
     if (_hasSetLanguage) return;
     _hasSetLanguage = true;
@@ -47,13 +47,16 @@ class LocalizationService extends ChangeNotifier {
   }
 
   String t(String key) {
-    return _translations[_currentLocale]?[key] ?? _translations['en']?[key] ?? key;
+    return _translations[_currentLocale]?[key] ??
+        _translations['en']?[key] ??
+        key;
   }
 
   static const Map<String, Map<String, String>> _translations = {
     'si': {
       'welcome_title': 'ආයුබෝවන්!',
-      'welcome_subtitle': 'සතුටින් ඉගෙන ගන්න, දැනුමෙන් ඉදිරියට යන්න, සිංහල ඉගෙනුම් ලෝකයේ පුංචි වීරයෙක් වෙන්න!',
+      'welcome_subtitle':
+          'සතුටින් ඉගෙන ගන්න, දැනුමෙන් ඉදිරියට යන්න, සිංහල ඉගෙනුම් ලෝකයේ පුංචි වීරයෙක් වෙන්න!',
       'welcome_btn_signup': 'ආරම්භ කරන්න',
       'welcome_btn_signin': 'මට දැනටමත් ගිණුමක් ඇත',
       'btn_signin': 'ඇතුළු වන්න',
@@ -65,7 +68,8 @@ class LocalizationService extends ChangeNotifier {
       'password_hint': 'ඔබගේ මුරපදය',
       'password_hint_create': 'මුරපදයක් සාදන්න',
       'forgot_password': 'මුරපදය අමතකද?',
-      'forgot_password_desc': 'කණගාටු නොවන්න! ඔබගේ විද්‍යුත් තැපැල් ලිපිනය ඇතුලත් කරන්න. මුරපදය නැවත සැකසීමට අපි පින් අංකයක් එවන්නෙමු.',
+      'forgot_password_desc':
+          'කණගාටු නොවන්න! ඔබගේ විද්‍යුත් තැපැල් ලිපිනය ඇතුලත් කරන්න. මුරපදය නැවත සැකසීමට අපි පින් අංකයක් එවන්නෙමු.',
       'sending_code': 'කේතය යවමින් පවතී...',
       'send_code': 'කේතය යවන්න',
       'check_email': 'ඔබගේ විද්‍යුත් තැපෑල පරීක්ෂා කරන්න',
@@ -91,11 +95,13 @@ class LocalizationService extends ChangeNotifier {
       'mobile_number_hint': 'ඔබගේ දුරකථන අංකය',
       'confirm_password': 'මුරපදය තහවුරු කරන්න',
       'confirm_password_hint': 'මුරපදය නැවත ඇතුලත් කරන්න',
-      'agree_terms': 'සිප්සර භාවිතා කිරීමේ නියමයන්ට හා රහස්‍යතා ප්‍රතිපත්තියට එකඟ වෙමි.',
+      'agree_terms':
+          'සිප්සර භාවිතා කිරීමේ නියමයන්ට හා රහස්‍යතා ප්‍රතිපත්තියට එකඟ වෙමි.',
       'benefit_private': 'පෞද්ගලික',
       'start_assessment': 'ඇගයීම ආරම්භ කරන්න',
       'maybe_later': 'පසුව බලමු',
-      'assessment_later_desc': 'ඔබට මෙය සිසුවාගේ ගිණුමෙන් ඕනෑම වේලාවක ආරම්භ කළ හැක.',
+      'assessment_later_desc':
+          'ඔබට මෙය සිසුවාගේ ගිණුමෙන් ඕනෑම වේලාවක ආරම්භ කළ හැක.',
       'start_from_profile': 'ඔබට මෙය සිසුවාගේ ගිණුමෙන් පසුව ආරම්භ කළ හැක.',
       'language': 'භාෂාව',
       'select_language': 'භාෂාව තෝරන්න',
@@ -139,20 +145,25 @@ class LocalizationService extends ChangeNotifier {
       'student_setup_ready_1': ' සියල්ල සකසා ඇති අතර ඉගෙනීමට සූදානම්.',
       'personalize_learning': 'ඔබටම ගැළපෙන ඉගෙනීම',
       'evaluation_desc_1': 'විනාඩි 2ක කෙටි ඇගයීමක් මගින් ',
-      'evaluation_desc_2': 'ගේ සුවිශේෂී ඉගෙනුම් රටාව තේරුම් ගෙන ඔවුන්ට ගැලපෙන ක්‍රියාකාරකම් සකස් කිරීමට අපට උපකාරී වේ.',
+      'evaluation_desc_2':
+          'ගේ සුවිශේෂී ඉගෙනුම් රටාව තේරුම් ගෙන ඔවුන්ට ගැලපෙන ක්‍රියාකාරකම් සකස් කිරීමට අපට උපකාරී වේ.',
       'personalized': 'ඔබට ගැළපෙන පාඩම්',
       '2_min': 'විනාඩි 2යි',
       'private': 'පෞද්ගලිකයි',
-      'assessment_prompt_desc': 'විනාඩි 2ක කෙටි ඇගයීමක් මගින් ඔවුන්ගේ සුවිශේෂී ඉගෙනුම් රටාව තේරුම් ගෙන ඔවුන්ට ගැලපෙන ක්‍රියාකාරකම් සකස් කිරීමට අපට උපකාරී වේ.',
+      'assessment_prompt_desc':
+          'විනාඩි 2ක කෙටි ඇගයීමක් මගින් ඔවුන්ගේ සුවිශේෂී ඉගෙනුම් රටාව තේරුම් ගෙන ඔවුන්ට ගැලපෙන ක්‍රියාකාරකම් සකස් කිරීමට අපට උපකාරී වේ.',
       'add_student': 'සිසුවෙකු එකතු කරන්න',
       'pending': 'නිම කරන්න',
       'completed': 'සම්පූර්ණයි',
       'premium_coming_soon': 'විශේෂිත පහසුකම් ළඟදීම!',
-      'premium_desc': 'ඔබගේ දරුවාගේ ඉගෙනුම් අත්දැකීම තවත් උසස් මට්ටමකට ගෙන ඒම සඳහා නවතම විශේෂාංග රැසක් හඳුන්වා දීමට අප සූදානම්.',
+      'premium_desc':
+          'ඔබගේ දරුවාගේ ඉගෙනුම් අත්දැකීම තවත් උසස් මට්ටමකට ගෙන ඒම සඳහා නවතම විශේෂාංග රැසක් හඳුන්වා දීමට අප සූදානම්.',
       'login_alerts': 'පිවිසුම් ඇඟවීම්',
-      'login_alerts_desc': 'ඔබගේ ගිණුමට නව උපාංගයකින් පිවිසෙන විට දැනුම් දෙන්න.',
+      'login_alerts_desc':
+          'ඔබගේ ගිණුමට නව උපාංගයකින් පිවිසෙන විට දැනුම් දෙන්න.',
       'learning_progress': 'ඉගෙනුම් ප්‍රගතිය',
-      'learning_progress_desc': 'ඔබේ දරුවා පරීක්ෂණයක් හෝ සන්ධිස්ථානයක් සම්පූර්ණ කළ විට දැනුම් දෙන්න.',
+      'learning_progress_desc':
+          'ඔබේ දරුවා පරීක්ෂණයක් හෝ සන්ධිස්ථානයක් සම්පූර්ණ කළ විට දැනුම් දෙන්න.',
       'app_updates': 'යෙදුම් යාවත්කාලීන සහ විශේෂාංග',
       'app_updates_desc': 'නව අධ්‍යාපනික මෙවලම් පිළිබඳ වැදගත් නිවේදන ලබා ගන්න.',
       'email_support': 'විද්‍යුත් තැපැල් සහාය',
@@ -168,7 +179,6 @@ class LocalizationService extends ChangeNotifier {
       'select_character': 'චරිතය තෝරන්න',
       'unlocked': 'අගුළු හැර ඇත',
 
-
       'new_notifications': 'නව',
       'activity_breakdown': 'ක්‍රියාකාරකම් බිඳවැටීම',
       'profile_photo': 'පැතිකඩ ඡායාරූපය',
@@ -176,7 +186,6 @@ class LocalizationService extends ChangeNotifier {
       'remove_photo': 'ඡායාරූපය ඉවත් කරන්න',
       'soon': 'ළඟදීම',
       'skill_progress': 'කුසලතා ප්‍රගතිය',
-
 
       'account_and_security': 'ගිණුම සහ ආරක්ෂාව',
       'help_and_support': 'උදව් සහ සහාය',
@@ -197,29 +206,33 @@ class LocalizationService extends ChangeNotifier {
       'weekly_activity': 'සතිපතා ක්‍රියාකාරකම්',
       'recent_skills': 'අලුතින් ඉගෙනගත් කුසලතා',
       'view_advanced_reports': 'වැඩිදුර ප්‍රගති වාර්තා සහ සිතියම් බලන්න',
-      'progress_report': 'ප්‍රගති වාර්තාව', 
+      'progress_report': 'ප්‍රගති වාර්තාව',
       'no_activities_played': 'තවමත් ක්‍රියාකාරකම් කර නැත',
       'whos_learning_today': 'අද ඉගෙන ගන්නේ කවුද?',
       'ready': 'සූදානම්',
-      'activity breakdown' : 'ක්‍රියාකාරකම් සාරාංශය',
+      'activity breakdown': 'ක්‍රියාකාරකම් සාරාංශය',
 
-      //connect specialist 
-      'linked_your_childs_account_to_their_therapist_or_reading_specialist' : 'ඔබේ දරුවාගේ ගිණුම ඔබේ දරුවාගේ චිකිත්සකවරයා හෝ කියවීම් විශේෂඥවරයා සමඟ සම්බන්ධ කරන්න.',
-      'clinic_code' : 'සායන කේතය',
-      'select_child' : 'දරුවෙකු තෝරන්න',
+      //connect specialist
+      'linked_your_childs_account_to_their_therapist_or_reading_specialist':
+          'ඔබේ දරුවාගේ ගිණුම ඔබේ දරුවාගේ චිකිත්සකවරයා හෝ කියවීම් විශේෂඥවරයා සමඟ සම්බන්ධ කරන්න.',
+      'clinic_code': 'සායන කේතය',
+      'select_child': 'දරුවෙකු තෝරන්න',
       'continue_to_consent': 'සම්මත කිරීම සඳහා ඉදිරියට යන්න',
       'scan_clinic_code': 'සායන කේතය ස්කෑන් කරන්න',
 
-      //Onboarding screens 
-      'Welcome_to_Sipsara!' : 'සිප්සර වෙත සාදරයෙන් පිළිගනිමු!',
-      'I’m_Moko,_your_new_learning_buddy!' : 'මම මොකෝ. ඔයාගේ අලුත් ඉගෙනුම් යාළුවා!',
-      'Continue' : 'ඉදිරියට යමු',
-      'I’m_Moko._Let’s_learn_together!' : 'මම මොකෝ. අපි එකට ඉගෙන ගනිමු!',
-      'Fun_Learning_Games!' : 'විනෝදයෙන් ඉගෙන ගනිමු!',
-      'Master_reading,_spelling,_and_shapes_with_dyslexia-friendly_games_designed_just_for_you.': 'ඔයා වෙනුවෙන්ම සකස් කළ විනෝද ක්‍රීඩා සමඟ කියවීම, අකුරු ලිවීම සහ හැඩතල හඳුනාගැනීම ඉගෙන ගනිමු.',
-      'Track_Your_Progress!' : 'ඔයාගේ දියුණුව බලමු!',
-      'Earn_exciting_rewards_and_unlock_new_levels_as_you_master_skills_every_day!' : 'හැමදාම අලුත් දේ ඉගෙනගෙන තෑගි දිනාගන්න. අලුත් මට්ටම් විවෘත කරගන්න!',
-      'Get_started' : 'පටන් ගනිමු',
+      //Onboarding screens
+      'Welcome_to_Sipsara!': 'සිප්සර වෙත සාදරයෙන් පිළිගනිමු!',
+      'I’m_Moko,_your_new_learning_buddy!':
+          'මම මොකෝ. ඔයාගේ අලුත් ඉගෙනුම් යාළුවා!',
+      'Continue': 'ඉදිරියට යමු',
+      'I’m_Moko._Let’s_learn_together!': 'මම මොකෝ. අපි එකට ඉගෙන ගනිමු!',
+      'Fun_Learning_Games!': 'විනෝදයෙන් ඉගෙන ගනිමු!',
+      'Master_reading,_spelling,_and_shapes_with_dyslexia-friendly_games_designed_just_for_you.':
+          'ඔයා වෙනුවෙන්ම සකස් කළ විනෝද ක්‍රීඩා සමඟ කියවීම, අකුරු ලිවීම සහ හැඩතල හඳුනාගැනීම ඉගෙන ගනිමු.',
+      'Track_Your_Progress!': 'ඔයාගේ දියුණුව බලමු!',
+      'Earn_exciting_rewards_and_unlock_new_levels_as_you_master_skills_every_day!':
+          'හැමදාම අලුත් දේ ඉගෙනගෙන තෑගි දිනාගන්න. අලුත් මට්ටම් විවෘත කරගන්න!',
+      'Get_started': 'පටන් ගනිමු',
 
       // Parent Hub Additions
       'last_active_prefix': 'අවසන් වරට ක්‍රියාකාරී වූයේ: ',
@@ -228,18 +241,21 @@ class LocalizationService extends ChangeNotifier {
       'recent': 'මෑතකදී',
       'add_student_first_msg': 'ප්‍රගතිය බැලීමට පළමුව සිසුවෙකු ඇතුළත් කරන්න',
       'add_student_settings_hint': 'පළමු සිසුවා ඇතුළත් කිරීමට විකල්ප වෙත යන්න',
-      
-      'delete_account_desc': 'මෙම ක්‍රියාව ආපසු හැරවිය නොහැක. ඔබගේ සියලුම දත්ත සහ සිසුන්ගේ ගිණුම් ස්ථිරවම මකා දැමෙනු ඇත.',
+
+      'delete_account_desc':
+          'මෙම ක්‍රියාව ආපසු හැරවිය නොහැක. ඔබගේ සියලුම දත්ත සහ සිසුන්ගේ ගිණුම් ස්ථිරවම මකා දැමෙනු ඇත.',
       'delete_account_confirm': 'තහවුරු කිරීමට, ඔබගේ සම්පූර්ණ නම ඇතුළත් කරන්න:',
       'cancel': 'අවලංගු කරන්න',
       'password_changed': 'මුරපදය වෙනස් කර ඇත!',
       'update_password': 'මුරපදය යාවත්කාලීන කරන්න',
       'update_name': 'නම යාවත්කාලීන කරන්න',
-      'update_name_desc': 'ඔබගේ ගිණුම යාවත්කාලීන කිරීමට ඔබගේ සම්පූර්ණ නම ඇතුළත් කරන්න.',
+      'update_name_desc':
+          'ඔබගේ ගිණුම යාවත්කාලීන කිරීමට ඔබගේ සම්පූර්ණ නම ඇතුළත් කරන්න.',
       'save_changes': 'වෙනස්කම් සුරකින්න',
       'name_updated_success': 'නම සාර්ථකව යාවත්කාලීන කරන ලදී!',
       'update_email_title': 'විද්‍යුත් තැපෑල යාවත්කාලීන කරන්න',
-      'update_email_desc': 'නව විද්‍යුත් තැපැල් ලිපිනයක් ඇතුළත් කරන්න. තහවුරු කිරීමට අපි සත්‍යාපන කේතයක් එවන්නෙමු.',
+      'update_email_desc':
+          'නව විද්‍යුත් තැපැල් ලිපිනයක් ඇතුළත් කරන්න. තහවුරු කිරීමට අපි සත්‍යාපන කේතයක් එවන්නෙමු.',
       'send_verification_code': 'සත්‍යාපන කේතය යවන්න',
       'verify_email': 'විද්‍යුත් තැපෑල සත්‍යාපනය කරන්න',
       'verify_email_desc': 'අපි අංක 6 ක සත්‍යාපන කේතයක් යැව්වෙමු ',
@@ -252,13 +268,16 @@ class LocalizationService extends ChangeNotifier {
       'delete_permanently': 'ස්ථිරවම මකා දමන්න',
       'reset_skills_title': 'කුසලතා ප්‍රගතිය නැවත සකසන්නද?',
       'reset_skills_desc_prefix': '',
-      'reset_skills_desc_suffix': ' ගේ සියලුම කුසලතා ප්‍රගතිය නැවත සැකසීමට ඔබට අවශ්‍යද? සම්පූර්ණ කරන ලද ක්‍රියාකාරකම්, ලකුණු, සහ අගුළු හරින ලද මට්ටම් නැවත ආරම්භයට සකසනු ඇත.',
+      'reset_skills_desc_suffix':
+          ' ගේ සියලුම කුසලතා ප්‍රගතිය නැවත සැකසීමට ඔබට අවශ්‍යද? සම්පූර්ණ කරන ලද ක්‍රියාකාරකම්, ලකුණු, සහ අගුළු හරින ලද මට්ටම් නැවත ආරම්භයට සකසනු ඇත.',
       'reset_skills_success': ' ගේ කුසලතා ප්‍රගතිය නැවත සකසන ලදී!',
       'reset_skills_btn': 'නැවත සකසන්න',
       'delete_student_title': 'සිසුවා මකා දමන්නද?',
       'delete_student_desc_prefix': '',
-      'delete_student_desc_suffix': ' ස්ථිරවම මකා දැමීමට ඔබට අවශ්‍ය බව නිසැකද? මෙම ක්‍රියාව ආපසු හැරවිය නොහැකි අතර ඉගෙනුම් ප්‍රගතිය ස්ථිරවම මැකී යනු ඇත.',
-      'delete_student_therapist_warning': 'මෙම සිසුවා චිකිත්සකයෙකු සමඟ සම්බන්ධ වී ඇත. සිසුවා මකා දැමීමෙන් එම සම්බන්ධතාවය ස්ථිරවම බිඳ වැටෙනු ඇත.',
+      'delete_student_desc_suffix':
+          ' ස්ථිරවම මකා දැමීමට ඔබට අවශ්‍ය බව නිසැකද? මෙම ක්‍රියාව ආපසු හැරවිය නොහැකි අතර ඉගෙනුම් ප්‍රගතිය ස්ථිරවම මැකී යනු ඇත.',
+      'delete_student_therapist_warning':
+          'මෙම සිසුවා චිකිත්සකයෙකු සමඟ සම්බන්ධ වී ඇත. සිසුවා මකා දැමීමෙන් එම සම්බන්ධතාවය ස්ථිරවම බිඳ වැටෙනු ඇත.',
       'delete_student_success': ' සාර්ථකව මකා දමන ලදී.',
 
       'add_student_subtitle': 'ආරම්භ කිරීමට සිසුවෙකු එකතු කරන්න',
@@ -274,7 +293,8 @@ class LocalizationService extends ChangeNotifier {
       'btn_finish_evaluation': 'ඇගයීම අවසන් කරන්න',
 
       // Add/Edit Student
-      'add_student_desc': 'අමතර දරුවෙකු නොමිලේ එකතු කරන්න. ඔබගේ ගිණුමට දරුවන් 5 දෙනෙකු දක්වා එකතු කළ හැක.',
+      'add_student_desc':
+          'අමතර දරුවෙකු නොමිලේ එකතු කරන්න. ඔබගේ ගිණුමට දරුවන් 5 දෙනෙකු දක්වා එකතු කළ හැක.',
       'choose_avatar': 'ගිණුම සඳහා පින්තූරයක් තෝරන්න',
       'fantasy': 'කාටූන් චරිත',
       'kids': 'ළමා චරිත',
@@ -294,41 +314,43 @@ class LocalizationService extends ChangeNotifier {
       'hours': 'පැය',
       'hour': 'පැය',
 
-      //home titles 
+      //home titles
       'reading_practice': 'කියවීමේ පුහුණුව',
-      'continue' : 'ඉදිරියට යමු',
-      'play_again' : 'නැවත සෙල්ලම් කරන්න', 
-      
-      //shop 
-      'character_shop' : 'මගේ කාටූන් චරිත සාප්පුව',
-      'human' : 'මිනිස් චරිත',
-      'mascot': 'සංකේත චරිත',
-      'select_character' : 'කැමති චරිතය තෝරන්න',
-      'unlocked': 'විවෘතයි',
+      'continue': 'ඉදිරියට යමු',
+      'play_again': 'නැවත සෙල්ලම් කරන්න',
 
-      //progress 
-      'learners_progress': 'සිසුන්ගේ ඉගෙනුම් ප්‍රගතිය', 
-      
+      //shop
+      'human': 'මිනිස් චරිත',
+      'mascot': 'සංකේත චරිත',
+
+      //progress
+      'learners_progress': 'සිසුන්ගේ ඉගෙනුම් ප්‍රගතිය',
 
       // Consent Screen
       'parental_consent': 'දෙමාපිය එකඟතා පත්‍රිකාව',
       'student_protection_agreement': 'සිසු ආරක්ෂණ ගිවිසුම',
-      'consent_review_terms': 'ඉදිරියට යාමට පෙර කරුණාකර පහත නියමයන් කියවා එකඟ වන්න.',
+      'consent_review_terms':
+          'ඉදිරියට යාමට පෙර කරුණාකර පහත නියමයන් කියවා එකඟ වන්න.',
       'consent_items': 'කැමැත්ත ලබාදිය යුතු කරුණු',
       'guardian_confirmation_title': 'භාරකරු තහවුරු කිරීම',
-      'guardian_confirmation_desc': 'මා මෙම දරුවාගේ දෙමාපියන් හෝ නීත්‍යානුකූල භාරකරු බවත්, ඔවුන් වෙනුවෙන් කැමැත්ත ලබා දීමට මට බලය ඇති බවත් මම තහවුරු කරමි.',
+      'guardian_confirmation_desc':
+          'මා මෙම දරුවාගේ දෙමාපියන් හෝ නීත්‍යානුකූල භාරකරු බවත්, ඔවුන් වෙනුවෙන් කැමැත්ත ලබා දීමට මට බලය ඇති බවත් මම තහවුරු කරමි.',
       'data_collection_title': 'ඉගෙනුම් දත්ත එකතු කිරීම',
-      'data_collection_desc': 'මාගේ දරුවාගේ අධ්‍යාපනික අත්දැකීම් ඔවුන්ට ගැලපෙන අයුරින් සැකසීමට ඔවුන්ගේ ඉගෙනුම් දත්ත (ප්‍රතිචාර, ප්‍රගතිය සහ කාර්යසාධනය) එකතු කිරීම සහ සැකසීම සඳහා මම කැමැත්ත ප්‍රකාශ කරමි.',
+      'data_collection_desc':
+          'මාගේ දරුවාගේ අධ්‍යාපනික අත්දැකීම් ඔවුන්ට ගැලපෙන අයුරින් සැකසීමට ඔවුන්ගේ ඉගෙනුම් දත්ත (ප්‍රතිචාර, ප්‍රගතිය සහ කාර්යසාධනය) එකතු කිරීම සහ සැකසීම සඳහා මම කැමැත්ත ප්‍රකාශ කරමි.',
       'screening_purpose_title': 'ඩිස්ලෙක්සියා පරීක්ෂාවේ අරමුණ',
-      'screening_purpose_desc': 'මෙම යෙදුම 1 ශ්‍රේණියේ ඩිස්ලෙක්සියා පරීක්ෂාව සහ ඉගෙනුම් සහාය සඳහා නිර්මාණය කර ඇති බව මම තේරුම් ගනිමි. එය වෛද්‍ය රෝග විනිශ්චය ලබා නොදෙන අතර වෘත්තීය මාර්ගෝපදේශනය සමඟ භාවිතා කළ යුතුය.',
+      'screening_purpose_desc':
+          'මෙම යෙදුම 1 ශ්‍රේණියේ ඩිස්ලෙක්සියා පරීක්ෂාව සහ ඉගෙනුම් සහාය සඳහා නිර්මාණය කර ඇති බව මම තේරුම් ගනිමි. එය වෛද්‍ය රෝග විනිශ්චය ලබා නොදෙන අතර වෘත්තීය මාර්ගෝපදේශනය සමඟ භාවිතා කළ යුතුය.',
       'terms_privacy_title': 'භාවිත නියමයන් සහ රහස්‍යතා ප්‍රතිපත්තිය',
-      'terms_privacy_desc': 'මා භාවිත නියමයන් සහ රහස්‍යතා ප්‍රතිපත්තිය කියවා ඊට එකඟ වී ඇත. මාගේ දරුවාගේ දත්ත ආරක්ෂිතව ගබඩා කරනු ඇති අතර තෙවන පාර්ශවයන් සමඟ බෙදා නොගන්නා බව මම තේරුම් ගනිමි.',
+      'terms_privacy_desc':
+          'මා භාවිත නියමයන් සහ රහස්‍යතා ප්‍රතිපත්තිය කියවා ඊට එකඟ වී ඇත. මාගේ දරුවාගේ දත්ත ආරක්ෂිතව ගබඩා කරනු ඇති අතර තෙවන පාර්ශවයන් සමඟ බෙදා නොගන්නා බව මම තේරුම් ගනිමි.',
       'digital_signature': 'ඩිජිටල් අත්සන',
-      'digital_signature_desc': 'ඔබගේ ඩිජිටල් අත්සන ලෙස ඔබගේ සම්පූර්ණ නම පහතින් ටයිප් කරන්න.',
+      'digital_signature_desc':
+          'ඔබගේ ඩිජිටල් අත්සන ලෙස ඔබගේ සම්පූර්ණ නම පහතින් ටයිප් කරන්න.',
       'signature_hint': 'දෙමාපියන්ගේ / භාරකරුගේ සම්පූර්ණ නම',
       'date_prefix': 'දිනය: ',
       'agree_continue': 'මම එකඟ වී ඉදිරියට යමි',
-      
+
       // New Parent Hub Inner Screens Additions
       'skill_analytics': 'කුසලතා විශ්ලේෂණය',
       'phonological_awareness': 'ශබ්ද විද්‍යාත්මක අවබෝධය',
@@ -350,17 +372,19 @@ class LocalizationService extends ChangeNotifier {
       'visual_category_sorting': 'කාණ්ඩ අනුව වෙන් කිරීම',
       'shadow_match_demo': 'සෙවනැලි ගැලපීමේ ආදර්ශනය',
       'child_progress_suffix': 'ගේ ප්‍රගතිය',
-      
+
       // Advanced Reports (TherapistStudentDetailScreen) additions
       'gt_label_success': 'මූලික සත්‍ය ලේබලය සාර්ථකව යවන ලදී!',
       'interaction_heatmaps': 'අන්තර්ක්‍රියාකාරී තාප සිතියම්',
-      'no_interventions': 'තවමත් මැදිහත්වීම් ජනනය කර නැත.\nදරුවා තවත් ක්‍රීඩා කළ යුතුය.',
+      'no_interventions':
+          'තවමත් මැදිහත්වීම් ජනනය කර නැත.\nදරුවා තවත් ක්‍රීඩා කළ යුතුය.',
       'no_telemetry_data': 'මෙම සිසුවා සඳහා තවමත් ටෙලිමෙට්‍රි දත්ත නොමැත.',
       'no_touch_paths': 'ටෙලිමෙට්‍රි දත්තවල ස්පර්ශ මාර්ග හමු නොවීය.',
       'select_risk_label': 'අවදානම් ලේබලය තෝරන්න',
       'submit_gt_label': 'මූලික සත්‍ය ලේබලය ඉදිරිපත් කරන්න',
       'view_interaction_heatmaps': 'අන්තර්ක්‍රියාකාරී තාප සිතියම් බලන්න',
-      'assessment_feeds_ml': 'ඔබගේ තක්සේරුව අපගේ යන්ත්‍ර ඉගෙනුම් ආකෘති පෝෂණය කරයි. කරුණාකර ඔවුන්ගේ දත්ත මත පදනම්ව මෙම සිසුවා සඳහා මූලික සත්‍ය අවදානම් මට්ටම තෝරන්න.',
+      'assessment_feeds_ml':
+          'ඔබගේ තක්සේරුව අපගේ යන්ත්‍ර ඉගෙනුම් ආකෘති පෝෂණය කරයි. කරුණාකර ඔවුන්ගේ දත්ත මත පදනම්ව මෙම සිසුවා සඳහා මූලික සත්‍ය අවදානම් මට්ටම තෝරන්න.',
       'cognitive_breakdown': 'සංජානන හැකියාවන්',
       'plan_tab': 'සැලැස්ම',
       'progress_tab': 'ප්‍රගතිය',
@@ -369,7 +393,7 @@ class LocalizationService extends ChangeNotifier {
       'sessions_tab': 'සැසි',
       'student_profile_title': 'සිසු ගිණුම',
       'weekly_progress': 'සතිපතා ප්‍රගතිය',
-      
+
       'activity': 'ක්‍රියාකාරකම',
       'attempt': 'උත්සාහය',
       'attempts': 'උත්සාහයන්',
@@ -400,7 +424,7 @@ class LocalizationService extends ChangeNotifier {
 
       // No session data
       'no_sessions': 'සැසි දත්ත නොමැත.',
-      
+
       'levels': 'මට්ටම්',
       'performance_trend': 'කාර්ය සාධන ප්‍රවණතාව',
       'accuracy_over_sessions': 'පසුගිය සැසි 7 තුළ නිරවද්‍යතාව',
@@ -411,9 +435,11 @@ class LocalizationService extends ChangeNotifier {
       'no_data_available': 'මෙම කුසලතාව සඳහා දත්ත නොමැත.',
       'add_therapist': 'චිකිත්සකයා එකතු කරන්න',
       'therapist_connections': 'චිකිත්සක සම්බන්ධතා',
-      'manage_specialist_access': 'ඔබගේ දරුවාගේ දත්ත වෙත චිකිත්සක ප්‍රවේශය කළමනාකරණය කරන්න',
+      'manage_specialist_access':
+          'ඔබගේ දරුවාගේ දත්ත වෙත චිකිත්සක ප්‍රවේශය කළමනාකරණය කරන්න',
       'no_therapists_connected': 'චිකිත්සකයින් සම්බන්ධ කර නොමැත',
-      'connect_reading_specialist': 'ඉගෙනුම් දත්ත සුරක්ෂිතව බෙදා ගැනීමට ඔබේ දරුවාගේ විශේෂඥයා සම්බන්ධ කරන්න.',
+      'connect_reading_specialist':
+          'ඉගෙනුම් දත්ත සුරක්ෂිතව බෙදා ගැනීමට ඔබේ දරුවාගේ විශේෂඥයා සම්බන්ධ කරන්න.',
       'my_therapists': 'මගේ චිකිත්සකයින්',
       'pending_requests': 'පොරොත්තු ඉල්ලීම්',
       'find_therapists': 'චිකිත්සකයින් සොයන්න',
@@ -425,15 +451,16 @@ class LocalizationService extends ChangeNotifier {
       'no_available_therapists': 'ලබාගත හැකි චිකිත්සකයින් හමු නොවීය.',
       'messaging_coming_soon': 'පණිවිඩ යැවීමේ විශේෂාංගය ළඟදීම!',
       'disconnect_therapist': 'චිකිත්සකයා විසන්ධි කරන්නද?',
-      'disconnect_desc': 'ඔබට මෙම චිකිත්සකයාගෙන් විසන්ධි වීමට අවශ්‍ය බව නිසැකද? ',
-      'disconnect_desc_full': 'මෙය ඔබගේ දරුවාගේ ඉගෙනුම් දත්ත වෙත ඇති ප්‍රවේශය අවලංගු කරනු ඇත. ඔබට පසුව නැවත සම්බන්ධ විය හැක.',
+      'disconnect_desc':
+          'ඔබට මෙම චිකිත්සකයාගෙන් විසන්ධි වීමට අවශ්‍ය බව නිසැකද? ',
+      'disconnect_desc_full':
+          'මෙය ඔබගේ දරුවාගේ ඉගෙනුම් දත්ත වෙත ඇති ප්‍රවේශය අවලංගු කරනු ඇත. ඔබට පසුව නැවත සම්බන්ධ විය හැක.',
       'therapist_disconnected': 'චිකිත්සකයා විසන්ධි විය',
       'active': 'සක්‍රීය',
 
       'clinic': 'සායනය',
       'connected_child': 'සම්බන්ධිත දරුවා',
       'connected_since': 'සම්බන්ධ වූ දිනය',
-
 
       'all': 'සියල්ල',
       'system': 'පද්ධතිය',
@@ -447,7 +474,8 @@ class LocalizationService extends ChangeNotifier {
       'overall_accuracy': 'සමස්ත නිරවද්‍යතාව',
       'weekly_minutes': 'සතිපතා මිනිත්තු',
       'student_progress': 'සිසු ප්‍රගතිය',
-      'withdraw_consent_info': 'ඔබට ඕනෑම වේලාවක දෙමාපිය ගිණුම් සැකසීම් හරහා\nඔබගේ කැමැත්ත ඉවත් කරගත හැක.',
+      'withdraw_consent_info':
+          'ඔබට ඕනෑම වේලාවක දෙමාපිය ගිණුම් සැකසීම් හරහා\nඔබගේ කැමැත්ත ඉවත් කරගත හැක.',
       'dash_greeting_morning': 'සුබ උදෑසනක්, {name}!',
       'dash_greeting_afternoon': 'සුබ දහවලක්, {name}!',
       'dash_greeting_evening': 'සුබ සන්ධ්‍යාවක්, {name}!',
@@ -476,7 +504,8 @@ class LocalizationService extends ChangeNotifier {
       'password_hint': 'your password',
       'password_hint_create': 'create password',
       'forgot_password': 'forgot password?',
-      'forgot_password_desc': 'Don\'t worry! It happens. Please enter the email address associated with your account.',
+      'forgot_password_desc':
+          'Don\'t worry! It happens. Please enter the email address associated with your account.',
       'sending_code': 'sending code...',
       'send_code': 'send code',
       'check_email': 'Check your email',
@@ -506,8 +535,10 @@ class LocalizationService extends ChangeNotifier {
       'benefit_private': 'private',
       'start_assessment': 'start assessment',
       'maybe_later': 'maybe later',
-      'assessment_later_desc': 'you can always start this from the student\'s profile.',
-      'start_from_profile': 'you can always start this from the student\'s profile.',
+      'assessment_later_desc':
+          'you can always start this from the student\'s profile.',
+      'start_from_profile':
+          'you can always start this from the student\'s profile.',
       'language': 'Language',
       'select_language': 'Select Language',
       'settings': 'Settings',
@@ -516,7 +547,8 @@ class LocalizationService extends ChangeNotifier {
       'invalid_phone': 'Please enter a valid phone number',
       'password_short': 'Password must be at least 6 characters long',
       'passwords_dont_match': 'Passwords do not match',
-      'must_agree_terms': 'You must agree to the Terms of Use and Privacy Policy',
+      'must_agree_terms':
+          'You must agree to the Terms of Use and Privacy Policy',
       'or_continue_with': 'Or continue with',
       'error_occurred': 'An error occurred. Please try again.',
       'change': 'change',
@@ -546,23 +578,30 @@ class LocalizationService extends ChangeNotifier {
       'student_added': 'student added!',
       'student_setup_ready_1': ' is all set up and ready to learn.',
       'personalize_learning': 'personalize learning',
-      'evaluation_desc_1': 'a quick 2-minute evaluation will help us understand ',
-      'evaluation_desc_2': '\'s unique learning style and tailor activities specifically for them.',
+      'evaluation_desc_1':
+          'a quick 2-minute evaluation will help us understand ',
+      'evaluation_desc_2':
+          '\'s unique learning style and tailor activities specifically for them.',
       'personalized': 'personalized',
       '2_min': '2 mins',
       'private': 'private',
-      'assessment_prompt_desc': 'a quick 2-minute assessment helps us understand their unique learning style and tailor activities specifically for them.',
+      'assessment_prompt_desc':
+          'a quick 2-minute assessment helps us understand their unique learning style and tailor activities specifically for them.',
       'add_student': 'add student',
       'pending': 'Pending',
       'completed': 'Completed',
       'premium_coming_soon': 'premium plans coming soon!',
-      'premium_desc': "we're crafting amazing premium features to supercharge your child's learning journey.",
+      'premium_desc':
+          "we're crafting amazing premium features to supercharge your child's learning journey.",
       'login_alerts': 'login alerts',
-      'login_alerts_desc': 'get notified when your account is accessed from a new device.',
+      'login_alerts_desc':
+          'get notified when your account is accessed from a new device.',
       'learning_progress': 'learning progress',
-      'learning_progress_desc': 'get notified when your child completes a screening or milestone.',
+      'learning_progress_desc':
+          'get notified when your child completes a screening or milestone.',
       'app_updates': 'app updates & features',
-      'app_updates_desc': 'receive important announcements about new educational tools.',
+      'app_updates_desc':
+          'receive important announcements about new educational tools.',
       'email_support': 'email support',
       'contact_support': 'contact support',
       'phone_support': 'phone support',
@@ -576,7 +615,6 @@ class LocalizationService extends ChangeNotifier {
       'select_character': 'Select Character',
       'unlocked': 'Unlocked',
 
-
       'new_notifications': 'new',
       'activity_breakdown': 'activity breakdown',
       'profile_photo': 'Profile Photo',
@@ -586,7 +624,6 @@ class LocalizationService extends ChangeNotifier {
       'show_less': 'show less',
       'skill_progress': 'skill progress',
       'no_students_yet': 'no students yet',
-
 
       'account_and_security': 'account & security',
       'help_and_support': 'help & support',
@@ -614,37 +651,38 @@ class LocalizationService extends ChangeNotifier {
       'ready': 'Ready',
       'activity breakdown': 'Activity Breakdown',
 
-      //connect specialist 
-      'linked_your_childs_account_to_their_therapist_or_reading_specialist' : 'Linked your childs account to their therapist or reading specialist',
-      'clinic_code' : 'Clinic Code',
-      'select_child' : 'Select Child',
+      //connect specialist
+      'linked_your_childs_account_to_their_therapist_or_reading_specialist':
+          'Linked your childs account to their therapist or reading specialist',
+      'clinic_code': 'Clinic Code',
+      'select_child': 'Select Child',
       'continue_to_consent': 'Continue to consent',
       'scan_clinic_code': 'Scan clinic code',
 
-      //Onboarding screens 
-      'Welcome_to_Sipsara!' : 'Welcome to Sipsara!',
-      'I’m_Moko,_your_new_learning_buddy!' : 'I’m Moko, your new learning buddy!',
-      'Continue' : 'Continue',
-      'I’m_Moko._Let’s_learn_together!' : 'I’m Moko. Let’s learn together!',
-      'Fun_Learning_Games!' : 'Fun Learning Games!',
-      'Master_reading,_spelling,_and_shapes_with_dyslexia-friendly_games_designed_just_for_you.': 'Master reading, spelling, and shapes with dyslexia-friendly games designed just for you.',
-      'Track_Your_Progress!' : 'Track Your Progress!',
-      'Earn_exciting_rewards_and_unlock_new_levels_as_you_master_skills_every_day!' : 'Earn exciting rewards and unlock new levels as you master skills every day!',
-      'Get_started' : 'Get started',
+      //Onboarding screens
+      'Welcome_to_Sipsara!': 'Welcome to Sipsara!',
+      'I’m_Moko,_your_new_learning_buddy!':
+          'I’m Moko, your new learning buddy!',
+      'Continue': 'Continue',
+      'I’m_Moko._Let’s_learn_together!': 'I’m Moko. Let’s learn together!',
+      'Fun_Learning_Games!': 'Fun Learning Games!',
+      'Master_reading,_spelling,_and_shapes_with_dyslexia-friendly_games_designed_just_for_you.':
+          'Master reading, spelling, and shapes with dyslexia-friendly games designed just for you.',
+      'Track_Your_Progress!': 'Track Your Progress!',
+      'Earn_exciting_rewards_and_unlock_new_levels_as_you_master_skills_every_day!':
+          'Earn exciting rewards and unlock new levels as you master skills every day!',
+      'Get_started': 'Get started',
 
-      //home titles 
+      //home titles
       'reading_practice': 'Reading Practice',
-      'continue' : 'Continue',
-      'play_again' : 'Play Again', 
-      
-      //shop 
-      'character_shop' : 'Character Shop',
-      'human' : 'Human',
-      'mascot': 'Mascot',
-      'select_character' : 'Select Character',
-      'unlocked': 'Unlocked',
+      'continue': 'Continue',
+      'play_again': 'Play Again',
 
-      //progress 
+      //shop
+      'human': 'Human',
+      'mascot': 'Mascot',
+
+      //progress
       'learners_progress': 'Learners Progress',
 
       // Parent Hub Additions
@@ -655,7 +693,8 @@ class LocalizationService extends ChangeNotifier {
       'add_student_first_msg': 'add a student first to view progress',
       'add_student_settings_hint': 'go to settings to add your first student',
 
-      'delete_account_desc': 'This action is irreversible. All your data and student profiles will be permanently deleted.',
+      'delete_account_desc':
+          'This action is irreversible. All your data and student profiles will be permanently deleted.',
       'delete_account_confirm': 'To confirm, type your full name:',
       'cancel': 'Cancel',
       'password_changed': 'Password changed!',
@@ -665,7 +704,8 @@ class LocalizationService extends ChangeNotifier {
       'save_changes': 'Save Changes',
       'name_updated_success': 'Name updated successfully!',
       'update_email_title': 'Update Email',
-      'update_email_desc': 'Enter a new email address. We will send a verification code to confirm.',
+      'update_email_desc':
+          'Enter a new email address. We will send a verification code to confirm.',
       'send_verification_code': 'Send Verification Code',
       'verify_email': 'Verify Email',
       'verify_email_desc': 'We sent a 6-digit verification code to ',
@@ -673,18 +713,24 @@ class LocalizationService extends ChangeNotifier {
       'verify_and_update': 'Verify & Update',
       'email_updated_success': 'Email updated successfully!',
       'change_password_title': 'Change Password',
-      'change_password_desc': 'Protect your account with a strong new password.',
+      'change_password_desc':
+          'Protect your account with a strong new password.',
       'delete': 'Delete',
       'delete_permanently': 'Delete Permanently',
       'reset_skills_title': 'Reset skills?',
-      'reset_skills_desc_prefix': 'Are you sure you want to reset all skill progress for ',
-      'reset_skills_desc_suffix': '? Completed activities, scores, and unlock status will be reset back to the start.',
+      'reset_skills_desc_prefix':
+          'Are you sure you want to reset all skill progress for ',
+      'reset_skills_desc_suffix':
+          '? Completed activities, scores, and unlock status will be reset back to the start.',
       'reset_skills_success': ' skills progress reset!',
       'reset_skills_btn': 'Reset skills',
       'delete_student_title': 'Delete student?',
-      'delete_student_desc_prefix': 'Are you absolutely sure you want to delete ',
-      'delete_student_desc_suffix': '? This action cannot be undone and all learning progress will be lost permanently.',
-      'delete_student_therapist_warning': 'This student is connected to a therapist. Deleting them will permanently break that connection.',
+      'delete_student_desc_prefix':
+          'Are you absolutely sure you want to delete ',
+      'delete_student_desc_suffix':
+          '? This action cannot be undone and all learning progress will be lost permanently.',
+      'delete_student_therapist_warning':
+          'This student is connected to a therapist. Deleting them will permanently break that connection.',
       'delete_student_success': ' deleted successfully.',
 
       'add_student_subtitle': 'add a student to get started',
@@ -701,7 +747,8 @@ class LocalizationService extends ChangeNotifier {
       'btn_finish_evaluation': 'Finish Evaluation',
 
       // Add/Edit Student
-      'add_student_desc': 'add an additional student for free. you are allowed to add up to 5 children to your account.',
+      'add_student_desc':
+          'add an additional student for free. you are allowed to add up to 5 children to your account.',
       'choose_avatar': 'choose a character profile picture',
       'fantasy': 'Fantasy',
       'kids': 'Kids',
@@ -724,22 +771,28 @@ class LocalizationService extends ChangeNotifier {
       // Consent Screen
       'parental_consent': 'parental consent',
       'student_protection_agreement': 'student protection agreement',
-      'consent_review_terms': 'please review and accept the following terms before proceeding.',
+      'consent_review_terms':
+          'please review and accept the following terms before proceeding.',
       'consent_items': 'consent items',
       'guardian_confirmation_title': 'guardian confirmation',
-      'guardian_confirmation_desc': 'I confirm that I am the parent or legal guardian of this child and have the authority to provide consent on their behalf.',
+      'guardian_confirmation_desc':
+          'I confirm that I am the parent or legal guardian of this child and have the authority to provide consent on their behalf.',
       'data_collection_title': 'learning data collection',
-      'data_collection_desc': 'I consent to the collection and processing of my child\'s learning data (responses, progress, and performance) to personalize their educational experience.',
+      'data_collection_desc':
+          'I consent to the collection and processing of my child\'s learning data (responses, progress, and performance) to personalize their educational experience.',
       'screening_purpose_title': 'dyslexia screening purpose',
-      'screening_purpose_desc': 'I understand that this app is designed for Grade 1 dyslexia screening and learning support. It does not provide medical diagnoses and should be used alongside professional guidance.',
+      'screening_purpose_desc':
+          'I understand that this app is designed for Grade 1 dyslexia screening and learning support. It does not provide medical diagnoses and should be used alongside professional guidance.',
       'terms_privacy_title': 'terms of use & privacy policy',
-      'terms_privacy_desc': 'I have read and agree to the terms of use and privacy policy. I understand my child\'s data will be stored securely and will not be shared with third parties.',
+      'terms_privacy_desc':
+          'I have read and agree to the terms of use and privacy policy. I understand my child\'s data will be stored securely and will not be shared with third parties.',
       'digital_signature': 'digital signature',
-      'digital_signature_desc': 'Type your full name below as your digital signature.',
+      'digital_signature_desc':
+          'Type your full name below as your digital signature.',
       'signature_hint': 'Parent / Guardian Full Name',
       'date_prefix': 'Date: ',
       'agree_continue': 'I Agree & Continue',
-      
+
       // New Parent Hub Inner Screens Additions
       'skill_analytics': 'Skill Analytics',
       'phonological_awareness': 'Phonological Awareness',
@@ -761,11 +814,12 @@ class LocalizationService extends ChangeNotifier {
       'visual_category_sorting': 'Category Sorting',
       'shadow_match_demo': 'Shadow Match Demo',
       'child_progress_suffix': '\'s progress',
-      
+
       // Advanced Reports (TherapistStudentDetailScreen) additions
       'gt_label_success': 'Ground Truth Label submitted successfully!',
       'interaction_heatmaps': 'Interaction Heatmaps',
-      'no_interventions': 'No interventions generated yet.\nStudent needs more play.',
+      'no_interventions':
+          'No interventions generated yet.\nStudent needs more play.',
       'Dr': 'Dr.',
       'students': 'students',
       'profile': 'profile',
@@ -775,7 +829,8 @@ class LocalizationService extends ChangeNotifier {
       'select_risk_label': 'Select Risk Label',
       'submit_gt_label': 'Submit Ground Truth Label',
       'view_interaction_heatmaps': 'View Interaction Heatmaps',
-      'assessment_feeds_ml': 'Your assessment feeds our ML models. Please select the ground-truth risk level for this student based on their data.',
+      'assessment_feeds_ml':
+          'Your assessment feeds our ML models. Please select the ground-truth risk level for this student based on their data.',
       'cognitive_breakdown': 'cognitive breakdown',
       'plan_tab': 'plan',
       'progress_tab': 'progress',
@@ -784,9 +839,9 @@ class LocalizationService extends ChangeNotifier {
       'sessions_tab': 'sessions',
       'student_profile_title': 'student profile',
       'weekly_progress': 'weekly progress',
-      'reading_fluency':'Reading Fluency',
-      'comprehension':'Comprehension',
-      
+      'reading_fluency': 'Reading Fluency',
+      'comprehension': 'Comprehension',
+
       'activity': 'Activity',
       'attempt': 'Attempt',
       'attempts': 'Attempts',
@@ -804,9 +859,9 @@ class LocalizationService extends ChangeNotifier {
       'risk_moderate': 'Moderate Risk',
       'risk_high': 'Needs Attention',
       'risk_pending': 'Collecting Data...',
-      'at_risk':'at risk',
+      'at_risk': 'at risk',
 
-      'in_app_notifications':'in-app notifications',
+      'in_app_notifications': 'in-app notifications',
 
       // Cognitive index display names
       'visual_processing_score': 'Visual Processing Speed',
@@ -831,9 +886,11 @@ class LocalizationService extends ChangeNotifier {
       'no_data_available': 'No data available for this skill.',
       'add_therapist': 'Add Therapist',
       'therapist_connections': 'Therapist Connections',
-      'manage_specialist_access': 'Manage specialist access to your child\'s data',
+      'manage_specialist_access':
+          'Manage specialist access to your child\'s data',
       'no_therapists_connected': 'No therapists connected',
-      'connect_reading_specialist': 'Connect your child\'s reading specialist or speech-language pathologist to share learning data securely.',
+      'connect_reading_specialist':
+          'Connect your child\'s reading specialist or speech-language pathologist to share learning data securely.',
       'my_therapists': 'My Therapists',
       'pending_requests': 'Pending Requests',
       'find_therapists': 'Find Therapists',
@@ -846,14 +903,14 @@ class LocalizationService extends ChangeNotifier {
       'messaging_coming_soon': 'Messaging feature coming soon!',
       'disconnect_therapist': 'Disconnect therapist?',
       'disconnect_desc': 'Are you sure you want to disconnect from ',
-      'disconnect_desc_full': 'This will revoke access to learning data. You can reconnect later.',
+      'disconnect_desc_full':
+          'This will revoke access to learning data. You can reconnect later.',
       'therapist_disconnected': 'Therapist disconnected',
       'active': 'Active',
 
       'clinic': 'Clinic',
       'connected_child': 'Connected Child',
       'connected_since': 'Connected Since',
-
 
       'all': 'All',
       'system': 'System',
@@ -867,7 +924,8 @@ class LocalizationService extends ChangeNotifier {
       'overall_accuracy': 'Overall Accuracy',
       'weekly_minutes': 'Weekly Minutes',
       'student_progress': 'Student Progress',
-      'withdraw_consent_info': 'you can withdraw consent at any time\nfrom the parent account settings.',
+      'withdraw_consent_info':
+          'you can withdraw consent at any time\nfrom the parent account settings.',
       'dash_greeting_morning': 'Good morning, {name}!',
       'dash_greeting_afternoon': 'Good afternoon, {name}!',
       'dash_greeting_evening': 'Good evening, {name}!',
@@ -881,6 +939,6 @@ class LocalizationService extends ChangeNotifier {
       'dash_nav_shop': 'shop',
       'dash_nav_progress': 'progress',
       'dash_nav_parents': 'parents',
-    }
+    },
   };
 }
