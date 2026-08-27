@@ -64,9 +64,45 @@ class HiddenSearchGenerator {
   };
 
   static HiddenSearchGameData generateGame() {
-    // Pick 5 unique target paths for the 5 rounds
     final List<String> allPaths = _assetDictionary.keys.toList()..shuffle(_random);
     final List<String> targetPaths = allPaths.take(5).toList();
+    
+    // Only these objects are simple enough to be used as targets in the colored-distractor tasks (rounds 4 and 5)
+    final List<String> safeLastTaskPaths = [
+      'everyday_objects/bell.png',
+      'vehicles/van.png',
+      'vehicles/train.png',
+      'everyday_objects/clock.png',
+      'everyday_objects/key.png',
+      'everyday_objects/book.png',
+      'vehicles/airplane.png',
+    ];
+
+    for (int i = 3; i < 5; i++) {
+      if (!safeLastTaskPaths.contains(targetPaths[i])) {
+        // Find a safe path from the remaining unused paths (or from the first 3 rounds if necessary)
+        bool swapped = false;
+        
+        // Try to swap with something in the first 3 rounds
+        for (int j = 0; j < 3; j++) {
+          if (safeLastTaskPaths.contains(targetPaths[j])) {
+            final temp = targetPaths[i];
+            targetPaths[i] = targetPaths[j];
+            targetPaths[j] = temp;
+            swapped = true;
+            break;
+          }
+        }
+        
+        // If couldn't swap internally, grab from unused paths
+        if (!swapped) {
+          final unusedSafePaths = safeLastTaskPaths.where((p) => !targetPaths.contains(p)).toList()..shuffle(_random);
+          if (unusedSafePaths.isNotEmpty) {
+            targetPaths[i] = unusedSafePaths.first;
+          }
+        }
+      }
+    }
     
     final List<HiddenSearchRound> rounds = [];
 
@@ -122,16 +158,16 @@ class HiddenSearchGenerator {
         bool dFlipped = false;
         
         if (isTrickyVariant) {
-          // ALWAYS apply a distinct color shift to tricky variants so they are visibly NOT the target
-          final distinctHues = [40.0, 90.0, 160.0, 220.0, 280.0, 330.0];
-          dColorHue = distinctHues[_random.nextInt(distinctHues.length)];
+          // Use distinct hue rotation angles to guarantee a completely different color
+          final distinctRotations = [90.0, 150.0, 180.0, 210.0, 270.0];
+          dColorHue = distinctRotations[_random.nextInt(distinctRotations.length)];
           dFlipped = allowFlips ? _random.nextBool() : false;
         } else {
           // Normal distractor (different object altogether)
           dFlipped = allowFlips ? _random.nextBool() : false;
           // Optionally color shift normal distractors if allowed
           if (allowColors && _random.nextDouble() < 0.3) {
-            dColorHue = _random.nextDouble() * 360.0;
+            dColorHue = 90.0 + _random.nextDouble() * 180.0; // Random rotation between 90 and 270 degrees
           }
         }
 

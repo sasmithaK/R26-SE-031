@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
 import '../services/auth_service.dart';
+import '../services/localization_service.dart';
 import 'otp_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -56,8 +57,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.cream,
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.cream,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
@@ -115,7 +119,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               // Headings
               Center(
                 child: Text(
-                  'forgot password?',
+                  LocalizationService.instance.t('forgot_password'),
                   style: AppTypography.heading(
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
@@ -128,7 +132,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Text(
-                    "Don't worry! Enter your email and we'll send a pin to reset it.",
+                    LocalizationService.instance.t('forgot_password_desc'),
                     textAlign: TextAlign.center,
                     style: AppTypography.body(
                       fontSize: 15,
@@ -162,10 +166,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       style: AppTypography.body(fontSize: 15),
-                      decoration: const InputDecoration(
-                        hintText: 'email address',
-                        prefixIcon: Icon(Icons.email_outlined, size: 20),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: InputDecoration(
+                        hintText: LocalizationService.instance.t('email_hint'),
+                        prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
                     ),
                   ],
@@ -178,7 +182,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 height: 48,
                 width: double.infinity,
                 child: GradientButton(
-                  text: _isLoading ? 'sending code...' : 'send code',
+                  text: _isLoading ? LocalizationService.instance.t('sending_code') : LocalizationService.instance.t('send_code'),
                   onPressed: _isLoading ? () {} : _submitEmail,
                   icon: Icons.send_rounded,
                 ),
@@ -188,6 +192,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
       ),
+        );
+      },
     );
   }
 }

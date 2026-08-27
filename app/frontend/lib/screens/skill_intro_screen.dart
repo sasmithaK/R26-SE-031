@@ -71,22 +71,13 @@ class _SkillIntroScreenState extends State<SkillIntroScreen> {
     await ProgressService().markSkillIntroSeen(widget.skillMap.id);
     if (!mounted) return;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LevelMapScreen(
-          skillMap: widget.skillMap,
-          studentData: widget.studentData,
-        ),
-      ),
-    );
+    Navigator.pop(context, true);
   }
 
   @override
   Widget build(BuildContext context) {
-    final introText = widget.skillMap.introText.isNotEmpty
-        ? widget.skillMap.introText
-        : 'සාදරයෙන් පිළිගන්නවා! මෙම කුසලතාවයෙන් අපි එකිනෙකට වෙනස් හැඩතල, රටා සහ වර්ණ හඳුනා ගැනීමට පුරුදු වෙමු.';
+    String introText = widget.skillMap.introText;
+    
 
     return Scaffold(
       backgroundColor: AppColors.cream,
@@ -129,9 +120,19 @@ class _SkillIntroScreenState extends State<SkillIntroScreen> {
                 widget.skillMap.title,
                 textAlign: TextAlign.center,
                 style: AppTypography.sinhala(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700, // Cleaner rendering than w900
                   color: AppColors.textPrimary,
+                  height: 1.3,
+                  letterSpacing: 0.5,
+                ).copyWith(
+                  shadows: [
+                    Shadow(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      offset: const Offset(0, 3),
+                      blurRadius: 8,
+                    )
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
@@ -212,14 +213,7 @@ class _SkillIntroScreenState extends State<SkillIntroScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     elevation: 4,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('ආරම්භ කරමු', style: AppTypography.button(fontSize: 20)),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.arrow_forward_rounded, size: 26),
-                    ],
-                  ),
+                  child: Text('ආරම්භ කරමු', style: AppTypography.button(fontSize: 20)),
                 ),
               ),
               const SizedBox(height: 12),

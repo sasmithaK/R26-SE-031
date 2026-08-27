@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
-import 'package:fl_chart/fl_chart.dart';
 import '../../theme/app_theme.dart';
+import '../../services/localization_service.dart';
 import '../../services/student_service.dart';
 import '../../services/telemetry_service.dart';
 import '../../widgets/telemetry_heatmap.dart';
-import '../../services/localization_service.dart';
 
 class TherapistStudentDetailScreen extends StatefulWidget {
   final Map<String, dynamic> student;
@@ -27,18 +26,18 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
   // Mock session history
   final List<Map<String, dynamic>> _sessions = [
     {
-      'date': 'Jul 28, 2026',
-      'duration': '45 min',
-      'type': 'Phonological Awareness',
+      'date': 'ජූලි 28, 2026',
+      'duration': 'මිනිත්තු 45',
+      'type': 'ශ්‍රව ධ්‍වනිමය දැනුවත්භාවය',
       'score': 78,
-      'notes': 'Excellent progress in syllable segmentation. Struggling with phoneme deletion tasks.',
+      'notes': 'අක්ෂර ඛණ්ඩ කිරීමේ විශිෂ්ට ප්‍රගතිය. ශ්‍රව ධ්‍වනිය ඉවත් කිරීමේ කාර්යයන්හිදී දුෂ්කරතා ඇත.',
     },
     {
-      'date': 'Jul 25, 2026',
-      'duration': '40 min',
-      'type': 'Reading Fluency',
+      'date': 'ජූලි 25, 2026',
+      'duration': 'මිනිත්තු 40',
+      'type': 'කියවීමේ ප්‍රවාහය',
       'score': 65,
-      'notes': 'Read 42 words per minute (up from 38). Still pausing at multisyllabic words.',
+      'notes': 'මිනිත්තුවකට වචන 42 කියවීය (38 සිට ඉහළ). බහු-අකුරු වචනවලදී ඉවකිරීම් ඇති.',
     },
   ];
 
@@ -46,7 +45,27 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
   bool _isSubmittingLabel = false;
   bool _isDownloadingReport = false;
   bool _isDownloadingAssessment = false;
-  final List<String> _labelOptions = ["Low Risk", "Moderate Risk", "Needs Attention"];
+  final List<String> _labelOptions = ["low risk", "moderate risk", "needs attention"];
+
+  // Maps backend risk strings to Sinhala for display
+  String _translateRisk(String risk) {
+    final lower = risk.toLowerCase();
+    if (lower.contains('low') || lower.contains('on track')) return LocalizationService.instance.t('risk_low');
+    if (lower.contains('moderate') || lower.contains('support')) return LocalizationService.instance.t('risk_moderate');
+    if (lower.contains('attention') || lower.contains('high')) return LocalizationService.instance.t('risk_high');
+    if (lower.contains('pending')) return LocalizationService.instance.t('risk_pending');
+    return risk;
+  }
+
+  // Maps backend cognitive index keys to localized display names
+  String _translateCognitiveName(String key) {
+    // key comes in as 'visual processing score' (after replaceAll('_', ' '))
+    final normalized = key.toLowerCase().replaceAll(' ', '_');
+    final translated = LocalizationService.instance.t(normalized);
+    // If no translation found, return a cleaned-up version
+    if (translated == normalized) return key;
+    return translated;
+  }
 
   String get _studentId => (widget.student['id'] ?? widget.student['_id']).toString();
 
@@ -79,8 +98,8 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
     
     if (error == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ground Truth Label submitted successfully!'),
+        SnackBar(
+          content: Text(LocalizationService.instance.t('gt_label_success')),
           backgroundColor: AppColors.gentleGreen,
         ),
       );
@@ -133,8 +152,8 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
     Navigator.of(context).pop(); // dismiss loading
 
     if (telemetryData.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('No telemetry data available for this student yet.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(LocalizationService.instance.t('no_telemetry_data')),
         backgroundColor: AppColors.softCoral,
       ));
       return;
@@ -161,8 +180,8 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
     }
 
     if (activityPoints.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('No touch paths found in the telemetry data.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(LocalizationService.instance.t('no_touch_paths')),
         backgroundColor: AppColors.softCoral,
       ));
       return;
@@ -204,8 +223,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Interaction Heatmaps',
+                    Text(LocalizationService.instance.t('interaction_heatmaps'),
                       style: AppTypography.heading(fontSize: 20, color: AppColors.textPrimary),
                     ),
                     IconButton(
@@ -226,8 +244,8 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                     final points = activityPoints[actName]!;
                     return HeatmapVisualizer(
                       touchPoints: points,
-                      title: 'Activity: $actName',
-                      subtitle: 'Aggregated touch precision tracking',
+                      title: '${LocalizationService.instance.t('activity')}: ${LocalizationService.instance.t(actName)}',
+                      subtitle: LocalizationService.instance.t('touch_precision_tracking'),
                     );
                   },
                 ),
@@ -243,7 +261,10 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
   Widget build(BuildContext context) {
     final student = widget.student;
 
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
       backgroundColor: AppColors.cream,
       body: SafeArea(
         child: FutureBuilder<Map<String, dynamic>>(
@@ -281,8 +302,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          'student profile',
+                        child: Text(LocalizationService.instance.t('student_profile_title'),
                           style: AppTypography.heading(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
@@ -297,7 +317,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          risk.toLowerCase(),
+                          _translateRisk(risk),
                           style: AppTypography.caption(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -356,7 +376,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '${student['age'] ?? student['grade'] ?? 'N/A'} · parent: ${student['parent'] ?? student['parent_name'] ?? 'N/A'}',
+                                '${student['age'] ?? student['grade'] ?? 'N/A'} · ${LocalizationService.instance.t('parent_label')}: ${student['parent'] ?? student['parent_name'] ?? 'N/A'}',
                                 style: AppTypography.caption(
                                   fontSize: 13,
                                   color: AppColors.textSecondary,
@@ -364,8 +384,9 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${LocalizationService.instance.t('Connected_Since')} ${student['connected'] ?? student['connected_at']?.toString().split('T')[0] ?? 'N/A'}',
+                                '${LocalizationService.instance.t('connected_since')} ${student['connected'] ?? student['connected_at']?.toString().split('T')[0] ?? 'N/A'}',
                                 style: AppTypography.caption(
+                                  fontSize: 12,
                                   color: AppColors.textHint,
                                 ),
                               ),
@@ -424,10 +445,10 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                     unselectedLabelColor: AppColors.textSecondary,
                     labelStyle: AppTypography.caption(fontSize: 13, fontWeight: FontWeight.w700),
                     unselectedLabelStyle: AppTypography.caption(fontSize: 13, fontWeight: FontWeight.w500),
-                    tabs: const [
-                      Tab(text: 'progress'),
-                      Tab(text: 'sessions'),
-                      Tab(text: 'plan'),
+                    tabs: [
+                      Tab(text: LocalizationService.instance.t('progress_tab')),
+                      Tab(text: LocalizationService.instance.t('sessions_tab')),
+                      Tab(text: LocalizationService.instance.t('plan_tab')),
                     ],
                   ),
                 ),
@@ -453,6 +474,8 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
         ),
       ),
     );
+      },
+    );
   }
 
   // ─── Progress Tab ───
@@ -462,8 +485,8 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
     // Fallback if no analytics exist yet
     if (indices.isEmpty) {
       indices = {
-        'waiting for data': 0.0,
-        'needs more play': 0.0,
+        LocalizationService.instance.t('waiting_for_data'): 0.0,
+        LocalizationService.instance.t('needs_more_play'): 0.0,
       };
     }
 
@@ -477,15 +500,22 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
           // Download Report Button
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 56,
             child: ElevatedButton.icon(
               onPressed: _isDownloadingReport ? null : _downloadReport,
               icon: _isDownloadingReport
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                   : const Icon(Icons.picture_as_pdf_rounded, size: 20),
-              label: Text(
-                _isDownloadingReport ? LocalizationService.instance.t('generating_report') : LocalizationService.instance.t('download_clinical_report'),
-                style: AppTypography.body(fontSize: 15, fontWeight: FontWeight.w700),
+              label: Flexible(
+                child: Text(
+                  _isDownloadingReport
+                      ? LocalizationService.instance.t('generating_report')
+                      : LocalizationService.instance.t('download_clinical_report'),
+                  style: AppTypography.body(fontSize: 14, fontWeight: FontWeight.w700),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.calmBlue,
@@ -495,20 +525,27 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           
           // Download Assessment Report Button
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 56,
             child: ElevatedButton.icon(
               onPressed: _isDownloadingAssessment ? null : _downloadAssessmentReport,
               icon: _isDownloadingAssessment
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.calmBlue, strokeWidth: 2))
                   : const Icon(Icons.assessment_rounded, size: 20),
-              label: Text(
-                _isDownloadingAssessment ? LocalizationService.instance.t('generating_assessment') : LocalizationService.instance.t('download_assessment_pdf'),
-                style: AppTypography.body(fontSize: 15, fontWeight: FontWeight.w700),
+              label: Flexible(
+                child: Text(
+                  _isDownloadingAssessment
+                      ? LocalizationService.instance.t('generating_assessment')
+                      : LocalizationService.instance.t('download_assessment_pdf'),
+                  style: AppTypography.body(fontSize: 14, fontWeight: FontWeight.w700),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
@@ -519,18 +556,23 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           
           // View Interaction Heatmaps Button
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 56,
             child: ElevatedButton.icon(
               onPressed: _showHeatmapsModal,
               icon: const Icon(Icons.touch_app_rounded, size: 20),
-              label: Text(
-                LocalizationService.instance.t('View_Interaction_Heatmaps'),
-                style: AppTypography.body(fontSize: 15, fontWeight: FontWeight.w700),
+              label: Flexible(
+                child: Text(
+                  LocalizationService.instance.t('view_interaction_heatmaps'),
+                  style: AppTypography.body(fontSize: 14, fontWeight: FontWeight.w700),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
@@ -564,8 +606,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'weekly progress',
+                    Text(LocalizationService.instance.t('weekly_progress'),
                       style: AppTypography.body(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -619,8 +660,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
           const SizedBox(height: 20),
 
           // Real Cognitive Skill Breakdown
-          Text(
-            'cognitive breakdown',
+          Text(LocalizationService.instance.t('cognitive_breakdown'),
             style: AppTypography.body(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -653,7 +693,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          name,
+                          _translateCognitiveName(name),
                           style: AppTypography.body(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -829,8 +869,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                   children: [
                     const Icon(Icons.psychology_outlined, color: AppColors.calmBlue, size: 24),
                     const SizedBox(width: 8),
-                    Text(
-                      'provide clinical label',
+                    Text(LocalizationService.instance.t('provide_clinical_label'),
                       style: AppTypography.body(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -840,8 +879,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Your assessment feeds our ML models. Please select the ground-truth risk level for this student based on their data.',
+                Text(LocalizationService.instance.t('assessment_feeds_ml'),
                   style: AppTypography.caption(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -858,8 +896,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _selectedLabel,
-                      hint: Text(
-                        'Select Risk Label',
+                      hint: Text(LocalizationService.instance.t('select_risk_label'),
                         style: AppTypography.caption(fontSize: 14, color: AppColors.textHint),
                       ),
                       isExpanded: true,
@@ -868,7 +905,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                         return DropdownMenuItem<String>(
                           value: value,
                           child: Text(
-                            value,
+                            _translateRisk(value),
                             style: AppTypography.body(fontSize: 14, color: AppColors.textPrimary),
                           ),
                         );
@@ -899,8 +936,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
                             height: 20, 
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
                           )
-                        : Text(
-                            'Submit Ground Truth Label',
+                        : Text(LocalizationService.instance.t('submit_gt_label'),
                             style: AppTypography.body(fontSize: 15, fontWeight: FontWeight.w700),
                           ),
                   ),
@@ -911,8 +947,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
 
           const SizedBox(height: 24),
 
-          Text(
-            'recommended interventions',
+          Text(LocalizationService.instance.t('recommended_interventions'),
             style: AppTypography.body(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -925,8 +960,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
-                child: Text(
-                  'No interventions generated yet.\nChild needs to play more games.',
+                child: Text(LocalizationService.instance.t('no_interventions'),
                   textAlign: TextAlign.center,
                   style: AppTypography.caption(color: AppColors.textHint, fontSize: 14),
                 ),
@@ -935,7 +969,7 @@ class _TherapistStudentDetailScreenState extends State<TherapistStudentDetailScr
 
           ...interventions.map((intervention) {
             final type = intervention['type'] ?? 'general';
-            final title = intervention['title'] ?? 'Strategy';
+            final title = intervention['title'] ?? LocalizationService.instance.t('strategy');
             final description = intervention['description'] ?? '';
             
             // Map type to visual

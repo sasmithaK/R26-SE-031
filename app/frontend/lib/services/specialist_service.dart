@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/foundation.dart';
+import '../config/api_config.dart';
 
 class SpecialistService {
-  final String _baseUrl = 'http://localhost:8015/api/v1/specialists';
+  String get _baseUrl => ApiConfig.specialistBaseUrl;
   final _storage = const FlutterSecureStorage();
 
   Future<String?> _getToken() async {

@@ -3,6 +3,7 @@ import '../widgets/app_loading_indicator.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
 import '../services/auth_service.dart';
+import '../services/localization_service.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String email;
@@ -68,8 +69,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.cream,
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.cream,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -85,7 +89,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'create new password',
+                LocalizationService.instance.t('create_new_password'),
                 style: AppTypography.heading(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
@@ -94,7 +98,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Your new password must be different from previous used passwords.',
+                LocalizationService.instance.t('new_password_desc'),
                 style: AppTypography.body(
                   fontSize: 16,
                   color: AppColors.textSecondary,
@@ -109,7 +113,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 obscureText: _obscurePassword,
                 style: AppTypography.body(fontSize: 16),
                 decoration: InputDecoration(
-                  hintText: 'new password',
+                  hintText: LocalizationService.instance.t('new_password_hint'),
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
                     icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
@@ -123,7 +127,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 obscureText: _obscureConfirmPassword,
                 style: AppTypography.body(fontSize: 16),
                 decoration: InputDecoration(
-                  hintText: 'confirm new password',
+                  hintText: LocalizationService.instance.t('confirm_new_password_hint'),
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
                     icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
@@ -137,7 +141,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               _isLoading
                   ? const Center(child: AppLoadingIndicator())
                   : GradientButton(
-                      text: 'reset password',
+                      text: LocalizationService.instance.t('btn_reset_password'),
                       onPressed: _resetPassword,
                       icon: Icons.lock_reset,
                     ),
@@ -146,6 +150,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           ),
         ),
       ),
+        );
+      },
     );
   }
 }

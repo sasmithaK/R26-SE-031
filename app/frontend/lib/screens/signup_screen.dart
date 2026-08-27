@@ -9,6 +9,8 @@ import 'character_intro_screen.dart';
 import 'therapist/therapist_dashboard_screen.dart';
 import 'otp_screen.dart';
 import '../widgets/sliding_role_toggle.dart';
+import '../services/localization_service.dart';
+import '../widgets/language_selector_button.dart';
 
 /// Sign-Up Screen
 /// Dyslexia-accessible: crème background, warm white inputs, 18pt+ text,
@@ -150,8 +152,11 @@ class _SignUpScreenState extends State<SignUpScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.cream,
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.cream,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -159,7 +164,6 @@ class _SignUpScreenState extends State<SignUpScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 12),
-
                   Stack(
                     alignment: Alignment.topCenter,
                     children: [
@@ -198,6 +202,11 @@ class _SignUpScreenState extends State<SignUpScreen>
                           ),
                         ),
                       ),
+                      // Language Selector on the right
+                      const Align(
+                        alignment: Alignment.topRight,
+                        child: LanguageSelectorButton(),
+                      ),
                     ],
                   ),
 
@@ -205,7 +214,7 @@ class _SignUpScreenState extends State<SignUpScreen>
 
                   // Heading
                   Text(
-                    'create your account',
+                    LocalizationService.instance.t('signup_title'),
                     style: AppTypography.heading(
                       fontSize: 30,
                       fontWeight: FontWeight.w700,
@@ -214,7 +223,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'join the learning adventure today',
+                    LocalizationService.instance.t('signup_subtitle'),
                     style: AppTypography.body(
                       fontSize: 16,
                       color: AppColors.textSecondary,
@@ -256,7 +265,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                           controller: _nameController,
                           style: AppTypography.body(fontSize: 16),
                           decoration: InputDecoration(
-                            hintText: 'your name',
+                            hintText: LocalizationService.instance.t('parent_name_hint'),
                             prefixIcon: const Icon(Icons.person_outline_rounded),
                           ),
                         ),
@@ -269,7 +278,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                           keyboardType: TextInputType.emailAddress,
                           style: AppTypography.body(fontSize: 16),
                           decoration: InputDecoration(
-                            hintText: 'email address',
+                            hintText: LocalizationService.instance.t('email_hint'),
                             prefixIcon: const Icon(Icons.email_outlined),
                           ),
                         ),
@@ -286,7 +295,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                                 controller: _specializationController,
                                 style: AppTypography.body(fontSize: 16),
                                 decoration: InputDecoration(
-                                  hintText: 'specialization (e.g. Speech Therapist)',
+                                  hintText: LocalizationService.instance.t('specialization_hint'),
                                   prefixIcon: const Icon(Icons.psychology_outlined),
                                 ),
                               ),
@@ -295,7 +304,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                                 controller: _clinicNameController,
                                 style: AppTypography.body(fontSize: 16),
                                 decoration: InputDecoration(
-                                  hintText: 'clinic name (optional)',
+                                  hintText: LocalizationService.instance.t('clinic_hint'),
                                   prefixIcon: const Icon(Icons.local_hospital_outlined),
                                 ),
                               ),
@@ -313,7 +322,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                           obscureText: !_isPasswordVisible,
                           style: AppTypography.body(fontSize: 16),
                           decoration: InputDecoration(
-                            hintText: 'create password',
+                            hintText: LocalizationService.instance.t('password_hint_create'),
                             prefixIcon: const Icon(Icons.lock_outline_rounded),
                             suffixIcon: IconButton(
                               icon: Icon(
@@ -338,7 +347,7 @@ class _SignUpScreenState extends State<SignUpScreen>
 
                   // Sign up button
                   GradientButton(
-                    text: _isLoading ? 'creating account...' : 'sign up',
+                    text: _isLoading ? LocalizationService.instance.t('signing_up') : LocalizationService.instance.t('btn_signup'),
                     icon: Icons.person_add_rounded,
                     onPressed: _isLoading ? () {} : _onSignUp,
                   ),
@@ -352,7 +361,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
-                          'or',
+                          LocalizationService.instance.t('or'),
                           style: AppTypography.caption(fontSize: 14),
                         ),
                       ),
@@ -391,7 +400,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'already have an account? ',
+                          LocalizationService.instance.t('already_have_account'),
                           style: AppTypography.body(
                             fontSize: 14,
                             color: AppColors.textSecondary,
@@ -406,7 +415,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                             );
                           },
                           child: Text(
-                            'sign in',
+                            LocalizationService.instance.t('btn_signin'),
                             style: AppTypography.body(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -423,6 +432,8 @@ class _SignUpScreenState extends State<SignUpScreen>
               ),
             ),
       ),
+    );
+      },
     );
   }
 

@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import '../../../widgets/app_loading_indicator.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../models/curriculum_models.dart';
 import '../../../../widgets/telemetry_wrapper.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../services/tts_service.dart';
+import '../../../../services/progress_service.dart';
 import 'widgets/pattern_background.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
 // ──────────────────────────────────────────────────────────────
 // Activity 05: Memory Adventure
@@ -33,7 +36,8 @@ class MemoryRound {
 
 class VisualAct5MemoryHats extends StatefulWidget {
   final ActivityNode activityNode;
-  const VisualAct5MemoryHats({Key? key, required this.activityNode}) : super(key: key);
+  final Map<String, dynamic>? studentData;
+  const VisualAct5MemoryHats({Key? key, required this.activityNode, this.studentData}) : super(key: key);
 
   @override
   _VisualAct5MemoryAdventureState createState() => _VisualAct5MemoryAdventureState();
@@ -70,7 +74,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
   static const List<String> _encourageMessages = [
     'හොඳට බලන්න! 👀',
     'ඔයාට පුළුවන්! 💪',
-    'නියමයි, දිගටම! ⭐',
+    'හොඳයි, දිගටම! ⭐',
     'මනාව! 🌟',
     'සුපිරියි! 🎉',
   ];
@@ -98,12 +102,12 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
     'animals/rabbit.png', 'animals/turtle.png',
     'fruits_food/apple.png', 'fruits_food/banana.png', 'fruits_food/grapes.png',
     'fruits_food/ice_cream.png', 'fruits_food/mango.png', 'fruits_food/orange.png', 'fruits_food/watermelon.png',
-    'nature/flower.png', 'nature/leaf.png', 'nature/sun.png',
+    'flowers/nil_manel.png', 'flowers/nelum.png', 'flowers/flower_05.png',
   ];
 
   static const List<String> _instructions = [
     'හොඳින් මතක තබා ගන්න!', // Look carefully!
-    'රූප තිබෙන තැන් මතක තියාගන්න!', // Remember where the pictures are!
+    'පින්තූර තිබෙන තැන් මතක තියාගන්න!', // Remember where the pictures are!
   ];
   late String _currentInstruction;
 
@@ -115,6 +119,11 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
   void initState() {
     super.initState();
     _rounds = _generateRounds();
+    _currentRoundIndex = ProgressService().getActivityState(
+      widget.activityNode.skillId,
+      widget.activityNode.id,
+    );
+    if (_currentRoundIndex >= _rounds.length) _currentRoundIndex = 0;
     
     final rng = Random();
     _currentInstruction = _instructions[rng.nextInt(_instructions.length)];
@@ -276,7 +285,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
       _currentPhase = MemoryPhase.recall;
     });
 
-    _playInstruction('මේ රූපය තිබුණේ කොහෙද?');
+    _playInstruction('මේ පින්තූරය තිබූ තැන තෝරන්න');
   }
 
   @override
@@ -289,9 +298,11 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
     for (var controller in _cardFlipControllers) {
       controller.dispose();
     }
+
     _audioPlayer.dispose();
     super.dispose();
   }
+
 
   // ── Game logic ──
 
@@ -307,7 +318,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
       _isProcessingTap = true;
       _cardFlipControllers[index].reverse();
       
-      _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
       final rng = Random();
       _currentEncouragement = _encourageMessages[rng.nextInt(_encourageMessages.length)];
       
@@ -323,7 +334,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
     } else {
       // Wrong!
       _isProcessingTap = true;
-      _audioPlayer.play(AssetSource('audio/wrong.mp3'));
+      SoundUtils.playFeedback('audio/wrong.mp3');
       context.findAncestorStateOfType<TelemetryWrapperState>()?.recordMisclick();
       
       // Briefly flip to show they got it wrong, then flip back
@@ -356,14 +367,39 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
         setState(() {
           _currentRoundIndex++;
         });
+        ProgressService().saveActivityState(
+          widget.activityNode.skillId,
+          widget.activityNode.id,
+          _currentRoundIndex,
+        );
+        ProgressService().saveActivityScore(
+          widget.activityNode.skillId,
+          widget.activityNode.id,
+          ((_currentRoundIndex / _rounds.length) * 100).toInt(),
+        );
         _initRoundState();
         _roundTransitionController.forward();
       });
     } else {
       // Activity complete!
+      ProgressService().clearActivityState(
+        widget.activityNode.skillId,
+        widget.activityNode.id,
+      );
+      ProgressService().saveActivityScore(
+        widget.activityNode.skillId,
+        widget.activityNode.id,
+        100,
+      );
       setState(() {
-        _activityComplete = true;
-      });
+          _activityComplete = true;
+          final sId = widget.activityNode?.skillId ?? '';
+          final aId = widget.activityNode?.id ?? '';
+          if (sId.isNotEmpty && aId.isNotEmpty) {
+            ProgressService().saveActivityScore(sId, aId, 100);
+            ProgressService().clearActivityState(sId, aId);
+          }
+        });
       _celebrationController.forward();
     }
   }
@@ -409,8 +445,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
                   const SizedBox(height: 4),
                   _buildGameArea(),
                   const SizedBox(height: 12),
-                  _buildMascotArea(),
-                  const SizedBox(height: 8),
+
                 ],
               ),
             ),
@@ -433,7 +468,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4A90D9).withOpacity(0.12),
+            color: const Color(0xFF4A90D9).withValues(alpha: 0.12),
             blurRadius: 12,
             offset: const Offset(0, 3),
           ),
@@ -464,7 +499,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
 
                     Flexible(
                       child: Text(
-                        widget.activityNode.skillTitle.isEmpty ? 'මතක අභියෝගය' : widget.activityNode.skillTitle,
+                        widget.activityNode.title.isEmpty ? 'මතක අභියෝගය' : widget.activityNode.title,
                         style: AppTypography.heading(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -532,7 +567,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
                       ? const Color(0xFFF9C623)
                       : const Color(0xFFE0E0E0),
               border: isCurrent
-                  ? Border.all(color: const Color(0xFFF9C623).withOpacity(0.3), width: 2)
+                  ? Border.all(color: const Color(0xFFF9C623).withValues(alpha: 0.3), width: 2)
                   : null,
             ),
           );
@@ -544,7 +579,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
   // ── Instruction Card ──
   Widget _buildInstructionCard() {
     final bool isRecall = _currentPhase == MemoryPhase.recall || _currentPhase == MemoryPhase.success;
-    final String text = isRecall ? 'මේ රූපය තිබුණේ කොහෙද?' : _currentInstruction;
+    final String text = isRecall ? 'මේ පින්තූරය තිබූ තැන තෝරන්න' : _currentInstruction;
     
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 500),
@@ -565,7 +600,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
           margin: const EdgeInsets.symmetric(horizontal: 16),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: AppColors.warmAmber.withOpacity(0.15),
+            color: AppColors.warmAmber.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: AppColors.warmAmber, width: 3),
           ),
@@ -580,7 +615,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.warmAmber.withOpacity(0.4), width: 2),
+                    border: Border.all(color: AppColors.warmAmber.withValues(alpha: 0.4), width: 2),
                   ),
                   child: Image.asset('assets/images/activity_icons/${_currentRound.targetAsset}'),
                 ),
@@ -594,7 +629,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
                 scale: _speakerBounceAnimation,
                 child: Container(
                   width: 48, height: 48,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.warmAmber, boxShadow: [BoxShadow(color: AppColors.warmAmber.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 3))]),
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.warmAmber, boxShadow: [BoxShadow(color: AppColors.warmAmber.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))]),
                   child: const Icon(Icons.volume_up_rounded, color: Colors.white, size: 26),
                 ),
               ),
@@ -635,7 +670,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 )
@@ -659,25 +694,31 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
     );
   }
 
-  // ── Main Game Area (Wrap Layout for Cards) ──
   Widget _buildGameArea() {
     return Expanded(
-      child: Center(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Wrap(
-              spacing: 16,
-              runSpacing: 24,
-              alignment: WrapAlignment.center,
-              children: List.generate(_currentRound.itemCount, (index) {
-                final asset = _currentRound.assets[index];
-                return _buildCardWidget(index, asset);
-              }),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: Wrap(
+                    spacing: 16,
+                    runSpacing: 24,
+                    alignment: WrapAlignment.center,
+                    children: List.generate(_currentRound.itemCount, (index) {
+                      final asset = _currentRound.assets[index];
+                      return _buildCardWidget(index, asset);
+                    }),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -695,17 +736,17 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
     bool isCorrect = _currentPhase == MemoryPhase.success && isTarget;
     bool isWrong = _lastMistakeIndex == index;
 
-    Color borderColor = const Color(0xFF4A90D9).withOpacity(0.3);
+    Color borderColor = const Color(0xFF4A90D9).withValues(alpha: 0.3);
     Color bgColor = Colors.white;
     double borderWidth = 2.0;
 
     if (isCorrect) {
       borderColor = const Color(0xFF6DBE6D);
-      bgColor = const Color(0xFF6DBE6D).withOpacity(0.15);
+      bgColor = const Color(0xFF6DBE6D).withValues(alpha: 0.15);
       borderWidth = 4.0;
     } else if (isWrong) {
       borderColor = const Color(0xFFE87C6D);
-      bgColor = const Color(0xFFE87C6D).withOpacity(0.15);
+      bgColor = const Color(0xFFE87C6D).withValues(alpha: 0.15);
       borderWidth = 4.0;
     }
 
@@ -771,19 +812,19 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
         boxShadow: [
           if (isCorrect)
             BoxShadow(
-              color: const Color(0xFF6DBE6D).withOpacity(0.3),
+              color: const Color(0xFF6DBE6D).withValues(alpha: 0.3),
               blurRadius: 16,
               spreadRadius: 2,
             )
           else if (isWrong)
             BoxShadow(
-              color: const Color(0xFFE87C6D).withOpacity(0.3),
+              color: const Color(0xFFE87C6D).withValues(alpha: 0.3),
               blurRadius: 16,
               spreadRadius: 2,
             )
           else
             BoxShadow(
-              color: const Color(0xFF4A90D9).withOpacity(0.15),
+              color: const Color(0xFF4A90D9).withValues(alpha: 0.15),
               blurRadius: 10,
               offset: const Offset(0, 4),
             )
@@ -823,7 +864,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
                                 size: sizes[index],
                                 shadows: [
                                   Shadow(
-                                    color: const Color(0xFFFFD700).withOpacity(0.6),
+                                    color: const Color(0xFFFFD700).withValues(alpha: 0.6),
                                     blurRadius: 12,
                                   )
                                 ],
@@ -855,13 +896,13 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.white.withOpacity(0.5),
+          color: Colors.white.withValues(alpha: 0.5),
           width: 3,
         ),
       ),
@@ -885,12 +926,12 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFFDF00).withOpacity(0.4),
+                  color: const Color(0xFFFFDF00).withValues(alpha: 0.4),
                   blurRadius: 12,
                   spreadRadius: 2,
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 6,
                   offset: const Offset(0, 3),
                 )
@@ -937,19 +978,19 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF4A90D9).withOpacity(0.15),
+                    color: const Color(0xFF4A90D9).withValues(alpha: 0.15),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
                 border: Border.all(
-                  color: const Color(0xFF4A90D9).withOpacity(0.3),
+                  color: const Color(0xFF4A90D9).withValues(alpha: 0.3),
                   width: 1.5,
                 ),
               ),
               child: Text(
                 _activityComplete
-                    ? 'නියමයි! 🎉'
+                    ? 'හොඳයි! 🎉'
                     : _currentPhase == MemoryPhase.success
                         ? 'සුපිරියි! ✨'
                         : _currentEncouragement,
@@ -969,51 +1010,11 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
   // ── Celebration Overlay ──
   Widget _buildCelebrationOverlay() {
     return Positioned.fill(
-      child: FadeTransition(
-        opacity: _celebrationScale,
-        child: Container(
-          color: Colors.white.withOpacity(0.9),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ScaleTransition(
-                  scale: _celebrationScale,
-                  child: const Icon(Icons.star_rounded, color: Color(0xFFF9C623), size: 120),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'නියමයි! ඔයා හරිම දක්ෂයි!',
-                  style: AppTypography.sinhala(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF3E3E3E),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: _finishActivity,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90D9),
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    elevation: 4,
-                  ),
-                  child: Text(
-                    'ඉදිරියට යමු',
-                    style: AppTypography.sinhala(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      child: SharedCelebrationPopup(
+        studentData: widget.studentData,
+        activityTitle: widget.activityNode.title,
+        scaleAnimation: _celebrationScale,
+        onFinish: _finishActivity,
       ),
     );
   }
@@ -1023,7 +1024,7 @@ class _CardPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.12)
+      ..color = Colors.white.withValues(alpha: 0.12)
       ..style = PaintingStyle.fill;
 
     // Draw soft, playful circles (bokeh effect)
@@ -1036,7 +1037,7 @@ class _CardPatternPainter extends CustomPainter {
     
     // Draw magical sparkling stars
     final starPaint = Paint()
-      ..color = Colors.white.withOpacity(0.25)
+      ..color = Colors.white.withValues(alpha: 0.25)
       ..style = PaintingStyle.fill;
       
     _drawSparkle(canvas, Offset(size.width * 0.5, size.height * 0.12), 6, starPaint);

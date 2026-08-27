@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
 import 'comprehensive_assessment_selection_screen.dart';
 import 'parent_account_screen.dart';
+import '../services/localization_service.dart';
 
 /// Friendly prompt screen shown after a student is successfully saved.
 /// Gently encourages the parent to take the assessment without forcing it.
@@ -62,6 +63,7 @@ class _AssessmentPromptScreenState extends State<AssessmentPromptScreen>
         builder: (context) => ComprehensiveAssessmentSelectionScreen(
           studentId: widget.studentId,
           studentName: widget.studentName,
+          avatarUrl: widget.avatarUrl,
         ),
       ),
     );
@@ -73,8 +75,11 @@ class _AssessmentPromptScreenState extends State<AssessmentPromptScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.cream,
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.cream,
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
@@ -112,7 +117,7 @@ class _AssessmentPromptScreenState extends State<AssessmentPromptScreen>
 
                   // Congrats title
                   Text(
-                    'student added!',
+                    LocalizationService.instance.t('student_added'),
                     style: AppTypography.heading(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
@@ -123,7 +128,7 @@ class _AssessmentPromptScreenState extends State<AssessmentPromptScreen>
                   const SizedBox(height: 8),
 
                   Text(
-                    '${widget.studentName} is all set up and ready to learn.',
+                    '${widget.studentName}${LocalizationService.instance.t('student_setup_ready_1')}',
                     textAlign: TextAlign.center,
                     style: AppTypography.body(
                       fontSize: 16,
@@ -173,7 +178,7 @@ class _AssessmentPromptScreenState extends State<AssessmentPromptScreen>
                         const SizedBox(height: 16),
 
                         Text(
-                          'personalize learning',
+                          LocalizationService.instance.t('personalize_learning'),
                           style: AppTypography.heading(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -184,7 +189,7 @@ class _AssessmentPromptScreenState extends State<AssessmentPromptScreen>
                         const SizedBox(height: 10),
 
                         Text(
-                          'A quick 2-minute evaluation helps us understand ${widget.studentName}\'s unique learning style and tailor activities just for them.',
+                          '${LocalizationService.instance.t('evaluation_desc_1')}${widget.studentName}${LocalizationService.instance.t('evaluation_desc_2')}',
                           textAlign: TextAlign.center,
                           style: AppTypography.body(
                             fontSize: 14,
@@ -201,9 +206,9 @@ class _AssessmentPromptScreenState extends State<AssessmentPromptScreen>
                           spacing: 10,
                           runSpacing: 10,
                           children: [
-                            _buildBenefitChip(Icons.auto_awesome_rounded, 'personalized'),
-                            _buildBenefitChip(Icons.timer_rounded, '2 min'),
-                            _buildBenefitChip(Icons.lock_rounded, 'private'),
+                            _buildBenefitChip(Icons.auto_awesome_rounded, LocalizationService.instance.t('personalized')),
+                            _buildBenefitChip(Icons.timer_rounded, LocalizationService.instance.t('2_min')),
+                            _buildBenefitChip(Icons.lock_rounded, LocalizationService.instance.t('private')),
                           ],
                         ),
                       ],
@@ -214,7 +219,7 @@ class _AssessmentPromptScreenState extends State<AssessmentPromptScreen>
 
                   // CTA Buttons
                   GradientButton(
-                    text: 'start assessment',
+                    text: LocalizationService.instance.t('start_assessment'),
                     icon: Icons.play_arrow_rounded,
                     gradient: AppColors.blueButtonGradient,
                     onPressed: _startAssessment,
@@ -222,17 +227,28 @@ class _AssessmentPromptScreenState extends State<AssessmentPromptScreen>
 
                   const SizedBox(height: 14),
 
-                  // Skip button — subtle, non-pushy
-                  TextButton(
+                  // Skip button — better UX design (long button)
+                  ElevatedButton(
                     onPressed: _skipForNow,
-                    style: TextButton.styleFrom(
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 56),
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.textSecondary,
+                      elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 32),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: AppColors.textHint.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                      ),
                     ),
                     child: Text(
-                      'maybe later',
+                      LocalizationService.instance.t('maybe_later'),
                       style: AppTypography.body(
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -241,7 +257,7 @@ class _AssessmentPromptScreenState extends State<AssessmentPromptScreen>
                   const SizedBox(height: 8),
 
                   Text(
-                    'you can always start this from the student\'s profile.',
+                    LocalizationService.instance.t('assessment_later_desc'),
                     textAlign: TextAlign.center,
                     style: AppTypography.caption(
                       fontSize: 12,
@@ -257,6 +273,8 @@ class _AssessmentPromptScreenState extends State<AssessmentPromptScreen>
         ),
       ),
     );
+  },
+);
   }
 
   Widget _buildBenefitChip(IconData icon, String label) {

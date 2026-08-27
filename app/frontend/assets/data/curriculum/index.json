@@ -1,7 +1,7 @@
 [
   {
     "id": "skill_1",
-    "title": "පින්තූර හඳුනාගැනීම",
+    "title": "පින්තූර හඳුනාගනිමු",
     "description": "පින්තූර හඳුනාගනිමු! 👁️",
     "file_path": "skill_1.json",
     "total_activities": 5,
@@ -13,10 +13,10 @@
   },
   {
     "id": "skill_2",
-    "title": "මූලික අකුරු හඳුනාගැනීම",
+    "title": "මූලික අකුරු හඳුනාගනිමු",
     "description": "විනෝදයෙන් අකුරු ඉගෙන ගනිමු! 🎵",
     "file_path": "skill_2.json",
-    "total_activities": 6,
+    "total_activities": 5,
     "image_path": "assets/images/skills/s1.png",
     "color_hex": "#6DBE6D",
     "emoji": "🅰️",
@@ -25,7 +25,7 @@
   },
   {
     "id": "skill_3",
-    "title": "සරල වචන සැකසීම",
+    "title": "සරල වචන සකසමු",
     "description": "අකුරු එකතු කර සරල වචන සාදමු! 🧩",
     "file_path": "skill_3.json",
     "total_activities": 5,
@@ -37,10 +37,10 @@
   },
   {
     "id": "skill_4",
-    "title": "සරල වාක්‍ය සැකසීම",
+    "title": "සරල වාක්‍ය සකසමු",
     "description": "සරල වාක්‍ය කියවමු! 🏆",
     "file_path": "skill_4.json",
-    "total_activities": 4,
+    "total_activities": 5,
     "image_path": "assets/images/skills/s3.png",
     "color_hex": "#E87C6D",
     "emoji": "🏆",
@@ -49,13 +49,25 @@
   },
   {
     "id": "skill_5",
-    "title": "කියවා තේරුම් ගැනීම",
+    "title": "කියවා තේරුම් ගනිමු",
     "description": "සැබෑ උගතෙකු සේ ඔබ කියවන දේ තේරුම් ගන්න! 🧠",
     "file_path": "skill_5.json",
     "total_activities": 4,
     "image_path": "assets/images/skills/s4.png",
     "color_hex": "#9B7ED4",
     "emoji": "🧠",
+    "audio_url": "",
+    "is_locked": true
+  },
+  {
+    "id": "skill_6",
+    "title": "සිංහල පෙළපොත",
+    "description": "1 ශ්‍රේණියේ සිංහල පෙළපොත ඇසුරින් කියවමු! 📚",
+    "file_path": "skill_6.json",
+    "total_activities": 2,
+    "image_path": "assets/images/skills/s4.png",
+    "color_hex": "#5CA9D6",
+    "emoji": "📚",
     "audio_url": "",
     "is_locked": true
   }

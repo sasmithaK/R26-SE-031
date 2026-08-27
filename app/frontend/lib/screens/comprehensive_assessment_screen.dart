@@ -7,7 +7,7 @@ import '../theme/app_theme.dart';
 import '../models/comprehensive_assessment_questions.dart';
 import '../widgets/gradient_button.dart';
 import '../services/student_service.dart';
-
+import '../services/localization_service.dart';
 class ComprehensiveAssessmentScreen extends StatefulWidget {
   final String studentId;
   final String category;
@@ -124,17 +124,20 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
 
   @override
   Widget build(BuildContext context) {
-    if (_questions.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Error')),
-        body: const Center(child: Text('Questions not found for this category.')),
-      );
-    }
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        if (_questions.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Error')),
+            body: const Center(child: Text('Questions not found for this category.')),
+          );
+        }
 
-    final progress = (_currentIndex + 1) / _questions.length;
+        final progress = (_currentIndex + 1) / _questions.length;
 
-    return Scaffold(
-      body: Stack(
+        return Scaffold(
+          body: Stack(
         children: [
           // Map Background
           Container(
@@ -174,7 +177,7 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
                                       Text(
-                                        'Question ',
+                                        LocalizationService.instance.t('question_prefix'),
                                         style: AppTypography.caption(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w500,
@@ -275,7 +278,9 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
                             duration: const Duration(milliseconds: 300),
                             opacity: _answers[_currentIndex] == null ? 0.0 : 1.0,
                             child: GradientButton(
-                              text: _currentIndex == _questions.length - 1 ? 'Finish Evaluation' : 'Next Question',
+                              text: _currentIndex == _questions.length - 1 
+                                  ? LocalizationService.instance.t('btn_finish_evaluation') 
+                                  : LocalizationService.instance.t('btn_next_question'),
                               icon: _currentIndex == _questions.length - 1 ? Icons.check_circle_rounded : Icons.arrow_forward_rounded,
                               onPressed: _answers[_currentIndex] == null 
                                   ? () {}
@@ -299,6 +304,8 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
           ),
         ],
       ),
+    );
+      },
     );
   }
 
@@ -342,7 +349,7 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Question ${index + 1}',
+                    '${LocalizationService.instance.t("question_prefix")}${index + 1}',
                     style: AppTypography.caption(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
@@ -377,8 +384,8 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
                   children: [
                     Expanded(
                       child: _buildInteractiveBlock(
-                        text: 'ඔව්',
-                        subtext: 'Yes',
+                        text: LocalizationService.instance.t('btn_yes'),
+                        subtext: '',
                         icon: Icons.check_rounded,
                         isSelected: _answers[index] == true,
                         activeGradient: AppColors.greenGradient,
@@ -389,10 +396,11 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
                     const SizedBox(width: 16),
                     Expanded(
                       child: _buildInteractiveBlock(
-                        text: 'නැත',
-                        subtext: 'No',
+                        text: LocalizationService.instance.t('btn_no'),
+                        subtext: '',
                         icon: Icons.close_rounded,
                         isSelected: _answers[index] == false,
+
                         activeGradient: AppColors.greenGradient,
                         activeShadow: AppColors.gentleGreen,
                         onTap: () => _onOptionSelected(index, false),
@@ -471,14 +479,17 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
                 color: isSelected ? Colors.white : AppColors.textPrimary,
               ),
             ),
-            Text(
-              subtext,
-              style: AppTypography.caption(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white.withValues(alpha: 0.8) : AppColors.textHint,
+            if (subtext.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                subtext,
+                style: AppTypography.caption(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white.withValues(alpha: 0.8) : AppColors.textHint,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

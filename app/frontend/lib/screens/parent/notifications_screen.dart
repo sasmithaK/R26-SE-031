@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../services/localization_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../theme/app_theme.dart';
+import '../../services/localization_service.dart';
 
 /// Notifications Screen — Milestones, therapist updates, reminders.
 class NotificationsScreen extends StatelessWidget {
@@ -48,7 +48,7 @@ class NotificationsScreen extends StatelessWidget {
           ],
         },
         {
-          'date': 'this week',
+          'date': 'this_week',
           'items': [
             {
               'icon': FontAwesomeIcons.chartLine,
@@ -70,8 +70,11 @@ class NotificationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.cream,
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.cream,
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -86,6 +89,8 @@ class NotificationsScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+      }
     );
   }
 
@@ -137,7 +142,7 @@ class NotificationsScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              '3 ${LocalizationService.instance.t('new_notifications')}',
+              '3 ${LocalizationService.instance.t('new')}',
               style: AppTypography.caption(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
@@ -161,7 +166,7 @@ class NotificationsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text(
-              group['date'] as String,
+              LocalizationService.instance.t(group['date'] as String),
               style: AppTypography.caption(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,

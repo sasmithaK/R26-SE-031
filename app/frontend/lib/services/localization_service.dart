@@ -53,8 +53,8 @@ class LocalizationService extends ChangeNotifier {
   static const Map<String, Map<String, String>> _translations = {
     'si': {
       'welcome_title': 'ආයුබෝවන්!',
-      'welcome_subtitle': 'සතුටින් ඉගෙන ගන්න, දැනුමෙන් ඉදිරියට යන්න, සිංහල ඉගෙනුම් ලෝකයේ පුංචි වීරයෙක් වෙන්න!',
-      'welcome_btn_signup': 'ආරම්භ කරන්න',
+'welcome_subtitle': 'සතුටින් ඉගෙන ගන්න, දැනුමෙන් ඉදිරියට යන්න, සිංහල ඉගෙනුම් ලෝකයේ පුංචි වීරයෙක් වෙන්න!',
+'welcome_subtitle': 'ඔබගේ සිංහල ඉගෙනුම්\nවික්‍රමය මෙතැනින් අරඹන්න!',      'welcome_btn_signup': 'ආරම්භ කරන්න',
       'welcome_btn_signin': 'මට දැනටමත් ගිණුමක් ඇත',
       'btn_signin': 'ඇතුළු වන්න',
       'signing_in': 'ඇතුළු වෙමින්...',
@@ -84,8 +84,8 @@ class LocalizationService extends ChangeNotifier {
       'parent_name_hint': 'ඔබගේ නම',
       'role_parent': 'දෙමාපිය',
       'role_therapist': 'චිකිත්සක',
-      //'specialization_hint': 'විශේෂඥතාව (කථන චිකිත්සක)',
-      'clinic_hint': 'සායනයේ නම (විකල්ප)',
+//'specialization_hint': 'විශේෂඥතාව (කථන චිකිත්සක)',
+'specialization_hint': 'විශේෂඥතාව (කථන චිකිත්සක)',      'clinic_hint': 'සායනයේ නම (විකල්ප)',
       'or': 'හෝ',
       'mobile_number': 'දුරකථන අංකය',
       'mobile_number_hint': 'ඔබගේ දුරකථන අංකය',
@@ -137,11 +137,14 @@ class LocalizationService extends ChangeNotifier {
       'show_less': 'අඩුවෙන් පෙන්වන්න',
       'student_added': 'සිසුවා එකතු කරන ලදී!',
       'student_setup_ready_1': ' සියල්ල සකසා ඇති අතර ඉගෙනීමට සූදානම්.',
-      'personalize_learning': 'ඔබටම ගැළපෙන ඉගෙනීම',
+'personalize_learning': 'ඔබටම ගැළපෙන ඉගෙනීම',
       'evaluation_desc_1': 'විනාඩි 2ක කෙටි ඇගයීමක් මගින් ',
       'evaluation_desc_2': 'ගේ සුවිශේෂී ඉගෙනුම් රටාව තේරුම් ගෙන ඔවුන්ට ගැලපෙන ක්‍රියාකාරකම් සකස් කිරීමට අපට උපකාරී වේ.',
       'personalized': 'ඔබට ගැළපෙන පාඩම්',
-      '2_min': 'විනාඩි 2යි',
+'personalize_learning': 'පුද්ගලීකරණ ඉගෙනීම',
+      'evaluation_desc_1': 'විනාඩි 2ක කෙටි ඇගයීමක් මගින් ',
+      'evaluation_desc_2': 'ගේ සුවිශේෂී ඉගෙනුම් රටාව තේරුම් ගෙන ඔවුන්ට ගැලපෙන ක්‍රියාකාරකම් සකස් කිරීමට අපට උපකාරී වේ.',
+      'personalized': 'පුද්ගලීකරණය කළ',      '2_min': 'විනාඩි 2යි',
       'private': 'පෞද්ගලිකයි',
       'assessment_prompt_desc': 'විනාඩි 2ක කෙටි ඇගයීමක් මගින් ඔවුන්ගේ සුවිශේෂී ඉගෙනුම් රටාව තේරුම් ගෙන ඔවුන්ට ගැලපෙන ක්‍රියාකාරකම් සකස් කිරීමට අපට උපකාරී වේ.',
       'add_student': 'සිසුවෙකු එකතු කරන්න',
@@ -156,7 +159,7 @@ class LocalizationService extends ChangeNotifier {
       'app_updates': 'යෙදුම් යාවත්කාලීන සහ විශේෂාංග',
       'app_updates_desc': 'නව අධ්‍යාපනික මෙවලම් පිළිබඳ වැදගත් නිවේදන ලබා ගන්න.',
       'email_support': 'විද්‍යුත් තැපැල් සහාය',
-      'contact_support': 'සහාය අමතන්න',
+'contact_support': 'සහාය අමතන්න',
       'phone_support': 'දුරකථන සහාය',
       'faq': 'නිතර අසන ප්‍රශ්න',
       'logout': 'ඉවත් වන්න',
@@ -190,12 +193,14 @@ class LocalizationService extends ChangeNotifier {
 
       'clinic_name': 'සායනයේ නම',
       'not_set': 'සකසා නැත',
-      'activities': 'ක්‍රියාකාරකම්',
+'phone_support': 'දුරකථන සහාය',
+      'faq': 'නිතර අසන ප්‍රශ්න',
+      'logout': 'ඉවත් වන්න',      'activities': 'ක්‍රියාකාරකම්',
       'accuracy': 'නිරවද්‍යතාව',
       'day_streak': 'අඛණ්ඩව ඉගෙනගත් දින',
       'stars_earned': 'ලබාගත් තරු',
       'weekly_activity': 'සතිපතා ක්‍රියාකාරකම්',
-      'recent_skills': 'අලුතින් ඉගෙනගත් කුසලතා',
+'recent_skills': 'අලුතින් ඉගෙනගත් කුසලතා',
       'view_advanced_reports': 'වැඩිදුර ප්‍රගති වාර්තා සහ සිතියම් බලන්න',
       'progress_report': 'ප්‍රගති වාර්තාව', 
       'no_activities_played': 'තවමත් ක්‍රියාකාරකම් කර නැත',
@@ -220,8 +225,12 @@ class LocalizationService extends ChangeNotifier {
       'Track_Your_Progress!' : 'ඔයාගේ දියුණුව බලමු!',
       'Earn_exciting_rewards_and_unlock_new_levels_as_you_master_skills_every_day!' : 'හැමදාම අලුත් දේ ඉගෙනගෙන තෑගි දිනාගන්න. අලුත් මට්ටම් විවෘත කරගන්න!',
       'Get_started' : 'පටන් ගනිමු',
-
-      // Parent Hub Additions
+'recent_skills': 'මෑත කුසලතා',
+      'view_advanced_reports': 'වැඩිදුර ප්‍රගති වාර්තා සහ සිතියම් බලන්න',
+      'progress_report': 'ප්‍රගති වාර්තාව',
+      'no_activities_played': 'තවමත් ක්‍රියාකාරකම් කර නැත',
+      'whos_learning_today': 'අද ඉගෙන ගන්නේ කවුද?',
+      'ready': 'සූදානම්',      // Parent Hub Additions
       'last_active_prefix': 'අවසන් වරට ක්‍රියාකාරී වූයේ: ',
       'view_progress_btn': 'ප්‍රගතිය බලන්න →',
       'never': 'කිසිදාක නැත',
@@ -276,9 +285,10 @@ class LocalizationService extends ChangeNotifier {
       // Add/Edit Student
       'add_student_desc': 'අමතර දරුවෙකු නොමිලේ එකතු කරන්න. ඔබගේ ගිණුමට දරුවන් 5 දෙනෙකු දක්වා එකතු කළ හැක.',
       'choose_avatar': 'ගිණුම සඳහා පින්තූරයක් තෝරන්න',
-      'fantasy': 'කාටූන් චරිත',
+'fantasy': 'කාටූන් චරිත',
       'kids': 'ළමා චරිත',
-      'student_first_name_hint': 'දරුවාගේ මුල් නම',
+'fantasy': 'ෆැන්ටසි',
+      'kids': 'ළමයි',      'student_first_name_hint': 'දරුවාගේ මුල් නම',
       'student_last_name_hint': 'දරුවාගේ අවසන් නම',
       'required_field': 'අවශ්‍යයි',
       'grade_1': '1 ශ්‍රේණිය',
@@ -294,7 +304,7 @@ class LocalizationService extends ChangeNotifier {
       'hours': 'පැය',
       'hour': 'පැය',
 
-      //home titles 
+//home titles 
       'reading_practice': 'කියවීමේ පුහුණුව',
       'continue' : 'ඉදිරියට යමු',
       'play_again' : 'නැවත සෙල්ලම් කරන්න', 
@@ -312,7 +322,8 @@ class LocalizationService extends ChangeNotifier {
 
       // Consent Screen
       'parental_consent': 'දෙමාපිය එකඟතා පත්‍රිකාව',
-      'student_protection_agreement': 'සිසු ආරක්ෂණ ගිවිසුම',
+// Consent Screen
+      'parental_consent': 'දෙමාපිය කැමැත්ත',      'student_protection_agreement': 'සිසු ආරක්ෂණ ගිවිසුම',
       'consent_review_terms': 'ඉදිරියට යාමට පෙර කරුණාකර පහත නියමයන් කියවා එකඟ වන්න.',
       'consent_items': 'කැමැත්ත ලබාදිය යුතු කරුණු',
       'guardian_confirmation_title': 'භාරකරු තහවුරු කිරීම',
@@ -336,18 +347,18 @@ class LocalizationService extends ChangeNotifier {
       'memory': 'මතකය',
       'letter_knowledge': 'අකුරු පිළිබඳ දැනුම',
       'tracing': 'අකුරු ලිවීම',
-      'visual_hidden_search': 'සැඟවුණු රූප සෙවීම',
-      'visual_pattern_adventure': 'රටා ගැලපීම',
+'visual_hidden_search': 'සැඟවුණු රූප සෙවීම',
+'visual_hidden_search': 'සැඟවුණු පින්තූර සෙවීම',      'visual_pattern_adventure': 'රටා ගැලපීම',
       'visual_sorting_adventure': 'හැඩතල වෙන් කිරීම',
       'visual_odd_one_out': 'වෙනස් එක තෝරන්න',
       'visual_memory_hats': 'මතක තොප්පි',
-      'visual_picture_matching': 'රූප ගැලපීම',
-      'visual_connect_pairs': 'යුගල සම්බන්ධ කිරීම',
+'visual_picture_matching': 'රූප ගැලපීම',
+'visual_picture_matching': 'පින්තූර ගැලපීම',      'visual_connect_pairs': 'යුගල සම්බන්ධ කිරීම',
       'visual_shadow_matching': 'සෙවනැලි ගැලපීම',
       'visual_tangled_paths': 'පැටලුණු මාර්ග',
       'visual_position_concepts': 'ස්ථාන සංකල්ප',
-      'visual_missing_picture': 'අතුරුදහන් වූ රූපය',
-      'visual_category_sorting': 'කාණ්ඩ අනුව වෙන් කිරීම',
+'visual_missing_picture': 'අතුරුදහන් වූ රූපය',
+'visual_missing_picture': 'අතුරුදහන් වූ පින්තූරය',      'visual_category_sorting': 'කාණ්ඩ අනුව වෙන් කිරීම',
       'shadow_match_demo': 'සෙවනැලි ගැලපීමේ ආදර්ශනය',
       'child_progress_suffix': 'ගේ ප්‍රගතිය',
       
@@ -376,8 +387,10 @@ class LocalizationService extends ChangeNotifier {
       'no_attempts_yet': 'තවමත් උත්සාහ කර නොමැත',
       'parent_label': 'මව්පියන්',
       'generating_report': 'වාර්තාව ජනනය කරමින්...',
+'generating_assessment': 'තක්සේරුව ජනනය කරමින්...',
+'download_clinical_report': 'සායනික වාර්තාව බාගන්න',
       'generating_assessment': 'තක්සේරුව ජනනය කරමින්...',
-      'touch_precision_tracking': 'ස්පර්ශ නිරවද්‍යතා ලුහුබැඳීම',
+      'download_assessment_pdf': 'තක්සේරු PDF බාගන්න',      'touch_precision_tracking': 'ස්පර්ශ නිරවද්‍යතා ලුහුබැඳීම',
       'strategy': 'ක්‍රමෝපාය',
 
       // Risk level display labels
@@ -446,7 +459,7 @@ class LocalizationService extends ChangeNotifier {
       'weekly_minutes': 'සතිපතා මිනිත්තු',
       'student_progress': 'සිසු ප්‍රගතිය',
       'withdraw_consent_info': 'ඔබට ඕනෑම වේලාවක දෙමාපිය ගිණුම් සැකසීම් හරහා\nඔබගේ කැමැත්ත ඉවත් කරගත හැක.',
-      'Home': 'මුල් පිටුව',
+'Home': 'මුල් පිටුව',
       'Shop': 'සාප්පුව',
       'Progress' : 'ප්‍රගතිය',
       'Parents' : 'දෙමාපියන්',
@@ -489,7 +502,19 @@ class LocalizationService extends ChangeNotifier {
       'students': 'සිසුන්',
       'profile': 'ගිණුම',
       'flagged': 'අවධානය යොමුකළ යුතු',
-    },
+'dash_greeting_morning': 'සුබ උදෑසනක්, {name}!',
+      'dash_greeting_afternoon': 'සුබ දහවලක්, {name}!',
+      'dash_greeting_evening': 'සුබ සන්ධ්‍යාවක්, {name}!',
+      'dash_greeting_night': 'සුබ රාත්‍රියක්, {name}!',
+      'dash_streak_0': 'දින {streak} ක අඛණ්ඩ ගමනක්! 🔥',
+      'dash_streak_low': 'දින {streak} ක අඛණ්ඩ ගමනක්! හොඳයි! 🔥',
+      'dash_streak_high': 'දින {streak} ක අඛණ්ඩ ගමනක්! ගොඩක් හොඳයි! 🔥',
+      'dash_learning_path': 'ඉගෙනුම් මාර්ගය 🧩',
+      'dash_reading_practice': 'කියවීමේ පුහුණුව 📖',
+      'dash_nav_home': 'මුල් පිටුව',
+      'dash_nav_shop': 'සාප්පුව',
+      'dash_nav_progress': 'ප්‍රගතිය',
+      'dash_nav_parents': 'දෙමාපියන්',    },
     'en': {
       'welcome_title': 'Welcome!',
       'welcome_subtitle': 'your sinhala learning\nadventure awaits!',
@@ -523,8 +548,8 @@ class LocalizationService extends ChangeNotifier {
       'parent_name_hint': 'your name',
       'role_parent': 'parent',
       'role_therapist': 'therapist',
-      //'specialization_hint': 'specialization (e.g. speech therapist)',
-      'clinic_hint': 'clinic name (optional)',
+//'specialization_hint': 'specialization (e.g. speech therapist)',
+'specialization_hint': 'specialization (e.g. speech therapist)',      'clinic_hint': 'clinic name (optional)',
       'or': 'or',
       'mobile_number': 'mobile number',
       'mobile_number_hint': 'Your mobile number',
@@ -592,7 +617,7 @@ class LocalizationService extends ChangeNotifier {
       'app_updates': 'app updates & features',
       'app_updates_desc': 'receive important announcements about new educational tools.',
       'email_support': 'email support',
-      'contact_support': 'contact support',
+'contact_support': 'contact support',
       'phone_support': 'phone support',
       'faq': 'FAQ',
       'logout': 'logout',
@@ -629,7 +654,9 @@ class LocalizationService extends ChangeNotifier {
       //'specialization': 'Specialization',
       'clinic_name': 'clinic name',
       'not_set': 'not set',
-      'activities': 'activities',
+'phone_support': 'phone support',
+      'faq': 'FAQ',
+      'logout': 'logout',      'activities': 'activities',
       'accuracy': 'accuracy',
       'day_streak': 'day streak',
       'stars_earned': 'stars earned',
@@ -640,7 +667,7 @@ class LocalizationService extends ChangeNotifier {
       'no_activities_played': 'No activities played yet',
       'whos_learning_today': 'who\'s learning today?',
       'ready': 'Ready',
-      'activity breakdown': 'Activity Breakdown',
+'activity breakdown': 'Activity Breakdown',
 
       //connect specialist 
       'linked_your_childs_account_to_their_therapist_or_reading_specialist' : 'Linked your childs account to their therapist or reading specialist',
@@ -674,6 +701,7 @@ class LocalizationService extends ChangeNotifier {
 
       //progress 
       'learners_progress': 'Learners Progress',
+>>>>>>> feature/onboarding
 
       // Parent Hub Additions
       'last_active_prefix': 'last active: ',
@@ -793,12 +821,14 @@ class LocalizationService extends ChangeNotifier {
       // Advanced Reports (TherapistStudentDetailScreen) additions
       'gt_label_success': 'Ground Truth Label submitted successfully!',
       'interaction_heatmaps': 'Interaction Heatmaps',
+<<<<<<< HEAD
       'no_interventions': 'No interventions generated yet.\nStudent needs more play.',
       'Dr': 'Dr.',
       'students': 'students',
       'profile': 'profile',
       'flagged': 'flagged',
-      'no_telemetry_data': 'No telemetry data available for this student yet.',
+=======
+      'no_interventions': 'No interventions generated yet.\nChild needs to play more games.',      'no_telemetry_data': 'No telemetry data available for this student yet.',
       'no_touch_paths': 'No touch paths found in the telemetry data.',
       'select_risk_label': 'Select Risk Label',
       'submit_gt_label': 'Submit Ground Truth Label',
@@ -812,8 +842,9 @@ class LocalizationService extends ChangeNotifier {
       'sessions_tab': 'sessions',
       'student_profile_title': 'student profile',
       'weekly_progress': 'weekly progress',
-      'reading_fluency':'Reading Fluency',
+'reading_fluency':'Reading Fluency',
       'comprehension':'Comprehension',
+>>>>>>> feature/onboarding
       
       'activity': 'Activity',
       'attempt': 'Attempt',
@@ -832,9 +863,11 @@ class LocalizationService extends ChangeNotifier {
       'risk_moderate': 'Moderate Risk',
       'risk_high': 'Needs Attention',
       'risk_pending': 'Collecting Data...',
+<<<<<<< HEAD
       'at_risk':'at risk',
 
       'in_app_notifications':'in-app notifications',
+=======,
 
       // Cognitive index display names
       'visual_processing_score': 'Visual Processing Speed',
@@ -896,8 +929,7 @@ class LocalizationService extends ChangeNotifier {
       'weekly_minutes': 'Weekly Minutes',
       'student_progress': 'Student Progress',
       'withdraw_consent_info': 'you can withdraw consent at any time\nfrom the parent account settings.',
-
-      //therapist screens start from here 
+//therapist screens start from here 
       //create account
        'specialization':'Specialization (Speech Therapist)',
 
@@ -925,6 +957,18 @@ class LocalizationService extends ChangeNotifier {
       'View_Interaction_Heatmaps':'View Interaction Heatmaps',
 
       'Today’s_Schedule' : 'Today’s Schedule',
-    }
+'dash_greeting_morning': 'Good morning, {name}!',
+      'dash_greeting_afternoon': 'Good afternoon, {name}!',
+      'dash_greeting_evening': 'Good evening, {name}!',
+      'dash_greeting_night': 'Good night, {name}!',
+      'dash_streak_0': '{streak} day streak! 🔥',
+      'dash_streak_low': '{streak} day streak! Good! 🔥',
+      'dash_streak_high': '{streak} day streak! Very good! 🔥',
+      'dash_learning_path': 'Learning Path 🧩',
+      'dash_reading_practice': 'Reading Practice 📖',
+      'dash_nav_home': 'home',
+      'dash_nav_shop': 'shop',
+      'dash_nav_progress': 'progress',
+      'dash_nav_parents': 'parents',    }
   };
 }

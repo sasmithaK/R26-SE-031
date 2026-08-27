@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../widgets/telemetry_wrapper.dart';
 import '../../../../models/curriculum_models.dart';
 import '../../../../services/tts_service.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
+import '../../../../services/progress_service.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
-/// Activity 4: වචනයට සවන් දී රූපය සොයමු (Listen to Word & Find Image)
+/// Activity 4: වචනයට සවන් දී පින්තූරය සොයමු (Listen to Word & Find Image)
 /// Template: audio_image_match_game
 class Skill2Act4Mcq extends StatefulWidget {
   final ActivityNode? activityNode;
+  final Map<String, dynamic>? studentData;
   final bool isRemedial;
-  const Skill2Act4Mcq({super.key, this.activityNode, this.isRemedial = false});
+  const Skill2Act4Mcq({super.key, this.activityNode, this.isRemedial = false, this.studentData});
 
   @override
   State<Skill2Act4Mcq> createState() => _Skill2Act4McqState();
@@ -27,6 +31,15 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
   @override
   void initState() {
     super.initState();
+    final skillId = widget.activityNode?.skillId ?? '';
+    final activityId = widget.activityNode?.id ?? '';
+    if (skillId.isNotEmpty && activityId.isNotEmpty) {
+      _currentRoundIndex = ProgressService().getActivityState(skillId, activityId);
+    }
+    final rounds = widget.activityNode?.rounds ?? [];
+    if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
+      _currentRoundIndex = 0;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _playAudioPrompt();
     });
@@ -50,13 +63,19 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
   void _checkAnswer(int index, List<int> correctIndices, int totalRounds) async {
     if (_isCorrect) return;
 
+    final bool wasSelected = _selectedIndices.contains(index);
     setState(() {
-      if (_selectedIndices.contains(index)) {
+      if (wasSelected) {
         _selectedIndices.remove(index);
       } else {
         _selectedIndices.add(index);
       }
     });
+
+    // Play tap feedback on every selection (not just when all are picked)
+    if (!wasSelected) {
+      SoundUtils.playFeedback('audio/correct.mp3');
+    }
 
     if (_selectedIndices.length == correctIndices.length) {
       bool isRight = _selectedIndices.containsAll(correctIndices);
@@ -68,25 +87,38 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
         setState(() {
           _isCorrect = true;
         });
-        await _audioPlayer.play(AssetSource('audio/correct.mp3'));
+        SoundUtils.playFeedback('audio/correct.mp3');
 
         Future.delayed(const Duration(milliseconds: 1400), () {
           if (!mounted) return;
           if (_currentRoundIndex < totalRounds - 1) {
             setState(() {
               _currentRoundIndex++;
+              final sId = widget.activityNode?.skillId ?? '';
+              final aId = widget.activityNode?.id ?? '';
+              if (sId.isNotEmpty && aId.isNotEmpty) {
+                int progress = ((_currentRoundIndex / (widget.activityNode?.rounds.length ?? 1)) * 100).toInt();
+                ProgressService().saveActivityScore(sId, aId, progress);
+                ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+              }
               _selectedIndices.clear();
               _isCorrect = false;
             });
             _playAudioPrompt();
           } else {
             setState(() {
-              _activityComplete = true;
-            });
+          _activityComplete = true;
+          final sId = widget.activityNode?.skillId ?? '';
+          final aId = widget.activityNode?.id ?? '';
+          if (sId.isNotEmpty && aId.isNotEmpty) {
+            ProgressService().saveActivityScore(sId, aId, 100);
+            ProgressService().clearActivityState(sId, aId);
+          }
+        });
           }
         });
       } else {
-        await _audioPlayer.play(AssetSource('audio/wrong.mp3'));
+        SoundUtils.playFeedback('audio/wrong.mp3');
         Future.delayed(const Duration(milliseconds: 800), () {
           if (mounted) {
             setState(() {
@@ -103,7 +135,7 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
     var rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('වචනයට සවන් දී රූපය සොයමු')),
+        appBar: AppBar(title: const Text('වචනයට සවන් දී පින්තූරය සොයමු')),
         body: const Center(child: Text('No rounds available.')),
       );
     }
@@ -113,8 +145,8 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
     }
 
     final currentRound = rounds[_currentRoundIndex];
-    final titleText = widget.activityNode?.skillTitle ?? 'වචනයට සවන් දී රූපය සොයමු';
-    final promptText = currentRound['prompt']?.toString() ?? 'අසා සිටින රූපය තෝරන්න';
+    final titleText = widget.activityNode?.title ?? 'වචනයට සවන් දී පින්තූරය සොයමු';
+    final promptText = currentRound['prompt']?.toString() ?? 'අසා සිටින පින්තූරය තෝරන්න';
     var options = (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ?? ['🔵', '🟥', '🔺', '⭐'];
     
     List<int> correctIndices = [];
@@ -165,6 +197,8 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
     }
 
     return SharedGameLayout(
+      studentData: widget.studentData,
+      activityTitle: widget.activityNode?.title ?? '',
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
       totalRounds: rounds.length,
@@ -193,21 +227,33 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
                   if (displayWord != null && displayWord.isNotEmpty) {
                     return Column(
                       children: [
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
+                          padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 28),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(22),
                             border: Border.all(
-                              color: AppColors.warmAmber.withOpacity(0.4),
-                              width: 2,
+                              color: AppColors.warmAmber.withValues(alpha: 0.5),
+                              width: 2.5,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.warmAmber.withValues(alpha: 0.15),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Text(
                             displayWord,
                             style: AppTypography.sinhala(
-                              fontSize: 60,
+                              fontSize: 64,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
                               height: 1.0,
@@ -215,7 +261,7 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
                             textAlign: TextAlign.center,
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
                       ],
                     );
                   }
@@ -223,7 +269,7 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
                 },
               ),
               if (correctIndices.length > 1) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   decoration: BoxDecoration(
@@ -235,17 +281,40 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
                     style: AppTypography.sinhala(fontSize: 16, fontWeight: FontWeight.w700, color: const Color(0xFFE65100)),
                   ),
                 ),
-                const SizedBox(height: 36),
+                const SizedBox(height: 16),
               ] else ...[
-                const SizedBox(height: 48),
+                const SizedBox(height: 20),
               ],
 
-              // Image Option Cards Grid
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
+              // Answer Pool Container (consistent with other Skill 2 activities)
+              Flexible(
+                fit: FlexFit.loose,
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.85),
+                        Colors.white.withValues(alpha: 0.5),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    borderRadius: BorderRadius.circular(40),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 20,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
                   child: Center(
                     child: Wrap(
+                      key: ValueKey('round_$_currentRoundIndex'),
                       spacing: spacing,
                       runSpacing: spacing,
                       alignment: WrapAlignment.center,
@@ -263,9 +332,9 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
                           padding: hasLongText ? const EdgeInsets.symmetric(horizontal: 24, vertical: 16) : null,
                           decoration: BoxDecoration(
                             color: isRight
-                                ? const Color(0xFF6DBE6D).withOpacity(0.15)
+                                ? const Color(0xFF6DBE6D).withValues(alpha: 0.15)
                                 : isWrong
-                                    ? const Color(0xFFE87C6D).withOpacity(0.15)
+                                    ? const Color(0xFFE87C6D).withValues(alpha: 0.15)
                                     : Colors.white,
                             borderRadius: BorderRadius.circular(24),
                             border: Border.all(
@@ -279,19 +348,19 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
                             boxShadow: [
                               if (isRight)
                                 BoxShadow(
-                                  color: const Color(0xFF6DBE6D).withOpacity(0.3),
+                                  color: const Color(0xFF6DBE6D).withValues(alpha: 0.3),
                                   blurRadius: 16,
                                   spreadRadius: 2,
                                 )
                               else if (isWrong)
                                 BoxShadow(
-                                  color: const Color(0xFFE87C6D).withOpacity(0.3),
+                                  color: const Color(0xFFE87C6D).withValues(alpha: 0.3),
                                   blurRadius: 16,
                                   spreadRadius: 2,
                                 )
                               else
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.08), 
+                                  color: Colors.black.withValues(alpha: 0.08), 
                                   blurRadius: 10, 
                                   offset: const Offset(0, 4)
                                 )
@@ -323,7 +392,7 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.warmAmber.withOpacity(0.15),
+          color: AppColors.warmAmber.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: AppColors.warmAmber, width: 3),
         ),
@@ -345,7 +414,7 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
                 shape: BoxShape.circle,
                 color: AppColors.warmAmber,
                 boxShadow: [
-                  BoxShadow(color: AppColors.warmAmber.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 3))
+                  BoxShadow(color: AppColors.warmAmber.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))
                 ]
               ),
               child: const Icon(Icons.volume_up_rounded, color: Colors.white, size: 26),

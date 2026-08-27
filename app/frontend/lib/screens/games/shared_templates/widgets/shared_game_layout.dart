@@ -1,9 +1,12 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../../../theme/app_theme.dart';
+import '../../shared_widgets/shared_celebration_popup.dart';
 import '../../skill_1/widgets/pattern_background.dart';
 
 class SharedGameLayout extends StatefulWidget {
+  final Map<String, dynamic>? studentData;
+  final String activityTitle;
   final Widget child;
   final String title;
   final int currentRoundIndex;
@@ -14,6 +17,8 @@ class SharedGameLayout extends StatefulWidget {
 
   const SharedGameLayout({
     Key? key,
+    this.studentData,
+    required this.activityTitle,
     required this.child,
     required this.title,
     required this.currentRoundIndex,
@@ -31,32 +36,9 @@ class _SharedGameLayoutState extends State<SharedGameLayout> with TickerProvider
   late AnimationController _celebrationController;
   late Animation<double> _celebrationScale;
 
-  late String _currentMascot;
-  late String _currentEncouragement;
-
-  static const List<String> _mascots = [
-    'assets/images/characters/human/human_student_1.png',
-    'assets/images/characters/mascots/solo_green.png',
-    'assets/images/characters/mascots/solo_orange.png',
-    'assets/images/characters/mascots/solo_pink.png',
-    'assets/images/characters/mascots/solo_yellow.png',
-    'assets/images/characters/mascots/solo_teal.png',
-  ];
-
-  static const List<String> _encourageMessages = [
-    'හොඳට බලන්න! 👀',
-    'ඔයාට පුළුවන්! 💪',
-    'නියමයි, දිගටම! ⭐',
-    'මනාව! 🌟',
-    'සුපිරියි! 🎉',
-  ];
-
   @override
   void initState() {
     super.initState();
-    final rng = Random();
-    _currentMascot = _mascots[rng.nextInt(_mascots.length)];
-    _currentEncouragement = _encourageMessages[rng.nextInt(_encourageMessages.length)];
 
     _celebrationController = AnimationController(
       vsync: this,
@@ -72,12 +54,6 @@ class _SharedGameLayoutState extends State<SharedGameLayout> with TickerProvider
     super.didUpdateWidget(oldWidget);
     if (widget.isActivityComplete && !oldWidget.isActivityComplete) {
       _celebrationController.forward();
-    }
-    if (widget.currentRoundIndex != oldWidget.currentRoundIndex) {
-      final rng = Random();
-      setState(() {
-        _currentEncouragement = _encourageMessages[rng.nextInt(_encourageMessages.length)];
-      });
     }
   }
 
@@ -104,8 +80,6 @@ class _SharedGameLayoutState extends State<SharedGameLayout> with TickerProvider
                 _buildTopHUD(),
                 const SizedBox(height: 8),
                 Expanded(child: widget.child),
-                _buildMascotArea(),
-                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -126,7 +100,7 @@ class _SharedGameLayoutState extends State<SharedGameLayout> with TickerProvider
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4A90D9).withOpacity(0.12),
+            color: const Color(0xFF4A90D9).withValues(alpha: 0.12),
             blurRadius: 12,
             offset: const Offset(0, 3),
           ),
@@ -232,7 +206,7 @@ class _SharedGameLayoutState extends State<SharedGameLayout> with TickerProvider
                       ? const Color(0xFFF9C623)
                       : const Color(0xFFE0E0E0),
               border: isCurrent
-                  ? Border.all(color: const Color(0xFFF9C623).withOpacity(0.3), width: 2)
+                  ? Border.all(color: const Color(0xFFF9C623).withValues(alpha: 0.3), width: 2)
                   : null,
             ),
           );
@@ -241,152 +215,16 @@ class _SharedGameLayoutState extends State<SharedGameLayout> with TickerProvider
     );
   }
 
-  Widget _buildMascotArea() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          Image.asset(
-            _currentMascot,
-            width: 50,
-            height: 50,
-            fit: BoxFit.contain,
-            errorBuilder: (c, e, s) => const SizedBox(width: 50, height: 50),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Text(
-                widget.isRoundComplete
-                    ? 'නියමයි! 🎉'
-                    : _currentEncouragement,
-                style: AppTypography.sinhala(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF5D7A9E),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildCelebrationOverlay() {
-    return AnimatedBuilder(
-      animation: _celebrationScale,
-      builder: (context, child) {
-        return Container(
-          color: Colors.black.withOpacity(0.4 * _celebrationScale.value),
-          child: Center(
-            child: Transform.scale(
-              scale: _celebrationScale.value,
-              child: child,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 32),
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4A90D9).withOpacity(0.2),
-              blurRadius: 30,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildStar(36),
-                const SizedBox(width: 10),
-                _buildStar(52),
-                const SizedBox(width: 10),
-                _buildStar(36),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Image.asset(
-              _currentMascot,
-              width: 80,
-              height: 80,
-              fit: BoxFit.contain,
-              errorBuilder: (c, e, s) => const SizedBox(width: 80, height: 80),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'නියමයි! 🎉',
-              style: AppTypography.sinhala(
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF3E3E3E),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'ඔබ සියල්ල අවසන් කළා!',
-              style: AppTypography.sinhala(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF6B7280),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 28),
-            GestureDetector(
-              onTap: widget.onNext,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6DBE6D), Color(0xFF4E9E4E)],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6DBE6D).withOpacity(0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  'ඉදිරියට යමු →',
-                  style: AppTypography.sinhala(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+    return Positioned.fill(
+      child: SharedCelebrationPopup(
+        studentData: widget.studentData,
+        activityTitle: widget.activityTitle,
+        scaleAnimation: _celebrationScale,
+        onFinish: widget.onNext,
       ),
     );
   }
-
   Widget _buildStar(double size) {
     return Icon(
       Icons.star_rounded,

@@ -59,12 +59,12 @@ class SessionManager {
       SessionActivity(
         screen: GameFactory.buildGame(ActivityNode(
           id: 'act_4',
-          title: 'වෙනස් රූපය',
+          title: 'වෙනස් පින්තූරය',
           telemetryTags: ['visual_odd_one_out'],
           templateType: 'visual_odd_one_out',
           rounds: [],
         )),
-        title: 'වෙනස් රූපය',
+        title: 'වෙනස් පින්තූරය',
         durationSeconds: 60,
       ),
       SessionActivity(

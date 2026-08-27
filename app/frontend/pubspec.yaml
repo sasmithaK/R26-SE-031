@@ -26,9 +26,11 @@ dependencies:
   mobile_scanner: ^7.4.0
   fl_chart: ^1.2.0
   share_plus: ^12.0.2
-  record: ^6.2.0
   path_provider: ^2.1.2
   url_launcher: ^6.3.0
+  flutter_sound: ^9.30.0
+  permission_handler: ^13.0.1
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1
@@ -40,6 +42,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - .env
     - assets/images/
     - assets/images/backgrounds/
     - assets/images/branding/
@@ -52,8 +55,14 @@ flutter:
     - assets/images/activity_icons/vehicles/
     - assets/images/activity_icons/nature/
     - assets/images/activity_icons/body_parts/
+    - assets/images/activity_icons/flowers/
+    - assets/images/activity_icons/basket/
+    - assets/images/activity_icons/places/
+    - assets/images/activity_icons/plants/
+    - assets/images/activity_icons/people/
     - assets/images/skills/
     - assets/images/games/
+    - assets/images/story/
     - assets/audio/
     - assets/data/
     - assets/data/curriculum/

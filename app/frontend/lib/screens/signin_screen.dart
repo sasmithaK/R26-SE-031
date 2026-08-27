@@ -9,7 +9,8 @@ import 'therapist/therapist_dashboard_screen.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import '../widgets/sliding_role_toggle.dart';
-
+import '../services/localization_service.dart';
+import '../widgets/language_selector_button.dart';
 /// Sign-In Screen
 /// Dyslexia-accessible: crème background, warm white inputs, 18pt+ text,
 /// calm blue accents, left-aligned, sentence case.
@@ -136,8 +137,11 @@ class _SignInScreenState extends State<SignInScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.cream,
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.cream,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -145,7 +149,6 @@ class _SignInScreenState extends State<SignInScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 12),
-
                   Stack(
                     alignment: Alignment.topCenter,
                     children: [
@@ -184,6 +187,11 @@ class _SignInScreenState extends State<SignInScreen>
                           ),
                         ),
                       ),
+                      // Language Selector on the right
+                      const Align(
+                        alignment: Alignment.topRight,
+                        child: LanguageSelectorButton(),
+                      ),
                     ],
                   ),
 
@@ -191,7 +199,7 @@ class _SignInScreenState extends State<SignInScreen>
 
                   // Heading
                   Text(
-                    'welcome back!',
+                    LocalizationService.instance.t('signin_title'),
                     style: AppTypography.heading(
                       fontSize: 32,
                       fontWeight: FontWeight.w700,
@@ -200,7 +208,7 @@ class _SignInScreenState extends State<SignInScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'sign in to continue your adventure',
+                    LocalizationService.instance.t('signin_subtitle'),
                     style: AppTypography.body(
                       fontSize: 16,
                       color: AppColors.textSecondary,
@@ -244,7 +252,7 @@ class _SignInScreenState extends State<SignInScreen>
                           keyboardType: TextInputType.emailAddress,
                           style: AppTypography.body(fontSize: 16),
                           decoration: InputDecoration(
-                            hintText: 'email address',
+                            hintText: LocalizationService.instance.t('email_hint'),
                             prefixIcon: const Icon(Icons.email_outlined),
                           ),
                         ),
@@ -257,7 +265,7 @@ class _SignInScreenState extends State<SignInScreen>
                           obscureText: !_isPasswordVisible,
                           style: AppTypography.body(fontSize: 16),
                           decoration: InputDecoration(
-                            hintText: 'password',
+                            hintText: LocalizationService.instance.t('password_hint'),
                             prefixIcon: const Icon(Icons.lock_outline_rounded),
                             suffixIcon: IconButton(
                               icon: Icon(
@@ -290,7 +298,7 @@ class _SignInScreenState extends State<SignInScreen>
                         );
                       },
                       child: Text(
-                        'forgot password?',
+                        LocalizationService.instance.t('forgot_password'),
                         style: AppTypography.body(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -304,7 +312,7 @@ class _SignInScreenState extends State<SignInScreen>
 
                   // Sign in button
                   GradientButton(
-                    text: _isLoading ? 'signing in...' : 'sign in',
+                    text: _isLoading ? LocalizationService.instance.t('signing_in') : LocalizationService.instance.t('btn_signin'),
                     icon: Icons.login_rounded,
                     onPressed: _isLoading ? () {} : _onSignIn,
                   ),
@@ -318,7 +326,7 @@ class _SignInScreenState extends State<SignInScreen>
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
-                          'or',
+                          LocalizationService.instance.t('or'),
                           style: AppTypography.caption(fontSize: 14),
                         ),
                       ),
@@ -357,7 +365,7 @@ class _SignInScreenState extends State<SignInScreen>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          "don't have an account? ",
+                          LocalizationService.instance.t('dont_have_account'),
                           style: AppTypography.body(
                             fontSize: 14,
                             color: AppColors.textSecondary,
@@ -372,7 +380,7 @@ class _SignInScreenState extends State<SignInScreen>
                             );
                           },
                           child: Text(
-                            'sign up',
+                            LocalizationService.instance.t('btn_signup'),
                             style: AppTypography.body(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -389,6 +397,8 @@ class _SignInScreenState extends State<SignInScreen>
               ),
             ),
       ),
+    );
+      },
     );
   }
 

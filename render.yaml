@@ -5,6 +5,10 @@ services:
     env: python
     buildCommand: "pip install -r app/backend/api/requirements.txt"
     startCommand: "cd app/backend/api && uvicorn main:app --host 0.0.0.0 --port $PORT"
+    buildFilter:
+      paths:
+        - app/backend/api/**
+        - render.yaml
     envVars:
       - key: PORT
         value: 8015

@@ -1,8 +1,9 @@
 {
   "greeting": {
-    "morning": "Good morning, {name}! ☀️",
-    "afternoon": "Good afternoon, {name}! 🌤️",
-    "evening": "Good evening, {name}! 🌙"
+    "morning": "Good morning, {name}!",
+    "afternoon": "Good afternoon, {name}!",
+    "evening": "Good evening, {name}!",
+    "night": "Good night, {name}!"
   },
   "streak": {
     "multi_day_label": "day streak! Keep going! 🔥",

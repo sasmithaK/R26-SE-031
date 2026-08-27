@@ -92,7 +92,7 @@ class _SessionContainerScreenState extends State<SessionContainerScreen> {
               FaIcon(FontAwesomeIcons.medal, size: 80, color: AppColors.warmAmber),
               const SizedBox(height: 24),
               Text(
-                'නියමයි!', // "Great job!"
+                'හොඳයි!', // "Great job!"
                 style: AppTypography.sinhala(fontSize: 32, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 16),

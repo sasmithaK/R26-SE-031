@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
 import '../services/student_service.dart';
+import '../services/localization_service.dart';
 import 'assessment_prompt_screen.dart';
 
 /// Parental Consent Screen
@@ -98,7 +99,10 @@ class _ConsentScreenState extends State<ConsentScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
       backgroundColor: AppColors.cream,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -108,7 +112,7 @@ class _ConsentScreenState extends State<ConsentScreen>
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'parental consent',
+          LocalizationService.instance.t('parental_consent'),
           style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary),
         ),
         centerTitle: true,
@@ -157,7 +161,7 @@ class _ConsentScreenState extends State<ConsentScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'student protection agreement',
+                            LocalizationService.instance.t('student_protection_agreement'),
                             style: AppTypography.heading(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
@@ -166,7 +170,7 @@ class _ConsentScreenState extends State<ConsentScreen>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'please review and accept the following terms before proceeding.',
+                            LocalizationService.instance.t('consent_review_terms'),
                             style: AppTypography.body(
                               fontSize: 14,
                               color: AppColors.textSecondary,
@@ -213,7 +217,7 @@ class _ConsentScreenState extends State<ConsentScreen>
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Grade 1 • @${widget.studentData['first_name']}',
+                          '${LocalizationService.instance.t("grade_1")} • @${widget.studentData['first_name']}',
                           style: AppTypography.caption(
                             fontSize: 13,
                             color: AppColors.textSecondary,
@@ -229,7 +233,7 @@ class _ConsentScreenState extends State<ConsentScreen>
 
               // --- Consent Checkboxes ---
               Text(
-                'consent items',
+                LocalizationService.instance.t('consent_items'),
                 style: AppTypography.heading(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -242,39 +246,39 @@ class _ConsentScreenState extends State<ConsentScreen>
                 value: _consentGuardian,
                 onChanged: (val) => setState(() => _consentGuardian = val ?? false),
                 icon: Icons.family_restroom_rounded,
-                title: 'guardian confirmation',
-                description: 'I confirm that I am the parent or legal guardian of this child and have the authority to provide consent on their behalf.',
+                title: LocalizationService.instance.t('guardian_confirmation_title'),
+                description: LocalizationService.instance.t('guardian_confirmation_desc'),
               ),
 
               _buildConsentItem(
                 value: _consentData,
                 onChanged: (val) => setState(() => _consentData = val ?? false),
                 icon: Icons.analytics_outlined,
-                title: 'learning data collection',
-                description: 'I consent to the collection and processing of my child\'s learning data (responses, progress, and performance) to personalize their educational experience.',
+                title: LocalizationService.instance.t('data_collection_title'),
+                description: LocalizationService.instance.t('data_collection_desc'),
               ),
 
               _buildConsentItem(
                 value: _consentPurpose,
                 onChanged: (val) => setState(() => _consentPurpose = val ?? false),
                 icon: Icons.psychology_outlined,
-                title: 'dyslexia screening purpose',
-                description: 'I understand that this app is designed for Grade 1 dyslexia screening and learning support. It does not provide medical diagnoses and should be used alongside professional guidance.',
+                title: LocalizationService.instance.t('screening_purpose_title'),
+                description: LocalizationService.instance.t('screening_purpose_desc'),
               ),
 
               _buildConsentItem(
                 value: _consentTerms,
                 onChanged: (val) => setState(() => _consentTerms = val ?? false),
                 icon: Icons.description_outlined,
-                title: 'terms of use & privacy policy',
-                description: 'I have read and agree to the terms of use and privacy policy. I understand my child\'s data will be stored securely and will not be shared with third parties.',
+                title: LocalizationService.instance.t('terms_privacy_title'),
+                description: LocalizationService.instance.t('terms_privacy_desc'),
               ),
 
               const SizedBox(height: 28),
 
               // --- Digital Signature ---
               Text(
-                'digital signature',
+                LocalizationService.instance.t('digital_signature'),
                 style: AppTypography.heading(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -283,7 +287,7 @@ class _ConsentScreenState extends State<ConsentScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                'type your full name below as your digital signature.',
+                LocalizationService.instance.t('digital_signature_desc'),
                 style: AppTypography.body(
                   fontSize: 14,
                   color: AppColors.textSecondary,
@@ -317,7 +321,7 @@ class _ConsentScreenState extends State<ConsentScreen>
                         color: AppColors.textPrimary,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'parent / guardian full name',
+                        hintText: LocalizationService.instance.t('signature_hint'),
                         prefixIcon: const Icon(Icons.draw_rounded),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
@@ -332,7 +336,7 @@ class _ConsentScreenState extends State<ConsentScreen>
                             size: 16, color: AppColors.textSecondary),
                         const SizedBox(width: 8),
                         Text(
-                          'date: ${DateFormat('MMMM dd, yyyy').format(DateTime.now())}',
+                          '${LocalizationService.instance.t("date_prefix")}${DateFormat('MMMM dd, yyyy').format(DateTime.now())}',
                           style: AppTypography.caption(
                             fontSize: 14,
                             color: AppColors.textSecondary,
@@ -350,7 +354,7 @@ class _ConsentScreenState extends State<ConsentScreen>
               _isSubmitting
                   ? const Center(child: AppLoadingIndicator())
                   : GradientButton(
-                      text: 'i agree & continue',
+                      text: LocalizationService.instance.t('agree_continue'),
                       icon: Icons.check_circle_rounded,
                       gradient: _allConsentsGiven
                           ? AppColors.greenGradient
@@ -364,7 +368,7 @@ class _ConsentScreenState extends State<ConsentScreen>
 
               Center(
                 child: Text(
-                  'you can withdraw consent at any time\nfrom the parent account settings.',
+                  LocalizationService.instance.t('withdraw_consent_info'),
                   textAlign: TextAlign.center,
                   style: AppTypography.caption(
                     fontSize: 12,
@@ -378,6 +382,8 @@ class _ConsentScreenState extends State<ConsentScreen>
           ),
         ),
       ),
+        );
+      },
     );
   }
 

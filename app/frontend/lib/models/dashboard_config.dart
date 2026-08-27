@@ -38,8 +38,10 @@ class DashboardConfig {
       template = greeting.morning;
     } else if (hour < 17) {
       template = greeting.afternoon;
-    } else {
+    } else if (hour < 20) {
       template = greeting.evening;
+    } else {
+      template = greeting.night;
     }
     return template.replaceAll('{name}', name);
   }
@@ -55,18 +57,21 @@ class GreetingConfig {
   final String morning;
   final String afternoon;
   final String evening;
+  final String night;
 
   GreetingConfig({
     required this.morning,
     required this.afternoon,
     required this.evening,
+    required this.night,
   });
 
   factory GreetingConfig.fromJson(Map<String, dynamic> json) {
     return GreetingConfig(
-      morning: json['morning'] ?? 'Good morning, {name}! ☀️',
-      afternoon: json['afternoon'] ?? 'Good afternoon, {name}! 🌤️',
-      evening: json['evening'] ?? 'Good evening, {name}! 🌙',
+      morning: json['morning'] ?? 'Good morning, {name}!',
+      afternoon: json['afternoon'] ?? 'Good afternoon, {name}!',
+      evening: json['evening'] ?? 'Good evening, {name}!',
+      night: json['night'] ?? 'Good night, {name}!',
     );
   }
 }

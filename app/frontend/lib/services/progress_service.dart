@@ -13,6 +13,7 @@ class ProgressService {
   static const String _keyCurrentStudentId = 'current_student_id';
   static const String _keyCompletedActivitiesPrefix = 'completed_'; // + studentId
   static const String _keyActivityScoresPrefix = 'scores_'; // + studentId
+  static const String _keyActivityStatePrefix = 'state_'; // + studentId
   static const String _keyLastActiveDate = 'last_active_date';
   static const String _keyStreakCount = 'streak_count';
   static const String _keyStreakEarned = 'streak_earned_by_activity';
@@ -112,7 +113,7 @@ class ProgressService {
 
   /// Marks an activity as completed for the current student
   Future<void> markActivityCompleted(String skillId, String activityId) async {
-    final prefs = await _ensurePrefs();
+    final prefs = _prefs ?? await _ensurePrefs();
     final key = '$_keyCompletedActivitiesPrefix$currentStudentId';
     List<String> completed = prefs.getStringList(key) ?? [];
     
@@ -126,17 +127,19 @@ class ProgressService {
       await prefs.setBool(_keyStreakEarned, true);
       _triggerCloudSync();
     }
+    // Automatically clear any partial progress since it's fully completed now!
+    await clearActivityState(skillId, activityId);
   }
 
-  /// Checks if an activity is completed (or has any recorded score > 0)
+  /// Checks if an activity is completed
   bool isActivityCompleted(String skillId, String activityId) {
     final key = '$_keyCompletedActivitiesPrefix$currentStudentId';
     List<String> completed = _prefs?.getStringList(key) ?? [];
     if (completed.contains('${skillId}_$activityId')) return true;
 
-    // Fallback: If student played and earned any score > 0, consider it completed so they can continue
+    // Fallback: If student played and earned a full score, consider it completed
     final score = getActivityScore(skillId, activityId);
-    return score > 0;
+    return score >= 100;
   }
 
   /// Get the number of completed activities for a given skill
@@ -145,10 +148,19 @@ class ProgressService {
     List<String> completed = _prefs?.getStringList(key) ?? [];
     
     int count = 0;
+    bool hasAct4 = false;
     for (String id in completed) {
       if (id.startsWith('${skillId}_')) {
         count++;
+        if (id == '${skillId}_act_4') {
+          hasAct4 = true;
+        }
       }
+    }
+
+    // Special rule for skill_4: act_4 counts as two activities for progress calculation
+    if (skillId == 'skill_4' && hasAct4) {
+      count++;
     }
 
     // Fallback check against activity scores if not listed in completed array
@@ -158,10 +170,17 @@ class ProgressService {
       if (scoresJson != null) {
         try {
           final Map<String, dynamic> scoresMap = json.decode(scoresJson);
+          bool fallbackHasAct4 = false;
           for (String k in scoresMap.keys) {
-            if (k.startsWith('${skillId}_') && (scoresMap[k] as num) > 0) {
+            if (k.startsWith('${skillId}_') && (scoresMap[k] as num) >= 100) {
               count++;
+              if (k == '${skillId}_act_4') {
+                fallbackHasAct4 = true;
+              }
             }
+          }
+          if (skillId == 'skill_4' && fallbackHasAct4) {
+            count++;
           }
         } catch (_) {}
       }
@@ -204,8 +223,13 @@ class ProgressService {
 
     // Progression rule: All activities in previous skill must be completed
     if (prevSkillId != null && prevTotalActivities > 0) {
-      final prevCompleted = getCompletedActivitiesCount(prevSkillId);
-      if (prevCompleted >= prevTotalActivities) return true;
+      int completedCount = 0;
+      for (int i = 0; i < prevTotalActivities; i++) {
+        if (isActivityCompleted(prevSkillId, 'act_${i + 1}')) {
+          completedCount++;
+        }
+      }
+      if (completedCount >= prevTotalActivities) return true;
     }
 
     // Trial rule: 1st activity of this skill completed with any score > 0
@@ -220,7 +244,7 @@ class ProgressService {
   // --- Scoring ---
 
   Future<void> saveActivityScore(String skillId, String activityId, int score) async {
-    final prefs = await _ensurePrefs();
+    final prefs = _prefs ?? await _ensurePrefs();
     final key = '$_keyActivityScoresPrefix$currentStudentId';
     String? scoresJson = prefs.getString(key);
     Map<String, dynamic> scores = {};
@@ -231,7 +255,7 @@ class ProgressService {
     }
     
     scores['${skillId}_$activityId'] = score;
-    await prefs.setString(key, json.encode(scores));
+    prefs.setString(key, json.encode(scores));
     _triggerCloudSync();
   }
 
@@ -246,6 +270,49 @@ class ProgressService {
       if (val is num) return val.toInt();
     } catch (_) {}
     return 0;
+  }
+
+  // --- Partial Progress State ---
+
+  Future<void> saveActivityState(String skillId, String activityId, int currentRoundIndex) async {
+    final prefs = _prefs ?? await _ensurePrefs();
+    final key = '$_keyActivityStatePrefix$currentStudentId';
+    String? stateJson = prefs.getString(key);
+    Map<String, dynamic> states = {};
+    if (stateJson != null) {
+      try {
+        states = json.decode(stateJson);
+      } catch (_) {}
+    }
+    
+    states['${skillId}_$activityId'] = currentRoundIndex;
+    prefs.setString(key, json.encode(states));
+  }
+
+  int getActivityState(String skillId, String activityId) {
+    final key = '$_keyActivityStatePrefix$currentStudentId';
+    String? stateJson = _prefs?.getString(key);
+    if (stateJson == null) return 0;
+    
+    try {
+      Map<String, dynamic> states = json.decode(stateJson);
+      final val = states['${skillId}_$activityId'];
+      if (val is num) return val.toInt();
+    } catch (_) {}
+    return 0;
+  }
+
+  Future<void> clearActivityState(String skillId, String activityId) async {
+    final prefs = _prefs ?? await _ensurePrefs();
+    final key = '$_keyActivityStatePrefix$currentStudentId';
+    String? stateJson = prefs.getString(key);
+    if (stateJson != null) {
+      try {
+        Map<String, dynamic> states = json.decode(stateJson);
+        states.remove('${skillId}_$activityId');
+        prefs.setString(key, json.encode(states));
+      } catch (_) {}
+    }
   }
 
   // --- Failure Tracking (Dynamic Difficulty Adjustment) ---
@@ -343,10 +410,17 @@ class ProgressService {
     final completedKey = '$_keyCompletedActivitiesPrefix$studentId';
     final scoresKey = '$_keyActivityScoresPrefix$studentId';
     final failsKey = '$_keyFailureCountPrefix$studentId';
+    final stateKey = '$_keyActivityStatePrefix$studentId';
 
     await prefs.remove(completedKey);
     await prefs.remove(scoresKey);
     await prefs.remove(failsKey);
+    await prefs.remove(stateKey);
+
+    // Also reset the streak
+    await prefs.remove(_keyStreakCount);
+    await prefs.remove(_keyStreakEarned);
+    await prefs.remove(_keyLastActiveDate);
 
     // Clear skill intro seen flags for all skills
     for (int i = 0; i <= 10; i++) {

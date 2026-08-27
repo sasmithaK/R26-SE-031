@@ -1,13 +1,14 @@
 [
   {
     "id": "skill_4",
-    "title": "සරල වාක්‍ය සැකසීම",
+    "title": "සරල වාක්‍ය සකසමු",
+    "intro_text": "අපි සරල වාක්‍ය සැකසීම ගැන විනෝදයෙන් ඉගෙනගනිමු!",
     "description": "සරල වාක්‍ය කියවමු! 🏆",
     "activities": [
       {
         "id": "act_1",
-        "title": "රූපයට ගැලපෙන වාක්‍යය තෝරන්න",
-        "description": "රූපයට ගැලපෙන නිවැරදි වාක්‍යය තෝරන්න",
+        "title": "පින්තූරයට වාක්‍යය තෝරමු",
+        "description": "පින්තූරයට ගැලපෙන නිවැරදි වාක්‍යය තෝරන්න",
         "telemetry_tags": [
           "reading_comprehension",
           "visual_context"
@@ -15,7 +16,7 @@
         "template_type": "skill4_act1_mcq",
         "rounds": [
           {
-            "prompt": "රූපයට ගැලපෙන වාක්‍යය තෝරන්න",
+            "prompt": "පින්තූරයට ගැලපෙන වාක්‍යය තෝරන්න",
             "image_url": "assets/images/games/mother_cooking.png",
             "options": [
               "අම්මා උයනවා",
@@ -25,7 +26,7 @@
             "correct_index": 0
           },
           {
-            "prompt": "රූපයට ගැලපෙන වාක්‍යය තෝරන්න",
+            "prompt": "පින්තූරයට ගැලපෙන වාක්‍යය තෝරන්න",
             "image_url": "assets/images/games/sun_shining.png",
             "options": [
               "ඉර පායනවා",
@@ -35,7 +36,7 @@
             "correct_index": 0
           },
           {
-            "prompt": "රූපයට ගැලපෙන වාක්‍යය තෝරන්න",
+            "prompt": "පින්තූරයට ගැලපෙන වාක්‍යය තෝරන්න",
             "image_url": "assets/images/games/rowing_boat.png",
             "options": [
               "ඔරුව පදිනවා",
@@ -46,7 +47,7 @@
             "correct_index": 0
           },
           {
-            "prompt": "රූපයට ගැලපෙන වාක්‍යය තෝරන්න",
+            "prompt": "පින්තූරයට ගැලපෙන වාක්‍යය තෝරන්න",
             "image_url": "assets/images/games/boy_reading.png",
             "options": [
               "පොත කියවනවා",
@@ -57,7 +58,7 @@
             "correct_index": 0
           },
           {
-            "prompt": "රූපයට ගැලපෙන වාක්‍යය තෝරන්න",
+            "prompt": "පින්තූරයට ගැලපෙන වාක්‍යය තෝරන්න",
             "image_url": "assets/images/games/teacher_writing.png",
             "options": [
               "ගුරුතුමී පොත බලනවා.",
@@ -72,7 +73,7 @@
       },
       {
         "id": "act_2",
-        "title": "අඩු වචනය සොයන්න",
+        "title": "වචන යොදා වාක්‍ය හදමු",
         "description": "වාක්‍යයේ හිස්තැනට සුදුසු වචනය තෝරන්න",
         "telemetry_tags": [
           "sentence_structure",
@@ -91,7 +92,8 @@
               "බත්"
             ],
             "correctOption": "හඳ",
-            "correct_index": 0
+            "correct_index": 0,
+            "image_url": "assets/images/games/moon_shining.png"
           },
           {
             "prompt": "හිස්තැනට සුදුසු වචනය තෝරන්න",
@@ -104,7 +106,8 @@
               "මල්"
             ],
             "correctOption": "මල්",
-            "correct_index": 1
+            "correct_index": 1,
+            "image_url": "assets/images/games/flower_blooming.png"
           },
           {
             "prompt": "හිස්තැනට සුදුසු වචනය තෝරන්න",
@@ -119,7 +122,8 @@
               "පොතක්"
             ],
             "correctOption": "පාසල්",
-            "correct_index": 0
+            "correct_index": 0,
+            "image_url": "assets/images/games/girl_going_to_school.png"
           },
           {
             "prompt": "හිස්තැනට සුදුසු වචනය තෝරන්න",
@@ -135,7 +139,8 @@
               "ගල්"
             ],
             "correctOption": "කෑම",
-            "correct_index": 0
+            "correct_index": 0,
+            "image_url": "assets/images/games/mother_cooking.png"
           },
           {
             "prompt": "හිස්තැනට සුදුසු වචනය තෝරන්න",
@@ -148,17 +153,17 @@
               "ගෙදර",
               "චිත්‍රයක්",
               "කිරි",
-              "සීනි",
-              "වතුර"
+              "සීනි"
             ],
             "correctOption": "චිත්‍රයක්",
-            "correct_index": 1
+            "correct_index": 1,
+            "image_url": "assets/images/games/boy_drawing.png"
           }
         ]
       },
       {
         "id": "act_3",
-        "title": "වාක්‍යය හදමු",
+        "title": "වාක්‍ය අසා හඳුනා ගනිමු",
         "description": "වචන නිවැරදිව ගලපා වාක්‍යය සාදමු",
         "telemetry_tags": [
           "sentence_structure",
@@ -225,8 +230,8 @@
       },
       {
         "id": "act_4",
-        "title": "වාක්‍යය සකසමු",
-        "description": "රූපයට අදාළ වාක්‍යය සෑදීමට වචන නිසි පිළිවෙලට සකසන්න.",
+        "title": "වචන පිළිවෙළට සකසමු",
+        "description": "පින්තූරයට අදාළ වාක්‍යය සෑදීමට වචන නිසි පිළිවෙලට සකසන්න.",
         "telemetry_tags": [
           "sentence_structure",
           "syntax",
@@ -235,7 +240,7 @@
         "template_type": "skill4_act4_jumbled_sentence",
         "rounds": [
           {
-            "prompt": "රූපයට අදාළ වාක්‍යය සාදන්න",
+            "prompt": "පින්තූරයට අදාළ වාක්‍යය සාදන්න",
             "correct_sentence": "පාසල් යනවා.",
             "scrambled_words": [
               "යනවා",
@@ -244,7 +249,7 @@
             "image_url": "assets/images/games/girl_going_to_school.png"
           },
           {
-            "prompt": "රූපයට අදාළ වාක්‍යය සාදන්න",
+            "prompt": "පින්තූරයට අදාළ වාක්‍යය සාදන්න",
             "correct_sentence": "පොතක් කියවනවා.",
             "scrambled_words": [
               "කියවනවා",
@@ -253,7 +258,7 @@
             "image_url": "assets/images/games/girl_reading_tree.jpg"
           },
           {
-            "prompt": "රූපයට අදාළ වාක්‍යය සාදන්න",
+            "prompt": "පින්තූරයට අදාළ වාක්‍යය සාදන්න",
             "correct_sentence": "මල්ලි සරුංගලයක් යවනවා.",
             "scrambled_words": [
               "යවනවා",
@@ -263,7 +268,7 @@
             "image_url": "assets/images/games/boy_flying_kite.png"
           },
           {
-            "prompt": "රූපයට අදාළ වාක්‍යය සාදන්න",
+            "prompt": "පින්තූරයට අදාළ වාක්‍යය සාදන්න",
             "correct_sentence": "බල්ලාට කෑම දෙනවා.",
             "scrambled_words": [
               "කෑම",
@@ -273,7 +278,7 @@
             "image_url": "assets/images/games/boy_feeding_dog.jpg"
           },
           {
-            "prompt": "රූපයට අදාළ වාක්‍යය සාදන්න",
+            "prompt": "පින්තූරයට අදාළ වාක්‍යය සාදන්න",
             "correct_sentence": "ළමයි දෙන්නා සෙල්ලම් කරනවා.",
             "scrambled_words": [
               "සෙල්ලම්",

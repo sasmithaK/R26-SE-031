@@ -4,8 +4,8 @@ import '../../services/auth_service.dart';
 import 'therapist_students_screen.dart';
 import 'therapist_messages_screen.dart';
 import 'therapist_profile_screen.dart';
+import '../../config/api_config.dart';
 import 'therapist_student_detail_screen.dart';
-import '../../services/localization_service.dart';
 
 class TherapistDashboardScreen extends StatefulWidget {
   const TherapistDashboardScreen({super.key});
@@ -64,15 +64,15 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.dashboard_rounded, LocalizationService.instance.t('home')),
-                _buildNavItem(1, Icons.people_outline_rounded, LocalizationService.instance.t('students')),
+                _buildNavItem(0, Icons.dashboard_rounded, 'home'),
+                _buildNavItem(1, Icons.people_outline_rounded, 'students'),
                 _buildNavItem(
                   2,
                   Icons.chat_bubble_outline_rounded,
-                  LocalizationService.instance.t('messages'),
+                  'messages',
                   badgeCount: 3,
                 ),
-                _buildNavItem(3, Icons.person_outline_rounded, LocalizationService.instance.t('profile')),
+                _buildNavItem(3, Icons.person_outline_rounded, 'profile'),
               ],
             ),
           ),
@@ -192,6 +192,18 @@ class _DashboardHome extends StatelessWidget {
                     initials = parts[0][0].toUpperCase();
                   }
 
+                  final hour = DateTime.now().hour;
+                  String greetingText;
+                  if (hour < 12) {
+                    greetingText = 'Good morning,';
+                  } else if (hour < 17) {
+                    greetingText = 'Good afternoon,';
+                  } else if (hour < 20) {
+                    greetingText = 'Good evening,';
+                  } else {
+                    greetingText = 'Good night,';
+                  }
+
                   return Row(
                     children: [
                       Expanded(
@@ -199,14 +211,14 @@ class _DashboardHome extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              LocalizationService.instance.t('good_morning'),
+                              greetingText,
                               style: AppTypography.body(
                                 fontSize: 16,
                                 color: AppColors.textSecondary,
                               ),
                             ),
                             Text(
-                              '${LocalizationService.instance.t('Dr')} $name 👋',
+                              'Dr. $name 👋',
                               style: AppTypography.heading(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w700,
@@ -238,9 +250,7 @@ class _DashboardHome extends StatelessWidget {
                                     profilePicUrl.isNotEmpty
                                 ? DecorationImage(
                                     image: NetworkImage(
-                                      profilePicUrl.startsWith('http')
-                                          ? profilePicUrl
-                                          : 'https://adaptedmind-auth-api.onrender.com$profilePicUrl',
+                                      ApiConfig.getProfileImageUrl(profilePicUrl),
                                     ),
                                     fit: BoxFit.cover,
                                   )
@@ -271,28 +281,28 @@ class _DashboardHome extends StatelessWidget {
                 children: [
                   _buildQuickStat(
                     '12',
-                    LocalizationService.instance.t('students'),
+                    'students',
                     Icons.people_outline_rounded,
                     AppColors.calmBlue,
                   ),
                   const SizedBox(width: 10),
                   _buildQuickStat(
                     '3',
-                    LocalizationService.instance.t('today'),
+                    'today',
                     Icons.event_available_rounded,
                     AppColors.gentleGreen,
                   ),
                   const SizedBox(width: 10),
                   _buildQuickStat(
                     '76%',
-                    LocalizationService.instance.t('Avg_Score'),
+                    'avg score',
                     Icons.insights_rounded,
                     AppColors.warmAmber,
                   ),
                   const SizedBox(width: 10),
                   _buildQuickStat(
                     '3',
-                    LocalizationService.instance.t('messages'),
+                    'messages',
                     Icons.mail_outline_rounded,
                     AppColors.softCoral,
                   ),
@@ -306,7 +316,7 @@ class _DashboardHome extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    LocalizationService.instance.t('Need_Attention'),
+                    'needs attention',
                     style: AppTypography.heading(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -323,7 +333,7 @@ class _DashboardHome extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '2 ${LocalizationService.instance.t('flagged')}',
+                      '2 flagged',
                       style: AppTypography.caption(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -340,7 +350,7 @@ class _DashboardHome extends StatelessWidget {
                 name: 'Dinuka Bandara',
                 avatar: '👦',
                 issue: 'comprehension score dropped 18% this week',
-                risk: LocalizationService.instance.t('at_risk'),
+                risk: 'At Risk',
                 progress: 42,
               ),
               const SizedBox(height: 10),
@@ -349,7 +359,7 @@ class _DashboardHome extends StatelessWidget {
                 name: 'Ishara Gamage',
                 avatar: '👧',
                 issue: 'no sessions completed in 6 days',
-                risk: LocalizationService.instance.t('at_risk'),
+                risk: 'At Risk',
                 progress: 50,
               ),
 
@@ -357,7 +367,7 @@ class _DashboardHome extends StatelessWidget {
 
               // Recent Activity
               Text(
-                LocalizationService.instance.t('Recent_Activities'),
+                'recent activity',
                 style: AppTypography.heading(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -401,7 +411,7 @@ class _DashboardHome extends StatelessWidget {
 
               // Today's Schedule
               Text(
-                LocalizationService.instance.t('Today’s_Schedule'),
+                'today\'s schedule',
                 style: AppTypography.heading(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -413,19 +423,19 @@ class _DashboardHome extends StatelessWidget {
               _buildScheduleItem(
                 '9:00 AM',
                 'Kavitha Perera',
-                LocalizationService.instance.t('phonological_awareness'),
+                'Phonological Awareness',
                 AppColors.calmBlue,
               ),
               _buildScheduleItem(
                 '10:30 AM',
                 'Ashan Fernando',
-                LocalizationService.instance.t('reading_fluency'),
+                'Reading Fluency',
                 AppColors.gentleGreen,
               ),
               _buildScheduleItem(
                 '2:00 PM',
                 'Nethmi Silva',
-                LocalizationService.instance.t('comprehension'),
+                'Comprehension',
                 AppColors.warmAmber,
               ),
 

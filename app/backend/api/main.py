@@ -27,12 +27,8 @@ from config import PORT, CORS_ORIGINS
 from routers.auth import router as auth_router, limiter as auth_limiter
 from routers.students import router as students_router
 from routers.specialists import router as specialists_router
-from routers.telemetry import router as telemetry_router
 from routers.activities import router as activities_router
 from routers.therapist import router as therapist_router
-from routers.stt import router as stt_router
-from routers.tts import router as tts_router
-from fastapi.staticfiles import StaticFiles
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -65,18 +61,10 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(auth_router)
 app.include_router(students_router)
 app.include_router(specialists_router)
-app.include_router(telemetry_router)
 app.include_router(activities_router)
 app.include_router(therapist_router)
-app.include_router(stt_router)
-app.include_router(tts_router)
 
-from routers.ml import router as ml_router
-app.include_router(ml_router)
-
-# Mount static folder for audio files
-os.makedirs("static", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Mount static folder (Moved to speech-monitoring-v1)
 
 
 # --- Health Check ---

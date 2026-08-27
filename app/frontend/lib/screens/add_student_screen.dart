@@ -4,6 +4,7 @@ import '../../theme/app_theme.dart';
 import 'consent_screen.dart';
 import '../services/auth_service.dart';
 import '../services/student_service.dart';
+import '../services/localization_service.dart';
 import 'parent_account_screen.dart';
 
 /// Add Student Screen
@@ -146,9 +147,22 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     super.dispose();
   }
 
+  String _getDisplayLimit(String limit) {
+    if (limit == 'No Limit') return LocalizationService.instance.t('no_limit');
+    final parts = limit.split(' ');
+    if (parts.length == 2) {
+      if (parts[1] == 'minutes') return '${parts[0]} ${LocalizationService.instance.t('minutes')}';
+      if (parts[1] == 'hour' || parts[1] == 'hours') return '${parts[0]} ${LocalizationService.instance.t(parts[1])}';
+    }
+    return limit;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
       backgroundColor: AppColors.cream,
       body: SafeArea(
         child: SingleChildScrollView(
@@ -166,7 +180,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                     children: [
                       if (widget.editStudentData == null) ...[
                         Text(
-                          'add an additional student for free. you are allowed to add up to 5 children to your account.',
+                          LocalizationService.instance.t('add_student_desc'),
                           style: AppTypography.body(
                             fontSize: 15,
                             color: AppColors.textSecondary,
@@ -176,7 +190,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                       ],
 
                       Text(
-                        'choose a character profile picture',
+                        LocalizationService.instance.t('choose_avatar'),
                         style: AppTypography.body(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -204,11 +218,11 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                     color: !_isHumanCategory ? Colors.white : Colors.transparent,
                                     borderRadius: BorderRadius.circular(20),
                                     boxShadow: !_isHumanCategory ? [
-                                      BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                                      BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))
                                     ] : [],
                                   ),
                                   alignment: Alignment.center,
-                                  child: Text('Fantasy', style: AppTypography.button(fontSize: 14, color: !_isHumanCategory ? AppColors.textPrimary : AppColors.textHint)),
+                                  child: Text(LocalizationService.instance.t('fantasy'), style: AppTypography.button(fontSize: 14, color: !_isHumanCategory ? AppColors.textPrimary : AppColors.textHint)),
                                 ),
                               ),
                             ),
@@ -222,11 +236,11 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                     color: _isHumanCategory ? Colors.white : Colors.transparent,
                                     borderRadius: BorderRadius.circular(20),
                                     boxShadow: _isHumanCategory ? [
-                                      BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                                      BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))
                                     ] : [],
                                   ),
                                   alignment: Alignment.center,
-                                  child: Text('Kids', style: AppTypography.button(fontSize: 14, color: _isHumanCategory ? AppColors.textPrimary : AppColors.textHint)),
+                                  child: Text(LocalizationService.instance.t('kids'), style: AppTypography.button(fontSize: 14, color: _isHumanCategory ? AppColors.textPrimary : AppColors.textHint)),
                                 ),
                               ),
                             ),
@@ -307,24 +321,24 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                           children: [
                             TextFormField(
                               controller: _firstNameController,
-                              decoration: const InputDecoration(
-                                hintText: 'student first name',
+                              decoration: InputDecoration(
+                                hintText: LocalizationService.instance.t('student_first_name_hint'),
                               ),
                               style: AppTypography.body(fontSize: 16),
                               validator: (val) => val == null || val.isEmpty
-                                  ? 'required'
+                                  ? LocalizationService.instance.t('required_field')
                                   : null,
                             ),
                             const SizedBox(height: 12),
 
                             TextFormField(
                               controller: _lastNameController,
-                              decoration: const InputDecoration(
-                                hintText: 'student last name',
+                              decoration: InputDecoration(
+                                hintText: LocalizationService.instance.t('student_last_name_hint'),
                               ),
                               style: AppTypography.body(fontSize: 16),
                               validator: (val) => val == null || val.isEmpty
-                                  ? 'required'
+                                  ? LocalizationService.instance.t('required_field')
                                   : null,
                             ),
                             const SizedBox(height: 12),
@@ -354,7 +368,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                   ),
                                   const SizedBox(width: 12),
                                   Text(
-                                    'Grade 1',
+                                    LocalizationService.instance.t('grade_1'),
                                     style: AppTypography.body(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
@@ -374,7 +388,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
-                                      'auto-set',
+                                      LocalizationService.instance.t('auto_set'),
                                       style: AppTypography.caption(
                                         fontSize: 12,
                                         color: AppColors.gentleGreen,
@@ -394,7 +408,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                               items: _limits.map((limit) {
                                 return DropdownMenuItem(
                                   value: limit,
-                                  child: Text('daily limit: $limit'),
+                                  child: Text('${LocalizationService.instance.t("daily_limit_prefix")}${_getDisplayLimit(limit)}'),
                                 );
                               }).toList(),
                               onChanged: (val) {
@@ -466,9 +480,9 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                         ScaffoldMessenger.of(
                                           context,
                                         ).showSnackBar(
-                                          const SnackBar(
+                                          SnackBar(
                                             content: Text(
-                                              'student updated successfully!',
+                                              LocalizationService.instance.t('student_updated_success'),
                                             ),
                                             backgroundColor:
                                                 AppColors.gentleGreen,
@@ -479,9 +493,9 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                     }
                                   } else if (_selectedGrade == null) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
+                                      SnackBar(
                                         content: Text(
-                                          'grade is set to Grade 1',
+                                          LocalizationService.instance.t('grade_set_info'),
                                         ),
                                       ),
                                     );
@@ -508,8 +522,8 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                 )
                               : Text(
                                   widget.editStudentData == null
-                                      ? 'save changes'
-                                      : 'update changes',
+                                      ? LocalizationService.instance.t('save_changes')
+                                      : LocalizationService.instance.t('update_changes'),
                                   style: AppTypography.button(fontSize: 18),
                                 ),
                         ),
@@ -522,6 +536,8 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 
@@ -546,7 +562,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
           ),
           const SizedBox(width: 16),
           Text(
-            widget.editStudentData == null ? 'add student' : 'edit student',
+            widget.editStudentData == null ? LocalizationService.instance.t('add_student') : LocalizationService.instance.t('edit_student'),
             style: AppTypography.heading(
               fontSize: 22,
               fontWeight: FontWeight.w700,

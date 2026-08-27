@@ -1,0 +1,19 @@
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.9.0
+python-multipart>=0.0.9
+
+# MongoDB Database
+motor>=3.4.0
+pymongo[srv]>=4.6.1
+dnspython>=2.6.1
+certifi
+python-dotenv>=1.0.1
+
+# NLP and Audio Processing
+torch
+transformers
+gTTS
+librosa
+praat-parselmouth
+soundfile

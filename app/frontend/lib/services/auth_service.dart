@@ -9,16 +9,13 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:aad_oauth/aad_oauth.dart';
 import 'package:aad_oauth/model/config.dart';
 import '../main.dart'; // For globalNavigatorKey
+import '../config/api_config.dart';
 
 /// Handles authentication-only API calls: login, signup, tokens, passwords.
 /// Student management is in StudentService.
 class AuthService {
   static String get _baseUrl {
-    // Local Testing (using your Mac's IP address):
-    // return 'http://127.0.0.1:8015/api/v1/auth';
-    
-    // Cloud Server (Render):
-    return 'https://adaptedmind-auth-api.onrender.com/api/v1/auth';
+    return ApiConfig.authBaseUrl;
   }
   // Helper to get device info
   Future<Map<String, String>> _getDeviceData() async {
