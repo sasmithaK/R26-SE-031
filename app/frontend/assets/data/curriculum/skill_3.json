@@ -18,7 +18,7 @@
           {
             "prompt": "පින්තූරයට ගැලපෙන වචනය තෝරන්න",
             "options": [
-              "හඳ",
+              "මල",
               "ඉර"
             ],
             "correctOption": "ඉර",
@@ -65,7 +65,9 @@
             "options": [
               "සීනුව",
               "පහන",
-              "පනාව"
+              "පනාව",
+              "කුඩය",
+              "අලියා"
             ],
             "correctOption": "සීනුව",
             "correct_index": 0,
@@ -126,8 +128,8 @@
           {
             "prompt": "'පු' + 'ටු' + 'ව' එකතු වූ විට හැදෙන වචනය කුමක්ද?",
             "options": [
-              "ඇඳ",
-              "මේසය",
+              "අටුව",
+              "කටුව",
               "පුටුව"
             ],
             "correctOption": "පුටුව",
@@ -161,7 +163,7 @@
             "options": [
               "වැව",
               "පාර",
-              "ගඟ"
+              "ඇස"
             ],
             "correctOption": "පාර",
             "correct_index": 1
@@ -193,8 +195,8 @@
             "prompt": "ශබ්දයට සවන් දී වචනය තෝරන්න",
             "audio_text": "බල්ලා",
             "options": [
-              "පූසා",
-              "එළුවා",
+              "අලියා",
+              "නරියා",
               "හරකා",
               "බල්ලා"
             ],
@@ -303,12 +305,12 @@
         "rounds": [
           {
             "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
-            "correct_word": "මල",
+            "correct_word": "කන",
             "scrambled_letters": [
-              "ල",
-              "ම"
+              "න",
+              "ක"
             ],
-            "image_url": "assets/images/activity_icons/nature/flower.png"
+            "image_url": "assets/images/activity_icons/body_parts/ear.png"
           },
           {
             "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
