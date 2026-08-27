@@ -1,14 +1,14 @@
 [
   {
     "id": "skill_1",
-    "title": "පින්තූර හඳුනාගැනීම",
-    "intro_text": "පින්තූර හඳුනාගනිමු!",
+    "title": "පින්තූර හඳුනාගනිමු",
+    "intro_text": "අපි පින්තූර හඳුනාගැනීම ගැන විනෝදයෙන් ඉගෙනගනිමු!",
     "intro_audio_url": "",
     "activities": [
       {
-        "id": "visual_act_1",
-        "title": "සඟවා ඇති පින්තූර සෙවීම",
-        "description": "සඟවා ඇති පින්තූර සොයන්න.",
+        "id": "act_1",
+        "title": "සැඟවුණු පින්තූර සොයමු",
+        "description": "සැඟවා ඇති පින්තූර සොයන්න.",
         "file_path": "",
         "telemetry_tags": [
           "visual",
@@ -63,9 +63,9 @@
         ]
       },
       {
-        "id": "visual_act_2",
-        "title": "වෙනස් දේ සෙවීම",
-        "description": "වෙනස් පින්තූරය තෝරන්න.",
+        "id": "act_2",
+        "title": "සෙවණැල්ලට පින්තූරය ගළපමු",
+        "description": "සෙවණැල්ලට ගැලපෙන පින්තූරය තෝරන්න.",
         "file_path": "skill_visual/activity_4.json",
         "telemetry_tags": [
           "visual",
@@ -75,8 +75,8 @@
         "rounds": []
       },
       {
-        "id": "visual_act_3",
-        "title": "වර්ග කිරීමේ ත්‍යාගය",
+        "id": "act_3",
+        "title": "පින්තූර වෙන් කරමු",
         "description": "පින්තූර නිවැරදි තැනට දමන්න.",
         "file_path": "skill_visual/activity_3.json",
         "telemetry_tags": [
@@ -87,8 +87,8 @@
         "rounds": []
       },
       {
-        "id": "visual_act_4",
-        "title": "රටාව සම්පූර්ණ කිරීම",
+        "id": "act_4",
+        "title": "රටාව සම්පූර්ණ කරමු",
         "description": "මීළඟට එන පින්තූරය තෝරන්න.",
         "file_path": "skill_visual/activity_2.json",
         "telemetry_tags": [
@@ -99,8 +99,8 @@
         "rounds": []
       },
       {
-        "id": "visual_act_5",
-        "title": "මතක අභියෝගය",
+        "id": "act_5",
+        "title": "පින්තූර මතකයෙන් සොයමු",
         "description": "තොප්පි යට ඇති දේවල් මතක තබාගන්න.",
         "file_path": "skill_visual/activity_5.json",
         "telemetry_tags": [

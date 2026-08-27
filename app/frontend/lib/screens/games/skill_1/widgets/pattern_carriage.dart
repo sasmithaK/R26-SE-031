@@ -44,8 +44,8 @@ class PatternCarriage extends StatelessWidget {
             height: 68,
             decoration: BoxDecoration(
               color: isCorrectRevealed 
-                  ? const Color(0xFF6DBE6D).withOpacity(0.15) 
-                  : (isMissing ? Colors.white.withOpacity(0.9) : Colors.white),
+                  ? const Color(0xFF6DBE6D).withValues(alpha: 0.15) 
+                  : (isMissing ? Colors.white.withValues(alpha: 0.9) : Colors.white),
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(10),
                 bottomRight: Radius.circular(10),
@@ -53,20 +53,20 @@ class PatternCarriage extends StatelessWidget {
               border: Border.all(
                 color: isCorrectRevealed 
                     ? const Color(0xFF6DBE6D) 
-                    : (isMissing ? Colors.grey.withOpacity(0.5) : accentColor.withOpacity(0.4)),
+                    : (isMissing ? Colors.grey.withValues(alpha: 0.5) : accentColor.withValues(alpha: 0.4)),
                 width: isCorrectRevealed ? 4.0 : (isMissing ? 2 : 1.5),
                 style: BorderStyle.solid,
               ),
               boxShadow: [
                 if (isCorrectRevealed)
                   BoxShadow(
-                    color: const Color(0xFF6DBE6D).withOpacity(0.3),
+                    color: const Color(0xFF6DBE6D).withValues(alpha: 0.3),
                     blurRadius: 16,
                     spreadRadius: 2,
                   )
                 else if (!isMissing)
                   BoxShadow(
-                    color: accentColor.withOpacity(0.2),
+                    color: accentColor.withValues(alpha: 0.2),
                     blurRadius: 6,
                     offset: const Offset(0, 3),
                   ),

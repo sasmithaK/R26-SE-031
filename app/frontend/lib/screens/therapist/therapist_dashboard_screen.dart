@@ -4,6 +4,7 @@ import '../../services/auth_service.dart';
 import 'therapist_students_screen.dart';
 import 'therapist_messages_screen.dart';
 import 'therapist_profile_screen.dart';
+import '../../config/api_config.dart';
 import 'therapist_student_detail_screen.dart';
 import '../../services/localization_service.dart';
 
@@ -192,6 +193,18 @@ class _DashboardHome extends StatelessWidget {
                     initials = parts[0][0].toUpperCase();
                   }
 
+                  final hour = DateTime.now().hour;
+                  String greetingText;
+                  if (hour < 12) {
+                    greetingText = 'Good morning,';
+                  } else if (hour < 17) {
+                    greetingText = 'Good afternoon,';
+                  } else if (hour < 20) {
+                    greetingText = 'Good evening,';
+                  } else {
+                    greetingText = 'Good night,';
+                  }
+
                   return Row(
                     children: [
                       Expanded(
@@ -238,9 +251,7 @@ class _DashboardHome extends StatelessWidget {
                                     profilePicUrl.isNotEmpty
                                 ? DecorationImage(
                                     image: NetworkImage(
-                                      profilePicUrl.startsWith('http')
-                                          ? profilePicUrl
-                                          : 'https://adaptedmind-auth-api.onrender.com$profilePicUrl',
+                                      ApiConfig.getProfileImageUrl(profilePicUrl),
                                     ),
                                     fit: BoxFit.cover,
                                   )

@@ -28,7 +28,7 @@ class GameHUD extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 shape: BoxShape.circle,
                 boxShadow: const [
                   BoxShadow(
@@ -52,7 +52,7 @@ class GameHUD extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 16.0),
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(24.0),
                 boxShadow: const [
                   BoxShadow(
@@ -80,7 +80,7 @@ class GameHUD extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(20.0),
               boxShadow: const [
                 BoxShadow(

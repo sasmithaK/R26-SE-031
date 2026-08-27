@@ -23,7 +23,7 @@ class PatternBackground extends StatelessWidget {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
             child: Container(
-              color: Colors.white.withOpacity(0.75), // Semi-transparent white to ensure UI legibility
+              color: Colors.white.withValues(alpha: 0.75), // Semi-transparent white to ensure UI legibility
             ),
           ),
         ),

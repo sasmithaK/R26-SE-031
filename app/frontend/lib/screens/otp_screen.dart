@@ -9,6 +9,7 @@ import 'reset_password_screen.dart';
 import 'select_student_screen.dart';
 import 'onboarding_screen.dart';
 import 'therapist/therapist_dashboard_screen.dart';
+import '../services/localization_service.dart';
 
 
 class OtpScreen extends StatefulWidget {
@@ -162,8 +163,11 @@ class _OtpScreenState extends State<OtpScreen> {
           AuthService().cancelSignup(widget.email);
         }
       },
-      child: Scaffold(
-        backgroundColor: AppColors.cream,
+      child: ListenableBuilder(
+        listenable: LocalizationService.instance,
+        builder: (context, _) {
+          return Scaffold(
+            backgroundColor: AppColors.cream,
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
@@ -218,10 +222,10 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Headings
                 Center(
                   child: Text(
-                    'check your email',
+                    LocalizationService.instance.t('check_email'),
+                    textAlign: TextAlign.center,
                     style: AppTypography.heading(
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
@@ -240,12 +244,12 @@ class _OtpScreenState extends State<OtpScreen> {
                         height: 1.5,
                       ),
                       children: [
-                        const TextSpan(text: "We've sent a 6-digit code to\n"),
+                        TextSpan(text: LocalizationService.instance.t('otp_sent_to')),
                         TextSpan(
                           text: widget.email,
                           style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                         ),
-                        const TextSpan(text: '.\nEnter it below to verify your account.'),
+                        TextSpan(text: LocalizationService.instance.t('otp_enter_below')),
                       ],
                     ),
                   ),
@@ -364,8 +368,8 @@ class _OtpScreenState extends State<OtpScreen> {
                       ),
                       child: Text(
                         _secondsRemaining > 0
-                            ? 'resend code in 0:${_secondsRemaining.toString().padLeft(2, '0')}'
-                            : 'Resend OTP now',
+                            ? LocalizationService.instance.t('resend_code_in').replaceAll('{time}', '0:${_secondsRemaining.toString().padLeft(2, '0')}')
+                            : LocalizationService.instance.t('resend_otp_now'),
                         style: AppTypography.body(
                           fontSize: 15,
                           color: _secondsRemaining > 0 ? AppColors.textSecondary : AppColors.calmBlue,
@@ -384,7 +388,7 @@ class _OtpScreenState extends State<OtpScreen> {
                   child: _isLoading
                       ? const Center(child: AppLoadingIndicator())
                       : GradientButton(
-                          text: 'verify code',
+                          text: LocalizationService.instance.t('verify_code'),
                           onPressed: _verifyOtp,
                           icon: Icons.check_circle_outline,
                         ),
@@ -394,7 +398,9 @@ class _OtpScreenState extends State<OtpScreen> {
             ),
           ),
         ),
-      ),
-    );
+      );
+    },
+  ),
+);
   }
 }

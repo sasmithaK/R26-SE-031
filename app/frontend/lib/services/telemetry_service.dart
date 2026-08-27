@@ -168,14 +168,20 @@ class TelemetryService {
         ? DateTime.now().difference(_sessionStartTime!).inSeconds
         : 0;
 
+    // Grab a local copy of events and clear immediately to avoid race conditions
+    // with newly started sessions while this submits in the background.
+    final eventsToSubmit = _sessionEvents.map((e) => e.toJson()).toList();
+    final sessionEventCount = _sessionEvents.length;
+    _sessionEvents.clear();
+
     final payload = {
       'student_id': studentId,
       'session_duration_seconds': totalDuration,
-      'events': _sessionEvents.map((e) => e.toJson()).toList(),
+      'events': eventsToSubmit,
       'device_metrics': await _getDeviceMetrics(),
     };
 
-    debugPrint('Telemetry: Submitting session (${_sessionEvents.length} events)...');
+    debugPrint('Telemetry: Submitting session ($sessionEventCount events)...');
 
     try {
       final error = await StudentService().submitTelemetry(payload);
@@ -189,8 +195,6 @@ class TelemetryService {
       debugPrint('Telemetry exception — queuing offline: $e');
       await _enqueueOffline(payload);
     }
-
-    _sessionEvents.clear();
 
     // Attempt to flush any previously queued offline payloads
     await flushOfflineQueue(studentId);

@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../widgets/telemetry_wrapper.dart';
 import '../../../../models/curriculum_models.dart';
 import '../../../../services/tts_service.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
+import '../../../../services/progress_service.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
 /// Skill 3 Activity 2 (Word Formation MCQ)
 /// Premium redesign: separates instruction from visual equation.
 class Skill3Act2WordFormation extends StatefulWidget {
   final ActivityNode? activityNode;
+  final Map<String, dynamic>? studentData;
   final bool isRemedial;
-  const Skill3Act2WordFormation({super.key, this.activityNode, this.isRemedial = false});
+  const Skill3Act2WordFormation({super.key, this.activityNode, this.isRemedial = false, this.studentData});
 
   @override
   State<Skill3Act2WordFormation> createState() => _Skill3Act2WordFormationState();
@@ -34,6 +38,15 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
   @override
   void initState() {
     super.initState();
+    final skillId = widget.activityNode?.skillId ?? '';
+    final activityId = widget.activityNode?.id ?? '';
+    if (skillId.isNotEmpty && activityId.isNotEmpty) {
+      _currentRoundIndex = ProgressService().getActivityState(skillId, activityId);
+    }
+    final rounds = widget.activityNode?.rounds ?? [];
+    if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
+      _currentRoundIndex = 0;
+    }
 
     // Pulsing glow for the speaker button
     _pulseController = AnimationController(
@@ -97,25 +110,38 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
       setState(() {
         _isCorrect = true;
       });
-      await _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
 
       Future.delayed(const Duration(milliseconds: 1400), () {
         if (!mounted) return;
         if (_currentRoundIndex < totalRounds - 1) {
           setState(() {
             _currentRoundIndex++;
+              final sId = widget.activityNode?.skillId ?? '';
+              final aId = widget.activityNode?.id ?? '';
+              if (sId.isNotEmpty && aId.isNotEmpty) {
+                int progress = ((_currentRoundIndex / (widget.activityNode?.rounds.length ?? 1)) * 100).toInt();
+                ProgressService().saveActivityScore(sId, aId, progress);
+                ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+              }
             _selectedIndex = null;
             _isCorrect = false;
           });
           _playAudioPrompt();
         } else {
           setState(() {
-            _activityComplete = true;
-          });
+          _activityComplete = true;
+          final sId = widget.activityNode?.skillId ?? '';
+          final aId = widget.activityNode?.id ?? '';
+          if (sId.isNotEmpty && aId.isNotEmpty) {
+            ProgressService().saveActivityScore(sId, aId, 100);
+            ProgressService().clearActivityState(sId, aId);
+          }
+        });
         }
       });
     } else {
-      await _audioPlayer.play(AssetSource('audio/wrong.mp3'));
+      SoundUtils.playFeedback('audio/wrong.mp3');
       Future.delayed(const Duration(milliseconds: 600), () {
         if (!mounted) return;
         setState(() {
@@ -148,7 +174,7 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
     }
 
     final currentRound = rounds[_currentRoundIndex];
-    final titleText = widget.activityNode?.skillTitle ?? 'වචනය සකසන්න';
+    final titleText = widget.activityNode?.title ?? 'වචනය සකසන්න';
     final promptText = currentRound['prompt']?.toString() ?? '';
     
     var options = (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ?? ['🔵', '🟥', '🔺', '⭐'];
@@ -166,6 +192,8 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
     final equationParts = _extractEquationParts(promptText);
 
     return SharedGameLayout(
+      studentData: widget.studentData,
+      activityTitle: widget.activityNode?.title ?? '',
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
       totalRounds: rounds.length,

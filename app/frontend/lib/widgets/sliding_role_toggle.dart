@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/localization_service.dart';
 
 class SlidingRoleToggle extends StatelessWidget {
   final String selectedRole;
@@ -65,14 +66,14 @@ class SlidingRoleToggle extends StatelessWidget {
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => onChanged("Parent"),
-                      child: _buildItem("Parent", Icons.family_restroom_rounded, !isTherapist),
+                      child: _buildItem(LocalizationService.instance.t('role_parent'), Icons.family_restroom_rounded, !isTherapist),
                     ),
                   ),
                   Expanded(
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => onChanged("Therapist"),
-                      child: _buildItem("Therapist", Icons.psychology_rounded, isTherapist),
+                      child: _buildItem(LocalizationService.instance.t('role_therapist'), Icons.psychology_rounded, isTherapist),
                     ),
                   ),
                 ],

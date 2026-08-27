@@ -1,13 +1,14 @@
 [
   {
     "id": "skill_3",
-    "title": "සරල වචන සැකසීම",
+    "title": "සරල වචන සකසමු",
+    "intro_text": "අපි සරල වචන සැකසීම ගැන විනෝදයෙන් ඉගෙනගනිමු!",
     "description": "අකුරු එකතු කර සරල වචන සාදමු! 🧩",
     "activities": [
       {
         "id": "act_1",
-        "title": "රූපයට ගැලපෙන වචනය තෝරන්න",
-        "description": "රූපයට ගැලපෙන නිවැරදි වචනය තෝරන්න",
+        "title": "පින්තූරයට වචනය තෝරමු",
+        "description": "පින්තූරයට ගැලපෙන නිවැරදි වචනය තෝරන්න",
         "telemetry_tags": [
           "reading_comprehension",
           "visual_context"
@@ -15,7 +16,7 @@
         "template_type": "skill3_image_mcq",
         "rounds": [
           {
-            "prompt": "රූපයට ගැලපෙන වචනය තෝරන්න",
+            "prompt": "පින්තූරයට ගැලපෙන වචනය තෝරන්න",
             "options": [
               "හඳ",
               "ඉර"
@@ -25,7 +26,7 @@
             "image_url": "assets/images/activity_icons/nature/sun.png"
           },
           {
-            "prompt": "රූපයට ගැලපෙන වචනය තෝරන්න",
+            "prompt": "පින්තූරයට ගැලපෙන වචනය තෝරන්න",
             "options": [
               "හඳ",
               "මල",
@@ -36,7 +37,7 @@
             "image_url": "assets/images/activity_icons/nature/moon.png"
           },
           {
-            "prompt": "රූපයට ගැලපෙන වචනය තෝරන්න",
+            "prompt": "පින්තූරයට ගැලපෙන වචනය තෝරන්න",
             "options": [
               "බසය",
               "මල",
@@ -48,7 +49,7 @@
             "image_url": "assets/images/activity_icons/vehicles/bus.png"
           },
           {
-            "prompt": "රූපයට ගැලපෙන වචනය තෝරන්න",
+            "prompt": "පින්තූරයට ගැලපෙන වචනය තෝරන්න",
             "options": [
               "යතුර",
               "පහන",
@@ -60,7 +61,7 @@
             "image_url": "assets/images/activity_icons/everyday_objects/key.png"
           },
           {
-            "prompt": "රූපයට ගැලපෙන වචනය තෝරන්න",
+            "prompt": "පින්තූරයට ගැලපෙන වචනය තෝරන්න",
             "options": [
               "සීනුව",
               "පහන",
@@ -74,7 +75,7 @@
       },
       {
         "id": "act_2",
-        "title": "වචනය සකසන්න",
+        "title": "අකුරුවලින් වචන හදමු",
         "description": "අකුරු එකතු කර නිවැරදි වචනය තෝරන්න",
         "telemetry_tags": [
           "spelling",
@@ -136,7 +137,7 @@
       },
       {
         "id": "act_3",
-        "title": "ශබ්දයට සවන් දී වචනය තෝරන්න",
+        "title": "වචන අසා හඳුනා ගනිමු",
         "description": "ශබ්දයට සවන් දී නිවැරදි වචනය තෝරන්න",
         "telemetry_tags": [
           "listening_comprehension",
@@ -204,7 +205,7 @@
       },
       {
         "id": "act_4",
-        "title": "අඩු අකුර පුරවන්න",
+        "title": "අඩු අකුර සොයමු",
         "description": "වචනයේ හිස්තැනට සුදුසු අකුර තෝරන්න",
         "telemetry_tags": [
           "spelling",
@@ -214,85 +215,50 @@
         "rounds": [
           {
             "prompt": "හිස්තැනට සුදුසු අකුර තෝරන්න",
-            "sequence": [
-              null,
-              "ස"
-            ],
-            "options": [
-              "ම",
-              "ග"
-            ],
+            "sequence": [null, "ස"],
+            "options": ["ම", "ග"],
             "correctOption": "ග",
-            "correct_index": 1
+            "correct_index": 1,
+            "image_url": "assets/images/activity_icons/plants/tree.png"
           },
           {
             "prompt": "හිස්තැනට සුදුසු අකුර තෝරන්න",
-            "sequence": [
-              "පො",
-              null
-            ],
-            "options": [
-              "ල",
-              "ත",
-              "ර"
-            ],
+            "sequence": ["පො", null],
+            "options": ["ල", "ත", "ර"],
             "correctOption": "ත",
-            "correct_index": 1
+            "correct_index": 1,
+            "image_url": "assets/images/activity_icons/everyday_objects/book.png"
           },
           {
             "prompt": "හිස්තැනට සුදුසු අකුර තෝරන්න",
-            "sequence": [
-              "පා",
-              null,
-              "ල"
-            ],
-            "options": [
-              "ර",
-              "ට",
-              "ස"
-            ],
+            "sequence": ["පා", null, "ල"],
+            "options": ["ර", "ට", "ස"],
             "correctOption": "ස",
-            "correct_index": 2
+            "correct_index": 2,
+            "image_url": "assets/images/activity_icons/places/school.png"
           },
           {
             "prompt": "හිස්තැනට සුදුසු අකුර තෝරන්න",
-            "sequence": [
-              "අ",
-              null,
-              "මා"
-            ],
-            "options": [
-              "ක්",
-              "ම්",
-              "න්",
-              "ල්"
-            ],
+            "sequence": ["අ", null, "මා"],
+            "options": ["ක්", "ම්", "න්", "ල්"],
             "correctOption": "ම්",
-            "correct_index": 1
+            "correct_index": 1,
+            "image_url": "assets/images/activity_icons/people/mother.png"
           },
           {
             "prompt": "හිස්තැනට සුදුසු අකුර තෝරන්න",
-            "sequence": [
-              "තා",
-              "ත්",
-              null
-            ],
-            "options": [
-              "මා",
-              "නා",
-              "ගා",
-              "තා",
-              "රා"
-            ],
+            "sequence": ["තා", "ත්", null],
+            "options": ["මා", "නා", "ගා", "තා"],
             "correctOption": "තා",
-            "correct_index": 3
+            "correct_index": 3,
+            "image_url": "assets/images/activity_icons/people/father.png"
           }
         ]
       },
       {
         "id": "act_5",
-        "title": "අකුරු පිළිවෙලට සකසමු",
-        "description": "රූපයට අදාළ නම සෑදීමට අකුරු නිසි පිළිවෙලට සකසන්න.",
+        "title": "අකුරු පිළිවෙළට සකසමු",
+        "description": "පින්තූරයට අදාළ නම සෑදීමට අකුරු නිසි පිළිවෙලට සකසන්න.",
         "telemetry_tags": [
           "spelling",
           "anagram",
@@ -301,16 +267,16 @@
         "template_type": "skill3_jumbled_word",
         "rounds": [
           {
-            "prompt": "රූපයට අදාළ වචනය සාදන්න",
+            "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
             "correct_word": "මල",
             "scrambled_letters": [
               "ල",
               "ම"
             ],
-            "image_url": "assets/images/activity_icons/nature/flower.png"
+            "image_url": "assets/images/activity_icons/flowers/flower_05.png"
           },
           {
-            "prompt": "රූපයට අදාළ වචනය සාදන්න",
+            "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
             "correct_word": "ඇස",
             "scrambled_letters": [
               "ස",
@@ -319,7 +285,7 @@
             "image_url": "assets/images/activity_icons/body_parts/eye.png"
           },
           {
-            "prompt": "රූපයට අදාළ වචනය සාදන්න",
+            "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
             "correct_word": "පහන",
             "scrambled_letters": [
               "හ",
@@ -329,7 +295,7 @@
             "image_url": "assets/images/activity_icons/everyday_objects/oil_lamp.png"
           },
           {
-            "prompt": "රූපයට අදාළ වචනය සාදන්න",
+            "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
             "correct_word": "පනාව",
             "scrambled_letters": [
               "නා",
@@ -339,7 +305,7 @@
             "image_url": "assets/images/activity_icons/everyday_objects/comb.png"
           },
           {
-            "prompt": "රූපයට අදාළ වචනය සාදන්න",
+            "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
             "correct_word": "පුටුව",
             "scrambled_letters": [
               "ටු",

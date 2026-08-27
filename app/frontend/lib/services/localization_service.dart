@@ -84,7 +84,7 @@ class LocalizationService extends ChangeNotifier {
       'parent_name_hint': 'ඔබගේ නම',
       'role_parent': 'දෙමාපිය',
       'role_therapist': 'චිකිත්සක',
-      //'specialization_hint': 'විශේෂඥතාව (කථන චිකිත්සක)',
+      'specialization_hint': 'විශේෂඥතාව (කථන චිකිත්සක)',
       'clinic_hint': 'සායනයේ නම (විකල්ප)',
       'or': 'හෝ',
       'mobile_number': 'දුරකථන අංකය',
@@ -336,17 +336,17 @@ class LocalizationService extends ChangeNotifier {
       'memory': 'මතකය',
       'letter_knowledge': 'අකුරු පිළිබඳ දැනුම',
       'tracing': 'අකුරු ලිවීම',
-      'visual_hidden_search': 'සැඟවුණු රූප සෙවීම',
+      'visual_hidden_search': 'සැඟවුණු පින්තූර සෙවීම',
       'visual_pattern_adventure': 'රටා ගැලපීම',
       'visual_sorting_adventure': 'හැඩතල වෙන් කිරීම',
       'visual_odd_one_out': 'වෙනස් එක තෝරන්න',
       'visual_memory_hats': 'මතක තොප්පි',
-      'visual_picture_matching': 'රූප ගැලපීම',
+      'visual_picture_matching': 'පින්තූර ගැලපීම',
       'visual_connect_pairs': 'යුගල සම්බන්ධ කිරීම',
       'visual_shadow_matching': 'සෙවනැලි ගැලපීම',
       'visual_tangled_paths': 'පැටලුණු මාර්ග',
       'visual_position_concepts': 'ස්ථාන සංකල්ප',
-      'visual_missing_picture': 'අතුරුදහන් වූ රූපය',
+      'visual_missing_picture': 'අතුරුදහන් වූ පින්තූරය',
       'visual_category_sorting': 'කාණ්ඩ අනුව වෙන් කිරීම',
       'shadow_match_demo': 'සෙවනැලි ගැලපීමේ ආදර්ශනය',
       'child_progress_suffix': 'ගේ ප්‍රගතිය',
@@ -376,7 +376,9 @@ class LocalizationService extends ChangeNotifier {
       'no_attempts_yet': 'තවමත් උත්සාහ කර නොමැත',
       'parent_label': 'මව්පියන්',
       'generating_report': 'වාර්තාව ජනනය කරමින්...',
+      'download_clinical_report': 'සායනික වාර්තාව බාගන්න',
       'generating_assessment': 'තක්සේරුව ජනනය කරමින්...',
+      'download_assessment_pdf': 'තක්සේරු PDF බාගන්න',
       'touch_precision_tracking': 'ස්පර්ශ නිරවද්‍යතා ලුහුබැඳීම',
       'strategy': 'ක්‍රමෝපාය',
 
@@ -446,49 +448,19 @@ class LocalizationService extends ChangeNotifier {
       'weekly_minutes': 'සතිපතා මිනිත්තු',
       'student_progress': 'සිසු ප්‍රගතිය',
       'withdraw_consent_info': 'ඔබට ඕනෑම වේලාවක දෙමාපිය ගිණුම් සැකසීම් හරහා\nඔබගේ කැමැත්ත ඉවත් කරගත හැක.',
-      'Home': 'මුල් පිටුව',
-      'Shop': 'සාප්පුව',
-      'Progress' : 'ප්‍රගතිය',
-      'Parents' : 'දෙමාපියන්',
-
-      //therapist screens start from here 
-      //create account
-     'specialization':'විගේෂඥතාව (කථන චිකිත්සක)',
-
-      //dashboard 
-      'Avg_Score':'සාමානය ලකුණු',
-      'Need_Attention':'විශේෂ අවධානය අවශ්‍යයි ',
-      'Recent_Activities': 'මෑත ක්‍රියාකාරකම්',
-
-      //therapist profile 
-      'Therapist_Account': 'චිකිත්සක ගිණුම',
-      'Clinic_Connection': 'සායනය සමඟ සම්බන්ධතාව',
-      'Account_and_Security':'ගිණුම සහ ආරක්ෂාව',
-      'Help_and_Support':'උදව් සහ සහාය',
-
-      //clinic connection 
-      'Have_parents_scan_this_QR_code' : 'දෙමාපියන්ට මෙම QR කේතය ස්කෑන් කිරීමට සලස්වන්න.',
-      'Or_enter_Code' : 'හෝ කේතය ඇතුළත් කරන්න.',
-      'Share_invite_code' :'ආරාධනා කේතය බෙදාගන්න',
-
-      //therapist messages
-       'Search_Conversations':'සංවාද සෙවීම',
-        'New':'නව',
-      //students profile 
-      'Connected_Since':'සම්බන්ධ වූ දිනය',
-      'View_Interaction_Heatmaps':'අන්තර්ක්‍රියා තාප සිතියම් බලන්න',
-      'download_clinical_report':'සායනික වාර්තාව බාගත කරන්න',
-      'download_assessment_pdf':'ඇගයීම් වාර්තාව එක බාගත කරන්න',
-      'reading_fluency':'කියවීමේ හැකියාව',
-      'comprehension':'අවබෝධය',
-      'at_risk':'අවදානමක් ඇති',
-      'in_app_notifications':'යෙදුම් දැනුම්දීම්', 
-
-      'Today’s_Schedule' : 'අදට නියමිත කාලසටහන',
-      'Dr': 'වෛද්‍ය',
-      'students': 'සිසුන්',
-      'profile': 'ගිණුම',
-      'flagged': 'අවධානය යොමුකළ යුතු',
+      'dash_greeting_morning': 'සුබ උදෑසනක්, {name}!',
+      'dash_greeting_afternoon': 'සුබ දහවලක්, {name}!',
+      'dash_greeting_evening': 'සුබ සන්ධ්‍යාවක්, {name}!',
+      'dash_greeting_night': 'සුබ රාත්‍රියක්, {name}!',
+      'dash_streak_0': 'දින {streak} ක අඛණ්ඩ ගමනක්! 🔥',
+      'dash_streak_low': 'දින {streak} ක අඛණ්ඩ ගමනක්! හොඳයි! 🔥',
+      'dash_streak_high': 'දින {streak} ක අඛණ්ඩ ගමනක්! ගොඩක් හොඳයි! 🔥',
+      'dash_learning_path': 'ඉගෙනුම් මාර්ගය 🧩',
+      'dash_reading_practice': 'කියවීමේ පුහුණුව 📖',
+      'dash_nav_home': 'මුල් පිටුව',
+      'dash_nav_shop': 'සාප්පුව',
+      'dash_nav_progress': 'ප්‍රගතිය',
+      'dash_nav_parents': 'දෙමාපියන්',
     },
     'en': {
       'welcome_title': 'Welcome!',
@@ -523,7 +495,7 @@ class LocalizationService extends ChangeNotifier {
       'parent_name_hint': 'your name',
       'role_parent': 'parent',
       'role_therapist': 'therapist',
-      //'specialization_hint': 'specialization (e.g. speech therapist)',
+      'specialization_hint': 'specialization (e.g. speech therapist)',
       'clinic_hint': 'clinic name (optional)',
       'or': 'or',
       'mobile_number': 'mobile number',
@@ -896,35 +868,19 @@ class LocalizationService extends ChangeNotifier {
       'weekly_minutes': 'Weekly Minutes',
       'student_progress': 'Student Progress',
       'withdraw_consent_info': 'you can withdraw consent at any time\nfrom the parent account settings.',
-
-      //therapist screens start from here 
-      //create account
-       'specialization':'Specialization (Speech Therapist)',
-
-      //dashboard 
-      'Avg_Score':'Avg Score',
-      'Need_Attention':'Need Attention',
-      'Recent_Activities': 'Recent Activities',
-
-      //therapist profile 
-      'Therapist_Account': 'Therapist Account',
-      'Clinic_Connection': 'Clinic Connection',
-      'Account_and_Security':'Account and Security',
-      'Help_and_Support':'Help and Support',
-
-      //clinic connection 
-      'Have_parents_scan_this_QR_code' : 'Have parents scan this QR code.',
-      'Or_enter_Code' : 'Or enter Code.',
-      'Share_invite_code' :'Share invite code',
-
-      //therapist messages
-       'Search_Conversations':'Search Conversations',
-        'New':'New',
-      //students profile 
-      'Connected_Since':'Connected Since',
-      'View_Interaction_Heatmaps':'View Interaction Heatmaps',
-
-      'Today’s_Schedule' : 'Today’s Schedule',
+      'dash_greeting_morning': 'Good morning, {name}!',
+      'dash_greeting_afternoon': 'Good afternoon, {name}!',
+      'dash_greeting_evening': 'Good evening, {name}!',
+      'dash_greeting_night': 'Good night, {name}!',
+      'dash_streak_0': '{streak} day streak! 🔥',
+      'dash_streak_low': '{streak} day streak! Good! 🔥',
+      'dash_streak_high': '{streak} day streak! Very good! 🔥',
+      'dash_learning_path': 'Learning Path 🧩',
+      'dash_reading_practice': 'Reading Practice 📖',
+      'dash_nav_home': 'home',
+      'dash_nav_shop': 'shop',
+      'dash_nav_progress': 'progress',
+      'dash_nav_parents': 'parents',
     }
   };
 }

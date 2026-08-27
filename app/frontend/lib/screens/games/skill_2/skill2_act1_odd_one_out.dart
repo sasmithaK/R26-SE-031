@@ -1,20 +1,22 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../widgets/telemetry_wrapper.dart';
 import '../../../../models/curriculum_models.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
+import '../../../../services/progress_service.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
 class Skill2Act1OddOneOut extends StatefulWidget {
   final ActivityNode? activityNode;
+  final Map<String, dynamic>? studentData;
   final bool isRemedial;
 
-  const Skill2Act1OddOneOut({
-    super.key,
+  const Skill2Act1OddOneOut({super.key,
     this.activityNode,
-    this.isRemedial = false,
-  });
+    this.isRemedial = false, this.studentData});
 
   @override
   State<Skill2Act1OddOneOut> createState() => _Skill2Act1OddOneOutState();
@@ -38,6 +40,15 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
   @override
   void initState() {
     super.initState();
+    final skillId = widget.activityNode?.skillId ?? '';
+    final activityId = widget.activityNode?.id ?? '';
+    if (skillId.isNotEmpty && activityId.isNotEmpty) {
+      _currentRoundIndex = ProgressService().getActivityState(skillId, activityId);
+    }
+    final rounds = widget.activityNode?.rounds ?? [];
+    if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
+      _currentRoundIndex = 0;
+    }
     _setupRound();
   }
 
@@ -92,7 +103,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       setState(() {
         _foundIndices.add(index);
       });
-      await _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
       
       if (_foundIndices.length == _targetCount) {
         setState(() {
@@ -106,12 +117,25 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
           if (!mounted) return;
           if (_currentRoundIndex < rounds.length - 1) {
             setState(() {
-              _currentRoundIndex++;
+              _currentRoundIndex++; print("SAVING STATE: ${widget.activityNode?.skillId} ${widget.activityNode?.id} $_currentRoundIndex");
+              final sId = widget.activityNode?.skillId ?? '';
+              final aId = widget.activityNode?.id ?? '';
+              if (sId.isNotEmpty && aId.isNotEmpty) {
+                int progress = ((_currentRoundIndex / (widget.activityNode?.rounds.length ?? 1)) * 100).toInt();
+                ProgressService().saveActivityScore(sId, aId, progress);
+                ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+              }
               _setupRound();
             });
           } else {
             setState(() {
               _isActivityComplete = true;
+              final sId = widget.activityNode?.skillId ?? '';
+              final aId = widget.activityNode?.id ?? '';
+              if (sId.isNotEmpty && aId.isNotEmpty) {
+                ProgressService().saveActivityScore(sId, aId, 100);
+                ProgressService().clearActivityState(sId, aId);
+              }
             });
           }
         });
@@ -120,7 +144,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       setState(() {
         _wrongIndices.add(index);
       });
-      await _audioPlayer.play(AssetSource('audio/wrong.mp3'));
+      SoundUtils.playFeedback('audio/wrong.mp3');
       
       context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(0);
       
@@ -142,8 +166,8 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     }
 
     final currentRound = rounds[_currentRoundIndex];
-    final promptText = currentRound['prompt']?.toString() ?? 'වෙනස් රූපය සොයන්න.';
-    final titleText = widget.activityNode?.skillTitle ?? 'වෙනස් රූපය සොයමු';
+    final promptText = currentRound['prompt']?.toString() ?? 'නිවැරදි පින්තූරය සොයන්න.';
+    final titleText = widget.activityNode?.title ?? 'නිවැරදි අකුර සොයමු';
     
     String? targetLetter;
     if (currentRound['items'] != null) {
@@ -162,6 +186,8 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     }
 
     return SharedGameLayout(
+      studentData: widget.studentData,
+      activityTitle: widget.activityNode?.title ?? '',
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
       totalRounds: rounds.length,
@@ -212,7 +238,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.warmAmber.withOpacity(0.15),
+          color: AppColors.warmAmber.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: AppColors.warmAmber, width: 3),
         ),
@@ -227,7 +253,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: AppColors.warmAmber.withOpacity(0.4),
+                    color: AppColors.warmAmber.withValues(alpha: 0.4),
                     width: 2,
                   ),
                 ),
@@ -269,7 +295,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
                 shape: BoxShape.circle,
                 color: AppColors.warmAmber,
                 boxShadow: [
-                  BoxShadow(color: AppColors.warmAmber.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 3))
+                  BoxShadow(color: AppColors.warmAmber.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))
                 ]
               ),
               child: const Icon(Icons.volume_up_rounded, color: Colors.white, size: 26),
@@ -286,13 +312,13 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: _foundIndices.length == _targetCount
-            ? const Color(0xFF6DBE6D).withOpacity(0.15)
-            : const Color(0xFFF9C623).withOpacity(0.15),
+            ? const Color(0xFF6DBE6D).withValues(alpha: 0.15)
+            : const Color(0xFFF9C623).withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: _foundIndices.length == _targetCount
-              ? const Color(0xFF6DBE6D).withOpacity(0.3)
-              : const Color(0xFFF9C623).withOpacity(0.3),
+              ? const Color(0xFF6DBE6D).withValues(alpha: 0.3)
+              : const Color(0xFFF9C623).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -390,7 +416,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     
     // Base colors (Clean white for readability)
     Color tileColor = Colors.white;
-    Color borderColor = Colors.black.withOpacity(0.1);
+    Color borderColor = Colors.black.withValues(alpha: 0.1);
     Color shadowColor = const Color(0xFFD1D5DB); // Light grey shadow
     Color textColor = AppColors.textPrimary;
     double borderWidth = 2.0;
@@ -425,7 +451,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
           item['value'],
           style: TextStyle(
             fontFamily: 'IskoolaPota',
-            fontSize: _shuffledItems.length > 4 ? 44 : 54,
+            fontSize: _shuffledItems.length > 4 ? 56 : 72,
             fontWeight: FontWeight.bold,
             color: textColor,
           ),
@@ -454,7 +480,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
             color: tileColor,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isPressed ? borderColor : Colors.white.withOpacity(0.5),
+              color: isPressed ? borderColor : Colors.white.withValues(alpha: 0.5),
               width: isPressed ? borderWidth : 2,
             ),
             boxShadow: [
@@ -468,7 +494,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
               // General drop shadow
               if (!isPressed)
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
+                  color: Colors.black.withValues(alpha: 0.25),
                   offset: const Offset(0, 12),
                   blurRadius: 10,
                 )

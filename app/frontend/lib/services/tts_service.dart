@@ -1,13 +1,17 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
+import '../config/api_config.dart';
 
 class TtsService {
   static final TtsService _instance = TtsService._internal();
   factory TtsService() => _instance;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final String _baseUrl = 'https://adaptedmind-auth-api.onrender.com';
+
+  String get _baseUrl {
+    return ApiConfig.speechBaseUrl;
+  }
   
   TtsService._internal();
 

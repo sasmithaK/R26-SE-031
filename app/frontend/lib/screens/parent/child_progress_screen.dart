@@ -8,6 +8,7 @@ import '../../services/localization_service.dart';
 import '../../services/student_service.dart';
 import 'skill_detail_progress_screen.dart';
 import '../therapist/therapist_student_detail_screen.dart';
+import '../../services/localization_service.dart';
 /// Child Progress Screen — Visual dashboard showing a specific child's
 /// learning journey: weekly activity chart, overall stats, skill progress.
 class ChildProgressScreen extends StatefulWidget {
@@ -165,8 +166,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen>
         'icon': icon,
         'color': color,
         'progress': (avgScore / 100.0).clamp(0.0, 1.0),
-        LocalizationService.instance.t('accuracy'): avgScore.round(),
-        'levels': '${evts.length} rounds',
+        'accuracy': avgScore.round(),
+        'levels': evts.length,
         'lastPlayed': 'recent',
         'events': evts,
       };
@@ -176,12 +177,12 @@ class _ChildProgressScreenState extends State<ChildProgressScreen>
     if (_skills.isEmpty) {
       _skills = [
          {
-          'name': LocalizationService.instance.t('no_activities_played'),
+          'name': 'no_activities_played',
           'icon': FontAwesomeIcons.ghost,
           'color': AppColors.borderLight,
           'progress': 0.0,
-          LocalizationService.instance.t('accuracy'): 0,
-          'levels': '0 rounds',
+          'accuracy': 0,
+          'levels': 0,
           'lastPlayed': 'never',
         }
       ];
@@ -197,12 +198,19 @@ class _ChildProgressScreenState extends State<ChildProgressScreen>
   @override
   Widget build(BuildContext context) {
     final name = widget.studentData['first_name'] ?? 'student';
-    final grade = widget.studentData['grade'] ?? 'n/a';
+    String rawGrade = widget.studentData['grade'] ?? 'n/a';
+    if (rawGrade.toLowerCase().contains('grade 1')) {
+      rawGrade = LocalizationService.instance.t('grade_1');
+    }
+    final grade = rawGrade;
     final avatar =
         AvatarUtils.getCorrectedAvatarPath(widget.studentData['avatar_url'] as String?, 'assets/images/characters/human/human_student_1.png');
 
-    return Scaffold(
-      backgroundColor: AppColors.cream,
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.cream,
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: SafeArea(
@@ -236,7 +244,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen>
                       icon: const Icon(Icons.analytics_rounded, color: Colors.white),
                       label: Text(
                         LocalizationService.instance.t('view_advanced_reports'),
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -260,6 +268,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen>
         ),
       ),
     );
+  });
   }
 
   // ─── Header ───
@@ -313,7 +322,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "$name${LocalizationService.instance.t('child_progress_suffix')}",
+                  LocalizationService.instance.t('progress_report'),
                   style: AppTypography.heading(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
@@ -436,7 +445,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen>
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '${_weeklyMinutes.reduce((a, b) => a + b).round()} min total',
+                    '${_weeklyMinutes.reduce((a, b) => a + b).round()} ${LocalizationService.instance.t('minutes')}',
                     style: AppTypography.caption(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -525,7 +534,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            LocalizationService.instance.t('skill_progress'),
+            LocalizationService.instance.t('recent_skills'),
             style: AppTypography.heading(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -598,7 +607,9 @@ class _ChildProgressScreenState extends State<ChildProgressScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        skill['name'] as String,
+                        skill['name'] == 'no_activities_played'
+                            ? LocalizationService.instance.t('no_activities_played')
+                            : LocalizationService.instance.t((skill['name'] as String).toLowerCase().replaceAll(' ', '_')),
                         style: AppTypography.body(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -630,14 +641,14 @@ class _ChildProgressScreenState extends State<ChildProgressScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'levels: ${skill['levels']}',
+                        '${LocalizationService.instance.t('levels')}: ${skill['levels']}',
                         style: AppTypography.caption(
                           fontSize: 11,
                           color: AppColors.textHint,
                         ),
                       ),
                       Text(
-                        'last: ${skill['lastPlayed']}',
+                        '${LocalizationService.instance.t('last_active_prefix')}${LocalizationService.instance.t(skill['lastPlayed'] as String)}',
                         style: AppTypography.caption(
                           fontSize: 11,
                           color: AppColors.textHint,

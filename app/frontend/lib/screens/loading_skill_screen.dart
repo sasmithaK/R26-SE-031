@@ -30,28 +30,40 @@ class _LoadingSkillScreenState extends State<LoadingSkillScreen> {
     _loadSkillAndNavigate();
   }
 
+  bool _isPopping = false;
+
   Future<void> _loadSkillAndNavigate() async {
     try {
       final skillDetail = await SkillDetail.load(widget.skill.file);
       if (!mounted) return;
 
       final bool isIntroSeen = ProgressService().isSkillIntroSeen(skillDetail.id);
-      final Widget targetScreen = isIntroSeen
-          ? LevelMapScreen(skillMap: skillDetail, studentData: widget.studentData)
-          : SkillIntroScreen(skillMap: skillDetail, studentData: widget.studentData);
-
-      // We use pushReplacement so the user doesn't go back to the loading screen
-      await Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => targetScreen),
-      );
       
-      // Since it's replaced, the return won't hit here in the same way,
-      // but if we used push and waited, we could call onReturn.
-      // Wait, dashboard expects onReturn to refresh state!
-      // Let's pass the result back or invoke onReturn.
-      // If we use pushReplacement, dashboard's 'await Navigator.push' completes!
-      // So onReturn will be called immediately by the dashboard, which is fine.
+      if (!isIntroSeen) {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => SkillIntroScreen(skillMap: skillDetail, studentData: widget.studentData)),
+        );
+        if (result != true) {
+          // User backed out of intro without clicking start
+          if (mounted) Navigator.pop(context);
+          return;
+        }
+      }
+
+      if (!mounted) return;
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => LevelMapScreen(skillMap: skillDetail, studentData: widget.studentData)),
+      );
+
+      if (mounted) {
+        setState(() {
+          _isPopping = true; // hide UI to prevent flash during pop
+        });
+        Navigator.pop(context, result);
+      }
+      
     } catch (e) {
       debugPrint('Error loading skill detail: $e');
       if (mounted) Navigator.pop(context);
@@ -60,6 +72,8 @@ class _LoadingSkillScreenState extends State<LoadingSkillScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isPopping) return const SizedBox.shrink(); // Transparent during pop
+
     return Scaffold(
       backgroundColor: AppColors.cream,
       body: Center(

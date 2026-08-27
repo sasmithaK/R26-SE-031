@@ -1,0 +1,28 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies required for ML, audio processing, and xgboost
+RUN apt-get update && apt-get install -y \
+    libsndfile1 \
+    libgomp1 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the unified requirements file
+COPY requirements-azure.txt .
+
+# Suppress pip root warning since we are in an isolated container
+ENV PIP_ROOT_USER_ACTION=ignore
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements-azure.txt
+
+# Copy the entire backend application, excluding tests/venv if any via dockerignore ideally
+COPY . .
+
+# Expose the port Azure App Service expects
+EXPOSE 8080
+
+# Run the Azure gateway which spawns the 4 internal services
+CMD ["python", "azure_gateway.py"]

@@ -1,0 +1,94 @@
+[
+  {
+    "id": "skill_6",
+    "title": "සිංහල පෙළපොත",
+    "description": "1 ශ්‍රේණියේ සිංහල පෙළපොත ඇසුරින් කියවමු! 📚",
+    "activities": [
+      {
+        "id": "act_1",
+        "title": "පෙළපොතෙන් කියවමු - 1",
+        "description": "පළමු පාඩම ඇසුරින් කියවමු",
+        "telemetry_tags": [
+          "reading_comprehension",
+          "textbook_reading"
+        ],
+        "template_type": "interactive_story",
+        "rounds": [
+          {
+            "prompt": "ගස",
+            "overlays": [
+              { "text": "ගස", "align_x": 0.0, "align_y": 0.6 }
+            ]
+          },
+          {
+            "prompt": "ගඟ\nමල",
+            "overlays": [
+              { "text": "ගඟ", "align_x": -0.6, "align_y": -0.3 },
+              { "text": "මල", "align_x": 0.6, "align_y": 0.3 }
+            ]
+          },
+          {
+            "prompt": "ගඟ ළඟ ගස\nගස යට මල",
+            "overlays": [
+              { "text": "ගඟ ළඟ ගස", "align_x": 0.0, "align_y": 0.3 },
+              { "text": "ගස යට මල", "align_x": 0.0, "align_y": 0.5 }
+            ]
+          },
+          {
+            "prompt": "ගගන නයන\nඅර බලන්න.",
+            "overlays": [
+              { "text": "ගගන නයන", "align_x": -0.4, "align_y": 0.4 },
+              { "text": "අර බලන්න.", "align_x": 0.4, "align_y": 0.6 }
+            ]
+          },
+          {
+            "prompt": "ගස වට කර මල්\nඉහළ පහළ මල්",
+            "overlays": [
+              { "text": "ගස වට කර මල්", "align_x": 0.0, "align_y": 0.3 },
+              { "text": "ඉහළ පහළ මල්", "align_x": 0.0, "align_y": 0.5 }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "act_2",
+        "title": "පෙළපොතෙන් කියවමු - 2",
+        "description": "දෙවන පාඩම ඇසුරින් කියවමු",
+        "telemetry_tags": [
+          "reading_comprehension",
+          "textbook_reading"
+        ],
+        "template_type": "generic_mcq_game",
+        "rounds": [
+          {
+            "options": [
+              "පාසලට",
+              "කඩේට"
+            ],
+            "correctOption": "පාසලට",
+            "correct_index": 0,
+            "prompt": "ළමයා පාසලට යයි. කොහෙද යන්නේ?"
+          },
+          {
+            "options": [
+              "පොත",
+              "පෑන"
+            ],
+            "correctOption": "පොත",
+            "correct_index": 0,
+            "prompt": "මල්ලී පොත කියවයි. මොනවාද කියවන්නේ?"
+          },
+          {
+            "options": [
+              "බත්",
+              "පාන්"
+            ],
+            "correctOption": "බත්",
+            "correct_index": 0,
+            "prompt": "නංගී බත් කයි. මොනවාද කන්නේ?"
+          }
+        ]
+      }
+    ]
+  }
+]

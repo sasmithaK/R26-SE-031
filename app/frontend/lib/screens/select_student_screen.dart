@@ -12,6 +12,7 @@ import 'dashboard_screen.dart';
 import 'add_student_screen.dart';
 import 'parent/parent_hub_screen.dart';
 import 'assessment_prompt_screen.dart';
+import '../services/localization_service.dart';
 
 /// Select Student Screen
 /// Dyslexia-accessible: calm blue header, warm white student cards,
@@ -79,8 +80,11 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
 
-    return Scaffold(
-      body: Stack(
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
+          body: Stack(
         children: [
           // Background
           Container(
@@ -117,7 +121,7 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        "who's learning today?",
+                        LocalizationService.instance.t('whos_learning_today'),
                         style: AppTypography.heading(
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
@@ -146,6 +150,8 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
           ),
         ],
       ),
+        );
+      },
     );
   }
 
@@ -209,7 +215,7 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
           ),
           const SizedBox(height: 20),
           Text(
-            'no students yet!',
+            LocalizationService.instance.t('no_students_yet'),
             style: AppTypography.heading(
               fontSize: 22,
               color: AppColors.textPrimary,
@@ -217,7 +223,7 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'add a student to start learning',
+            LocalizationService.instance.t('add_student_subtitle'),
             style: AppTypography.body(
               fontSize: 16,
               color: AppColors.textSecondary,
@@ -367,7 +373,7 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
                           const Icon(Icons.assignment_late_rounded, size: 14, color: Colors.white),
                           const SizedBox(width: 4),
                           Text(
-                            'Pending',
+                            LocalizationService.instance.t('pending'),
                             style: AppTypography.caption(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
@@ -398,7 +404,7 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
                         const Icon(Icons.check_circle_rounded, size: 14, color: Colors.white),
                         const SizedBox(width: 4),
                         Text(
-                          'Ready',
+                          LocalizationService.instance.t('ready'),
                           style: AppTypography.caption(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
@@ -420,7 +426,7 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
     return Padding(
       padding: const EdgeInsets.all(24),
       child: GradientButton(
-        text: 'add student',
+        text: LocalizationService.instance.t('add_student'),
         icon: Icons.person_add_rounded,
         gradient: AppColors.greenGradient,
         onPressed: () async {

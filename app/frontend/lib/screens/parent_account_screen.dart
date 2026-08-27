@@ -5,6 +5,8 @@ import '../../theme/app_theme.dart';
 import 'welcome_screen.dart';
 import 'assessment_prompt_screen.dart';
 import 'add_student_screen.dart';
+import 'therapist/therapist_dashboard_screen.dart';
+import '../../services/localization_service.dart';
 import 'dashboard_screen.dart';
 import 'comprehensive_assessment_screen.dart';
 import 'comprehensive_results_screen.dart';
@@ -413,6 +415,12 @@ class _ParentAccountScreenState extends State<ParentAccountScreen>
           editLabel: 'change',
           onEdit: _isSocialLogin ? null : () => _showChangePasswordDialog(),
           subtitle: _isSocialLogin ? 'managed by $_authProvider' : null,
+        ),
+        _buildEditableRow(
+          label: LocalizationService.instance.t('language'),
+          value: LocalizationService.instance.currentLocale == 'en' ? 'English' : 'සිංහල',
+          editLabel: LocalizationService.instance.t('change'),
+          onEdit: () => _showChangeLanguageDialog(),
         ),
         const SizedBox(height: 12),
         // Security toggles
@@ -1195,6 +1203,54 @@ class _ParentAccountScreenState extends State<ParentAccountScreen>
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   //  DIALOGS (Frontend only logic for Name / Email updates)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  void _showChangeLanguageDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppColors.cardSurface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Text(LocalizationService.instance.t('select_language'),
+              style: AppTypography.heading(fontSize: 20, color: AppColors.textPrimary)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('English'),
+                trailing: LocalizationService.instance.currentLocale == 'en'
+                    ? const Icon(Icons.check, color: AppColors.gentleGreen)
+                    : null,
+                onTap: () {
+                  LocalizationService.instance.setLocale('en');
+                  Navigator.pop(ctx);
+                  setState(() {});
+                },
+              ),
+              ListTile(
+                title: const Text('සිංහල'),
+                trailing: LocalizationService.instance.currentLocale == 'si'
+                    ? const Icon(Icons.check, color: AppColors.gentleGreen)
+                    : null,
+                onTap: () {
+                  LocalizationService.instance.setLocale('si');
+                  Navigator.pop(ctx);
+                  setState(() {});
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('cancel',
+                  style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   void _showEditNameDialog() {
     final controller = TextEditingController(text: _userName);

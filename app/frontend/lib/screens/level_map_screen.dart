@@ -40,6 +40,7 @@ class _LevelMapScreenState extends State<LevelMapScreen>
   bool _isNavigating = false;
   bool _isBottomSheetOpen = false;
   int _animatingFromLevel = -1; // Tracks the level we are animating from
+  int _animatingProgressForLevel = -1; // To show the progress ring filling up to 100% before solidifying
 
   List<ActivityNode> get levels => widget.skillMap.activities;
 
@@ -82,7 +83,6 @@ class _LevelMapScreenState extends State<LevelMapScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToCurrentLevel();
-      _autoStartFirstLevel();
     });
   }
 
@@ -103,16 +103,7 @@ class _LevelMapScreenState extends State<LevelMapScreen>
     }
   }
 
-  void _autoStartFirstLevel() {
-    bool firstCompleted = ProgressService().isActivityCompleted(widget.skillMap.id, levels[0].id);
-    if (currentLevel == 0 && !firstCompleted) {
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted && currentLevel == 0 && !_isNavigating) {
-          _navigateToLevel(0);
-        }
-      });
-    }
-  }
+
 
   void _scrollToCurrentLevel() {
 
@@ -185,8 +176,8 @@ class _LevelMapScreenState extends State<LevelMapScreen>
     // Use a fixed, consistent premium spacing for all skills
     double nodeSpacing = 130.0;
 
-    // Determine map height
-    double contentHeight = levels.length * nodeSpacing + 160;
+    // Determine map height (added more bottom padding so the last node's star is fully visible)
+    double contentHeight = levels.length * nodeSpacing + 260;
     double mapHeight = max(screenHeight, contentHeight);
     bool shouldScroll = contentHeight > screenHeight;
 
@@ -216,8 +207,9 @@ class _LevelMapScreenState extends State<LevelMapScreen>
 
                     // Map content overlay
                     Padding(
-                      padding: const EdgeInsets.only(top: 120, bottom: 40),
+                      padding: const EdgeInsets.only(top: 120, bottom: 120),
                       child: Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           // Animated Path
                           AnimatedBuilder(
@@ -366,23 +358,12 @@ class _LevelMapScreenState extends State<LevelMapScreen>
                         Text(
                           level.title,
                           style: AppTypography.sinhala(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
+                            height: 1.2,
                           ),
                         ),
-                        if (level.description.isNotEmpty) ...[
-                          const SizedBox(height: 3),
-                          Text(
-                            level.description,
-                            style: AppTypography.sinhala(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -460,37 +441,71 @@ class _LevelMapScreenState extends State<LevelMapScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppColors.warmAmber.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.warmAmber.withValues(alpha: 0.3), width: 1),
                   ),
-                  child: Text(
-                    'ක්‍රියාකාරකම ${index + 1}',
-                    style: AppTypography.sinhala(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.warmAmber),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.extension_rounded, size: 16, color: AppColors.warmAmber),
+                      const SizedBox(width: 6),
+                      Text(
+                        'ක්‍රියාකාරකම ${index + 1}',
+                        style: AppTypography.sinhala(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.warmAmber),
+                      ),
+                    ],
                   ),
                 ),
-                if (isCompleted) ...[
-                  const SizedBox(width: 8),
-                  _buildStarBadge(score, AppColors.gentleGreen),
-                ],
               ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              level.title,
-              textAlign: TextAlign.center,
-              style: AppTypography.sinhala(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
-            ),
-            if (level.description.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                level.description,
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text(
+                level.title,
                 textAlign: TextAlign.center,
-                style: AppTypography.sinhala(fontSize: 15, color: AppColors.textSecondary),
+                style: AppTypography.sinhala(
+                  fontSize: 22, 
+                  fontWeight: FontWeight.w700, 
+                  color: AppColors.textPrimary,
+                  height: 1.4,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+            
+            // Show a celebratory completion badge below the title
+            if (isCompleted) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.gentleGreen.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.gentleGreen.withValues(alpha: 0.3), width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildStarBadge(score, AppColors.gentleGreen),
+                    const SizedBox(width: 8),
+                    Text(
+                      'සම්පූර්ණයි', // "Completed"
+                      style: AppTypography.sinhala(
+                        fontSize: 14, 
+                        fontWeight: FontWeight.w800, 
+                        color: AppColors.gentleGreen,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
-            const SizedBox(height: 16),
+            
+            const SizedBox(height: 24),
 
             // Speaker Audio Instruction Button
             GestureDetector(
@@ -530,8 +545,14 @@ class _LevelMapScreenState extends State<LevelMapScreen>
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   elevation: 4,
                 ),
-                icon: const Icon(Icons.play_arrow_rounded, size: 28),
-                label: Text('ක්‍රීඩා කරමු', style: AppTypography.button(fontSize: 18)),
+                icon: Icon(
+                  isCompleted ? Icons.replay_rounded : Icons.play_arrow_rounded, 
+                  size: 28,
+                ),
+                label: Text(
+                  isCompleted ? 'නැවත ක්‍රීඩා කරමු' : 'ක්‍රීඩා කරමු', 
+                  style: AppTypography.button(fontSize: 18),
+                ),
               ),
             ),
           ],
@@ -659,6 +680,10 @@ class _LevelMapScreenState extends State<LevelMapScreen>
         final nodeY = index * nodeSpacing + 20;
 
         bool isCompleted = ProgressService().isActivityCompleted(widget.skillMap.id, level.id);
+        if (_animatingProgressForLevel == index) {
+          isCompleted = false; // Keep it white with progress ring filling up
+        }
+        
         int score = ProgressService().getActivityScore(widget.skillMap.id, level.id);
         bool isCurrent = index == currentLevel;
         bool isLocked = index > currentLevel;
@@ -723,9 +748,11 @@ class _LevelMapScreenState extends State<LevelMapScreen>
     if (isCompleted) {
       bgColor = AppColors.gentleGreen;
       borderColor = AppColors.gentleGreenDark;
+      contentColor = Colors.white;
     } else if (isCurrent) {
-      bgColor = AppColors.warmAmber;
-      borderColor = AppColors.orangeDark;
+      bgColor = Colors.white;
+      borderColor = AppColors.borderLight;
+      contentColor = AppColors.warmAmber;
     } else {
       bgColor = Colors.white;
       borderColor = AppColors.borderLight;
@@ -778,93 +805,149 @@ class _LevelMapScreenState extends State<LevelMapScreen>
                         : 1.0;
                     return Transform.scale(scale: scale, child: child);
                   },
-                  child: Container(
-                    width: size,
-                    height: size,
-                    decoration: BoxDecoration(
-                      color: bgColor,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: borderColor, width: borderWidth),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          offset: const Offset(0, 6),
-                          blurRadius: 8,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: size,
+                        height: size,
+                        decoration: BoxDecoration(
+                          color: bgColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: borderColor, width: borderWidth),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              offset: const Offset(0, 6),
+                              blurRadius: 8,
+                            ),
+                            if (isCurrent && _animatingFromLevel == -1)
+                              BoxShadow(
+                                color: AppColors.warmAmber.withValues(
+                                  alpha: 0.2 + (_pulseController.value * 0.35),
+                                ),
+                                blurRadius: 16 + (_pulseController.value * 10),
+                                spreadRadius: 2 + (_pulseController.value * 4),
+                              ),
+                          ],
                         ),
-                        if (isCurrent)
-                          BoxShadow(
-                            color: AppColors.warmAmber.withValues(alpha: 0.4),
-                            blurRadius: 20,
-                            spreadRadius: 4,
+                        child: Center(
+                          child: isLocked
+                              ? Icon(Icons.lock_rounded, color: AppColors.borderLight, size: 32)
+                              : (isCompleted && type != 'trophy'
+                                  ? Icon(Icons.check_rounded, color: Colors.white, size: iconSize)
+                                  : (type == 'trophy'
+                                      ? ((isCurrent && _animatingFromLevel == -1)
+                                          ? const SizedBox.shrink()
+                                          : Text(
+                                              '🏆',
+                                              style: AppTypography.button(
+                                                fontSize: fontSize,
+                                                color: contentColor,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ))
+                                      : const SizedBox.shrink())),
+                        ),
+                      ),
+                        if (!isLocked)
+                          SizedBox(
+                            width: size + 8,
+                            height: size + 8,
+                            child: TweenAnimationBuilder<double>(
+                              duration: const Duration(milliseconds: 1200),
+                              curve: Curves.easeOutCubic,
+                              tween: Tween<double>(
+                                begin: 0.0,
+                                end: (score / 100.0).clamp(0.0, 1.0),
+                              ),
+                              builder: (context, animatedProgress, child) {
+                                return CustomPaint(
+                                  painter: NodeProgressPainter(
+                                    progress: animatedProgress,
+                                    strokeWidth: 6.0,
+                                    color: score >= 100
+                                        ? AppColors.gentleGreen
+                                        : AppColors.warmAmber,
+                                  ),
+                                );
+                              },
+                            ),
                           ),
-                      ],
-                    ),
-                    child: Center(
-                      child: isLocked
-                          ? Icon(Icons.lock_rounded, color: AppColors.borderLight, size: 32)
-                          : (isCompleted && type != 'trophy'
-                              ? Icon(Icons.check_rounded, color: Colors.white, size: iconSize)
-                              : (type == 'trophy'
-                                  ? ((isCurrent && _animatingFromLevel == -1)
-                                      ? const SizedBox.shrink()
-                                      : Text(
-                                          '🏆',
-                                          style: AppTypography.button(
-                                            fontSize: fontSize,
-                                            color: contentColor,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ))
-                                  : const SizedBox.shrink())),
-                    ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
               ],
             ),
-            if (isCompleted || (isCurrent && score > 0))
-              Positioned(
-                bottom: -4,
-                child: _buildStarBadge(score, isCompleted ? AppColors.gentleGreen : AppColors.warmAmber),
-              ),
+            if (!isLocked)
+              Builder(builder: (context) {
+                int starCount = 1;
+                if (widget.skillMap.id == 'skill_4' && index == 3) {
+                  starCount = 2;
+                }
+                return Positioned(
+                  bottom: -4,
+                  child: _buildStarBadge(
+                    score,
+                    isCompleted ? AppColors.gentleGreen : AppColors.warmAmber,
+                    starCount: starCount,
+                  ),
+                );
+              }),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStarBadge(int score, Color baseColor) {
-    int starCount = 1;
-    if (score >= 80) {
-      starCount = 3;
-    } else if (score >= 50) {
-      starCount = 2;
-    }
+  Widget _buildStarBadge(int score, Color baseColor, {int starCount = 1}) {
+    final bool fullyCompleted = score >= 100;
+    final double targetValue = fullyCompleted ? 1.0 : 0.0;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.warmAmber,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.orangeDark, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          )
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: List.generate(
-          starCount,
-          (i) => const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 1.0),
-            child: Icon(Icons.star_rounded, color: Colors.white, size: 13),
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeInOut,
+      tween: Tween<double>(begin: 0.0, end: targetValue),
+      builder: (context, value, child) {
+        // Smooth color transition: grey → warm amber
+        final bgColor = Color.lerp(Colors.grey[350], AppColors.warmAmber, value)!;
+        final borderClr = Color.lerp(Colors.grey[400], AppColors.orangeDark, value)!;
+        final iconColor = Color.lerp(Colors.grey[400], Colors.white, value)!;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderClr, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+              if (value > 0.3)
+                BoxShadow(
+                  color: AppColors.warmAmber.withValues(alpha: value * 0.45),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                ),
+            ],
           ),
-        ),
-      ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(
+              starCount,
+              (index) => Icon(
+                Icons.star_rounded,
+                color: iconColor,
+                size: 16,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -887,7 +970,18 @@ class _LevelMapScreenState extends State<LevelMapScreen>
         }
 
         final avatarUrl = AvatarUtils.getCorrectedAvatarPath(widget.studentData?['avatar_url'] as String?, 'assets/images/characters/mascots/solo_blue.png');
-        final double scaleFactor = 1.05;
+        
+        // Dynamically scale: 1.05 for the final node (which is larger), 0.85 for normal nodes
+        final bool isTargetLast = currentLevel == levels.length - 1;
+        final double targetScale = isTargetLast ? 1.05 : 0.85;
+        double scaleFactor = targetScale;
+        
+        if (_animatingFromLevel != -1) {
+          final bool isStartLast = _animatingFromLevel == levels.length - 1;
+          final double startScale = isStartLast ? 1.05 : 0.85;
+          scaleFactor = startScale + (targetScale - startScale) * _avatarMoveAnim.value;
+        }
+        
         final double containerSize = 76;
         final double halfSize = containerSize / 2;
 
@@ -958,7 +1052,7 @@ class _LevelMapScreenState extends State<LevelMapScreen>
       final fails = ProgressService().getFailureCount(widget.skillMap.id, level.id);
       final bool isRemedial = fails >= 2;
 
-      Widget nextScreen = GameFactory.buildGame(level, isRemedial: isRemedial);
+      Widget nextScreen = GameFactory.buildGame(level, isRemedial: isRemedial, studentData: widget.studentData);
       
       // Start a new telemetry session for this activity
       TelemetryService().startSession();
@@ -969,53 +1063,258 @@ class _LevelMapScreenState extends State<LevelMapScreen>
         MaterialPageRoute(builder: (context) => nextScreen),
       );
 
-      // Extract score result if provided as int or default to 100 on continue
-      int scoreToSave = 100;
+      // Extract score result if provided as int
+      int? returnedScore;
       if (result != null && result is int) {
-        scoreToSave = result;
+        returnedScore = result;
       }
       
       // Submit the telemetry session that was recorded during this activity
       final studentId = ProgressService().currentStudentId;
-      await TelemetryService().endSessionAndSubmit(studentId);
+      TelemetryService().endSessionAndSubmit(studentId); // Fire and forget so we don't freeze the map
 
-      // DDA: Update failure count
-      if (scoreToSave < 40) {
-        await ProgressService().incrementFailureCount(widget.skillMap.id, level.id);
-      } else if (scoreToSave >= 40 && fails > 0) {
-        await ProgressService().resetFailureCount(widget.skillMap.id, level.id);
-      }
-
-      // Mark level as completed persistently
+      // The games save partial state and score themselves. 
+      // Read the latest score from the service to know exactly where we stand.
       final currentScore = ProgressService().getActivityScore(widget.skillMap.id, level.id);
-      if (scoreToSave > currentScore || !isCompleted) {
-        await ProgressService().saveActivityScore(widget.skillMap.id, level.id, scoreToSave);
+      final finalScore = returnedScore ?? currentScore;
+
+      // NEW: Wait for the screen transition to completely finish before triggering UI updates,
+      // so the user can fully witness the progress bar animating!
+      await Future.delayed(const Duration(milliseconds: 400));
+
+      // DDA: Update failure count (only if they actually returned a score)
+      if (returnedScore != null) {
+        if (returnedScore < 40) {
+          await ProgressService().incrementFailureCount(widget.skillMap.id, level.id);
+        } else if (returnedScore >= 40) {
+          await ProgressService().resetFailureCount(widget.skillMap.id, level.id);
+        }
       }
-      await ProgressService().markActivityCompleted(widget.skillMap.id, level.id);
 
-      final nextLevelIndex = index + 1;
-      if (nextLevelIndex > currentLevel && nextLevelIndex < levels.length) {
-        setState(() {
-          _animatingFromLevel = currentLevel;
-          currentLevel = nextLevelIndex;
-        });
+      if (finalScore >= 100) {
+        // Mark it completed instantly in cache so dashboard updates immediately if user exits early.
+        await ProgressService().markActivityCompleted(widget.skillMap.id, level.id);
 
-        // Trigger smooth avatar glide animation to the newly unlocked activity
-        _unlockController.forward(from: 0.0).then((_) {
+        if (!isCompleted) {
+          // Show progress filling up to 100% first
+          setState(() {
+            _animatingProgressForLevel = index;
+          });
+          
+          // Wait for the TweenAnimationBuilder to complete its 1.2s animation
+          await Future.delayed(const Duration(milliseconds: 1200));
+          
           if (mounted) {
             setState(() {
-              _animatingFromLevel = -1;
+              _animatingProgressForLevel = -1;
             });
           }
-        });
+          
+          // Wait a tiny bit for the user to admire the green "pop"
+          await Future.delayed(const Duration(milliseconds: 500));
 
-        _scrollToCurrentLevel();
+          final nextLevelIndex = index + 1;
+          if (nextLevelIndex > currentLevel && nextLevelIndex < levels.length) {
+            setState(() {
+              _animatingFromLevel = currentLevel;
+              currentLevel = nextLevelIndex;
+            });
+
+            // Trigger smooth avatar glide animation to the newly unlocked activity
+            _unlockController.forward(from: 0.0).then((_) {
+              if (mounted) {
+                setState(() {
+                  _animatingFromLevel = -1;
+                });
+              }
+            });
+          } else if (nextLevelIndex == levels.length) {
+            // First time completing the very last activity in this skill!
+            if (mounted) {
+              _showSkillCompleteCelebration();
+            }
+          }
+          _scrollToCurrentLevel();
+        } else {
+          setState(() {});
+          _refreshCurrentLevel();
+        }
       } else {
+        // Rebuild UI to show partial progress
+        setState(() {});
         _refreshCurrentLevel();
       }
     } finally {
       _isNavigating = false;
     }
+  }
+
+  void _showSkillCompleteCelebration() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      transitionDuration: const Duration(milliseconds: 600),
+      pageBuilder: (context, anim1, anim2) {
+        return _buildCelebrationOverlay();
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+              CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCelebrationOverlay() {
+    return StatefulBuilder(
+      builder: (context, setStateOverlay) {
+        return Material(
+          color: Colors.transparent,
+          child: Center(
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.85,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.white, AppColors.cream],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(color: AppColors.warmAmber, width: 4),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.warmAmber.withValues(alpha: 0.4),
+                    blurRadius: 40,
+                    spreadRadius: 10,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Spinning glow + star
+                  SizedBox(
+                    height: 160,
+                    width: 160,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: 2 * pi),
+                          duration: const Duration(seconds: 10),
+                          builder: (context, value, child) {
+                            return Transform.rotate(
+                              angle: value,
+                              child: child,
+                            );
+                          },
+                          child: Icon(
+                            Icons.brightness_7_rounded,
+                            size: 160,
+                            color: AppColors.warmAmber.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.5, end: 1.0),
+                          duration: const Duration(milliseconds: 800),
+                          curve: Curves.elasticOut,
+                          builder: (context, value, child) {
+                            return Transform.scale(
+                              scale: value,
+                              child: child,
+                            );
+                          },
+                          child: const Icon(
+                            Icons.star_rounded,
+                            size: 100,
+                            color: AppColors.warmAmber,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'සුබ පැතුම්!',
+                    textAlign: TextAlign.center,
+                    style: AppTypography.heading(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.warmAmber,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'ඔබ මෙම අදියර සාර්ථකව නිම කළා!\nමීළඟ අදියර දැන් විවෘතයි.',
+                    textAlign: TextAlign.center,
+                    style: AppTypography.body(
+                      fontSize: 18,
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context); // close modal
+                        Navigator.pop(context, 'next_skill'); // pop LevelMapScreen back to Dashboard
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.gentleGreen,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        elevation: 6,
+                        shadowColor: AppColors.gentleGreen.withValues(alpha: 0.5),
+                      ),
+                      child: Text(
+                        'මීළඟ අදියරට යමු',
+                        style: AppTypography.button(fontSize: 18, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(context); // just close the modal
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(color: AppColors.borderLight, width: 2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        backgroundColor: AppColors.cardSurface,
+                      ),
+                      child: Text(
+                        'මෙම සිතියමේ රැඳෙන්න',
+                        style: AppTypography.button(
+                          fontSize: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -1166,3 +1465,70 @@ class PathPainter extends CustomPainter {
            oldDelegate.pathAnimationProgress != pathAnimationProgress;
   }
 }
+
+class NodeProgressPainter extends CustomPainter {
+  final double progress;   // 0.0 – 1.0
+  final double strokeWidth;
+  final Color color;
+
+  NodeProgressPainter({
+    required this.progress,
+    required this.strokeWidth,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - strokeWidth) / 2;
+
+    // Arc geometry — starts just to the left of the star (bottom-center)
+    // and sweeps clockwise around the top, ending just to the right.
+    // The 60° gap at the bottom keeps the star badge clear.
+    const double gapDeg = 60;
+    const double startDeg = 90 + (gapDeg / 2);       // 120°
+    const double maxSweepDeg = 360 - gapDeg;          // 300°
+    const double startRad = startDeg * (pi / 180);
+    const double maxSweepRad = maxSweepDeg * (pi / 180);
+
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    // ── 1.  Background track (subtle ring showing "empty" portion) ──
+    final trackPaint = Paint()
+      ..color = color.withValues(alpha: 0.12)
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, startRad, maxSweepRad, false, trackPaint);
+
+    if (progress <= 0) return;
+
+    final sweepRad = maxSweepRad * progress.clamp(0.0, 1.0);
+
+    // ── 2.  Gradient progress arc ──
+    final gradientPaint = Paint()
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(
+        startAngle: startRad,
+        endAngle: startRad + sweepRad,
+        colors: [
+          color.withValues(alpha: 0.6),
+          color,
+          Color.lerp(color, Colors.white, 0.2)!,
+        ],
+        stops: const [0.0, 0.7, 1.0],
+      ).createShader(rect);
+
+    canvas.drawArc(rect, startRad, sweepRad, false, gradientPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant NodeProgressPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+           oldDelegate.strokeWidth != strokeWidth ||
+           oldDelegate.color != color;
+  }
+}
+

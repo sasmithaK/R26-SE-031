@@ -4,6 +4,7 @@ import '../widgets/gradient_button.dart';
 
 import 'signin_screen.dart';
 import 'signup_screen.dart';
+import '../services/localization_service.dart';
 
 /// Screen 2: Welcome / Get Started
 /// Dyslexia-accessible: warm crème top, pale slate blue bottom,
@@ -147,8 +148,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
 
-    return Scaffold(
-      backgroundColor: AppColors.cream,
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.cream,
       body: Stack(
         children: [
           // Background decorations (soft bubbles)
@@ -182,7 +186,20 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
               child: Column(
                 children: [
-                  SizedBox(height: screenHeight * 0.02),
+                  if (!LocalizationService.instance.hasSetLanguage)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          _buildLangBtn('EN', 'en'),
+                          const SizedBox(width: 8),
+                          _buildLangBtn('සිංහල', 'si'),
+                        ],
+                      ),
+                    )
+                  else
+                    SizedBox(height: screenHeight * 0.02),
 
                   // App name
                   AnimatedBuilder(
@@ -238,7 +255,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'your sinhala learning\nadventure awaits!',
+                            LocalizationService.instance.t('welcome_subtitle'),
                             textAlign: TextAlign.center,
                             style: AppTypography.body(
                               fontSize: 20,
@@ -251,10 +268,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                           // GET STARTED button
                           GradientButton(
-                            text: 'get started',
+                            text: LocalizationService.instance.t('welcome_btn_signup'),
                             icon: Icons.rocket_launch_rounded,
                             gradient: AppColors.greenGradient,
                             onPressed: () {
+                              LocalizationService.instance.markLanguageAsSet();
                               Navigator.of(context).push(
                                 PageRouteBuilder(
                                   pageBuilder: (context, animation,
@@ -284,8 +302,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                           // I ALREADY HAVE AN ACCOUNT button
                           OutlinedGradientButton(
-                            text: 'i already have an account',
+                            text: LocalizationService.instance.t('welcome_btn_signin'),
                             onPressed: () {
+                              LocalizationService.instance.markLanguageAsSet();
                               Navigator.of(context).push(
                                 PageRouteBuilder(
                                   pageBuilder: (context, animation,
@@ -322,6 +341,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         ],
       ),
     );
+      },
+    );
   }
 
   Widget _buildCharacterGroup(double screenWidth) {
@@ -332,6 +353,32 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       child: Image.asset(
         'assets/images/characters/mascots/furry_monsters_group_transparent.png',
         fit: BoxFit.contain,
+      ),
+    );
+  }
+
+  Widget _buildLangBtn(String label, String code) {
+    final bool isSelected = LocalizationService.instance.currentLocale == code;
+    return GestureDetector(
+      onTap: () {
+        LocalizationService.instance.setLocale(code);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.calmBlue : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.calmBlue : AppColors.borderLight,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppColors.textSecondary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }

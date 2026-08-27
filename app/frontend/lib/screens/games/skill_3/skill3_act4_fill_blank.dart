@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../widgets/telemetry_wrapper.dart';
 import '../../../../models/curriculum_models.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
+import '../../../../services/progress_service.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
 /// Skill 3 Activity 4 (Fill Blank Slot Matching Image)
 /// Template: fill_blank_game
 class Skill3Act4FillBlank extends StatefulWidget {
   final ActivityNode? activityNode;
+  final Map<String, dynamic>? studentData;
   final bool isRemedial;
-  const Skill3Act4FillBlank({super.key, this.activityNode, this.isRemedial = false});
+  const Skill3Act4FillBlank({super.key, this.activityNode, this.isRemedial = false, this.studentData});
 
   @override
   State<Skill3Act4FillBlank> createState() => _Skill3Act4FillBlankState();
@@ -34,6 +38,15 @@ class _Skill3Act4FillBlankState extends State<Skill3Act4FillBlank>
   @override
   void initState() {
     super.initState();
+    final skillId = widget.activityNode?.skillId ?? '';
+    final activityId = widget.activityNode?.id ?? '';
+    if (skillId.isNotEmpty && activityId.isNotEmpty) {
+      _currentRoundIndex = ProgressService().getActivityState(skillId, activityId);
+    }
+    final rounds = widget.activityNode?.rounds ?? [];
+    if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
+      _currentRoundIndex = 0;
+    }
 
     // Pulsing glow for the blank slot
     _pulseController = AnimationController(
@@ -79,13 +92,20 @@ class _Skill3Act4FillBlankState extends State<Skill3Act4FillBlank>
       });
       _pulseController.stop();
       _bounceController.forward(from: 0.0);
-      await _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
 
       Future.delayed(const Duration(milliseconds: 1400), () {
         if (!mounted) return;
         if (_currentRoundIndex < totalRounds - 1) {
           setState(() {
             _currentRoundIndex++;
+              final sId = widget.activityNode?.skillId ?? '';
+              final aId = widget.activityNode?.id ?? '';
+              if (sId.isNotEmpty && aId.isNotEmpty) {
+                int progress = ((_currentRoundIndex / (widget.activityNode?.rounds.length ?? 1)) * 100).toInt();
+                ProgressService().saveActivityScore(sId, aId, progress);
+                ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+              }
             _selectedOptionIndex = null;
             _isCorrect = false;
           });
@@ -93,12 +113,18 @@ class _Skill3Act4FillBlankState extends State<Skill3Act4FillBlank>
           _bounceController.reset();
         } else {
           setState(() {
-            _activityComplete = true;
-          });
+          _activityComplete = true;
+          final sId = widget.activityNode?.skillId ?? '';
+          final aId = widget.activityNode?.id ?? '';
+          if (sId.isNotEmpty && aId.isNotEmpty) {
+            ProgressService().saveActivityScore(sId, aId, 100);
+            ProgressService().clearActivityState(sId, aId);
+          }
+        });
         }
       });
     } else {
-      await _audioPlayer.play(AssetSource('audio/wrong.mp3'));
+      SoundUtils.playFeedback('audio/wrong.mp3');
       Future.delayed(const Duration(milliseconds: 600), () {
         if (!mounted) return;
         setState(() {
@@ -112,10 +138,7 @@ class _Skill3Act4FillBlankState extends State<Skill3Act4FillBlank>
   Widget build(BuildContext context) {
     var rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('හිස්තැන පුරවමු')),
-        body: const Center(child: Text('No rounds available.')),
-      );
+      return const Scaffold(body: Center(child: Text('Loading...')));
     }
     
     if (rounds.length > 5) {
@@ -123,13 +146,15 @@ class _Skill3Act4FillBlankState extends State<Skill3Act4FillBlank>
     }
 
     final currentRound = rounds[_currentRoundIndex];
-    final titleText = widget.activityNode?.skillTitle ?? 'රූපයට ගැලපෙන හිස්තැන පුරවමු';
-    final instructionText = widget.activityNode?.description ?? 'රූප පෙළෙහි හිස්තැනට ගැලපෙන නිවැරදි රූපය තෝරන්න.';
+    final titleText = widget.activityNode?.title ?? 'පින්තූරයට ගැලපෙන හිස්තැන සොයමු';
+    final instructionText = widget.activityNode?.description ?? 'පින්තූර පෙළෙහි හිස්තැනට ගැලපෙන නිවැරදි පින්තූරය තෝරන්න.';
 
     final sequence = (currentRound['sequence'] as List?)?.map((e) => e?.toString()).toList() ?? ['🔴', '🔵', null, '🟢'];
     var options = (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ?? ['🟡', '🟣', '🔴', '⭐'];
     final correctOption = currentRound['correctOption']?.toString() ?? options.first;
     
+    final imageUrl = currentRound['image_url']?.toString();
+
     if (widget.isRemedial && options.length > 2) {
       var distractors = options.where((item) => item != correctOption).toList();
       if (distractors.isNotEmpty) distractors = distractors.sublist(0, 1);
@@ -138,6 +163,8 @@ class _Skill3Act4FillBlankState extends State<Skill3Act4FillBlank>
     }
 
     return SharedGameLayout(
+      studentData: widget.studentData,
+      activityTitle: widget.activityNode?.title ?? '',
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
       totalRounds: rounds.length,
@@ -156,22 +183,26 @@ class _Skill3Act4FillBlankState extends State<Skill3Act4FillBlank>
         child: Column(
           children: [
             Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  _buildInstructionCard(instructionText),
-                  const Spacer(flex: 1),
-
-                  // ── Premium Sequence Card ──
-                  _buildSequenceCard(sequence, correctOption),
-
-                  const Spacer(flex: 2),
-
-                  // ── Premium Answer Pool ──
-                  _buildAnswerPool(options, correctOption, rounds.length),
-
-                  const Spacer(flex: 1),
-                ],
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 12),
+                    _buildInstructionCard(instructionText),
+                    const SizedBox(height: 24),
+                    
+                    // ── Premium Sequence Card ──
+                    _buildSequenceCard(sequence, correctOption, imageUrl),
+                    
+                    const SizedBox(height: 32),
+                    
+                    // ── Premium Answer Pool ──
+                    _buildAnswerPool(options, correctOption, rounds.length),
+                    
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
           ],
@@ -180,9 +211,10 @@ class _Skill3Act4FillBlankState extends State<Skill3Act4FillBlank>
     );
   }
 
-  /// Premium floating sequence card with animated blank slot
-  Widget _buildSequenceCard(List<String?> sequence, String correctOption) {
+  /// Premium floating sequence card with animated blank slot and image
+  Widget _buildSequenceCard(List<String?> sequence, String correctOption, String? imageUrl) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -199,21 +231,51 @@ class _Skill3Act4FillBlankState extends State<Skill3Act4FillBlank>
           )
         ],
       ),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 12,
-        runSpacing: 12,
-        children: sequence.map((item) {
-          final isBlank = (item == null);
-          final currentText = isBlank ? (_isCorrect ? correctOption : '') : item;
-          final isWide = false;
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (imageUrl != null) ...[
+            Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.warmAmber.withValues(alpha: 0.2),
+                    blurRadius: 16,
+                    spreadRadius: 4,
+                    offset: const Offset(0, 4),
+                  )
+                ],
+              ),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Image.asset(imageUrl, fit: BoxFit.contain),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 12,
+            children: sequence.map((item) {
+              final isBlank = (item == null);
+              final currentText = isBlank ? (_isCorrect ? correctOption : '') : item;
+              final isWide = false;
 
-          if (isBlank) {
-            return _buildBlankSlot(correctOption, isWide);
-          } else {
-            return _buildFilledSlot(item, isWide);
-          }
-        }).toList(),
+              if (isBlank) {
+                return _buildBlankSlot(correctOption, isWide);
+              } else {
+                return _buildFilledSlot(item, isWide);
+              }
+            }).toList(),
+          ),
+        ],
       ),
     );
   }

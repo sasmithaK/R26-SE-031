@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.adaptedmind.adapted_mind_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
