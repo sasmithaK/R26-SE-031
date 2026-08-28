@@ -30,7 +30,7 @@
             "image_url": "assets/images/games/sun_shining.png",
             "options": [
               "ඉර පායනවා",
-              "හඳ පායනවා"
+              "වැස්ස පායනවා"
             ],
             "correctOption": "ඉර පායනවා",
             "correct_index": 0
@@ -40,7 +40,7 @@
             "image_url": "assets/images/games/rowing_boat.png",
             "options": [
               "ඔරුව පදිනවා",
-              "පොත කියවනවා",
+              "ළමයා පීනනවා",
               "ඉර පායනවා"
             ],
             "correctOption": "ඔරුව පදිනවා",
@@ -52,7 +52,7 @@
             "options": [
               "පොත කියවනවා",
               "ඔරුව පදිනවා",
-              "ඉර පායනවා"
+              "අකුරු ලියනවා"
             ],
             "correctOption": "පොත කියවනවා",
             "correct_index": 0
@@ -131,9 +131,9 @@
             ],
             "options": [
               "කෑම",
-              "පොත",
-              "හාවා",
-              "ගල්"
+              "පෑන",
+              "බෑගය",
+              "වැඩ"
             ],
             "correctOption": "කෑම",
             "correct_index": 0
@@ -148,9 +148,9 @@
             "options": [
               "සරුංගල්",
               "සෙල්ලම්",
-              "කිරි",
-              "ගෙදර",
-              "වතුර"
+              "කොප්පය",
+              "පිරිසිය",
+              "පිරිසිදු"
             ],
             "correctOption": "සරුංගල්",
             "correct_index": 0
@@ -219,7 +219,7 @@
               "පවනි කරනවා සෙල්ලම්."
             ],
             "correctOption": "පවනි සෙල්ලම් කරනවා.",
-            "correct_index": 0,
+            "correct_index": 1,
             "audio_text": "පවනි සෙල්ලම් කරනවා."
           }
         ]

@@ -98,7 +98,7 @@
             "prompt": "'පෑ' + 'න' එකතු වූ විට හැදෙන වචනය කුමක්ද?",
             "options": [
               "පෑන",
-              "පැදුර",
+              "පැල",
               "කෑම"
             ],
             "correctOption": "පෑන",
@@ -107,9 +107,9 @@
           {
             "prompt": "'ත' + 'රු' + 'ව' එකතු වූ විට හැදෙන වචනය කුමක්ද?",
             "options": [
-              "හඳ",
+              "තෑග්ග",
               "තරුව",
-              "ඉර"
+              "තාත්තා"
             ],
             "correctOption": "තරුව",
             "correct_index": 1
@@ -117,7 +117,7 @@
           {
             "prompt": "'ම' + 'ල්' + 'ලි' එකතු වූ විට හැදෙන වචනය කුමක්ද?",
             "options": [
-              "මාමා",
+              "මහත",
               "අයියා",
               "නංගි",
               "මල්ලි"
@@ -130,6 +130,7 @@
             "options": [
               "අටුව",
               "කටුව",
+              "ඔටුවා",
               "පුටුව"
             ],
             "correctOption": "පුටුව",
@@ -152,7 +153,7 @@
             "audio_text": "අත",
             "options": [
               "අත",
-              "පය"
+              "රට"
             ],
             "correctOption": "අත",
             "correct_index": 0
@@ -161,9 +162,9 @@
             "prompt": "ශබ්දයට සවන් දී වචනය තෝරන්න",
             "audio_text": "පාර",
             "options": [
-              "වැව",
+              "පාට",
               "පාර",
-              "ඇස"
+              "හාවා"
             ],
             "correctOption": "පාර",
             "correct_index": 1
@@ -172,9 +173,9 @@
             "prompt": "ශබ්දයට සවන් දී වචනය තෝරන්න",
             "audio_text": "ගෙදර",
             "options": [
-              "පාසල",
+              "බෙරය",
               "ගෙදර",
-              "වත්ත"
+              "කෙවිට"
             ],
             "correctOption": "ගෙදර",
             "correct_index": 1
@@ -183,7 +184,7 @@
             "prompt": "ශබ්දයට සවන් දී වචනය තෝරන්න",
             "audio_text": "අක්කා",
             "options": [
-              "නංගි",
+              "වැරදි",
               "අක්කා",
               "අයියා",
               "මල්ලි"
@@ -231,7 +232,7 @@
           {
             "prompt": "හිස්තැනට සුදුසු අකුර තෝරන්න",
             "sequence": [
-              "පො",
+              "පේ",
               null
             ],
             "options": [
@@ -239,7 +240,7 @@
               "ත",
               "ර"
             ],
-            "correctOption": "ත",
+            "correctOption": "ර",
             "correct_index": 1
           },
           {
@@ -310,7 +311,7 @@
               "න",
               "ක"
             ],
-            "image_url": "assets/images/activity_icons/body_parts/ear.png"
+            "image_url": "assets/images/activity_icons/body_parts/ear.jpg"
           },
           {
             "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
