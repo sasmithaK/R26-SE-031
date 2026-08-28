@@ -9,6 +9,7 @@ import 'http_overrides.dart';
 import 'services/localization_service.dart';
 
 import 'config/api_config.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 final GlobalKey<NavigatorState> globalNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -18,13 +19,15 @@ void main() async {
   // Load environment variables
   await dotenv.load(fileName: ".env");
   
-  // Set global HTTP overrides to fix long hangs (like 4 min IPv6 timeouts)
-  HttpOverrides.global = MyHttpOverrides();
+  if (!kIsWeb) {
+    // Set global HTTP overrides to fix long hangs (like 4 min IPv6 timeouts)
+    HttpOverrides.global = MyHttpOverrides();
 
-  // Ping the server early to wake up Render free tier in the background
-  try {
-    HttpClient().getUrl(Uri.parse(ApiConfig.authBaseUrl)).then((req) => req.close()).catchError((_) {});
-  } catch (_) {}
+    // Ping the server early to wake up Render free tier in the background
+    try {
+      HttpClient().getUrl(Uri.parse(ApiConfig.authBaseUrl)).then((req) => req.close()).catchError((_) {});
+    } catch (_) {}
+  }
 
   // Initialize ProgressService (no longer bypassing student ID)
   await ProgressService().init();
