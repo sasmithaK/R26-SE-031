@@ -91,6 +91,42 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
     TtsService().speak(spokenInstruction, folder: 'skill_2');
   }
 
+  void _transitionToNextRound(int? nextIdx, int totalRounds) {
+    if (_currentRoundIndex < totalRounds - 1) {
+      setState(() {
+        _currentRoundIndex = nextIdx ?? (_currentRoundIndex + 1);
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          int progress =
+              ((_currentRoundIndex /
+                          (widget.activityNode?.rounds.length ?? 1)) *
+                      100)
+                  .toInt();
+          ProgressService().saveActivityScore(sId, aId, progress);
+          ProgressService().saveActivityState(
+            sId,
+            aId,
+            _currentRoundIndex,
+          );
+        }
+        _selectedIndices.clear();
+        _isCorrect = false;
+      });
+      _playAudioPrompt(autoPlay: true);
+    } else {
+      setState(() {
+        _activityComplete = true;
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          ProgressService().saveActivityScore(sId, aId, 100);
+          ProgressService().clearActivityState(sId, aId);
+        }
+      });
+    }
+  }
+
   void _checkAnswer(
     int index,
     List<int> correctIndices,
@@ -111,12 +147,8 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
     if (_selectedIndices.length == correctIndices.length) {
       bool isRight = _selectedIndices.containsAll(correctIndices);
 
-      int score = isRight ? 100 : 0;
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
-        score,
-      );
-
       if (isRight) {
+        int? nextIdx = await context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(100);
         setState(() {
           _isCorrect = true;
         });
@@ -124,49 +156,26 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
 
         Future.delayed(const Duration(milliseconds: 1400), () {
           if (!mounted) return;
-          if (_currentRoundIndex < totalRounds - 1) {
-            setState(() {
-              _currentRoundIndex++;
-              final sId = widget.activityNode?.skillId ?? '';
-              final aId = widget.activityNode?.id ?? '';
-              if (sId.isNotEmpty && aId.isNotEmpty) {
-                int progress =
-                    ((_currentRoundIndex /
-                                (widget.activityNode?.rounds.length ?? 1)) *
-                            100)
-                        .toInt();
-                ProgressService().saveActivityScore(sId, aId, progress);
-                ProgressService().saveActivityState(
-                  sId,
-                  aId,
-                  _currentRoundIndex,
-                );
-              }
-              _selectedIndices.clear();
-              _isCorrect = false;
-            });
-            _playAudioPrompt(autoPlay: true);
-          } else {
-            setState(() {
-              _activityComplete = true;
-              final sId = widget.activityNode?.skillId ?? '';
-              final aId = widget.activityNode?.id ?? '';
-              if (sId.isNotEmpty && aId.isNotEmpty) {
-                ProgressService().saveActivityScore(sId, aId, 100);
-                ProgressService().clearActivityState(sId, aId);
-              }
-            });
-          }
+          _transitionToNextRound(nextIdx, totalRounds);
         });
       } else {
         SoundUtils.playFeedback('audio/wrong.mp3');
-        Future.delayed(const Duration(milliseconds: 800), () {
-          if (mounted) {
-            setState(() {
-              _selectedIndices.clear();
-            });
-          }
-        });
+        final nextIdx = await context.findAncestorStateOfType<TelemetryWrapperState>()?.registerWrongAttempt();
+
+        if (nextIdx != null) {
+          Future.delayed(const Duration(milliseconds: 1400), () {
+            if (!mounted) return;
+            _transitionToNextRound(nextIdx, totalRounds);
+          });
+        } else {
+          Future.delayed(const Duration(milliseconds: 800), () {
+            if (mounted) {
+              setState(() {
+                _selectedIndices.clear();
+              });
+            }
+          });
+        }
       }
     } else if (!wasSelected) {
       // Intermediate tap feedback

@@ -5,6 +5,7 @@ import httpx
 import uuid
 import asyncio
 from datetime import datetime
+import re
 import sys
 from pathlib import Path as PathLib
 sys.path.insert(0, str(PathLib(__file__).parent.parent.parent.parent))
@@ -21,17 +22,25 @@ class TelemetryModel(BaseModel):
     total_round_latency_ms: int
     hesitation_count: int
     misclick_count: int
+    audio_replay_count: Optional[int] = 0
+    scaffold_level_used: Optional[int] = 0
+    original_options_count: Optional[int] = None
+    current_pair_id: Optional[str] = None
+    incorrect_option_ids: Optional[List[str]] = None
     touch_stream: List[Any] = []
 
 class InteractionPayload(BaseModel):
     student_id: str
     session_id: str
+    skill_id: Optional[str] = None
     activity_id: str
+    round_number: Optional[int] = None
     item_id: str
     knowledge_component_id: str = "KC_LETTER_IDENTITY"
     response: InteractionResponseModel
     telemetry: TelemetryModel
     speech: Optional[Any] = None
+    phase: str = "COMPLETE"
 
 async def run_background_pipeline(payload: InteractionPayload, c4_result: dict, event_id: str):
     db = get_db()
@@ -152,6 +161,27 @@ async def process_interaction(payload: InteractionPayload, background_tasks: Bac
     db = get_db()
     event_id = str(uuid.uuid4())
     
+    # --- CANONICALIZATION ---
+    canonical_activity_id = payload.activity_id
+    canonical_item_id = payload.item_id
+    
+    if payload.skill_id and payload.activity_id and payload.round_number is not None:
+        s_match = re.search(r"skill_(\d+)", str(payload.skill_id))
+        a_match = re.search(r"act_(\d+)", str(payload.activity_id))
+        if s_match and a_match:
+            s_num = s_match.group(1)
+            a_num = a_match.group(1)
+            canonical_activity_id = f"{s_num}.{a_num}"
+            canonical_item_id = f"S{s_num}A{a_num}R{payload.round_number:02d}"
+
+    print(f"\n[LEARNING INTERACTION]")
+    print(f"student={payload.student_id}")
+    print(f"frontend skill={payload.skill_id}")
+    print(f"frontend activity={payload.activity_id}")
+    print(f"round={payload.round_number}")
+    print(f"canonical activity={canonical_activity_id}")
+    print(f"canonical item={canonical_item_id}")
+
     # Fetch latest fatigue from C1 and learner profile from C3 to inform C4
     c1 = await db.behavioral_features.find_one({"student_id": payload.student_id}, sort=[("_id", -1)])
     c3 = await db.learner_profiles.find_one({"student_id": payload.student_id}, sort=[("_id", -1)])
@@ -166,13 +196,15 @@ async def process_interaction(payload: InteractionPayload, background_tasks: Bac
             adaptive_submit = {
                 "student_id": payload.student_id,
                 "session_id": payload.session_id,
-                "activity_id": payload.activity_id,
+                "activity_id": canonical_activity_id,
                 "knowledge_component_id": payload.knowledge_component_id,
-                "item_id": payload.item_id,
+                "item_id": canonical_item_id,
                 "is_correct": payload.response.is_correct,
                 "current_session_duration_sec": payload.telemetry.total_round_latency_ms // 1000,
                 "fatigue_score": fatigue_score,
-                "learner_profile": learner_profile_dict
+                "learner_profile": learner_profile_dict,
+                "phase": payload.phase,
+                "telemetry": payload.telemetry.dict()
             }
             c4_resp = await client.post(
                 "http://localhost:9017/update_interaction",
@@ -203,5 +235,6 @@ async def process_interaction(payload: InteractionPayload, background_tasks: Bac
         "result": {
             "is_correct": payload.response.is_correct
         },
-        "next_action": c4_result.get("next_action", {})
+        "next_action": c4_result.get("next_action", {}),
+        "response_quality": c4_result.get("response_quality")
     }

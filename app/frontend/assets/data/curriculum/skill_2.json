@@ -233,39 +233,166 @@
         "template_type": "skill2_identical_match",
         "rounds": [
           {
-            "letters": [
-              "ක",
-              "ම"
+            "core_round": 1,
+            "content": {
+              "letters": [
+                "ක",
+                "ම"
+              ]
+            },
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "content": {
+                  "letters": [
+                    "ප",
+                    "බ"
+                  ]
+                }
+              },
+              {
+                "variant_id": "V2",
+                "content": {
+                  "letters": [
+                    "ත",
+                    "ද"
+                  ]
+                }
+              }
             ]
           },
           {
-            "letters": [
-              "කා",
-              "ම"
+            "core_round": 2,
+            "content": {
+              "letters": [
+                "කා",
+                "ම"
+              ]
+            },
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "content": {
+                  "letters": [
+                    "පා",
+                    "බ"
+                  ]
+                }
+              },
+              {
+                "variant_id": "V2",
+                "content": {
+                  "letters": [
+                    "තා",
+                    "ද"
+                  ]
+                }
+              }
             ]
           },
           {
-            "letters": [
-              "ග",
-              "ටු",
-              "ව"
+            "core_round": 3,
+            "content": {
+              "letters": [
+                "ග",
+                "ටු",
+                "ව"
+              ]
+            },
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "content": {
+                  "letters": [
+                    "ම",
+                    "කු",
+                    "ර"
+                  ]
+                }
+              },
+              {
+                "variant_id": "V2",
+                "content": {
+                  "letters": [
+                    "ල",
+                    "පු",
+                    "ස"
+                  ]
+                }
+              }
             ]
           },
           {
-            "letters": [
-              "ර",
-              "ලි",
-              "ස",
-              "දු"
+            "core_round": 4,
+            "content": {
+              "letters": [
+                "ර",
+                "ලි",
+                "ස",
+                "දු"
+              ]
+            },
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "content": {
+                  "letters": [
+                    "ම",
+                    "වි",
+                    "ක",
+                    "බු"
+                  ]
+                }
+              },
+              {
+                "variant_id": "V2",
+                "content": {
+                  "letters": [
+                    "ප",
+                    "නි",
+                    "ට",
+                    "චු"
+                  ]
+                }
+              }
             ]
           },
           {
-            "letters": [
-              "න",
-              "පා",
-              "බ",
-              "මු",
-              "ය"
+            "core_round": 5,
+            "content": {
+              "letters": [
+                "න",
+                "පා",
+                "බ",
+                "මු",
+                "ය"
+              ]
+            },
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "content": {
+                  "letters": [
+                    "ර",
+                    "මා",
+                    "ක",
+                    "පු",
+                    "ව"
+                  ]
+                }
+              },
+              {
+                "variant_id": "V2",
+                "content": {
+                  "letters": [
+                    "ල",
+                    "ගා",
+                    "ඩ",
+                    "චු",
+                    "ස"
+                  ]
+                }
+              }
             ]
           }
         ]

@@ -112,6 +112,42 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     _isRoundComplete = false;
   }
 
+  void _transitionToNextRound(int? nextIdx) {
+    final rounds = widget.activityNode?.rounds ?? [];
+    if (_currentRoundIndex < rounds.length - 1) {
+      setState(() {
+        _currentRoundIndex = nextIdx ?? (_currentRoundIndex + 1);
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          int progress =
+              ((_currentRoundIndex /
+                          (widget.activityNode?.rounds.length ?? 1)) *
+                      100)
+                  .toInt();
+          ProgressService().saveActivityScore(sId, aId, progress);
+          ProgressService().saveActivityState(
+            sId,
+            aId,
+            _currentRoundIndex,
+          );
+        }
+        _setupRound();
+        _playCurrentInstruction(autoPlay: true);
+      });
+    } else {
+      setState(() {
+        _isActivityComplete = true;
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          ProgressService().saveActivityScore(sId, aId, 100);
+          ProgressService().clearActivityState(sId, aId);
+        }
+      });
+    }
+  }
+
   Future<void> _onItemTapped(int index) async {
     if (_isRoundComplete || _foundIndices.contains(index)) return;
 
@@ -134,48 +170,14 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
           _isRoundComplete = true;
         });
 
-        final rounds = widget.activityNode?.rounds ?? [];
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
+        int? nextIdx = await context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
           100,
+          currentRoundIndex: _currentRoundIndex,
         );
 
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (!mounted) return;
-          if (_currentRoundIndex < rounds.length - 1) {
-            setState(() {
-              _currentRoundIndex++;
-              print(
-                "SAVING STATE: ${widget.activityNode?.skillId} ${widget.activityNode?.id} $_currentRoundIndex",
-              );
-              final sId = widget.activityNode?.skillId ?? '';
-              final aId = widget.activityNode?.id ?? '';
-              if (sId.isNotEmpty && aId.isNotEmpty) {
-                int progress =
-                    ((_currentRoundIndex /
-                                (widget.activityNode?.rounds.length ?? 1)) *
-                            100)
-                        .toInt();
-                ProgressService().saveActivityScore(sId, aId, progress);
-                ProgressService().saveActivityState(
-                  sId,
-                  aId,
-                  _currentRoundIndex,
-                );
-              }
-              _setupRound();
-              _playCurrentInstruction(autoPlay: true);
-            });
-          } else {
-            setState(() {
-              _isActivityComplete = true;
-              final sId = widget.activityNode?.skillId ?? '';
-              final aId = widget.activityNode?.id ?? '';
-              if (sId.isNotEmpty && aId.isNotEmpty) {
-                ProgressService().saveActivityScore(sId, aId, 100);
-                ProgressService().clearActivityState(sId, aId);
-              }
-            });
-          }
+          _transitionToNextRound(nextIdx);
         });
       }
     } else {
@@ -184,17 +186,24 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       });
       SoundUtils.playFeedback('audio/wrong.mp3');
 
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
-        0,
+      final nextIdx = await context.findAncestorStateOfType<TelemetryWrapperState>()?.registerWrongAttempt(
+        currentRoundIndex: _currentRoundIndex,
       );
 
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && !_isRoundComplete) {
-          setState(() {
-            _wrongIndices.remove(index);
-          });
-        }
-      });
+      if (nextIdx != null) {
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (!mounted) return;
+          _transitionToNextRound(nextIdx);
+        });
+      } else {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && !_isRoundComplete) {
+            setState(() {
+              _wrongIndices.remove(index);
+            });
+          }
+        });
+      }
     }
   }
 

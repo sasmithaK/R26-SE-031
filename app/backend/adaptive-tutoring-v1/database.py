@@ -2,6 +2,9 @@ import os
 from motor.motor_asyncio import AsyncIOMotorClient
 
 import certifi
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # MongoDB connection settings
 MONGODB_URL = os.environ.get("MONGODB_URL")

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from database import get_db
 from datetime import datetime
 

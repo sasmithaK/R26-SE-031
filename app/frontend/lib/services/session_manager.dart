@@ -21,7 +21,7 @@ class SessionManager {
 
   /// Generates a curated 10-minute playlist of activities based on the student's level.
   /// For now, it returns a static progressive list.
-  List<SessionActivity> generateDailySession() {
+  List<SessionActivity> generateDailySession({Map<String, dynamic>? studentData}) {
     return [
       SessionActivity(
         screen: GameFactory.buildGame(ActivityNode(
@@ -30,7 +30,7 @@ class SessionManager {
           telemetryTags: ['visual_hidden_search'],
           templateType: 'visual_hidden_search',
           rounds: [],
-        )),
+        ), studentData: studentData),
         title: 'සැඟවුණු පින්තූර',
         durationSeconds: 60,
       ),
@@ -41,7 +41,7 @@ class SessionManager {
           telemetryTags: ['visual_pattern_adventure'],
           templateType: 'visual_pattern_adventure',
           rounds: [],
-        )),
+        ), studentData: studentData),
         title: 'රටා සම්පූර්ණ කරන්න',
         durationSeconds: 60,
       ),
@@ -52,7 +52,7 @@ class SessionManager {
           telemetryTags: ['visual_sorting_adventure'],
           templateType: 'visual_sorting_adventure',
           rounds: [],
-        )),
+        ), studentData: studentData),
         title: 'වර්ගීකරණය',
         durationSeconds: 90,
       ),
@@ -63,7 +63,7 @@ class SessionManager {
           telemetryTags: ['visual_odd_one_out'],
           templateType: 'visual_odd_one_out',
           rounds: [],
-        )),
+        ), studentData: studentData),
         title: 'වෙනස් පින්තූරය',
         durationSeconds: 60,
       ),
@@ -74,7 +74,7 @@ class SessionManager {
           telemetryTags: ['visual_memory_hats'],
           templateType: 'visual_memory_hats',
           rounds: [],
-        )),
+        ), studentData: studentData),
         title: 'මතක තබා ගන්න',
         durationSeconds: 90,
       ),

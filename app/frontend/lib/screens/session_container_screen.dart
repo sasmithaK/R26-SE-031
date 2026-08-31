@@ -21,7 +21,7 @@ class _SessionContainerScreenState extends State<SessionContainerScreen> {
   @override
   void initState() {
     super.initState();
-    _playlist = SessionManager().generateDailySession();
+    _playlist = SessionManager().generateDailySession(studentData: widget.studentData);
     
     // Start telemetry
     TelemetryService().startSession();

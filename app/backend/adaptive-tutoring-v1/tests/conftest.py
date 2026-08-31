@@ -5,22 +5,33 @@ import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from unittest.mock import patch, MagicMock, AsyncMock
+from mongomock_motor import AsyncMongoMockClient
+import database
 
-# Patch MongoDB connection
-patch("database.connect_to_mongo").start()
-patch("database.close_mongo_connection").start()
+# Mock the Database initialization
+mock_client = AsyncMongoMockClient()
+mock_db = mock_client["test_db"]
+
+# Replace db globals
+database.db_instance.client = mock_client
+database.db = mock_db
+database.knowledge_states_collection = mock_db["knowledge_states"]
+database.adaptive_decisions_collection = mock_db["adaptive_decisions"]
 
 @pytest.fixture(autouse=True)
-def mock_bkt_collection():
-    with patch("database.bkt_states_collection") as mock_coll:
-        mock_coll.find_one = AsyncMock(return_value=None)
-        mock_coll.update_one = AsyncMock(return_value=None)
-        yield mock_coll
+async def reset_db():
+    # Clear collections between tests
+    await mock_db["knowledge_states"].delete_many({})
+    await mock_db["adaptive_decisions"].delete_many({})
+    await mock_db["item_bank"].delete_many({})
+    yield
 
 from main import app
 
 @pytest.fixture
 def client():
+    # Clear events so real connection isn't attempted
+    app.router.on_startup.clear()
+    app.router.on_shutdown.clear()
     with TestClient(app) as c:
         yield c

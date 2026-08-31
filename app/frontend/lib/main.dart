@@ -22,9 +22,12 @@ void main() async {
   HttpOverrides.global = MyHttpOverrides();
 
   // Ping the server early to wake up Render free tier in the background
-  try {
-    HttpClient().getUrl(Uri.parse(ApiConfig.authBaseUrl)).then((req) => req.close()).catchError((_) {});
-  } catch (_) {}
+  Future.microtask(() async {
+    try {
+      final req = await HttpClient().getUrl(Uri.parse(ApiConfig.authBaseUrl));
+      await req.close();
+    } catch (_) {}
+  });
 
   // Initialize ProgressService (no longer bypassing student ID)
   await ProgressService().init();

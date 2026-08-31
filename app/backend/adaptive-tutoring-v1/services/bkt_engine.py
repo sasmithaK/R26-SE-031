@@ -6,11 +6,38 @@ class BKTEngine:
         # P(T) = Probability of learning the skill (Transition)
         # P(G) = Probability of guessing correctly without knowing
         # P(S) = Probability of slipping (answering incorrectly despite knowing)
+        # PROVISIONAL / THEORY-INFORMED PROTOTYPE PARAMETERS
+        # These are not empirically fitted parameters.
+        proto_priors = (0.3, 0.1, 0.2, 0.1)
+        
         self.priors = {
+            # Legacy KCs
             "KC_mirror_consonants": (0.3, 0.1, 0.2, 0.1),
             "KC_vowel_diacritics": (0.4, 0.15, 0.25, 0.1),
             "KC_conjunct_consonants": (0.2, 0.05, 0.1, 0.15),
-            "default": (0.3, 0.1, 0.2, 0.1)
+            
+            # Official KCs - Provisional mapping
+            "KC_VISUAL_IDENTIFICATION": proto_priors,
+            "KC_VISUAL_MATCHING": proto_priors,
+            "KC_VISUAL_CATEGORIZATION": proto_priors,
+            "KC_VISUAL_PATTERN": proto_priors,
+            "KC_VISUAL_MEMORY": proto_priors,
+            "KC_LETTER_IDENTIFICATION": proto_priors,
+            "KC_LETTER_MATCHING": proto_priors,
+            "KC_PHONEME_LETTER_MAPPING": proto_priors,
+            "KC_LETTER_DECODING": proto_priors,
+            "KC_LETTER_MEMORY": proto_priors,
+            "KC_WORD_RECOGNITION": proto_priors,
+            "KC_WORD_FORMATION": proto_priors,
+            "KC_AUDITORY_WORD_RECOGNITION": proto_priors,
+            "KC_WORD_COMPLETION": proto_priors,
+            "KC_WORD_SEQUENCING": proto_priors,
+            "KC_SENTENCE_COMPREHENSION": proto_priors,
+            "KC_SENTENCE_COMPLETION": proto_priors,
+            "KC_AUDITORY_SENTENCE_RECOGNITION": proto_priors,
+            "KC_SENTENCE_SEQUENCING": proto_priors,
+            
+            "default": proto_priors
         }
 
     def update_knowledge_state(self, current_prob: float, target_kc: str, is_correct: bool) -> float:
@@ -40,6 +67,7 @@ class BKTEngine:
         # P(L_t) = P(L_t | obs) + (1 - P(L_t | obs)) * P(T)
         p_new = p_obs + (1 - p_obs) * p_t
         
-        return round(p_new, 4)
+        p_clamped = min(max(p_new, 0.0), 1.0)
+        return round(p_clamped, 4)
 
 bkt_engine = BKTEngine()
