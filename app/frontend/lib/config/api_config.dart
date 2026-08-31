@@ -18,7 +18,7 @@ class ApiConfig {
       return '10.0.2.2';
     }
     // Return Mac's local IP for physical iOS devices
-    return '192.168.1.2';
+    return '192.168.1.5';
   }
 
   // --- Base URLs for specific backend microservices ---
