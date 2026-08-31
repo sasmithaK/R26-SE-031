@@ -211,9 +211,10 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     return null; // Return null to indicate no forceful jump yet
   }
 
-  Future<Map<String, dynamic>?> registerAdaptiveWrongAttempt({int? currentRoundIndex, int maxAttempts = 3, Map<String, dynamic>? extraTelemetry}) async {
+  Future<Map<String, dynamic>?> registerAdaptiveWrongAttempt({int? currentRoundIndex, int maxAttempts = 3, Map<String, dynamic>? extraTelemetry, String? itemId}) async {
     _misclickCount++;
-    final itemId = "${widget.activityNode.id}_round${currentRoundIndex != null ? currentRoundIndex + 1 : _currentRound}";
+    
+    final payloadItemId = itemId ?? "${widget.activityNode.id}_round${currentRoundIndex != null ? currentRoundIndex + 1 : _currentRound}";
     
     // Build attempt payload
     final studentId = widget.studentData?['id'] ?? widget.studentData?['_id'] ?? 'STU001';
@@ -225,7 +226,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
       "skill_id": widget.activityNode.skillId,
       "activity_id": widget.activityNode.id,
       "round_number": _currentRound,
-      "item_id": itemId,
+      "item_id": payloadItemId,
       "phase": "ATTEMPT",
       "response": {
         "selected_character": "item", 
@@ -253,7 +254,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     }
     
     debugPrint('\n===== TASK ATTEMPT =====');
-    debugPrint('item=$itemId');
+    debugPrint('item=$payloadItemId');
     debugPrint('attempt=$_misclickCount');
     debugPrint('result=$result');
     debugPrint('======================\n');
@@ -273,7 +274,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     return _currentRound - 1;
   }
 
-  Future<Map<String, dynamic>?> completeAdaptiveRound(int baseScore, {int? currentRoundIndex}) async {
+  Future<Map<String, dynamic>?> completeAdaptiveRound(int baseScore, {int? currentRoundIndex, String? itemId}) async {
     if (currentRoundIndex != null) {
       _currentRound = currentRoundIndex + 1;
     }
@@ -312,6 +313,8 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     // --- NEW: Real-time Orchestrator Submission (C1-C4) ---
     final studentId = widget.studentData?['id'] ?? widget.studentData?['_id'] ?? 'STU001';
     final sessionId = TelemetryService().sessionStartTime?.toIso8601String() ?? DateTime.now().toIso8601String();
+    
+    final payloadItemId = itemId ?? "${widget.activityNode.id}_round$_currentRound";
 
     final payload = {
       "student_id": studentId,
@@ -319,7 +322,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
       "skill_id": widget.activityNode.skillId,
       "activity_id": widget.activityNode.id,
       "round_number": _currentRound,
-      "item_id": "${widget.activityNode.id}_round$_currentRound",
+      "item_id": payloadItemId,
       "response": {
         "selected_character": "item", 
         "is_correct": finalRoundScore > 0
@@ -338,10 +341,10 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     // Await response
     final result = await StudentService().submitInteraction(payload);
     
-    _applyAdaptiveNextAction(result, itemId: "${widget.activityNode.id}_round$_currentRound");
+    _applyAdaptiveNextAction(result, itemId: payloadItemId);
 
     if (finalRoundScore > 0) {
-      final itemId = "${widget.activityNode.id}_round$_currentRound";
+      final logItemId = payloadItemId;
       debugPrint('\n===== ROUND COMPLETE =====');
       debugPrint('item=$itemId');
       // If it's a correct answer, attempts = misclicks + 1 (the final correct tap)

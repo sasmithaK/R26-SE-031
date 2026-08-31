@@ -28,6 +28,8 @@ def _get_default_state(activity_id: str) -> dict:
         return {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A2_CORE_V1"}
     elif activity_id == "2.1":
         return {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A1_CORE_V1"}
+    elif activity_id == "2.3":
+        return {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A3_CORE_V1"}
     return {}
 
 app = FastAPI(title="Adaptive Tutoring Service", version="1.0")
@@ -69,6 +71,10 @@ async def update_interaction(request: InteractionRequest):
         round_str = request.item_id.replace("act_1_round", "")
         if round_str.isdigit():
             canonical_item = f"S2A1R{int(round_str):02d}"
+    elif canonical_act == "2.3" and request.item_id.startswith("act_3_round"):
+        round_str = request.item_id.replace("act_3_round", "")
+        if round_str.isdigit():
+            canonical_item = f"S2A3R{int(round_str):02d}"
 
     if student_doc and "knowledge_state" in student_doc:
         knowledge_state = student_doc["knowledge_state"]
@@ -86,7 +92,7 @@ async def update_interaction(request: InteractionRequest):
     # ---------------------------------------------------------
     # RESET LOGIC FOR TESTING OR REPLAY
     # ---------------------------------------------------------
-    if canonical_item == "RESET" or (canonical_item in ["S2A1R01", "S2A2R01"] and adaptive_state.get("next_phase") == "COMPLETE"):
+    if canonical_item == "RESET" or (canonical_item in ["S2A1R01", "S2A2R01", "S2A3R01"] and adaptive_state.get("next_phase") == "COMPLETE"):
         # Reset knowledge state and theta
         knowledge_state[official_kc] = bkt_engine.priors.get(official_kc, bkt_engine.priors["default"])[0]
         theta = 0.0

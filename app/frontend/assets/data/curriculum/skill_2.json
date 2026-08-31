@@ -895,36 +895,124 @@
         "template_type": "skill2_audio",
         "rounds": [
           {
-            "prompt": "ශබ්දයට සවන් දී 'අ' තෝරන්න",
+            "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
             "options": [
               "අ",
               "ආ"
             ],
             "correctOption": "අ",
-            "correct_index": 0
+            "correct_index": 0,
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "item_id": "S2A3R01V1",
+                "content": {
+                  "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
+                  "options": [
+                    "ඉ",
+                    "ට"
+                  ],
+                  "correctOption": "ඉ",
+                  "correct_index": 0
+                }
+              },
+              {
+                "variant_id": "V2",
+                "item_id": "S2A3R01V2",
+                "content": {
+                  "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
+                  "options": [
+                    "උ",
+                    "ට"
+                  ],
+                  "correctOption": "උ",
+                  "correct_index": 0
+                }
+              }
+            ]
           },
           {
-            "prompt": "ශබ්දයට සවන් දී 'ස' තෝරන්න",
+            "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
             "options": [
               "ය",
               "ස",
               "ර"
             ],
             "correctOption": "ස",
-            "correct_index": 1
+            "correct_index": 1,
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "item_id": "S2A3R02V1",
+                "content": {
+                  "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
+                  "options": [
+                    "ක",
+                    "ග",
+                    "ච"
+                  ],
+                  "correctOption": "ක",
+                  "correct_index": 0
+                }
+              },
+              {
+                "variant_id": "V2",
+                "item_id": "S2A3R02V2",
+                "content": {
+                  "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
+                  "options": [
+                    "න",
+                    "ත",
+                    "ද"
+                  ],
+                  "correctOption": "න",
+                  "correct_index": 0
+                }
+              }
+            ]
           },
           {
-            "prompt": "ශබ්දයට සවන් දී 'ප' තෝරන්න",
+            "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
             "options": [
               "ව",
               "ච",
               "ප"
             ],
             "correctOption": "ප",
-            "correct_index": 2
+            "correct_index": 2,
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "item_id": "S2A3R03V1",
+                "content": {
+                  "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
+                  "options": [
+                    "ල",
+                    "ර",
+                    "ව"
+                  ],
+                  "correctOption": "ල",
+                  "correct_index": 0
+                }
+              },
+              {
+                "variant_id": "V2",
+                "item_id": "S2A3R03V2",
+                "content": {
+                  "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
+                  "options": [
+                    "ම",
+                    "බ",
+                    "න"
+                  ],
+                  "correctOption": "ම",
+                  "correct_index": 0
+                }
+              }
+            ]
           },
           {
-            "prompt": "ශබ්දයට සවන් දී 'ට' තෝරන්න",
+            "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
             "options": [
               "ඩ",
               "ට",
@@ -932,10 +1020,42 @@
               "ග"
             ],
             "correctOption": "ට",
-            "correct_index": 1
+            "correct_index": 1,
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "item_id": "S2A3R04V1",
+                "content": {
+                  "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
+                  "options": [
+                    "ද",
+                    "ය",
+                    "ත",
+                    "න"
+                  ],
+                  "correctOption": "ද",
+                  "correct_index": 0
+                }
+              },
+              {
+                "variant_id": "V2",
+                "item_id": "S2A3R04V2",
+                "content": {
+                  "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
+                  "options": [
+                    "බ",
+                    "ප",
+                    "ම",
+                    "ව"
+                  ],
+                  "correctOption": "බ",
+                  "correct_index": 0
+                }
+              }
+            ]
           },
           {
-            "prompt": "ශබ්දයට සවන් දී 'බ' තෝරන්න",
+            "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
             "options": [
               "ම",
               "ධ",
@@ -944,7 +1064,41 @@
               "ඩ"
             ],
             "correctOption": "බ",
-            "correct_index": 3
+            "correct_index": 3,
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "item_id": "S2A3R05V1",
+                "content": {
+                  "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
+                  "options": [
+                    "ස",
+                    "න",
+                    "ට",
+                    "ඩ",
+                    "ත"
+                  ],
+                  "correctOption": "න",
+                  "correct_index": 0
+                }
+              },
+              {
+                "variant_id": "V2",
+                "item_id": "S2A3R05V2",
+                "content": {
+                  "prompt": "ශබ්දයට සවන් දී අකුර තෝරන්න",
+                  "options": [
+                    "ව",
+                    "ග",
+                    "ධ",
+                    "ද",
+                    "ක"
+                  ],
+                  "correctOption": "ක",
+                  "correct_index": 0
+                }
+              }
+            ]
           }
         ]
       },

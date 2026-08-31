@@ -62,6 +62,8 @@ class PolicyEngine:
         """
         if activity_id == "2.1":
             return self._s2a1_get_support_action(telemetry, options_count, struggle_score, available_incorrect_ids, adaptive_state, round_idx)
+        elif activity_id == "2.3":
+            return self._s2a3_get_support_action(telemetry, options_count, struggle_score, available_incorrect_ids, adaptive_state, round_idx)
             
         # S2A2 logic
         current_pair_id = getattr(telemetry, "current_pair_id", None)
@@ -227,6 +229,10 @@ class PolicyEngine:
         # S2A1 STATE MACHINE
         if current_activity == "2.1" and adaptive_state is not None:
             return self._s2a1_state_machine(response_quality, adaptive_state, current_difficulty_b, policy_reason)
+            
+        # S2A3 STATE MACHINE
+        if current_activity == "2.3" and adaptive_state is not None:
+            return self._s2a3_state_machine(response_quality, adaptive_state, current_difficulty_b, policy_reason)
             
         # ... fallback to previous logic for other activities (kept minimal)
         decision = "CONTINUE"
@@ -462,6 +468,163 @@ class PolicyEngine:
             "next_phase": state.get("next_phase", "CORE"),
             "progress_core": min(state.get("current_core_round", 1), 7),
             "progress_total": 7,
+            "state_updates": state
+        }
+
+    def _s2a3_get_support_action(
+        self,
+        telemetry: Any,
+        options_count: int,
+        struggle_score: int,
+        available_incorrect_ids: list,
+        adaptive_state: Dict[str, Any],
+        round_idx: int
+    ) -> Dict[str, Any]:
+        
+        pair_state = adaptive_state.get("current_pair_state", {
+            "p1_wrong": 0,
+            "scaffold_step": 0
+        })
+        
+        pair_state["p1_wrong"] = pair_state.get("p1_wrong", 0) + 1
+        step = pair_state.get("scaffold_step", 0)
+        
+        # Scaffold sequence based on options_count
+        if options_count <= 2:
+            step = 3
+        elif options_count == 3 or options_count == 4:
+            if pair_state["p1_wrong"] == 1: step = 1
+            else: step = 3
+        elif options_count >= 5:
+            if pair_state["p1_wrong"] == 1: step = 1
+            elif pair_state["p1_wrong"] == 2: step = 2
+            else: step = 3
+            
+        if pair_state.get("scaffold_step") == 3:
+            step = 3
+            
+        pair_state["scaffold_step"] = step
+        adaptive_state["current_pair_state"] = pair_state
+        adaptive_state["highest_scaffold_level_used"] = max(adaptive_state.get("highest_scaffold_level_used", 0), step)
+
+        decision = "RETRY_CURRENT"
+        highlight = False
+        remove_option_ids = []
+
+        if step in [1, 2]:
+            decision = "SCAFFOLD_REMOVE_DISTRACTOR"
+            if available_incorrect_ids:
+                import random
+                remove_option_ids = [random.choice(available_incorrect_ids)]
+        elif step >= 3:
+            decision = "SCAFFOLD_HIGHLIGHT_CORRECT"
+            highlight = True
+            
+        return {
+            "decision": decision,
+            "scaffold_level": step,
+            "remove_option_ids": remove_option_ids,
+            "highlight_correct": highlight
+        }
+
+    def _s2a3_state_machine(self, response_quality: str, state: Dict[str, Any], current_b: float, policy_reason: list) -> Dict[str, Any]:
+        core_round = state.get("current_core_round", 1)
+        phase = state.get("next_phase", "CORE")
+        
+        next_item = ""
+        decision = "CONTINUE"
+        
+        is_success = response_quality in ["MASTERED", "CLEAN_SUCCESS", "INDEPENDENT_SUCCESS"]
+        
+        def advance_core():
+            if core_round >= 5:
+                state["next_phase"] = "COMPLETE"
+                state["expected_item_id"] = "COMPLETE"
+                return "COMPLETE", "ACTIVITY_COMPLETE"
+            else:
+                state["current_core_round"] = core_round + 1
+                state["next_phase"] = "CORE"
+                state["expected_item_id"] = f"S2A3R{core_round + 1:02d}"
+                return state["expected_item_id"], "CONTINUE"
+
+        if phase == "CORE":
+            if is_success:
+                policy_reason.append(f"S2A3_CORE_R{core_round}_PASSED")
+                next_item, decision = advance_core()
+            else:
+                policy_reason.append(f"S2A3_CORE_R{core_round}_STRUGGLED")
+                if core_round == 1:
+                    state["next_phase"] = "CONFIRMATION"
+                    next_item = "S2A3R01V1"
+                else:
+                    state["next_phase"] = "REMEDIATION"
+                    next_item = f"S2A3R{core_round - 1:02d}V1"
+                state["expected_item_id"] = next_item
+                decision = "REMEDIATION"
+                
+        elif phase == "REMEDIATION":
+            if is_success:
+                policy_reason.append("S2A3_REMEDIATION_SUCCESS_PROCEED_TO_CONFIRMATION")
+                state["next_phase"] = "CONFIRMATION"
+                next_item = f"S2A3R{core_round:02d}V1"
+            else:
+                policy_reason.append("S2A3_REMEDIATION_FAILED_TRY_V2")
+                state["next_phase"] = "REMEDIATION_V2"
+                next_item = f"S2A3R{core_round - 1:02d}V2"
+            state["expected_item_id"] = next_item
+            
+        elif phase == "REMEDIATION_V2":
+            if is_success:
+                policy_reason.append("S2A3_REMEDIATION_V2_SUCCESS_PROCEED_TO_CONFIRMATION")
+                state["next_phase"] = "CONFIRMATION"
+                next_item = f"S2A3R{core_round:02d}V1"
+            else:
+                policy_reason.append("S2A3_REMEDIATION_V2_FAILED_RETRY_CORE")
+                state["next_phase"] = "CORE"
+                next_item = f"S2A3R{core_round:02d}"
+            state["expected_item_id"] = next_item
+
+        elif phase == "CONFIRMATION":
+            if is_success:
+                policy_reason.append("S2A3_CONFIRMATION_COMPLETE_ADVANCE")
+                next_item, decision = advance_core()
+            else:
+                policy_reason.append("S2A3_CONFIRMATION_FAILED_TRY_V2")
+                state["next_phase"] = "CONFIRMATION_V2"
+                next_item = f"S2A3R{core_round:02d}V2"
+                state["expected_item_id"] = next_item
+
+        elif phase == "CONFIRMATION_V2":
+            if is_success:
+                policy_reason.append("S2A3_CONFIRMATION_V2_COMPLETE_ADVANCE")
+                next_item, decision = advance_core()
+            else:
+                policy_reason.append("S2A3_CONFIRMATION_V2_FAILED_RETRY_CORE")
+                state["next_phase"] = "CORE"
+                next_item = f"S2A3R{core_round:02d}"
+                state["expected_item_id"] = next_item
+                
+        elif phase == "COMPLETE":
+            policy_reason.append("S2A3_ALREADY_COMPLETE")
+            next_item = "COMPLETE"
+            decision = "ACTIVITY_COMPLETE"
+        else:
+            state["expected_item_id"] = f"S2A3R{core_round:02d}"
+            next_item = state["expected_item_id"]
+
+        return {
+            "next_activity": "2.3",
+            "next_item": next_item,
+            "difficulty": current_b,
+            "target_difficulty": current_b,
+            "difficulty_direction": "MAINTAIN",
+            "scaffold_level": 0,
+            "decision": decision,
+            "policy_reason": policy_reason,
+            "confirmation_required": False,
+            "next_phase": state.get("next_phase", "CORE"),
+            "progress_core": min(state.get("current_core_round", 1), 5),
+            "progress_total": 5,
             "state_updates": state
         }
 
