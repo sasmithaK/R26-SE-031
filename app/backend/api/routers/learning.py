@@ -172,7 +172,10 @@ async def process_interaction(payload: InteractionPayload, background_tasks: Bac
             s_num = s_match.group(1)
             a_num = a_match.group(1)
             canonical_activity_id = f"{s_num}.{a_num}"
-            canonical_item_id = f"S{s_num}A{a_num}R{payload.round_number:02d}"
+            if payload.item_id and payload.item_id.startswith(f"S{s_num}A{a_num}"):
+                canonical_item_id = payload.item_id
+            else:
+                canonical_item_id = f"S{s_num}A{a_num}R{payload.round_number:02d}"
 
     print(f"\n[LEARNING INTERACTION]")
     print(f"student={payload.student_id}")

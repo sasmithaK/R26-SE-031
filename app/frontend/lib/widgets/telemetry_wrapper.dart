@@ -60,6 +60,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
   int _roundsCompletedTotal = 0;
   int _currentRound = 1;
   int _highestScaffoldUsed = 0;
+  bool _activityCompleted = false;
 
   @visibleForTesting
   int get currentRound => _currentRound;
@@ -103,6 +104,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
   }
 
   void _logAbandonment() {
+    if (_activityCompleted) return;
     _roundStopwatch.stop();
     final totalRoundLatency = _roundStopwatch.elapsedMilliseconds;
     
@@ -149,6 +151,17 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
       _hesitationStopwatch.start();
       debugPrint('TELEMETRY: Hesitation timer resumed.');
     }
+  }
+
+  /// Resets round and hesitation timers. Used after mandatory wait/memorization phases.
+  void resetRoundTimers() {
+    _roundStopwatch.reset();
+    _roundStopwatch.start();
+    _hesitationStopwatch.reset();
+    _hesitationStopwatch.start();
+    _firstTouchLatencyMs = -1;
+    _firstTouchRecorded = false;
+    debugPrint('TELEMETRY: Round timers reset.');
   }
 
   /// Called by the transparent Listener widget on every pointer event.
@@ -421,6 +434,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
 
           if (decision == 'CURRICULUM_COMPLETE' || decision == 'ACTIVITY_COMPLETE') {
             debugPrint('\nAction:\nC4_ACTIVITY_OR_CURRICULUM_COMPLETE');
+            _activityCompleted = true;
             // Do NOT pop here. Let the game handle showing the completion UI
             return;
           }

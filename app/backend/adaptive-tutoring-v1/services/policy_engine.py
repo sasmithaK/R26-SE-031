@@ -66,6 +66,8 @@ class PolicyEngine:
             return self._s2a3_get_support_action(telemetry, options_count, struggle_score, available_incorrect_ids, adaptive_state, round_idx)
         elif activity_id == "2.4":
             return self._s2a4_get_support_action(telemetry, options_count, struggle_score, available_incorrect_ids, adaptive_state, round_idx)
+        elif activity_id == "2.5":
+            return self._s2a5_get_support_action(telemetry, options_count, struggle_score, available_incorrect_ids, adaptive_state, round_idx)
             
         # S2A2 logic
         current_pair_id = getattr(telemetry, "current_pair_id", None)
@@ -316,6 +318,10 @@ class PolicyEngine:
         # S2A4 STATE MACHINE
         if current_activity == "2.4" and adaptive_state is not None:
             return self._s2a4_state_machine(response_quality, adaptive_state, current_difficulty_b, policy_reason)
+            
+        # S2A5 STATE MACHINE
+        if current_activity == "2.5" and adaptive_state is not None:
+            return self._s2a5_state_machine(response_quality, adaptive_state, current_difficulty_b, policy_reason)
             
         # ... fallback to previous logic for other activities (kept minimal)
         decision = "CONTINUE"
@@ -837,5 +843,207 @@ class PolicyEngine:
             "state_updates": state
         }
 
+
+
+    def _s2a5_state_machine(self, response_quality: str, state: Dict[str, Any], current_b: float, policy_reason: list) -> Dict[str, Any]:
+        core_round = state.get("current_core_round", 1)
+        phase = state.get("next_phase", "CORE")
+        origin_core_round = state.get("origin_core_round", core_round)
+        used_variants = state.get("used_variant_ids", [])
+        
+        next_item = ""
+        decision = "CONTINUE"
+        
+        is_success = response_quality in ["MASTERED", "CLEAN_SUCCESS", "INDEPENDENT_SUCCESS", "STRUGGLED_SUCCESS"]
+        
+        def advance_core():
+            if core_round >= 5:
+                state["next_phase"] = "COMPLETE"
+                state["expected_item_id"] = "COMPLETE"
+                return "COMPLETE", "ACTIVITY_COMPLETE"
+            else:
+                next_round = core_round + 1
+                state["current_core_round"] = next_round
+                state["origin_core_round"] = next_round
+                state["next_phase"] = "CORE"
+                state["expected_item_id"] = f"S2A5R{next_round:02d}"
+                return state["expected_item_id"], "CONTINUE"
+
+        if phase == "COMPLETE":
+            policy_reason.append("S2A5_ALREADY_COMPLETE")
+            next_item = "COMPLETE"
+            decision = "ACTIVITY_COMPLETE"
+            
+        elif phase == "CORE":
+            if is_success:
+                policy_reason.append(f"S2A5_CORE_R{core_round}_PASSED")
+                next_item, decision = advance_core()
+                state["expected_item_id"] = next_item
+            else:
+                policy_reason.append(f"S2A5_CORE_R{core_round}_STRUGGLED")
+                state["origin_core_round"] = core_round
+                new_phase = "CONFIRMATION_V1" if core_round == 1 else "REMEDIATION_V1"
+                
+                # Find next unused variant
+                chain = ["REMEDIATION_V1", "REMEDIATION_V2", "CONFIRMATION_V1", "CONFIRMATION_V2"]
+                start_idx = chain.index(new_phase)
+                
+                for p in chain[start_idx:]:
+                    cand_item = f"S2A5R{core_round - 1:02d}{p[-2:]}" if p.startswith("REMEDIATION") else f"S2A5R{core_round:02d}{p[-2:]}"
+                    if cand_item not in used_variants:
+                        state["next_phase"] = p
+                        state["expected_item_id"] = cand_item
+                        used_variants.append(cand_item)
+                        state["used_variant_ids"] = used_variants
+                        decision = "REMEDIATION"
+                        next_item = cand_item
+                        break
+                else:
+                    policy_reason.append("S2A5_ALL_VARIANTS_EXHAUSTED_ADVANCE_TO_CORE")
+                    next_item, decision = advance_core()
+                    state["expected_item_id"] = next_item
+                    
+        else:
+            # We are in a variant phase and just finished it
+            if phase == "REMEDIATION_V1":
+                if is_success:
+                    policy_reason.append("S2A5_REMEDIATION_V1_SUCCESS_PROCEED_TO_CONFIRMATION")
+                    new_phase = "CONFIRMATION_V1"
+                else:
+                    policy_reason.append("S2A5_REMEDIATION_V1_FAILED_TRY_V2")
+                    new_phase = "REMEDIATION_V2"
+            elif phase == "REMEDIATION_V2":
+                if is_success:
+                    policy_reason.append("S2A5_REMEDIATION_V2_SUCCESS_PROCEED_TO_CONFIRMATION")
+                else:
+                    policy_reason.append("S2A5_REMEDIATION_V2_FAILED_PROCEED_TO_CONFIRMATION_ANYWAY")
+                new_phase = "CONFIRMATION_V1"
+            elif phase == "CONFIRMATION_V1":
+                if is_success:
+                    policy_reason.append("S2A5_CONFIRMATION_V1_COMPLETE_ADVANCE")
+                    next_item, decision = advance_core()
+                    state["expected_item_id"] = next_item
+                    new_phase = None
+                else:
+                    policy_reason.append("S2A5_CONFIRMATION_V1_FAILED_TRY_V2")
+                    new_phase = "CONFIRMATION_V2"
+            elif phase == "CONFIRMATION_V2":
+                if is_success:
+                    policy_reason.append("S2A5_CONFIRMATION_V2_COMPLETE_ADVANCE")
+                else:
+                    policy_reason.append("S2A5_CONFIRMATION_V2_FAILED_ADVANCE_ANYWAY")
+                next_item, decision = advance_core()
+                state["expected_item_id"] = next_item
+                new_phase = None
+                
+            if new_phase:
+                chain = ["REMEDIATION_V1", "REMEDIATION_V2", "CONFIRMATION_V1", "CONFIRMATION_V2"]
+                start_idx = chain.index(new_phase)
+                
+                for p in chain[start_idx:]:
+                    cand_item = f"S2A5R{origin_core_round - 1:02d}{p[-2:]}" if p.startswith("REMEDIATION") else f"S2A5R{origin_core_round:02d}{p[-2:]}"
+                    if cand_item not in used_variants:
+                        state["next_phase"] = p
+                        state["expected_item_id"] = cand_item
+                        used_variants.append(cand_item)
+                        state["used_variant_ids"] = used_variants
+                        decision = "CONTINUE"
+                        next_item = cand_item
+                        break
+                else:
+                    policy_reason.append("S2A5_ALL_VARIANTS_EXHAUSTED_ADVANCE_TO_CORE")
+                    next_item, decision = advance_core()
+                    state["expected_item_id"] = next_item
+
+        return {
+            "next_activity": "2.5",
+            "next_item": next_item,
+            "difficulty": current_b,
+            "target_difficulty": current_b,
+            "difficulty_direction": "MAINTAIN",
+            "scaffold_level": 0,
+            "decision": decision,
+            "policy_reason": policy_reason,
+            "confirmation_required": False,
+            "next_phase": state.get("next_phase", "CORE"),
+            "progress_core": min(state.get("current_core_round", 1), 5),
+            "progress_total": 5,
+            "state_updates": state
+        }
+
+    def _s2a5_get_support_action(
+        self,
+        telemetry: Any,
+        options_count: int,
+        struggle_score: int,
+        available_incorrect_ids: list,
+        adaptive_state: Dict[str, Any],
+        round_idx: int
+    ) -> Dict[str, Any]:
+        
+        pair_state = adaptive_state.get("current_pair_state", {
+            "round": round_idx,
+            "wrong_count": 0,
+            "scaffold_locked": False
+        })
+        
+        if pair_state.get("round") != round_idx:
+            pair_state = {
+                "round": round_idx,
+                "wrong_count": 0,
+                "scaffold_locked": False
+            }
+            
+        pair_state["wrong_count"] += 1
+        wrong_count = pair_state["wrong_count"]
+        scaffold_locked = pair_state.get("scaffold_locked", False)
+        
+        phase = adaptive_state.get("next_phase", "CORE")
+        
+        if phase == "CORE":
+            if wrong_count == 1:
+                decision = "RETRY_CURRENT"
+                remove_option_ids = []
+                highlight = False
+            else:
+                decision = "SCAFFOLD_REMOVE_AND_HIGHLIGHT"
+                highlight = True
+                if not scaffold_locked:
+                    remove_option_ids = [available_incorrect_ids[0]] if available_incorrect_ids else []
+                    pair_state["scaffold_locked"] = True
+                else:
+                    remove_option_ids = []
+                    
+        elif phase.startswith("REMEDIATION"):
+            decision = "SCAFFOLD_REMOVE_AND_HIGHLIGHT"
+            highlight = True
+            if not scaffold_locked:
+                remove_option_ids = [available_incorrect_ids[0]] if available_incorrect_ids else []
+                pair_state["scaffold_locked"] = True
+            else:
+                remove_option_ids = []
+                
+        elif phase.startswith("CONFIRMATION"):
+            decision = "SCAFFOLD_REMOVE_AND_HIGHLIGHT"
+            highlight = True
+            if not scaffold_locked:
+                remove_option_ids = [available_incorrect_ids[0]] if available_incorrect_ids else []
+                pair_state["scaffold_locked"] = True
+            else:
+                remove_option_ids = []
+        else:
+            decision = "RETRY_CURRENT"
+            remove_option_ids = []
+            highlight = False
+            
+        adaptive_state["current_pair_state"] = pair_state
+        
+        level = 1 if (highlight or remove_option_ids or scaffold_locked) else 0
+        return {
+            "decision": decision,
+            "scaffold_level": level,
+            "remove_option_ids": remove_option_ids,
+            "highlight_correct": highlight
+        }
 
 policy_engine = PolicyEngine()

@@ -32,6 +32,15 @@ def _get_default_state(activity_id: str) -> dict:
         return {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A3_CORE_V1"}
     elif activity_id == "2.4":
         return {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A4_CORE_V1"}
+    elif activity_id == "2.5":
+        return {
+            "current_core_round": 1, 
+            "next_phase": "CORE", 
+            "expected_item_id": "S2A5R01",
+            "used_variant_ids": [],
+            "scaffold_locked": False,
+            "adaptive_policy_version": "S2A5_CORE_V1"
+        }
     return {}
 
 app = FastAPI(title="Adaptive Tutoring Service", version="1.0")
@@ -81,6 +90,10 @@ async def update_interaction(request: InteractionRequest):
         round_str = request.item_id.replace("act_4_round", "")
         if round_str.isdigit():
             canonical_item = f"S2A4R{int(round_str):02d}"
+    elif canonical_act == "2.5" and request.item_id.startswith("act_5_round"):
+        round_str = request.item_id.replace("act_5_round", "")
+        if round_str.isdigit():
+            canonical_item = f"S2A5R{int(round_str):02d}"
 
     if student_doc and "knowledge_state" in student_doc:
         knowledge_state = student_doc["knowledge_state"]
@@ -98,13 +111,26 @@ async def update_interaction(request: InteractionRequest):
     # ---------------------------------------------------------
     # RESET LOGIC FOR TESTING OR REPLAY
     # ---------------------------------------------------------
-    if canonical_item == "RESET" or canonical_item in ["S2A1R01", "S2A2R01", "S2A3R01", "S2A4R01"]:
+    is_fresh_start = False
+    if canonical_item == "RESET":
+        is_fresh_start = True
+    elif canonical_item in ["S2A1R01", "S2A2R01", "S2A3R01", "S2A4R01", "S2A5R01"]:
+        expected = adaptive_state.get("expected_item_id")
+        if expected != canonical_item:
+            is_fresh_start = True
+
+    if is_fresh_start:
         # Reset knowledge state and theta
         knowledge_state[official_kc] = bkt_engine.priors.get(official_kc, bkt_engine.priors["default"])[0]
         theta = 0.0
         adaptive_state = _get_default_state(canonical_act)
+        adaptive_state["expected_item_id"] = canonical_item
         if canonical_act == "2.2":
             adaptive_state["core_completed"] = {"1": False, "2": False, "3": False, "4": False, "5": False}
+        
+        if canonical_item == "RESET":
+            # Save and return immediately if this was just a reset ping
+            pass
 
     # Fetch Item parameters from Item Bank
     item_doc = await db.item_bank.find_one({"item_id": canonical_item})

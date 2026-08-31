@@ -10,7 +10,7 @@ import '../../../../services/progress_service.dart';
 import '../shared_widgets/shared_celebration_popup.dart';
 import '../../../../services/tts_service.dart';
 
-/// Activity 3: රටාව මතක තබා ගනිමු (Remember the Pattern)
+/// Activity 5: අකුරු මතකයෙන් සකසමු (Remember the Pattern)
 /// Template: pattern_memory_game
 class Skill2Act5PatternMemory extends StatefulWidget {
   final ActivityNode? activityNode;
@@ -41,9 +41,15 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
   bool _isCorrect = false;
   bool _activityComplete = false;
   int _currentRoundIndex = 0;
+  
+  String _currentItemId = '';
+  String? _currentVariantId;
 
   String? _wrongTappedOption;
   String? _correctTappedOption;
+  
+  final Set<String> _removedOptionIds = {};
+  bool _highlightCorrect = false;
 
   @override
   void initState() {
@@ -61,7 +67,28 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
       _currentRoundIndex = 0;
     }
     _timerController = AnimationController(vsync: this);
+    _setupRound();
     _startMemorizeTimer();
+  }
+  
+  void _setupRound() {
+    final rounds = widget.activityNode?.rounds ?? [];
+    if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
+      final currentRound = rounds[_currentRoundIndex];
+      _currentItemId = currentRound['item_id']?.toString() ?? 'S2A5R0${_currentRoundIndex + 1}';
+      
+      // If a variant is selected by C4, load its data instead
+      if (_currentVariantId != null && currentRound.containsKey('adaptive_variants')) {
+        final variants = currentRound['adaptive_variants'] as List<dynamic>? ?? [];
+        final variant = variants.firstWhere((v) => v['variant_id'] == _currentVariantId, orElse: () => null);
+        if (variant != null && variant.containsKey('content')) {
+          _currentItemId = variant['item_id']?.toString() ?? '';
+        }
+      }
+    }
+    _removedOptionIds.clear();
+    _highlightCorrect = false;
+    _isCorrect = false;
   }
 
   @override
@@ -75,6 +102,21 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
   List<dynamic> get _rounds {
     var r = widget.activityNode?.rounds ?? [];
     return r.length > 5 ? r.sublist(0, 5) : r;
+  }
+  
+  Map<String, dynamic> _getCurrentRoundData() {
+    final rounds = _rounds;
+    if (rounds.isEmpty || _currentRoundIndex >= rounds.length) return {};
+    
+    Map<String, dynamic> roundData = rounds[_currentRoundIndex];
+    if (_currentVariantId != null && roundData.containsKey('adaptive_variants')) {
+      final variants = roundData['adaptive_variants'] as List<dynamic>? ?? [];
+      final variant = variants.firstWhere((v) => v['variant_id'] == _currentVariantId, orElse: () => null);
+      if (variant != null && variant.containsKey('content')) {
+        roundData = variant['content'] as Map<String, dynamic>;
+      }
+    }
+    return roundData;
   }
 
   void _playCurrentInstruction({bool autoPlay = false}) {
@@ -98,17 +140,18 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
   }
 
   void _startMemorizeTimer() {
-    final rounds = _rounds;
-    if (rounds.isEmpty) return;
+    final roundData = _getCurrentRoundData();
+    if (roundData.isEmpty) return;
 
-    final currentRound = rounds[_currentRoundIndex];
-    final showSeconds = (currentRound['show_seconds'] as int?) ?? 4;
+    final showSeconds = (roundData['show_seconds'] as int?) ?? 4;
 
     setState(() {
       _isMemorizing = true;
       _countdown = showSeconds;
       _userSequence.clear();
       _isCorrect = false;
+      _removedOptionIds.clear();
+      _highlightCorrect = false;
     });
 
     _playCurrentInstruction(autoPlay: true);
@@ -128,6 +171,80 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
           _isMemorizing = false;
         });
         _playCurrentInstruction(autoPlay: true);
+        
+        // Reset telemetry timers so memorization time isn't counted as hesitation/latency
+        final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+        wrapper?.resetRoundTimers();
+      }
+    });
+  }
+
+  void _transitionToNextRound(Map<String, dynamic>? nextAction) {
+    if (nextAction != null && nextAction['decision'] == 'ACTIVITY_COMPLETE') {
+      _completeActivity();
+      return;
+    }
+    
+    int totalRounds = widget.activityNode?.rounds.length ?? 1;
+    setState(() {
+      if (nextAction != null && nextAction.containsKey('next_item')) {
+         final nextItem = nextAction['next_item'].toString();
+         final regex = RegExp(r'R(\d+)');
+         final match = regex.firstMatch(nextItem);
+         if (match != null && match.group(1) != null) {
+            int roundNum = int.tryParse(match.group(1)!) ?? (_currentRoundIndex + 1);
+            _currentRoundIndex = roundNum - 1;
+         } else {
+            _currentRoundIndex++;
+         }
+
+         if (nextItem.contains('V1')) _currentVariantId = 'V1';
+         else if (nextItem.contains('V2')) _currentVariantId = 'V2';
+         else _currentVariantId = null;
+      } else {
+         _currentVariantId = null;
+         _currentRoundIndex++;
+      }
+      
+      final sId = widget.activityNode?.skillId ?? '';
+      final aId = widget.activityNode?.id ?? '';
+      if (sId.isNotEmpty && aId.isNotEmpty) {
+        int progress = ((_currentRoundIndex / totalRounds) * 100).toInt();
+        ProgressService().saveActivityScore(sId, aId, progress);
+        ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+      }
+      _setupRound();
+    });
+    
+    if (_currentRoundIndex < totalRounds || _currentVariantId != null) {
+      _startMemorizeTimer();
+    } else {
+      _completeActivity();
+    }
+  }
+
+  void _completeActivity() {
+    setState(() {
+      _activityComplete = true;
+      final sId = widget.activityNode?.skillId ?? '';
+      final aId = widget.activityNode?.id ?? '';
+      if (sId.isNotEmpty && aId.isNotEmpty) {
+        ProgressService().saveActivityScore(sId, aId, 100);
+        ProgressService().clearActivityState(sId, aId);
+      }
+    });
+  }
+
+  void _processScaffoldAction(Map<String, dynamic> nextAction) {
+    setState(() {
+      if (nextAction['remove_option_ids'] != null) {
+        final List<dynamic> removeIds = nextAction['remove_option_ids'];
+        for (var id in removeIds) {
+           _removedOptionIds.add(id.toString());
+        }
+      }
+      if (nextAction['highlight_correct'] == true) {
+        _highlightCorrect = true;
       }
     });
   }
@@ -135,27 +252,47 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
   void _addItemToUserSequence(
     String item,
     List<String> targetPattern,
+    List<String> allOptions,
     int totalRounds,
   ) async {
     if (_isCorrect || _isMemorizing || _wrongTappedOption != null) return;
 
-    setState(() {
-      _userSequence.add(item);
-    });
-
-    // Check if user sequence matches target pattern so far
-    final currentIndex = _userSequence.length - 1;
-    if (_userSequence[currentIndex] != targetPattern[currentIndex]) {
+    final currentIndex = _userSequence.length;
+    if (item != targetPattern[currentIndex]) {
       // Wrong item picked
       setState(() {
         _wrongTappedOption = item;
       });
       SoundUtils.playFeedback('audio/wrong.mp3');
+      
+      // Calculate genuine distractors
+      List<String> genuineDistractors = allOptions.where((opt) => 
+         !targetPattern.contains(opt) && 
+         !_userSequence.contains(opt) && 
+         !_removedOptionIds.contains(opt)
+      ).toList();
+      
+      final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+      if (wrapper != null) {
+        final result = await wrapper.registerAdaptiveWrongAttempt(
+          itemId: _currentItemId,
+          extraTelemetry: {
+            "selected_option_id": item,
+            "correct_option_id": targetPattern[currentIndex],
+            "original_options_count": allOptions.length,
+            "incorrect_option_ids": genuineDistractors,
+          }
+        );
+        if (result != null && result['next_action'] != null) {
+           _processScaffoldAction(result['next_action']);
+        }
+      }
+      
       Future.delayed(const Duration(milliseconds: 600), () {
         if (mounted) {
           setState(() {
             _wrongTappedOption = null;
-            _userSequence.clear();
+            // DO NOT clear user sequence!
           });
         }
       });
@@ -165,7 +302,9 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
     // Correct item picked
     setState(() {
       _correctTappedOption = item;
+      _userSequence.add(item);
     });
+    
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {
         setState(() {
@@ -178,76 +317,44 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
 
     // Check if pattern completed
     if (_userSequence.length == targetPattern.length) {
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
-        100,
-      );
       setState(() {
         _isCorrect = true;
       });
       SoundUtils.playFeedback('audio/correct.mp3');
-
-      Future.delayed(const Duration(milliseconds: 1400), () {
-        if (!mounted) return;
-        if (_currentRoundIndex < totalRounds - 1) {
-          _currentRoundIndex++;
-          final sId = widget.activityNode?.skillId ?? '';
-          final aId = widget.activityNode?.id ?? '';
-          if (sId.isNotEmpty && aId.isNotEmpty) {
-            int progress =
-                ((_currentRoundIndex /
-                            (widget.activityNode?.rounds.length ?? 1)) *
-                        100)
-                    .toInt();
-            ProgressService().saveActivityScore(sId, aId, progress);
-            ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
-          }
-          _startMemorizeTimer();
-        } else {
-          setState(() {
-            _activityComplete = true;
-            final sId = widget.activityNode?.skillId ?? '';
-            final aId = widget.activityNode?.id ?? '';
-            if (sId.isNotEmpty && aId.isNotEmpty) {
-              ProgressService().saveActivityScore(sId, aId, 100);
-              ProgressService().clearActivityState(sId, aId);
-            }
-          });
-        }
-      });
+      
+      final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+      if (wrapper != null) {
+         final result = await wrapper.completeAdaptiveRound(100, itemId: _currentItemId);
+         Future.delayed(const Duration(milliseconds: 1400), () {
+            if (!mounted) return;
+            _transitionToNextRound(result?['next_action']);
+         });
+      } else {
+         Future.delayed(const Duration(milliseconds: 1400), () {
+            if (!mounted) return;
+            _transitionToNextRound(null);
+         });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final rounds = _rounds;
-    if (rounds.isEmpty) {
+    final roundData = _getCurrentRoundData();
+    if (roundData.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('රටාව මතක තබා ගනිමු')),
         body: const Center(child: Text('No rounds available.')),
       );
     }
 
-    final currentRound = rounds[_currentRoundIndex];
     final titleText = widget.activityNode?.title ?? 'රටාව මතක තබා ගනිමු';
     final targetPattern =
-        (currentRound['pattern'] as List?)?.map((e) => e.toString()).toList() ??
+        (roundData['pattern'] as List?)?.map((e) => e.toString()).toList() ??
         ['🔴', '🔵'];
     var options =
-        (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ??
+        (roundData['options'] as List?)?.map((e) => e.toString()).toList() ??
         ['🔴', '🔵', '🟢'];
-
-    if (widget.isRemedial && options.length > 2) {
-      // Reduce distractors: Keep only items in the target pattern + 1 distractor (if any)
-      final requiredItems = targetPattern.toSet();
-      final distractors = options
-          .where((o) => !requiredItems.contains(o))
-          .toList();
-      options = requiredItems.toList();
-      if (distractors.isNotEmpty) {
-        options.add(distractors.first);
-      }
-      options.shuffle();
-    }
 
     double itemSize;
     double spacing;
@@ -297,7 +404,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
       activityTitle: widget.activityNode?.title ?? '',
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
-      totalRounds: rounds.length,
+      totalRounds: _rounds.length,
       isRoundComplete: _isCorrect,
       isActivityComplete: _activityComplete,
       onNext: () {
@@ -364,9 +471,10 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
                                   : '?');
                         final isFilled =
                             _isMemorizing || i < _userSequence.length;
+                        // Determine if this is the currently expected slot and there is an error
                         final isCurrentWrong =
                             (_wrongTappedOption != null) &&
-                            (i == _userSequence.length - 1);
+                            (i == _userSequence.length);
 
                         return AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
@@ -458,14 +566,21 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
                             runSpacing: 16.0,
                             alignment: WrapAlignment.center,
                             children: options.map((opt) {
+                              if (_removedOptionIds.contains(opt)) {
+                                return SizedBox(width: hasLongText ? 150 : itemSize, height: hasLongText ? 80 : itemSize);
+                              }
+                              
                               final isWrong = _wrongTappedOption == opt;
                               final isCorrect = _correctTappedOption == opt;
                               final isPressed = isWrong || isCorrect;
+                              
+                              final isExpectedNext = _userSequence.length < targetPattern.length && targetPattern[_userSequence.length] == opt;
+                              final isHighlighted = _highlightCorrect && isExpectedNext;
 
                               Color tileColor = Colors.white;
                               Color borderColor = Colors.transparent;
                               Color textColor = AppColors.textPrimary;
-                              double borderWidth = isPressed ? 4.0 : 1.0;
+                              double borderWidth = isPressed || isHighlighted ? 4.0 : 1.0;
 
                               if (isCorrect) {
                                 tileColor = const Color(
@@ -479,13 +594,18 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
                                 ).withValues(alpha: 0.15);
                                 borderColor = const Color(0xFFE87C6D);
                                 textColor = const Color(0xFFE87C6D);
+                              } else if (isHighlighted) {
+                                tileColor = const Color(0xFF6DBE6D).withValues(alpha: 0.15);
+                                borderColor = const Color(0xFF6DBE6D);
+                                textColor = AppColors.textPrimary;
                               }
 
                               return GestureDetector(
                                 onTap: () => _addItemToUserSequence(
                                   opt,
                                   targetPattern,
-                                  rounds.length,
+                                  options,
+                                  _rounds.length,
                                 ),
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 150),
@@ -502,13 +622,13 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
                                     color: tileColor,
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                      color: isPressed
+                                      color: isPressed || isHighlighted
                                           ? borderColor
                                           : const Color(0xFFE2E8F0),
                                       width: borderWidth,
                                     ),
                                     boxShadow: [
-                                      if (isCorrect)
+                                      if (isCorrect || isHighlighted)
                                         BoxShadow(
                                           color: const Color(
                                             0xFF6DBE6D,
