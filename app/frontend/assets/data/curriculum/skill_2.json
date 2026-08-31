@@ -1113,15 +1113,45 @@
         "template_type": "skill2_mcq",
         "rounds": [
           {
+            "item_id": "S2A4R01",
             "prompt": "'මල්' යන වචනයේ මුල් අකුර කුමක්ද?",
             "options": [
               "ම",
               "ය"
             ],
             "correctOption": "ම",
-            "correct_index": 0
+            "correct_index": 0,
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "item_id": "S2A4R01V1",
+                "content": {
+                  "prompt": "'කඩ' යන වචනයේ මුල් අකුර කුමක්ද?",
+                  "options": [
+                    "ක",
+                    "න"
+                  ],
+                  "correctOption": "ක",
+                  "correct_index": 0
+                }
+              },
+              {
+                "variant_id": "V2",
+                "item_id": "S2A4R01V2",
+                "content": {
+                  "prompt": "'දල' යන වචනයේ මුල් අකුර කුමක්ද?",
+                  "options": [
+                    "ද",
+                    "ප"
+                  ],
+                  "correctOption": "ද",
+                  "correct_index": 0
+                }
+              }
+            ]
           },
           {
+            "item_id": "S2A4R02",
             "prompt": "'ගස' යන වචනයේ මුල් අකුර කුමක්ද?",
             "options": [
               "ස",
@@ -1129,9 +1159,40 @@
               "ට"
             ],
             "correctOption": "ග",
-            "correct_index": 1
+            "correct_index": 1,
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "item_id": "S2A4R02V1",
+                "content": {
+                  "prompt": "'නම' යන වචනයේ මුල් අකුර කුමක්ද?",
+                  "options": [
+                    "න",
+                    "ම",
+                    "ය"
+                  ],
+                  "correctOption": "න",
+                  "correct_index": 0
+                }
+              },
+              {
+                "variant_id": "V2",
+                "item_id": "S2A4R02V2",
+                "content": {
+                  "prompt": "'බත' යන වචනයේ මුල් අකුර කුමක්ද?",
+                  "options": [
+                    "බ",
+                    "ක",
+                    "ත"
+                  ],
+                  "correctOption": "බ",
+                  "correct_index": 0
+                }
+              }
+            ]
           },
           {
+            "item_id": "S2A4R03",
             "prompt": "'පොත' යන වචනයේ අග අකුර කුමක්ද?",
             "options": [
               "පො",
@@ -1139,9 +1200,40 @@
               "ත"
             ],
             "correctOption": "ත",
-            "correct_index": 2
+            "correct_index": 2,
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "item_id": "S2A4R03V1",
+                "content": {
+                  "prompt": "'ගම' යන වචනයේ අග අකුර කුමක්ද?",
+                  "options": [
+                    "ග",
+                    "ය",
+                    "ම"
+                  ],
+                  "correctOption": "ම",
+                  "correct_index": 2
+                }
+              },
+              {
+                "variant_id": "V2",
+                "item_id": "S2A4R03V2",
+                "content": {
+                  "prompt": "'මල' යන වචනයේ අග අකුර කුමක්ද?",
+                  "options": [
+                    "ම",
+                    "ක",
+                    "ල"
+                  ],
+                  "correctOption": "ල",
+                  "correct_index": 2
+                }
+              }
+            ]
           },
           {
+            "item_id": "S2A4R04",
             "prompt": "'අහස' යන වචනයේ අග අකුර කුමක්ද?",
             "options": [
               "අ",
@@ -1150,9 +1242,42 @@
               "ස"
             ],
             "correctOption": "ස",
-            "correct_index": 3
+            "correct_index": 3,
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "item_id": "S2A4R04V1",
+                "content": {
+                  "prompt": "'කම' යන වචනයේ අග අකුර කුමක්ද?",
+                  "options": [
+                    "ක",
+                    "ග",
+                    "ය",
+                    "ම"
+                  ],
+                  "correctOption": "ම",
+                  "correct_index": 3
+                }
+              },
+              {
+                "variant_id": "V2",
+                "item_id": "S2A4R04V2",
+                "content": {
+                  "prompt": "'කඩය' යන වචනයේ අග අකුර කුමක්ද?",
+                  "options": [
+                    "ක",
+                    "ඩ",
+                    "ර",
+                    "ය"
+                  ],
+                  "correctOption": "ය",
+                  "correct_index": 3
+                }
+              }
+            ]
           },
           {
+            "item_id": "S2A4R05",
             "prompt": "'බල්ලා' යන වචනයේ මුල් සහ අග අකුරු තෝරන්න",
             "options": [
               "ම",
@@ -1165,6 +1290,46 @@
             "correct_indices": [
               1,
               3
+            ],
+            "adaptive_variants": [
+              {
+                "variant_id": "V1",
+                "item_id": "S2A4R05V1",
+                "content": {
+                  "prompt": "'නරියා' යන වචනයේ මුල් සහ අග අකුරු තෝරන්න",
+                  "options": [
+                    "ක",
+                    "යා",
+                    "න",
+                    "ර",
+                    "බ",
+                    "ම"
+                  ],
+                  "correct_indices": [
+                    1,
+                    2
+                  ]
+                }
+              },
+              {
+                "variant_id": "V2",
+                "item_id": "S2A4R05V2",
+                "content": {
+                  "prompt": "'හාවා' යන වචනයේ මුල් සහ අග අකුරු තෝරන්න",
+                  "options": [
+                    "ප",
+                    "වා",
+                    "ට",
+                    "හා",
+                    "ස",
+                    "ම"
+                  ],
+                  "correct_indices": [
+                    1,
+                    3
+                  ]
+                }
+              }
             ]
           }
         ]
