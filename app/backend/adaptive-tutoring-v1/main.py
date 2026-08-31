@@ -6,6 +6,29 @@ import database
 from services.bkt_engine import bkt_engine
 from services.irt_engine import irt_engine
 from services.policy_engine import policy_engine
+from typing import Dict, Any
+
+def get_adaptive_state(student_doc: dict, activity_id: str) -> dict:
+    if not student_doc:
+        return _get_default_state(activity_id)
+        
+    adaptive_states = student_doc.get("adaptive_states", {})
+    state = adaptive_states.get(activity_id)
+    
+    # Safe migration copy from old schema
+    if not state and activity_id == "2.2":
+        old_state = student_doc.get("s2a2_state")
+        if old_state:
+            state = dict(old_state) # Copy
+            
+    return state if state else _get_default_state(activity_id)
+
+def _get_default_state(activity_id: str) -> dict:
+    if activity_id == "2.2":
+        return {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A2_CORE_V1"}
+    elif activity_id == "2.1":
+        return {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A1_CORE_V1"}
+    return {}
 
 app = FastAPI(title="Adaptive Tutoring Service", version="1.0")
 
@@ -32,22 +55,6 @@ async def update_interaction(request: InteractionRequest):
     
     official_kc = resolve_knowledge_component(request.activity_id, request.item_id, request.knowledge_component_id)
     
-    if student_doc and "knowledge_state" in student_doc:
-        knowledge_state = student_doc["knowledge_state"]
-        theta = student_doc.get("theta_estimate", 0.0)
-        s2a2_state = student_doc.get("s2a2_state")
-        if not s2a2_state:
-            s2a2_state = {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A2_CORE_V1"}
-    else:
-        knowledge_state = {
-            official_kc: bkt_engine.priors.get(official_kc, bkt_engine.priors["default"])[0]
-        }
-        theta = 0.0
-        s2a2_state = {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A2_CORE_V1"}
-        
-    current_prob = knowledge_state.get(official_kc, bkt_engine.priors["default"][0])
-    mastery_before = current_prob
-    
     canonical_act = resolve_canonical_activity(request.activity_id, request.item_id, getattr(request, 'skill_id', None))
     if not canonical_act:
         canonical_act = request.activity_id
@@ -58,11 +65,34 @@ async def update_interaction(request: InteractionRequest):
         round_str = request.item_id.replace("act_2_round", "")
         if round_str.isdigit():
             canonical_item = f"S2A2R{int(round_str):02d}"
-            
-    # Auto-reset S2A2 state if the user starts round 1 but the state is already complete or stuck
-    if canonical_act == "2.2" and canonical_item == "S2A2R01":
-        if s2a2_state.get("next_phase") == "COMPLETE" or s2a2_state.get("current_core_round", 1) > 5:
-            s2a2_state = {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A2_CORE_V1", "core_completed": {"1": False, "2": False, "3": False, "4": False, "5": False}}
+    elif canonical_act == "2.1" and request.item_id.startswith("act_1_round"):
+        round_str = request.item_id.replace("act_1_round", "")
+        if round_str.isdigit():
+            canonical_item = f"S2A1R{int(round_str):02d}"
+
+    if student_doc and "knowledge_state" in student_doc:
+        knowledge_state = student_doc["knowledge_state"]
+        theta = student_doc.get("theta_estimate", 0.0)
+    else:
+        knowledge_state = {
+            official_kc: bkt_engine.priors.get(official_kc, bkt_engine.priors["default"])[0]
+        }
+        theta = 0.0
+        
+    adaptive_state = get_adaptive_state(student_doc, canonical_act)
+    current_prob = knowledge_state.get(official_kc, bkt_engine.priors["default"][0])
+    mastery_before = current_prob
+    
+    # ---------------------------------------------------------
+    # RESET LOGIC FOR TESTING OR REPLAY
+    # ---------------------------------------------------------
+    if canonical_item == "RESET" or (canonical_item in ["S2A1R01", "S2A2R01"] and adaptive_state.get("next_phase") == "COMPLETE"):
+        # Reset knowledge state and theta
+        knowledge_state[official_kc] = bkt_engine.priors.get(official_kc, bkt_engine.priors["default"])[0]
+        theta = 0.0
+        adaptive_state = _get_default_state(canonical_act)
+        if canonical_act == "2.2":
+            adaptive_state["core_completed"] = {"1": False, "2": False, "3": False, "4": False, "5": False}
 
     # Fetch Item parameters from Item Bank
     item_doc = await db.item_bank.find_one({"item_id": canonical_item})
@@ -98,12 +128,14 @@ async def update_interaction(request: InteractionRequest):
             options_count, 
             struggle_score, 
             available_incorrect_ids, 
-            s2a2_state
+            adaptive_state,
+            canonical_act,
+            round_num
         )
         
         # Track scaffold usage
-        if support.get("scaffold_level", 0) > s2a2_state.get("highest_scaffold_level_used", 0):
-            s2a2_state["highest_scaffold_level_used"] = support.get("scaffold_level", 0)
+        if support.get("scaffold_level", 0) > adaptive_state.get("highest_scaffold_level_used", 0):
+            adaptive_state["highest_scaffold_level_used"] = support.get("scaffold_level", 0)
             
         # Next item remains the current item! No state mutation occurs here.
         next_action = NextAction(
@@ -114,21 +146,28 @@ async def update_interaction(request: InteractionRequest):
             decision=support.get("decision", "RETRY_CURRENT"),
             remove_option_ids=support.get("remove_option_ids", None),
             highlight_correct=support.get("highlight_correct", False),
-            next_phase=s2a2_state.get("next_phase", "CORE"),
-            progress_core=s2a2_state.get("current_core_round", 1),
-            progress_total=5
+            next_phase=adaptive_state.get("next_phase", "CORE"),
+            progress_core=adaptive_state.get("current_core_round", 1),
+            progress_total=7 if canonical_act == "2.1" else 5
         )
         
+        # Save adaptive state
+        adaptive_states = student_doc.get("adaptive_states", {}) if student_doc else {}
+        adaptive_states[canonical_act] = adaptive_state
+        
+        update_set = {
+            "knowledge_state": knowledge_state,
+            "theta_estimate": theta,
+            "adaptive_states": adaptive_states,
+            "last_updated": datetime.utcnow().isoformat()
+        }
+        # Keep old state for rollback safety
+        if student_doc and "s2a2_state" in student_doc:
+            update_set["s2a2_state"] = student_doc["s2a2_state"]
+            
         await database.knowledge_states_collection.update_one(
             {"student_id": request.student_id},
-            {
-                "$set": {
-                    "knowledge_state": knowledge_state,
-                    "theta_estimate": theta,
-                    "s2a2_state": s2a2_state,
-                    "last_updated": datetime.utcnow().isoformat()
-                }
-            },
+            {"$set": update_set},
             upsert=True
         )
         
@@ -139,7 +178,7 @@ async def update_interaction(request: InteractionRequest):
         )
 
     # COMPLETE Phase: check for duplicate/stale requests
-    expected_item = s2a2_state.get("expected_item_id")
+    expected_item = adaptive_state.get("expected_item_id")
     # ---------------------------------------------------------
     # STALE COMPLETION CHECK (ONLY FOR S2A2 PILOT)
     # ---------------------------------------------------------
@@ -152,8 +191,8 @@ async def update_interaction(request: InteractionRequest):
             difficulty=diff_b,
             scaffold_level=0,
             decision="RETRY_CURRENT",
-            next_phase=s2a2_state.get("next_phase", "CORE"),
-            progress_core=s2a2_state.get("current_core_round", 1),
+            next_phase=adaptive_state.get("next_phase", "CORE"),
+            progress_core=adaptive_state.get("current_core_round", 1),
             progress_total=5
         )
         return TutoringResponse(
@@ -162,12 +201,18 @@ async def update_interaction(request: InteractionRequest):
             next_action=next_action
         )
 
+
     # COMPLETE Phase: update BKT/IRT
     
     # Override response quality if scaffolding was used during this item's attempts
-    frontend_scaffold = request.telemetry.get("scaffold_level_used", 0) if isinstance(request.telemetry, dict) else getattr(request.telemetry, "scaffold_level_used", 0)
-    if request.is_correct and (s2a2_state.get("highest_scaffold_level_used", 0) > 0 or frontend_scaffold > 0):
-        response_quality = "ASSISTED_SUCCESS"
+    frontend_scaffold = getattr(request.telemetry, "scaffold_level_used", 0)
+    if request.is_correct and (adaptive_state.get("highest_scaffold_level_used", 0) > 0 or frontend_scaffold > 0):
+        # We cap response quality to ASSISTED_SUCCESS if any scaffolding was needed
+        # (even if they solved it in 1 attempt from the frontend perspective).
+        if response_quality in ["MASTERED", "INDEPENDENT_SUCCESS"]:
+            response_quality = "ASSISTED_SUCCESS"
+            
+    print(f"BKT Before: {mastery_before:.3f}, Correct: {request.is_correct}, Quality: {response_quality}")
 
     new_prob = bkt_engine.update_knowledge_state(
         current_prob=current_prob,
@@ -182,17 +227,18 @@ async def update_interaction(request: InteractionRequest):
         b_i=diff_b,
         learning_rate=0.5
     )
-    
+
+    # Generate explicit Next Action using Policy Engine
     policy_output = policy_engine.get_next_action(
         kc_mastery=new_prob,
         theta=theta_new,
-        fatigue_score=request.fatigue_score,
+        fatigue_score=getattr(request, "fatigue_score", 0),
         current_activity=canonical_act,
         response_quality=response_quality,
         struggle_band=struggle_band,
         current_difficulty_b=diff_b,
-        s2a2_state=s2a2_state,
-        learner_profile=request.learner_profile
+        adaptive_state=adaptive_state,
+        learner_profile=getattr(request, "learner_profile", {})
     )
     
     # 5. Check Candidate Availability for next_activity
@@ -206,7 +252,6 @@ async def update_interaction(request: InteractionRequest):
             next_activity = canonical_act
             policy_output["next_activity"] = canonical_act
             policy_output["policy_reason"].append("NEXT_ACTIVITY_UNAVAILABLE")
-            # We will query candidates for the reverted activity below
             candidates = []
     else:
         candidates = []
@@ -216,31 +261,68 @@ async def update_interaction(request: InteractionRequest):
         candidates_cursor = db.item_bank.find({"activity_id": next_activity})
         candidates = await candidates_cursor.to_list(length=100)
     
-    # 6. Save State
-    if canonical_act == "2.2" or request.activity_id == "act_2":
-        s2a2_state = policy_output.get("state_updates", s2a2_state)
-        
-        # Reset the scaffold state for the next item NOW, after classification is complete
-        s2a2_state["highest_scaffold_level_used"] = 0
-        if "current_pair_state" in s2a2_state:
-            s2a2_state["current_pair_state"] = {
-                "pair_id": None,
-                "wrong_count": 0,
-                "scaffold_step": 0
-            }
+    # Apply State Machine updates
+    adaptive_state = policy_output.get("state_updates", adaptive_state)
+    
+    # Reset scaffold tracking for the next item
+    adaptive_state["highest_scaffold_level_used"] = 0
+    if "current_pair_state" in adaptive_state:
+        adaptive_state["current_pair_state"] = {
+            "pair_id": None,
+            "wrong_count": 0,
+            "p1_wrong": 0,
+            "p2_wrong": 0,
+            "p3_wrong": 0,
+            "scaffold_step": 0
+        }
 
+    # Save final decision
+    next_action = NextAction(
+        next_activity=policy_output["next_activity"],
+        next_item=policy_output["next_item"],
+        difficulty=policy_output["difficulty"],
+        scaffold_level=policy_output["scaffold_level"],
+        decision=policy_output["decision"],
+        next_phase=policy_output.get("next_phase", "CORE"),
+        progress_core=policy_output.get("progress_core", 1),
+        progress_total=policy_output.get("progress_total", 5)
+    )
+    next_reason = policy_output["policy_reason"]
+    decision_doc = {
+        "student_id": request.student_id,
+        "timestamp": datetime.utcnow().isoformat(),
+        "activity_id": canonical_act,
+        "item_id": canonical_item,
+        "is_correct": request.is_correct,
+        "response_quality": response_quality,
+        "mastery_before": mastery_before,
+        "mastery_after": new_prob,
+        "theta_before": theta,
+        "theta_after": theta_new,
+        "adaptive_state": adaptive_state,
+        "next_item": next_action.next_item,
+        "policy_reason": next_reason
+    }
+    await database.adaptive_decisions_collection.insert_one(decision_doc)
+
+    adaptive_states = student_doc.get("adaptive_states", {}) if student_doc else {}
+    adaptive_states[canonical_act] = adaptive_state
+    
+    update_set = {
+        "knowledge_state": knowledge_state,
+        "theta_estimate": theta_new,
+        "adaptive_states": adaptive_states,
+        "last_updated": datetime.utcnow().isoformat()
+    }
+    if student_doc and "s2a2_state" in student_doc:
+        update_set["s2a2_state"] = student_doc["s2a2_state"]
+        
     await database.knowledge_states_collection.update_one(
         {"student_id": request.student_id},
-        {
-            "$set": {
-                "knowledge_state": knowledge_state,
-                "theta_estimate": theta_new,
-                "s2a2_state": s2a2_state,
-                "last_updated": datetime.utcnow().isoformat()
-            }
-        },
+        {"$set": update_set},
         upsert=True
     )
+    
     # BKT Decision Evidence
     evidence = {
         "official_kc": official_kc,

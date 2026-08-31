@@ -16,207 +16,694 @@
         "template_type": "skill2_odd_one_out",
         "rounds": [
           {
-            "prompt": "'අ' අකුර සොයන්න.",
-            "items": [
+            "core_round": 1,
+            "content": {
+              "prompt": "'අ' අකුර සොයන්න.",
+              "items": [
+                {
+                  "type": "icon",
+                  "value": "assets/images/activity_icons/fruits_food/apple.png",
+                  "is_target": false
+                },
+                {
+                  "type": "icon",
+                  "value": "assets/images/activity_icons/fruits_food/apple.png",
+                  "is_target": false
+                },
+                {
+                  "type": "icon",
+                  "value": "assets/images/activity_icons/fruits_food/apple.png",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "අ",
+                  "is_target": true
+                }
+              ]
+            },
+            "adaptive_variants": [
               {
-                "type": "icon",
-                "value": "assets/images/activity_icons/fruits_food/apple.png",
-                "is_target": false
+                "variant_id": "V1",
+                "content": {
+                  "prompt": "'අ' අකුර සොයන්න.",
+                  "items": [
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/fruits_food/apple.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/fruits_food/apple.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/fruits_food/apple.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "අ",
+                      "is_target": true
+                    }
+                  ]
+                }
               },
               {
-                "type": "icon",
-                "value": "assets/images/activity_icons/fruits_food/apple.png",
-                "is_target": false
-              },
-              {
-                "type": "icon",
-                "value": "assets/images/activity_icons/fruits_food/apple.png",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "අ",
-                "is_target": true
+                "variant_id": "V2",
+                "content": {
+                  "prompt": "'අ' අකුර සොයන්න.",
+                  "items": [
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/fruits_food/apple.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/fruits_food/apple.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/fruits_food/apple.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "අ",
+                      "is_target": true
+                    }
+                  ]
+                }
               }
             ]
           },
           {
-            "prompt": "'ම' අකුර සොයන්න.",
-            "items": [
+            "core_round": 2,
+            "content": {
+              "prompt": "'ම' අකුර සොයන්න.",
+              "items": [
+                {
+                  "type": "icon",
+                  "value": "assets/images/activity_icons/everyday_objects/spoon.png",
+                  "is_target": false
+                },
+                {
+                  "type": "icon",
+                  "value": "assets/images/activity_icons/everyday_objects/spoon.png",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ය",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ම",
+                  "is_target": true
+                }
+              ]
+            },
+            "adaptive_variants": [
               {
-                "type": "icon",
-                "value": "assets/images/activity_icons/everyday_objects/spoon.png",
-                "is_target": false
+                "variant_id": "V1",
+                "content": {
+                  "prompt": "'ම' අකුර සොයන්න.",
+                  "items": [
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/everyday_objects/spoon.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/everyday_objects/spoon.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ය",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ම",
+                      "is_target": true
+                    }
+                  ]
+                }
               },
               {
-                "type": "icon",
-                "value": "assets/images/activity_icons/everyday_objects/spoon.png",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ය",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ම",
-                "is_target": true
+                "variant_id": "V2",
+                "content": {
+                  "prompt": "'ම' අකුර සොයන්න.",
+                  "items": [
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/everyday_objects/spoon.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/everyday_objects/spoon.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ය",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ම",
+                      "is_target": true
+                    }
+                  ]
+                }
               }
             ]
           },
           {
-            "prompt": "'ර' අකුර සොයන්න.",
-            "items": [
+            "core_round": 3,
+            "content": {
+              "prompt": "'ර' අකුර සොයන්න.",
+              "items": [
+                {
+                  "type": "icon",
+                  "value": "assets/images/activity_icons/everyday_objects/flag.png",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ය",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ම",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ර",
+                  "is_target": true
+                }
+              ]
+            },
+            "adaptive_variants": [
               {
-                "type": "icon",
-                "value": "assets/images/activity_icons/everyday_objects/flag.png",
-                "is_target": false
+                "variant_id": "V1",
+                "content": {
+                  "prompt": "'ර' අකුර සොයන්න.",
+                  "items": [
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/everyday_objects/flag.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ය",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ම",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ර",
+                      "is_target": true
+                    }
+                  ]
+                }
               },
               {
-                "type": "letter",
-                "value": "ය",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ම",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ර",
-                "is_target": true
+                "variant_id": "V2",
+                "content": {
+                  "prompt": "'ර' අකුර සොයන්න.",
+                  "items": [
+                    {
+                      "type": "icon",
+                      "value": "assets/images/activity_icons/everyday_objects/flag.png",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ය",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ම",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ර",
+                      "is_target": true
+                    }
+                  ]
+                }
               }
             ]
           },
           {
-            "prompt": "'ඳ' අකුර සොයන්න.",
-            "items": [
+            "core_round": 4,
+            "content": {
+              "prompt": "'ඳ' අකුර සොයන්න.",
+              "items": [
+                {
+                  "type": "letter",
+                  "value": "උ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "උ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "උ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ඳ",
+                  "is_target": true
+                }
+              ]
+            },
+            "adaptive_variants": [
               {
-                "type": "letter",
-                "value": "උ",
-                "is_target": false
+                "variant_id": "V1",
+                "content": {
+                  "prompt": "'ඳ' අකුර සොයන්න.",
+                  "items": [
+                    {
+                      "type": "letter",
+                      "value": "උ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "උ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "උ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඳ",
+                      "is_target": true
+                    }
+                  ]
+                }
               },
               {
-                "type": "letter",
-                "value": "උ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "උ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ඳ",
-                "is_target": true
+                "variant_id": "V2",
+                "content": {
+                  "prompt": "'ඳ' අකුර සොයන්න.",
+                  "items": [
+                    {
+                      "type": "letter",
+                      "value": "උ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "උ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "උ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඳ",
+                      "is_target": true
+                    }
+                  ]
+                }
               }
             ]
           },
           {
-            "prompt": "'ධ' අකුර සොයන්න.",
-            "items": [
+            "core_round": 5,
+            "content": {
+              "prompt": "'ධ' අකුර සොයන්න.",
+              "items": [
+                {
+                  "type": "letter",
+                  "value": "ඔ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ඔ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ඔ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ඔ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ඔ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ධ",
+                  "is_target": true
+                }
+              ]
+            },
+            "adaptive_variants": [
               {
-                "type": "letter",
-                "value": "ඔ",
-                "is_target": false
+                "variant_id": "V1",
+                "content": {
+                  "prompt": "'ධ' අකුර සොයන්න.",
+                  "items": [
+                    {
+                      "type": "letter",
+                      "value": "ඔ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඔ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඔ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඔ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඔ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ධ",
+                      "is_target": true
+                    }
+                  ]
+                }
               },
               {
-                "type": "letter",
-                "value": "ඔ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ඔ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ඔ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ඔ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ධ",
-                "is_target": true
+                "variant_id": "V2",
+                "content": {
+                  "prompt": "'ධ' අකුර සොයන්න.",
+                  "items": [
+                    {
+                      "type": "letter",
+                      "value": "ඔ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඔ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඔ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඔ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඔ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ධ",
+                      "is_target": true
+                    }
+                  ]
+                }
               }
             ]
           },
           {
-            "prompt": "'ට' අකුරු දෙක සොයන්න.",
-            "items": [
+            "core_round": 6,
+            "content": {
+              "prompt": "'ට' අකුරු දෙක සොයන්න.",
+              "items": [
+                {
+                  "type": "letter",
+                  "value": "ඩ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ඩ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ඩ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ඩ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ට",
+                  "is_target": true
+                },
+                {
+                  "type": "letter",
+                  "value": "ට",
+                  "is_target": true
+                }
+              ]
+            },
+            "adaptive_variants": [
               {
-                "type": "letter",
-                "value": "ඩ",
-                "is_target": false
+                "variant_id": "V1",
+                "content": {
+                  "prompt": "'ට' අකුරු දෙක සොයන්න.",
+                  "items": [
+                    {
+                      "type": "letter",
+                      "value": "ඩ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඩ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඩ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඩ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ට",
+                      "is_target": true
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ට",
+                      "is_target": true
+                    }
+                  ]
+                }
               },
               {
-                "type": "letter",
-                "value": "ඩ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ඩ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ඩ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ට",
-                "is_target": true
-              },
-              {
-                "type": "letter",
-                "value": "ට",
-                "is_target": true
+                "variant_id": "V2",
+                "content": {
+                  "prompt": "'ට' අකුරු දෙක සොයන්න.",
+                  "items": [
+                    {
+                      "type": "letter",
+                      "value": "ඩ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඩ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඩ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඩ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ට",
+                      "is_target": true
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ට",
+                      "is_target": true
+                    }
+                  ]
+                }
               }
             ]
           },
           {
-            "prompt": "'අ' සහ 'ආ' අකුරු සොයන්න.",
-            "items": [
+            "core_round": 7,
+            "content": {
+              "prompt": "'අ' සහ 'ආ' අකුරු සොයන්න.",
+              "items": [
+                {
+                  "type": "letter",
+                  "value": "ඇ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ඇ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ඇ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "ඇ",
+                  "is_target": false
+                },
+                {
+                  "type": "letter",
+                  "value": "අ",
+                  "is_target": true
+                },
+                {
+                  "type": "letter",
+                  "value": "ආ",
+                  "is_target": true
+                }
+              ]
+            },
+            "adaptive_variants": [
               {
-                "type": "letter",
-                "value": "ඇ",
-                "is_target": false
+                "variant_id": "V1",
+                "content": {
+                  "prompt": "'අ' සහ 'ආ' අකුරු සොයන්න.",
+                  "items": [
+                    {
+                      "type": "letter",
+                      "value": "ඇ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඇ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඇ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඇ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "අ",
+                      "is_target": true
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ආ",
+                      "is_target": true
+                    }
+                  ]
+                }
               },
               {
-                "type": "letter",
-                "value": "ඇ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ඇ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "ඇ",
-                "is_target": false
-              },
-              {
-                "type": "letter",
-                "value": "අ",
-                "is_target": true
-              },
-              {
-                "type": "letter",
-                "value": "ආ",
-                "is_target": true
+                "variant_id": "V2",
+                "content": {
+                  "prompt": "'අ' සහ 'ආ' අකුරු සොයන්න.",
+                  "items": [
+                    {
+                      "type": "letter",
+                      "value": "ඇ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඇ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඇ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ඇ",
+                      "is_target": false
+                    },
+                    {
+                      "type": "letter",
+                      "value": "අ",
+                      "is_target": true
+                    },
+                    {
+                      "type": "letter",
+                      "value": "ආ",
+                      "is_target": true
+                    }
+                  ]
+                }
               }
             ]
           }

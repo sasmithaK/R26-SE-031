@@ -39,6 +39,9 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
 
   // Track temporarily tapped incorrect items for red flash
   Set<int> _wrongIndices = {};
+  Set<int> _removedIndices = {};
+  int? _highlightedIndex;
+  String? _currentVariantId;
 
   // No randomized colors; we use clean, readable white/cream tiles
 
@@ -84,7 +87,22 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
       final currentRound = rounds[_currentRoundIndex];
 
-      final rawItems = currentRound['items'] as List<dynamic>? ?? [];
+      List<dynamic> rawItems = [];
+      if (currentRound.containsKey('content')) {
+        if (_currentVariantId != null) {
+          final variants = currentRound['adaptive_variants'] as List<dynamic>? ?? [];
+          final variant = variants.firstWhere((v) => v['variant_id'] == _currentVariantId, orElse: () => null);
+          if (variant != null && variant['content'] != null) {
+            rawItems = variant['content']['items'] ?? [];
+          } else {
+            rawItems = currentRound['content']['items'] ?? [];
+          }
+        } else {
+          rawItems = currentRound['content']['items'] ?? [];
+        }
+      } else {
+        rawItems = currentRound['items'] as List<dynamic>? ?? [];
+      }
       final items = rawItems
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
@@ -109,14 +127,56 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
 
     _foundIndices.clear();
     _wrongIndices.clear();
+    _removedIndices.clear();
+    _highlightedIndex = null;
     _isRoundComplete = false;
   }
 
-  void _transitionToNextRound(int? nextIdx) {
+  void _transitionToNextRound(Map<String, dynamic>? c4Result) {
     final rounds = widget.activityNode?.rounds ?? [];
-    if (_currentRoundIndex < rounds.length - 1) {
+    
+    int? nextIdx;
+    if (c4Result != null && c4Result.containsKey('next_action')) {
+      final nextAction = c4Result['next_action'];
+      
+      if (nextAction['decision'] == 'CURRICULUM_COMPLETE' || nextAction['decision'] == 'ACTIVITY_COMPLETE') {
+        setState(() {
+          _isActivityComplete = true;
+        });
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          ProgressService().saveActivityScore(sId, aId, 100);
+          ProgressService().clearActivityState(sId, aId);
+        }
+        return;
+      }
+
+      if (nextAction['next_item'] != null) {
+        String nextItem = nextAction['next_item'];
+        if (nextItem.contains('V')) {
+          _currentVariantId = nextItem.split('V').last;
+          _currentVariantId = 'V$_currentVariantId';
+        } else {
+          _currentVariantId = null;
+        }
+        
+        final match = RegExp(r'R(\d+)').firstMatch(nextItem);
+        if (match != null) {
+          nextIdx = int.parse(match.group(1)!) - 1;
+        }
+      }
+    }
+    
+    // Sequential fallback if backend fails or returns null
+    if (nextIdx == null) {
+      debugPrint('BACKEND_ERROR_SEQUENTIAL_FALLBACK (no result or missing next_action)');
+      nextIdx = _currentRoundIndex + 1;
+    }
+    
+    if (nextIdx < rounds.length) {
       setState(() {
-        _currentRoundIndex = nextIdx ?? (_currentRoundIndex + 1);
+        _currentRoundIndex = nextIdx!;
         final sId = widget.activityNode?.skillId ?? '';
         final aId = widget.activityNode?.id ?? '';
         if (sId.isNotEmpty && aId.isNotEmpty) {
@@ -149,7 +209,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
   }
 
   Future<void> _onItemTapped(int index) async {
-    if (_isRoundComplete || _foundIndices.contains(index)) return;
+    if (_isRoundComplete || _foundIndices.contains(index) || _removedIndices.contains(index)) return;
 
     final item = _shuffledItems[index];
     final currentRound = widget.activityNode?.rounds[_currentRoundIndex] ?? {};
@@ -170,14 +230,14 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
           _isRoundComplete = true;
         });
 
-        int? nextIdx = await context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
+        final c4Result = await context.findAncestorStateOfType<TelemetryWrapperState>()?.completeAdaptiveRound(
           100,
           currentRoundIndex: _currentRoundIndex,
         );
 
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (!mounted) return;
-          _transitionToNextRound(nextIdx);
+          _transitionToNextRound(c4Result);
         });
       }
     } else {
@@ -186,24 +246,72 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       });
       SoundUtils.playFeedback('audio/wrong.mp3');
 
-      final nextIdx = await context.findAncestorStateOfType<TelemetryWrapperState>()?.registerWrongAttempt(
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          setState(() {
+            _wrongIndices.remove(index);
+          });
+        }
+      });
+
+      final extraTelemetry = {
+        "visible_option_ids": List.generate(_shuffledItems.length, (i) => i).where((i) => !_removedIndices.contains(i)).map((i) => i.toString()).toList(),
+        "incorrect_option_ids": List.generate(_shuffledItems.length, (i) => i).where((i) {
+          final it = _shuffledItems[i];
+          final tg = currentRound['target_letter']?.toString();
+          final isTarget = it['is_target'] == true || (it['is_target'] == null && it['value'] == tg);
+          return !isTarget && !_removedIndices.contains(i);
+        }).map((i) => i.toString()).toList(),
+        "remaining_target_ids": List.generate(_shuffledItems.length, (i) => i).where((i) {
+          final it = _shuffledItems[i];
+          final tg = currentRound['target_letter']?.toString();
+          return (it['is_target'] == true || (it['is_target'] == null && it['value'] == tg)) && !_foundIndices.contains(i);
+        }).map((i) => i.toString()).toList(),
+        "selected_target_ids": _foundIndices.map((i) => i.toString()).toList(),
+      };
+
+      final c4Result = await context.findAncestorStateOfType<TelemetryWrapperState>()?.registerAdaptiveWrongAttempt(
         currentRoundIndex: _currentRoundIndex,
+        extraTelemetry: extraTelemetry,
       );
 
-      if (nextIdx != null) {
-        Future.delayed(const Duration(milliseconds: 1500), () {
-          if (!mounted) return;
-          _transitionToNextRound(nextIdx);
-        });
-      } else {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted && !_isRoundComplete) {
-            setState(() {
-              _wrongIndices.remove(index);
-            });
+      if (c4Result != null && c4Result.containsKey('next_action')) {
+        final nextAction = c4Result['next_action'];
+        
+        if (nextAction['decision'] == 'TERMINATE' || nextAction['decision'] == 'REMEDIATION') {
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            if (!mounted) return;
+            _transitionToNextRound(c4Result);
+          });
+          return;
+        }
+        
+        setState(() {
+          if (nextAction['remove_option_ids'] != null && nextAction['remove_option_ids'].isNotEmpty) {
+            for (var id in nextAction['remove_option_ids']) {
+              _removedIndices.add(int.parse(id.toString()));
+            }
+          }
+          if (nextAction['highlight_correct'] == true) {
+            for (int i = 0; i < _shuffledItems.length; i++) {
+              final it = _shuffledItems[i];
+              final tg = currentRound['target_letter']?.toString();
+              if ((it['is_target'] == true || (it['is_target'] == null && it['value'] == tg)) && !_foundIndices.contains(i)) {
+                _highlightedIndex = i;
+                break;
+              }
+            }
           }
         });
       }
+
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && !_isRoundComplete) {
+          setState(() {
+            _wrongIndices.remove(index);
+          });
+        }
+      });
     }
   }
 
@@ -219,9 +327,10 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     final titleText = widget.activityNode?.title ?? 'නිවැරදි අකුර සොයමු';
 
     String? targetLetter;
-    if (currentRound['items'] != null) {
+    final itemsList = currentRound.containsKey('content') ? currentRound['content']['items'] : currentRound['items'];
+    if (itemsList != null) {
       List<String> uniqueLetters = [];
-      for (var item in currentRound['items']) {
+      for (var item in itemsList) {
         if (item['is_target'] == true && item['type'] == 'letter') {
           final val = item['value']?.toString();
           if (val != null && !uniqueLetters.contains(val)) {
@@ -480,9 +589,14 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
   }
 
   Widget _buildCard(int index) {
+    if (_removedIndices.contains(index)) {
+      return const SizedBox.shrink();
+    }
+
     final item = _shuffledItems[index];
     final isFound = _foundIndices.contains(index);
     final isWrong = _wrongIndices.contains(index);
+    final isHighlighted = _highlightedIndex == index;
 
     // 3D Press state
     final isPressed = isFound || isWrong;
@@ -504,6 +618,10 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       borderColor = Colors.red[800]!;
       shadowColor = Colors.red[900]!;
       textColor = Colors.white;
+    } else if (isHighlighted) {
+      tileColor = AppColors.warmAmber.withOpacity(0.3);
+      borderColor = AppColors.warmAmber;
+      shadowColor = AppColors.warmAmber;
     }
 
     // Dim the unselected tiles if the round is complete to focus on the correct answers
