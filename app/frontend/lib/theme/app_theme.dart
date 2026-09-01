@@ -101,7 +101,7 @@ class AppColors {
 /// ─────────────────────────────────────────────────────────────
 /// Dyslexia-Accessible Typography
 ///   • Noto Sans Sinhala — monolinear, uniform stroke (Sinhala)
-///   • Nunito Sans — clean sans-serif (English)
+///   • Noto Sans Sinhala — clean sans-serif (English)
 ///   • 18pt+ minimum body text (19px+ on mobile)
 ///   • 1.7x–2.0x line height
 ///   • +15–25% letter spacing
@@ -132,8 +132,8 @@ class AppTypography {
     Color color = AppColors.textPrimary,
     double? height,
   }) {
-    return GoogleFonts.nunitoSans(
-      fontSize: fontSize,
+    return GoogleFonts.notoSansSinhala(
+      fontSize: fontSize * 0.80, // Scale down to match previous Nunito Sans visual size
       fontWeight: fontWeight,
       color: color,
       height: height ?? 1.4,
@@ -148,8 +148,8 @@ class AppTypography {
     Color color = AppColors.textPrimary,
     double? height,
   }) {
-    return GoogleFonts.nunitoSans(
-      fontSize: fontSize,
+    return GoogleFonts.notoSansSinhala(
+      fontSize: fontSize * 0.80,
       fontWeight: fontWeight,
       color: color,
       height: height ?? 1.7,
@@ -164,8 +164,8 @@ class AppTypography {
     FontWeight fontWeight = FontWeight.w700,
     Color color = Colors.white,
   }) {
-    return GoogleFonts.nunitoSans(
-      fontSize: fontSize,
+    return GoogleFonts.notoSansSinhala(
+      fontSize: fontSize * 0.80,
       fontWeight: fontWeight,
       color: color,
       height: 1.3,
@@ -179,8 +179,8 @@ class AppTypography {
     FontWeight fontWeight = FontWeight.w500,
     Color color = AppColors.textSecondary,
   }) {
-    return GoogleFonts.nunitoSans(
-      fontSize: fontSize,
+    return GoogleFonts.notoSansSinhala(
+      fontSize: fontSize * 0.80,
       fontWeight: fontWeight,
       color: color,
       height: 1.6,

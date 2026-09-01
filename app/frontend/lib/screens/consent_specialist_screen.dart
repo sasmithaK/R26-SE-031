@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
 import '../services/auth_service.dart';
+import '../services/localization_service.dart';
 
 class ConsentSpecialistScreen extends StatefulWidget {
   final String clinicCode;
@@ -20,7 +21,7 @@ class _ConsentSpecialistScreenState extends State<ConsentSpecialistScreen> {
   Future<void> _submit() async {
     if (!_agreed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('please tap the checkbox to agree.')),
+        SnackBar(content: Text(LocalizationService.instance.t('please_tap_checkbox'))),
       );
       return;
     }
@@ -38,7 +39,7 @@ class _ConsentSpecialistScreenState extends State<ConsentSpecialistScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('successfully connected!'), backgroundColor: AppColors.calmBlue),
+        SnackBar(content: Text(LocalizationService.instance.t('successfully_connected')), backgroundColor: AppColors.calmBlue),
       );
       // Pop ConsentSpecialistScreen AND ConnectSpecialistScreen
       int count = 0;
@@ -58,7 +59,7 @@ class _ConsentSpecialistScreenState extends State<ConsentSpecialistScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'privacy consent',
+          LocalizationService.instance.t('privacy_consent'),
           style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary),
         ),
         centerTitle: true,
@@ -78,16 +79,16 @@ class _ConsentSpecialistScreenState extends State<ConsentSpecialistScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('what you are sharing:', style: AppTypography.heading(fontSize: 18, color: AppColors.textPrimary)),
+                  Text(LocalizationService.instance.t('what_you_are_sharing'), style: AppTypography.heading(fontSize: 18, color: AppColors.textPrimary)),
                   const SizedBox(height: 16),
-                  _buildBulletPoint('phonetic error patterns (e.g., visual reversals like b/d)'),
-                  _buildBulletPoint('time spent on learning activities'),
-                  _buildBulletPoint('overall reading level progression'),
+                  _buildBulletPoint(LocalizationService.instance.t('consent_bullet_1')),
+                  _buildBulletPoint(LocalizationService.instance.t('consent_bullet_2')),
+                  _buildBulletPoint(LocalizationService.instance.t('consent_bullet_3')),
                   const SizedBox(height: 24),
-                  Text('why we share this:', style: AppTypography.heading(fontSize: 18, color: AppColors.textPrimary)),
+                  Text(LocalizationService.instance.t('why_we_share_this'), style: AppTypography.heading(fontSize: 18, color: AppColors.textPrimary)),
                   const SizedBox(height: 12),
                   Text(
-                    "this allows your child's specialist to track their response to intervention (RTI) in real-time, helping them adjust therapy sessions.",
+                    LocalizationService.instance.t('why_we_share_desc'),
                     style: AppTypography.body(fontSize: 14, color: AppColors.textSecondary),
                   ),
                 ],
@@ -103,7 +104,7 @@ class _ConsentSpecialistScreenState extends State<ConsentSpecialistScreen> {
                 ),
                 Expanded(
                   child: Text(
-                    "i consent to sharing my child's learning data with the specialist associated with clinic code ${widget.clinicCode}.",
+                    LocalizationService.instance.t('consent_agree_text').replaceAll('{clinicCode}', widget.clinicCode),
                     style: AppTypography.body(fontSize: 14),
                   ),
                 ),
@@ -111,7 +112,7 @@ class _ConsentSpecialistScreenState extends State<ConsentSpecialistScreen> {
             ),
             const SizedBox(height: 32),
             GradientButton(
-              text: _isLoading ? 'connecting...' : 'agree & connect',
+              text: _isLoading ? LocalizationService.instance.t('connecting') : LocalizationService.instance.t('agree_connect'),
               icon: Icons.check_circle_outline,
               onPressed: _isLoading ? () {} : _submit,
             ),

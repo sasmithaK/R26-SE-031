@@ -7,8 +7,8 @@
     "activities": [
       {
         "id": "act_1",
-        "title": "වෙනස් අකුර සොයමු",
-        "description": "වෙනස් පින්තූරය හෝ අකුර සොයා ඒ මත ඔබන්න.",
+        "title": "නිවැරදි අකුර සොයමු",
+        "description": "නිවැරදි පින්තූරය හෝ අකුර සොයා ඒ මත ඔබන්න.",
         "telemetry_tags": [
           "visual_discrimination",
           "odd_one_out"
@@ -38,7 +38,12 @@
                 "value": "අ",
                 "is_target": true
               }
-            ]
+            ],
+            "item_id": "S2_A1_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "'ම' අකුර සොයන්න.",
@@ -63,7 +68,12 @@
                 "value": "ම",
                 "is_target": true
               }
-            ]
+            ],
+            "item_id": "S2_A1_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "'ර' අකුර සොයන්න.",
@@ -88,7 +98,12 @@
                 "value": "ර",
                 "is_target": true
               }
-            ]
+            ],
+            "item_id": "S2_A1_R03",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "'ඳ' අකුර සොයන්න.",
@@ -113,7 +128,12 @@
                 "value": "ඳ",
                 "is_target": true
               }
-            ]
+            ],
+            "item_id": "S2_A1_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "'ධ' අකුර සොයන්න.",
@@ -148,7 +168,12 @@
                 "value": "ධ",
                 "is_target": true
               }
-            ]
+            ],
+            "item_id": "S2_A1_R05",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "'ට' අකුරු දෙක සොයන්න.",
@@ -183,7 +208,12 @@
                 "value": "ට",
                 "is_target": true
               }
-            ]
+            ],
+            "item_id": "S2_A1_R06",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           },
           {
             "prompt": "'අ' සහ 'ආ' අකුරු සොයන්න.",
@@ -218,9 +248,20 @@
                 "value": "ආ",
                 "is_target": true
               }
-            ]
+            ],
+            "item_id": "S2_A1_R07",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_AKSHARA_IDENTITY",
+          "prompt_modality": "visual",
+          "response_modality": "tap",
+          "research_role": "primary"
+        }
       },
       {
         "id": "act_2",
@@ -236,20 +277,35 @@
             "letters": [
               "ක",
               "ම"
-            ]
+            ],
+            "item_id": "S2_A2_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "letters": [
               "කා",
               "ම"
-            ]
+            ],
+            "item_id": "S2_A2_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "letters": [
               "ග",
               "ටු",
               "ව"
-            ]
+            ],
+            "item_id": "S2_A2_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "letters": [
@@ -257,7 +313,12 @@
               "ලි",
               "ස",
               "දු"
-            ]
+            ],
+            "item_id": "S2_A2_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "letters": [
@@ -266,9 +327,20 @@
               "බ",
               "මු",
               "ය"
-            ]
+            ],
+            "item_id": "S2_A2_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_AKSHARA_IDENTITY",
+          "prompt_modality": "visual",
+          "response_modality": "tap",
+          "research_role": "primary"
+        }
       },
       {
         "id": "act_3",
@@ -287,17 +359,27 @@
               "ආ"
             ],
             "correctOption": "අ",
-            "correct_index": 0
+            "correct_index": 0,
+            "item_id": "S2_A3_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
-            "prompt": "ශබ්දයට සවන් දී 'ම' තෝරන්න",
+            "prompt": "ශබ්දයට සවන් දී 'ස' තෝරන්න",
             "options": [
               "ය",
-              "ම",
+              "ස",
               "ර"
             ],
-            "correctOption": "ම",
-            "correct_index": 1
+            "correctOption": "ස",
+            "correct_index": 1,
+            "item_id": "S2_A3_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "ශබ්දයට සවන් දී 'ප' තෝරන්න",
@@ -307,7 +389,12 @@
               "ප"
             ],
             "correctOption": "ප",
-            "correct_index": 2
+            "correct_index": 2,
+            "item_id": "S2_A3_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "ශබ්දයට සවන් දී 'ට' තෝරන්න",
@@ -318,7 +405,12 @@
               "ග"
             ],
             "correctOption": "ට",
-            "correct_index": 1
+            "correct_index": 1,
+            "item_id": "S2_A3_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "ශබ්දයට සවන් දී 'බ' තෝරන්න",
@@ -330,9 +422,20 @@
               "ඩ"
             ],
             "correctOption": "බ",
-            "correct_index": 3
+            "correct_index": 3,
+            "item_id": "S2_A3_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_PHONEME_GRAPHEME",
+          "prompt_modality": "audio",
+          "response_modality": "tap",
+          "research_role": "primary"
+        }
       },
       {
         "id": "act_4",
@@ -351,7 +454,12 @@
               "ය"
             ],
             "correctOption": "ම",
-            "correct_index": 0
+            "correct_index": 0,
+            "item_id": "S2_A4_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "'ගස' යන වචනයේ මුල් අකුර කුමක්ද?",
@@ -361,7 +469,12 @@
               "ට"
             ],
             "correctOption": "ග",
-            "correct_index": 1
+            "correct_index": 1,
+            "item_id": "S2_A4_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "'පොත' යන වචනයේ අග අකුර කුමක්ද?",
@@ -371,7 +484,12 @@
               "ත"
             ],
             "correctOption": "ත",
-            "correct_index": 2
+            "correct_index": 2,
+            "item_id": "S2_A4_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "'අහස' යන වචනයේ අග අකුර කුමක්ද?",
@@ -382,10 +500,15 @@
               "ස"
             ],
             "correctOption": "ස",
-            "correct_index": 3
+            "correct_index": 3,
+            "item_id": "S2_A4_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
-            "prompt": "'බල්ලා': මුල් සහ අග අකුරු තෝරන්න",
+            "prompt": "'බල්ලා' යන වචනයේ මුල් සහ අග අකුරු තෝරන්න",
             "options": [
               "ම",
               "ලා",
@@ -397,9 +520,20 @@
             "correct_indices": [
               1,
               3
-            ]
+            ],
+            "item_id": "S2_A4_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_AKSHARA_IDENTITY",
+          "prompt_modality": "visual_text",
+          "response_modality": "tap",
+          "research_role": "primary"
+        }
       },
       {
         "id": "act_5",
@@ -421,7 +555,12 @@
               "ර",
               "ට",
               "ම"
-            ]
+            ],
+            "item_id": "S2_A5_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "show_seconds": 5,
@@ -433,7 +572,12 @@
               "ම",
               "ක්",
               "ල්"
-            ]
+            ],
+            "item_id": "S2_A5_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "show_seconds": 5,
@@ -447,7 +591,12 @@
               "ම",
               "ක",
               "න"
-            ]
+            ],
+            "item_id": "S2_A5_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "show_seconds": 4,
@@ -461,7 +610,12 @@
               "ස",
               "ට්",
               "ග"
-            ]
+            ],
+            "item_id": "S2_A5_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "show_seconds": 4,
@@ -475,9 +629,20 @@
               "වි",
               "රි",
               "මි"
-            ]
+            ],
+            "item_id": "S2_A5_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_ORTHOGRAPHIC_MEMORY",
+          "prompt_modality": "visual",
+          "response_modality": "sequence_tap",
+          "research_role": "secondary"
+        }
       }
     ],
     "total_activities": 5

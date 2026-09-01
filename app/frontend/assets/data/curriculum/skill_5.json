@@ -20,7 +20,12 @@
             ],
             "correctOption": "හරි",
             "correct_index": 0,
-            "prompt": "ගසට උඩින් ඉර තියන්න"
+            "prompt": "ගසට උඩින් ඉර තියන්න",
+            "item_id": "S5_A1_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "options": [
@@ -28,7 +33,12 @@
             ],
             "correctOption": "හරි",
             "correct_index": 0,
-            "prompt": "බල්ලාට කෑම දෙන්න"
+            "prompt": "බල්ලාට කෑම දෙන්න",
+            "item_id": "S5_A1_R02",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "options": [
@@ -36,9 +46,21 @@
             ],
             "correctOption": "හරි",
             "correct_index": 0,
-            "prompt": "මලට පාට කරන්න"
+            "prompt": "මලට පාට කරන්න",
+            "item_id": "S5_A1_R03",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "requires_speech_monitoring": true,
+        "research_metadata": {
+          "knowledge_component_id": "KC_READING_COMPREHENSION",
+          "prompt_modality": "visual_text",
+          "response_modality": "speech_and_tap",
+          "research_role": "secondary"
+        }
       },
       {
         "id": "act_2",
@@ -57,7 +79,12 @@
             ],
             "correctOption": "ළමයා",
             "correct_index": 0,
-            "prompt": "ළමයා කෑම කයි. කවුද කන්නේ?"
+            "prompt": "ළමයා කෑම කයි. කවුද කන්නේ?",
+            "item_id": "S5_A2_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "options": [
@@ -66,7 +93,12 @@
             ],
             "correctOption": "අම්මා",
             "correct_index": 0,
-            "prompt": "අම්මා කඩේට යයි. කවුද යන්නේ?"
+            "prompt": "අම්මා කඩේට යයි. කවුද යන්නේ?",
+            "item_id": "S5_A2_R02",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "options": [
@@ -75,9 +107,21 @@
             ],
             "correctOption": "බල්ලා",
             "correct_index": 0,
-            "prompt": "බල්ලා දුවයි. කවුද දුවන්නේ?"
+            "prompt": "බල්ලා දුවයි. කවුද දුවන්නේ?",
+            "item_id": "S5_A2_R03",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "requires_speech_monitoring": true,
+        "research_metadata": {
+          "knowledge_component_id": "KC_READING_COMPREHENSION",
+          "prompt_modality": "visual_text",
+          "response_modality": "speech_and_tap",
+          "research_role": "secondary"
+        }
       },
       {
         "id": "act_3",
@@ -96,7 +140,12 @@
             ],
             "correctOption": "කෑම",
             "correct_index": 0,
-            "prompt": "ළමයා කෑම කයි. මොනවාද කන්නේ?"
+            "prompt": "ළමයා කෑම කයි. මොනවාද කන්නේ?",
+            "item_id": "S5_A3_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "options": [
@@ -105,9 +154,21 @@
             ],
             "correctOption": "පත්තරය",
             "correct_index": 0,
-            "prompt": "තාත්තා පත්තරය කියවයි. මොනවාද කියවන්නේ?"
+            "prompt": "තාත්තා පත්තරය කියවයි. මොනවාද කියවන්නේ?",
+            "item_id": "S5_A3_R02",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "requires_speech_monitoring": true,
+        "research_metadata": {
+          "knowledge_component_id": "KC_READING_COMPREHENSION",
+          "prompt_modality": "visual_text",
+          "response_modality": "speech_and_tap",
+          "research_role": "secondary"
+        }
       },
       {
         "id": "act_4",
@@ -126,7 +187,12 @@
             ],
             "correctOption": "පාසලට",
             "correct_index": 0,
-            "prompt": "ළමයා පාසලට යයි. කොහෙද යන්නේ?"
+            "prompt": "ළමයා පාසලට යයි. කොහෙද යන්නේ?",
+            "item_id": "S5_A4_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "options": [
@@ -135,9 +201,21 @@
             ],
             "correctOption": "වතුරේ",
             "correct_index": 0,
-            "prompt": "මාළු වතුරේ පීනයි. කොහෙද පීනන්නේ?"
+            "prompt": "මාළු වතුරේ පීනයි. කොහෙද පීනන්නේ?",
+            "item_id": "S5_A4_R02",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "requires_speech_monitoring": true,
+        "research_metadata": {
+          "knowledge_component_id": "KC_READING_COMPREHENSION",
+          "prompt_modality": "visual_text",
+          "response_modality": "speech_and_tap",
+          "research_role": "secondary"
+        }
       }
     ]
   }

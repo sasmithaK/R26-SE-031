@@ -6,6 +6,8 @@ class ComprehensiveQuestion {
 
   const ComprehensiveQuestion({required this.textSi, required this.textEn});
 
+  String get id => 'q_${textEn.hashCode.abs()}';
+
   String get text {
     return LocalizationService.instance.currentLocale == 'si' ? textSi : textEn;
   }

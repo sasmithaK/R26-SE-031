@@ -89,10 +89,15 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
       _isLoading = true;
     });
 
+    final payload = List.generate(_questions.length, (i) => {
+      'question_id': _questions[i].id,
+      'answer': _answers[i]!,
+    });
+
     final error = await StudentService().submitComprehensiveAssessment(
       widget.studentId,
       widget.category,
-      _answers.cast<bool>(),
+      payload,
     );
     
     if (!mounted) return;

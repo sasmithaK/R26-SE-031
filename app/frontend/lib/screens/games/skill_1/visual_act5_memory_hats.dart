@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import '../../../widgets/app_loading_indicator.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../models/curriculum_models.dart';
@@ -9,6 +10,7 @@ import '../../../../theme/app_theme.dart';
 import '../../../../services/tts_service.dart';
 import '../../../../services/progress_service.dart';
 import 'widgets/pattern_background.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
 // ──────────────────────────────────────────────────────────────
 // Activity 05: Memory Adventure
@@ -34,7 +36,8 @@ class MemoryRound {
 
 class VisualAct5MemoryHats extends StatefulWidget {
   final ActivityNode activityNode;
-  const VisualAct5MemoryHats({Key? key, required this.activityNode}) : super(key: key);
+  final Map<String, dynamic>? studentData;
+  const VisualAct5MemoryHats({Key? key, required this.activityNode, this.studentData}) : super(key: key);
 
   @override
   _VisualAct5MemoryAdventureState createState() => _VisualAct5MemoryAdventureState();
@@ -99,12 +102,12 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
     'animals/rabbit.png', 'animals/turtle.png',
     'fruits_food/apple.png', 'fruits_food/banana.png', 'fruits_food/grapes.png',
     'fruits_food/ice_cream.png', 'fruits_food/mango.png', 'fruits_food/orange.png', 'fruits_food/watermelon.png',
-    'nature/flower.png', 'nature/leaf.png', 'nature/sun.png',
+    'flowers/nil_manel.png', 'flowers/nelum.png', 'flowers/flower_05.png',
   ];
 
   static const List<String> _instructions = [
-    'හොඳින් මතක තබා ගන්න!', // Look carefully!
-    'පින්තූර තිබෙන තැන් මතක තියාගන්න!', // Remember where the pictures are!
+    'මෙම පින්තූර හොඳින් මතක තබා ගන්න', // Remember these pictures well
+    'මෙම පින්තූර හොඳින් මතක තබා ගන්න', 
   ];
   late String _currentInstruction;
 
@@ -180,7 +183,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
   }
 
   void _playInstruction(String text) {
-    TtsService().speak(text);
+    TtsService().speak(text, folder: 'skill_1');
     _speakerBounceController.forward().then((_) {
       _speakerBounceController.reverse();
     });
@@ -203,7 +206,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
       int count = config[i]['count']!;
       int time = config[i]['time']!;
 
-      List<String> pool = List.from(_poolAssets)..shuffle(rng);
+      List<String> pool = List.from(_poolAssets);
       List<String> roundAssets = pool.take(count).toList();
       String target = roundAssets[rng.nextInt(count)];
 
@@ -282,7 +285,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
       _currentPhase = MemoryPhase.recall;
     });
 
-    _playInstruction('මේ පින්තූරය තිබුණේ කොහෙද?');
+    _playInstruction('මේ පින්තූරය තිබූ තැන තෝරන්න');
   }
 
   @override
@@ -295,9 +298,11 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
     for (var controller in _cardFlipControllers) {
       controller.dispose();
     }
+
     _audioPlayer.dispose();
     super.dispose();
   }
+
 
   // ── Game logic ──
 
@@ -313,7 +318,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
       _isProcessingTap = true;
       _cardFlipControllers[index].reverse();
       
-      _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
       final rng = Random();
       _currentEncouragement = _encourageMessages[rng.nextInt(_encourageMessages.length)];
       
@@ -329,7 +334,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
     } else {
       // Wrong!
       _isProcessingTap = true;
-      _audioPlayer.play(AssetSource('audio/wrong.mp3'));
+      SoundUtils.playFeedback('audio/wrong.mp3');
       context.findAncestorStateOfType<TelemetryWrapperState>()?.recordMisclick();
       
       // Briefly flip to show they got it wrong, then flip back
@@ -574,7 +579,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
   // ── Instruction Card ──
   Widget _buildInstructionCard() {
     final bool isRecall = _currentPhase == MemoryPhase.recall || _currentPhase == MemoryPhase.success;
-    final String text = isRecall ? 'මේ පින්තූරය තිබුණේ කොහෙද?' : _currentInstruction;
+    final String text = isRecall ? 'මේ පින්තූරය තිබූ තැන තෝරන්න' : _currentInstruction;
     
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 500),
@@ -1005,51 +1010,11 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats> with T
   // ── Celebration Overlay ──
   Widget _buildCelebrationOverlay() {
     return Positioned.fill(
-      child: FadeTransition(
-        opacity: _celebrationScale,
-        child: Container(
-          color: Colors.white.withValues(alpha: 0.9),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ScaleTransition(
-                  scale: _celebrationScale,
-                  child: const Icon(Icons.star_rounded, color: Color(0xFFF9C623), size: 120),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'හොඳයි! ඔයා හරිම දක්ෂයි!',
-                  style: AppTypography.sinhala(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF3E3E3E),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: _finishActivity,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90D9),
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    elevation: 4,
-                  ),
-                  child: Text(
-                    'ඉදිරියට යමු',
-                    style: AppTypography.sinhala(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      child: SharedCelebrationPopup(
+        studentData: widget.studentData,
+        activityTitle: widget.activityNode.title,
+        scaleAnimation: _celebrationScale,
+        onFinish: _finishActivity,
       ),
     );
   }

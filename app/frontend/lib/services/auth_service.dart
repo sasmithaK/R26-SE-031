@@ -10,6 +10,7 @@ import 'package:aad_oauth/aad_oauth.dart';
 import 'package:aad_oauth/model/config.dart';
 import '../main.dart'; // For globalNavigatorKey
 import '../config/api_config.dart';
+import 'localization_service.dart';
 
 /// Handles authentication-only API calls: login, signup, tokens, passwords.
 /// Student management is in StudentService.
@@ -345,6 +346,8 @@ class AuthService {
         if (data['role'] != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('cached_user_role', data['role']);
+          // We can't import directly here, so we will do it at the top level
+          await LocalizationService.instance.loadForRole(data['role']);
         }
         return data;
       }

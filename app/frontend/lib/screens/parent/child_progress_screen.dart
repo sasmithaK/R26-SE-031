@@ -1,15 +1,11 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
-import '../../widgets/app_loading_indicator.dart';
-import '../../utils/avatar_utils.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../theme/app_theme.dart';
-import '../../services/student_service.dart';
-import 'skill_detail_progress_screen.dart';
-import '../therapist/therapist_student_detail_screen.dart';
-import '../../services/localization_service.dart';
-/// Child Progress Screen — Visual dashboard showing a specific child's
-/// learning journey: weekly activity chart, overall stats, skill progress.
+import '../../services/parent_dashboard_service.dart';
+import '../../utils/avatar_utils.dart';
+import '../../widgets/app_loading_indicator.dart';
+import '../../widgets/trend_chart.dart';
+import '../../widgets/research_evidence_panel.dart';
+
 class ChildProgressScreen extends StatefulWidget {
   final Map<String, dynamic> studentData;
 
@@ -19,651 +15,358 @@ class ChildProgressScreen extends StatefulWidget {
   State<ChildProgressScreen> createState() => _ChildProgressScreenState();
 }
 
-class _ChildProgressScreenState extends State<ChildProgressScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
-
+class _ChildProgressScreenState extends State<ChildProgressScreen> {
+  final ParentDashboardService _dashboardService = ParentDashboardService();
   bool _isLoading = true;
-  List<double> _weeklyMinutes = [0, 0, 0, 0, 0, 0, 0];
-  List<Map<String, dynamic>> _skills = [];
-  int _totalActivities = 0;
-  int _overallAccuracy = 0;
-  int _dayStreak = 0;
-  int _totalStars = 0;
-
-  final List<String> _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  Map<String, dynamic>? _evidence;
+  Map<String, dynamic>? _progress;
+  
+  Map<String, dynamic>? _overview;
+  Map<String, dynamic>? _skills;
+  Map<String, dynamic>? _learningPattern;
+  Map<String, dynamic>? _activityHistory;
+  String _currentFilter = "limit=10";
 
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOut,
-    );
-    _fadeController.forward();
-    _loadTelemetryData();
+    _loadAllData();
   }
-  
-  Future<void> _loadTelemetryData() async {
-    final studentId = widget.studentData['id'] ?? widget.studentData['_id'];
-    if (studentId == null) {
-      setState(() => _isLoading = false);
-      return;
+
+  Future<void> _loadAllData() async {
+    if (mounted) setState(() => _isLoading = true);
+    final studentId = widget.studentData['student_id']?.toString() ?? widget.studentData['id']?.toString() ?? widget.studentData['_id']?.toString();
+    Future<Map<String, dynamic>> capture(Future<Map<String, dynamic>> request) async {
+      try { return await request; } catch (e) { return {'_error': e.toString()}; }
     }
-    
-    final sessions = await StudentService().getTelemetry(studentId.toString());
-    
-    _processTelemetryData(sessions);
+    final responses = studentId == null || studentId.isEmpty
+        ? List.generate(6, (_) => <String, dynamic>{'_error': 'Invalid student ID'})
+        : await Future.wait([
+            capture(_dashboardService.getOverview(studentId)),
+            capture(_dashboardService.getSkills(studentId)),
+            capture(_dashboardService.getLearningPattern(studentId)),
+            capture(_dashboardService.getActivityHistory(studentId, _currentFilter)),
+            capture(_dashboardService.getProgress(studentId)),
+            capture(_dashboardService.getResearchEvidence(studentId)),
+          ]);
+    if (!mounted) return;
     setState(() {
+      _overview = responses[0];
+      _skills = responses[1];
+      _learningPattern = responses[2];
+      _activityHistory = responses[3];
+      _progress = responses[4];
+      _evidence = responses[5];
       _isLoading = false;
     });
-  }
-
-  void _processTelemetryData(List<dynamic> sessions) {
-    // 1. Calculate Weekly Minutes (Monday - Sunday)
-    final now = DateTime.now();
-    final List<double> weeklyMins = List.filled(7, 0.0);
-    
-    final Map<String, List<dynamic>> activityEvents = {};
-    int totalActs = 0;
-    int totalScoreSum = 0;
-    int earnedStars = 0;
-    Set<String> activeDates = {};
-
-    for (final session in sessions) {
-      final submittedAtStr = session['submitted_at'] as String?;
-      if (submittedAtStr != null) {
-        final submittedAt = DateTime.tryParse(submittedAtStr);
-        if (submittedAt != null) {
-          final diff = now.difference(submittedAt).inDays;
-          if (diff < 7) {
-            final dayIndex = submittedAt.weekday - 1; 
-            final durationSecs = session['session_duration_seconds'] as int? ?? 0;
-            weeklyMins[dayIndex] += (durationSecs / 60.0);
-          }
-          // Store date string for streak calculation (YYYY-MM-DD)
-          activeDates.add("${submittedAt.year}-${submittedAt.month.toString().padLeft(2, '0')}-${submittedAt.day.toString().padLeft(2, '0')}");
-        }
-      }
-
-      final events = session['events'] as List<dynamic>? ?? [];
-      for (final ev in events) {
-        final activityName = ev['activity_name'] as String? ?? 'Unknown';
-        final score = ev['score'] as int? ?? 0;
-        
-        if (!activityEvents.containsKey(activityName)) {
-          activityEvents[activityName] = [];
-        }
-        activityEvents[activityName]!.add(ev);
-        
-        totalActs++;
-        totalScoreSum += score;
-        if (score >= 80) earnedStars += 3;
-        else if (score >= 50) earnedStars += 2;
-        else earnedStars += 1;
-      }
-    }
-
-    // Calculate Streak
-    int currentStreak = 0;
-    DateTime checkDate = now;
-    // Check if they played today or yesterday to start the streak
-    String todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-    String yesterdayStr = "${now.subtract(const Duration(days: 1)).year}-${now.subtract(const Duration(days: 1)).month.toString().padLeft(2, '0')}-${now.subtract(const Duration(days: 1)).day.toString().padLeft(2, '0')}";
-    
-    if (activeDates.contains(todayStr) || activeDates.contains(yesterdayStr)) {
-      if (activeDates.contains(todayStr)) {
-        checkDate = now;
-      } else {
-        checkDate = now.subtract(const Duration(days: 1));
-      }
-      
-      while (true) {
-        String dStr = "${checkDate.year}-${checkDate.month.toString().padLeft(2, '0')}-${checkDate.day.toString().padLeft(2, '0')}";
-        if (activeDates.contains(dStr)) {
-          currentStreak++;
-          checkDate = checkDate.subtract(const Duration(days: 1));
-        } else {
-          break;
-        }
-      }
-    }
-
-    _weeklyMinutes = weeklyMins;
-    _totalActivities = totalActs;
-    _overallAccuracy = totalActs > 0 ? (totalScoreSum / totalActs).round() : 0;
-    _dayStreak = currentStreak;
-    _totalStars = earnedStars;
-
-    _skills = activityEvents.entries.map((entry) {
-      final name = entry.key;
-      final evts = entry.value;
-      final scores = evts.map((e) => e['score'] as int? ?? 0).toList();
-      final avgScore = scores.isNotEmpty ? scores.reduce((a, b) => a + b) / scores.length : 0.0;
-      
-      // Determine an icon and color based on name (mocking styling for dynamic names)
-      dynamic icon = FontAwesomeIcons.gamepad;
-      Color color = AppColors.calmBlue;
-      if (name.contains('visual') || name.contains('picture')) {
-        icon = FontAwesomeIcons.eye;
-        color = AppColors.softCoral;
-      } else if (name.contains('sound') || name.contains('audio')) {
-        icon = FontAwesomeIcons.volumeHigh;
-        color = AppColors.gentleGreen;
-      } else if (name.contains('word') || name.contains('letter')) {
-        icon = FontAwesomeIcons.font;
-        color = AppColors.warmAmber;
-      }
-
-      return {
-        'name': name.replaceAll('_', ' ').toUpperCase(),
-        'icon': icon,
-        'color': color,
-        'progress': (avgScore / 100.0).clamp(0.0, 1.0),
-        'accuracy': avgScore.round(),
-        'levels': evts.length,
-        'lastPlayed': 'recent',
-        'events': evts,
-      };
-    }).toList();
-
-    // Fallback if no telemetry yet
-    if (_skills.isEmpty) {
-      _skills = [
-         {
-          'name': 'no_activities_played',
-          'icon': FontAwesomeIcons.ghost,
-          'color': AppColors.borderLight,
-          'progress': 0.0,
-          'accuracy': 0,
-          'levels': 0,
-          'lastPlayed': 'never',
-        }
-      ];
-    }
-  }
-
-  @override
-  void dispose() {
-    _fadeController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final name = widget.studentData['first_name'] ?? 'student';
-    String rawGrade = widget.studentData['grade'] ?? 'n/a';
-    if (rawGrade.toLowerCase().contains('grade 1')) {
-      rawGrade = LocalizationService.instance.t('grade_1');
-    }
-    final grade = rawGrade;
-    final avatar =
-        AvatarUtils.getCorrectedAvatarPath(widget.studentData['avatar_url'] as String?, 'assets/images/characters/human/human_student_1.png');
+    final grade = widget.studentData['grade'] ?? 'Grade 1';
+    final avatar = AvatarUtils.getCorrectedAvatarPath(
+        widget.studentData['avatar_url'] as String?, 
+        'assets/images/characters/human/human_student_1.png');
 
-    return ListenableBuilder(
-      listenable: LocalizationService.instance,
-      builder: (context, _) {
-        return Scaffold(
+    return DefaultTabController(
+      length: 5,
+      child: Scaffold(
+        backgroundColor: AppColors.cream,
+        appBar: AppBar(
           backgroundColor: AppColors.cream,
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SafeArea(
-          child: _isLoading 
-            ? const Center(child: AppLoadingIndicator())
-            : SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(name, grade, avatar),
-                const SizedBox(height: 24),
-                _buildOverallStats(),
-                const SizedBox(height: 24),
-                _buildWeeklyChart(),
-                const SizedBox(height: 24),
-                _buildSkillProgressSection(),
-                const SizedBox(height: 32),
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => TherapistStudentDetailScreen(student: widget.studentData),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.analytics_rounded, color: Colors.white),
-                      label: Text(
-                        LocalizationService.instance.t('view_advanced_reports'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.calmBlue,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        elevation: 4,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 48),
-              ],
-            ),
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+            onPressed: () => Navigator.pop(context),
           ),
-        ),
-      ),
-    );
-  });
-  }
-
-  // ─── Header ───
-  Widget _buildHeader(String name, String grade, String avatar) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.calmBlue.withValues(alpha: 0.08),
-            AppColors.cream,
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: Row(
-        children: [
-          // Back button
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.cardSurface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.borderLight),
-              ),
-              child: const Icon(Icons.arrow_back_rounded,
-                  color: AppColors.textPrimary, size: 22),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: AppColors.calmBlue),
+              tooltip: 'Reload latest data',
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Refreshing dashboard data...'), duration: Duration(seconds: 1)),
+                );
+                _loadAllData();
+              },
             ),
-          ),
-          const SizedBox(width: 16),
-          // Child avatar
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.calmBlue, width: 2),
-            ),
-            child: ClipOval(
-              child: Image.asset(avatar, fit: BoxFit.cover),
-            ),
-          ),
-          const SizedBox(width: 14),
-          // Name and grade
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  LocalizationService.instance.t('progress_report'),
-                  style: AppTypography.heading(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  grade,
-                  style: AppTypography.caption(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Overall Stats ───
-  Widget _buildOverallStats() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          _buildMiniStat(FontAwesomeIcons.gamepad, '$_totalActivities', LocalizationService.instance.t('activities'),
-              AppColors.calmBlue),
-          const SizedBox(width: 10),
-          _buildMiniStat(FontAwesomeIcons.bullseye, '$_overallAccuracy%', LocalizationService.instance.t('accuracy'),
-              AppColors.gentleGreen),
-          const SizedBox(width: 10),
-          _buildMiniStat(FontAwesomeIcons.fire, '$_dayStreak', LocalizationService.instance.t('day_streak'),
-              AppColors.warmAmber),
-          const SizedBox(width: 10),
-          _buildMiniStat(FontAwesomeIcons.star, '$_totalStars', LocalizationService.instance.t('stars_earned'),
-              AppColors.softCoral),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniStat(
-      dynamic icon, String value, String label, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        decoration: BoxDecoration(
-          color: AppColors.cardSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.15)),
-        ),
-        child: Column(
-          children: [
-            FaIcon(icon, size: 16, color: color),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: AppTypography.heading(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            Text(
-              label,
-              style: AppTypography.caption(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ─── Weekly Activity Chart ───
-  Widget _buildWeeklyChart() {
-    final maxMinutes =
-        _weeklyMinutes.reduce((a, b) => a > b ? a : b).clamp(1, 999);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.cardSurface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.borderLight, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  LocalizationService.instance.t('weekly_activity'),
-                  style: AppTypography.heading(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.gentleGreen.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '${_weeklyMinutes.reduce((a, b) => a + b).round()} ${LocalizationService.instance.t('minutes')}',
-                    style: AppTypography.caption(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.gentleGreen,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 160,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(7, (index) {
-                  final height =
-                      (_weeklyMinutes[index] / maxMinutes) * 110;
-                  final isToday = index == DateTime.now().weekday - 1;
-
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            '${_weeklyMinutes[index].round()}m',
-                            style: AppTypography.caption(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: isToday
-                                  ? AppColors.calmBlue
-                                  : AppColors.textHint,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 600),
-                            height: max(height, 4),
-                            decoration: BoxDecoration(
-                              gradient: isToday
-                                  ? AppColors.blueButtonGradient
-                                  : LinearGradient(
-                                      colors: [
-                                        AppColors.borderLight,
-                                        AppColors.calmBlue
-                                            .withValues(alpha: 0.3),
-                                      ],
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                    ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _dayLabels[index],
-                            style: AppTypography.caption(
-                              fontSize: 12,
-                              fontWeight: isToday
-                                  ? FontWeight.w800
-                                  : FontWeight.w500,
-                              color: isToday
-                                  ? AppColors.calmBlue
-                                  : AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ─── Skill Progress Section ───
-  Widget _buildSkillProgressSection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            LocalizationService.instance.t('recent_skills'),
-            style: AppTypography.heading(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppColors.calmBlue,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ..._skills.map((skill) => _buildSkillRow(skill)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSkillRow(Map<String, dynamic> skill) {
-    final color = skill['color'] as Color;
-    final progress = skill['progress'] as double;
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SkillDetailProgressScreen(
-              skillName: skill['name'] as String,
-              skillColor: color,
-              skillIcon: skill['icon'] as dynamic,
-              studentData: widget.studentData,
-              events: skill['events'] ?? [],
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.cardSurface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.borderLight),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Skill icon
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Center(
-                child: FaIcon(skill['icon'] as dynamic,
-                    size: 20, color: color),
-              ),
-            ),
-            const SizedBox(width: 14),
-            // Skill info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        skill['name'] == 'no_activities_played'
-                            ? LocalizationService.instance.t('no_activities_played')
-                            : LocalizationService.instance.t((skill['name'] as String).toLowerCase().replaceAll(' ', '_')),
-                        style: AppTypography.body(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        '${skill['accuracy']}%',
-                        style: AppTypography.caption(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: color,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: AppColors.borderLight,
-                      color: color,
-                      minHeight: 6,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${LocalizationService.instance.t('levels')}: ${skill['levels']}',
-                        style: AppTypography.caption(
-                          fontSize: 11,
-                          color: AppColors.textHint,
-                        ),
-                      ),
-                      Text(
-                        '${LocalizationService.instance.t('last_active_prefix')}${LocalizationService.instance.t(skill['lastPlayed'] as String)}',
-                        style: AppTypography.caption(
-                          fontSize: 11,
-                          color: AppColors.textHint,
-                        ),
-                      ),
-                    ],
-                  ),
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: DropdownButton<String>(
+                value: _currentFilter,
+                underline: const SizedBox(),
+                icon: const Icon(Icons.filter_list, color: AppColors.calmBlue),
+                style: const TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold),
+                onChanged: (String? newValue) {
+                  if (newValue != null && newValue != _currentFilter) {
+                    setState(() {
+                      _currentFilter = newValue;
+                      _isLoading = true;
+                    });
+                    _loadAllData();
+                  }
+                },
+                items: const [
+                  DropdownMenuItem(value: "limit=5", child: Text("Last 5 Interactions")),
+                  DropdownMenuItem(value: "limit=10", child: Text("Last 10 Interactions")),
+                  DropdownMenuItem(value: "limit=20", child: Text("Last 20 Interactions")),
+                  DropdownMenuItem(value: "days=7", child: Text("Last 7 Days")),
+                  DropdownMenuItem(value: "days=30", child: Text("Last 30 Days")),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            // Arrow
-            FaIcon(FontAwesomeIcons.chevronRight,
-                size: 12, color: AppColors.textHint),
           ],
+          title: Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundImage: AssetImage(avatar),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '$name - $grade',
+                  style: AppTypography.heading(fontSize: 18, color: AppColors.textPrimary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          bottom: const TabBar(
+            isScrollable: true,
+            labelColor: AppColors.calmBlue,
+            unselectedLabelColor: AppColors.textHint,
+            indicatorColor: AppColors.calmBlue,
+            tabs: [
+              Tab(text: "Overview"),
+              Tab(text: "Reading Progress"),
+              Tab(text: "Reading Pattern"),
+              Tab(text: "Activity History"),
+              Tab(text: "Reports"),
+            ],
+          ),
         ),
+        body: _isLoading
+            ? const Center(child: AppLoadingIndicator())
+            : RefreshIndicator(
+                onRefresh: _loadAllData,
+                color: AppColors.calmBlue,
+                child: TabBarView(
+                  children: [
+                  DashboardSection(data: _overview, onRetry: _loadAllData, child: _buildOverviewTab()),
+                  DashboardSection(data: _progress, onRetry: _loadAllData, child: _buildReadingProgressTab()),
+                  DashboardSection(data: _learningPattern, onRetry: _loadAllData, child: _buildReadingPatternTab()),
+                  DashboardSection(data: _activityHistory, onRetry: _loadAllData, child: _buildActivityHistoryTab()),
+                  _buildReportsTab(),
+                ],
+              ),
+            ),
+      ),
+    );
+  }
+
+  Widget _buildOverviewTab() {
+    // 4 KPI Cards
+    // Reading Accuracy: 78%
+    // Reading Practice: 18 min
+    // Reading Sessions: 6
+    // Reading Progress: Developing
+    
+    final accuracy = _overview?['accuracy'];
+    final practice = _overview?['practice_time_minutes'];
+    final sessions = _overview?['sessions_completed'] ?? 0;
+    final progress = _overview?['reading_progress'] ?? "Developing";
+    final assessment = Map<String, dynamic>.from(_overview?['assessment_summary'] ?? {});
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Quick Summary", style: AppTypography.heading(fontSize: 20)),
+          const SizedBox(height: 16),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.5,
+            children: [
+              _buildStatCard("First-attempt accuracy", metricText(accuracy, suffix: '%', decimals: 0), Icons.track_changes_rounded, AppColors.gentleGreen),
+              _buildStatCard("Reading Practice", metricText(practice, suffix: ' min', decimals: 0), Icons.schedule_rounded, AppColors.calmBlue),
+              _buildStatCard("Reading Sessions", "$sessions", Icons.videogame_asset_rounded, AppColors.softCoral),
+              _buildStatCard("Reading Progress", progress, Icons.trending_up_rounded, AppColors.warmAmber),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: AppColors.calmBlue.withValues(alpha: .10), borderRadius: BorderRadius.circular(16)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Parent Assessment Summary', style: AppTypography.heading(fontSize: 18)),
+              const SizedBox(height: 8),
+              Text('Completed categories: ${assessment['completed_categories'] ?? 0}/${assessment['total_categories'] ?? 4}'),
+              Text('Reported observations: ${assessment['reported_observations'] ?? 0}'),
+              const SizedBox(height: 6),
+              const Text('This is a parent observation summary for discussion with the therapist; it is not a diagnosis.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            ]),
+          ),
+          const SizedBox(height: 24),
+          
+          Text("Interpretation Limits", style: AppTypography.heading(fontSize: 20)),
+          const SizedBox(height: 16),
+          _buildFluencyCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFluencyCard() => const Padding(padding: EdgeInsets.all(16),
+    child: Text('Oral-reading fluency has not been validated. Accuracy and BKT mastery are different measures and are not used as a fluency score.'));
+
+  Widget _buildReadingProgressTab() {
+    List<dynamic> trendRaw = _progress?['accuracy_trend'] ?? [];
+    List<double?> trendData = trendRaw.map((e) => (e['accuracy'] as num?)?.toDouble()).toList();
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Accuracy Over Time", style: AppTypography.heading(fontSize: 18)),
+          const SizedBox(height: 16),
+          TrendChart(
+            title: "Reading Accuracy (%)",
+            dataPoints: trendData,
+            labels: trendRaw.map((e) => e['session'].toString()).toList(),
+            lineColor: AppColors.calmBlue,
+            minY: 0,
+            maxY: 100,
+          ),
+          Text('Estimated skill mastery', style: AppTypography.heading(fontSize: 18)),
+          if (_skills?['_error'] != null) Text(_skills!['_error'].toString()),
+          ...((_skills?['skills'] as List?) ?? []).map((r) => ListTile(
+            title: Text(r['skill_name'].toString()), subtitle: Text(r['status'].toString()),
+            trailing: Text(metricText(r['mastery_percentage'], suffix: '%', decimals: 0)),
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadingPatternTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Observation", style: AppTypography.heading(fontSize: 18)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.gentleGreen.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.insights_rounded, color: AppColors.gentleGreen),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _learningPattern?['observation'] ?? "No learning-pattern evidence is available.",
+                    style: AppTypography.body(fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text("Recommended Practice", style: AppTypography.heading(fontSize: 18)),
+          const SizedBox(height: 12),
+          ...(_learningPattern?['recommended_practices'] as List<dynamic>? ?? []).map((p) => _buildRecommendationTile(p.toString())),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecommendationTile(String text) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        border: Border.all(color: AppColors.warmAmber.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lightbulb_rounded, color: AppColors.warmAmber),
+          const SizedBox(width: 12),
+          Expanded(child: Text(text, style: AppTypography.body())),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityHistoryTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Recent Reading Activity", style: AppTypography.heading(fontSize: 18)),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.cardSurface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.borderLight),
+            ),
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(AppColors.calmBlue.withValues(alpha: 0.05)),
+              columns: const [
+                DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Activity', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Result', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Time', style: TextStyle(fontWeight: FontWeight.bold))),
+              ],
+              rows: ((_activityHistory?['history'] as List?) ?? []).map((r) => DataRow(cells: [
+                DataCell(Text('${r['session_date']}')),
+                DataCell(Text('${r['activity_name']}')),
+                DataCell(Text(metricText(r['accuracy'], suffix: '%', decimals: 0))),
+                DataCell(Text(metricText(r['duration_minutes'], suffix: ' min', decimals: 0))),
+              ])).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportsTab() => const Center(child: Padding(padding: EdgeInsets.all(24),
+    child: Text('Parent PDF export is not available yet. Use the PP2 Evidence tab to inspect objectives, baseline results and limitations.')));
+
+  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
+          Text(value, style: AppTypography.heading(fontSize: 18, color: AppColors.textPrimary)),
+          Text(label, style: AppTypography.caption(fontSize: 11, color: AppColors.textSecondary), textAlign: TextAlign.center),
+        ],
       ),
     );
   }

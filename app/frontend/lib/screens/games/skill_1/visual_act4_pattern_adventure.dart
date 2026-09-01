@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import '../../../widgets/app_loading_indicator.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../models/curriculum_models.dart';
@@ -14,6 +15,7 @@ import 'widgets/pattern_background.dart';
 import 'widgets/pattern_train.dart';
 import 'widgets/pattern_carriage.dart';
 import 'widgets/pattern_answer_token.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
 // ──────────────────────────────────────────────────────────────
 // Activity 02: Pattern Adventure
@@ -22,8 +24,9 @@ import 'widgets/pattern_answer_token.dart';
 
 class VisualAct4PatternAdventure extends StatefulWidget {
   final ActivityNode activityNode;
+  final Map<String, dynamic>? studentData;
 
-  const VisualAct4PatternAdventure({Key? key, required this.activityNode})
+  const VisualAct4PatternAdventure({Key? key, required this.activityNode, this.studentData})
       : super(key: key);
 
   @override
@@ -33,6 +36,7 @@ class VisualAct4PatternAdventure extends StatefulWidget {
 
 class _VisualAct4PatternAdventureState
     extends State<VisualAct4PatternAdventure> with TickerProviderStateMixin {
+  String _lastSpokenInstruction = '';
   // ── Game state ──
   int _currentRoundIndex = 0;
   late List<PatternRound> _rounds;
@@ -147,8 +151,7 @@ class _VisualAct4PatternAdventureState
         
         // Bounce the carriage
         _bounceController.forward(from: 0).then((_) {
-          // Sparkle sound
-          _audioPlayer.play(AssetSource('audio/correct.mp3'));
+          // Sparkle sound removed as per user request to only have one sound
           
           Future.delayed(const Duration(milliseconds: 800), () {
             if (!mounted) return;
@@ -202,12 +205,17 @@ class _VisualAct4PatternAdventureState
     _initRound();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playInstruction();
+      _playInstruction(autoPlay: true);
     });
   }
 
-  void _playInstruction() {
-    TtsService().speak('ඊළඟට එන්නේ මොකක්ද?');
+  void _playInstruction({bool autoPlay = false}) {
+    
+    if (autoPlay && _lastSpokenInstruction == 'රටාවට ගැළපෙන පින්තූරය තෝරන්න') {
+      return;
+    }
+    _lastSpokenInstruction = 'රටාවට ගැළපෙන පින්තූරය තෝරන්න';
+    TtsService().speak('රටාවට ගැළපෙන පින්තූරය තෝරන්න', folder: 'skill_1');
     _speakerBounceController.forward().then((_) {
       _speakerBounceController.reverse();
     });
@@ -244,6 +252,7 @@ class _VisualAct4PatternAdventureState
     super.dispose();
   }
 
+
   void _initRound() {
     if (_currentRoundIndex >= _rounds.length) return;
     _roundComplete = false;
@@ -261,7 +270,7 @@ class _VisualAct4PatternAdventureState
     final choicePath = currentRound.options[index];
 
     if (choicePath == currentRound.correctAnswer) {
-      _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
       _capturePositions(index);
 
       setState(() {
@@ -273,7 +282,7 @@ class _VisualAct4PatternAdventureState
 
       _flyController.forward(from: 0);
     } else {
-      _audioPlayer.play(AssetSource('audio/wrong.mp3'));
+      SoundUtils.playFeedback('audio/wrong.mp3');
       if (index < _shakeControllers.length) {
         _shakeControllers[index].forward(from: 0);
       }
@@ -548,7 +557,7 @@ class _VisualAct4PatternAdventureState
           mainAxisSize: MainAxisSize.min,
           children: [
             Flexible(
-              child: Text('ඊළඟට එන්නේ මොකක්ද?', style: AppTypography.sinhala(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary), textAlign: TextAlign.center),
+              child: Text('රටාවට ගැළපෙන පින්තූරය තෝරන්න', style: AppTypography.sinhala(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary), textAlign: TextAlign.center),
             ),
             const SizedBox(width: 12),
             ScaleTransition(
@@ -839,114 +848,12 @@ class _VisualAct4PatternAdventureState
 
   // ── Celebration Overlay ──
   Widget _buildCelebrationOverlay() {
-    return AnimatedBuilder(
-      animation: _celebrationScale,
-      builder: (context, child) {
-        return Container(
-          color: Colors.black.withValues(alpha: 0.4 * _celebrationScale.value),
-          child: Center(
-            child: Transform.scale(
-              scale: _celebrationScale.value,
-              child: child,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 32),
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4A90D9).withValues(alpha: 0.2),
-              blurRadius: 30,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 5-Star Arc Animation
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.elasticOut,
-              builder: (context, value, child) {
-                final angles = [-0.5, -0.25, 0.0, 0.25, 0.5];
-                final dy = [25.0, 8.0, 0.0, 8.0, 25.0];
-                final sizes = [42.0, 54.0, 68.0, 54.0, 42.0];
-
-                return Transform.scale(
-                  scale: value,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      return Transform.translate(
-                        offset: Offset(0, dy[index] - 15),
-                        child: Transform.rotate(
-                          angle: angles[index],
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                            child: Icon(
-                              Icons.star_rounded,
-                              color: const Color(0xFFFFD700),
-                              size: sizes[index],
-                              shadows: [
-                                Shadow(
-                                  color: const Color(0xFFFFD700).withValues(alpha: 0.6),
-                                  blurRadius: 12,
-                                )
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'හොඳයි! ඔයා දිනුම්!',
-              style: AppTypography.sinhala(
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                color: const Color(0xFFE8A54B),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'ඔයා සියලුම රටා සම්පූර්ණ කළා!',
-              style: AppTypography.sinhala(
-                fontSize: 18,
-                color: const Color(0xFF6B7280),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _finishActivity,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6DBE6D),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20)),
-                  elevation: 4,
-                ),
-                child: Text('ඉදිරියට යමු',
-                    style: AppTypography.button(fontSize: 20)),
-              ),
-            ),
-          ],
-        ),
+    return Positioned.fill(
+      child: SharedCelebrationPopup(
+        studentData: widget.studentData,
+        activityTitle: widget.activityNode.title,
+        scaleAnimation: _celebrationScale,
+        onFinish: _finishActivity,
       ),
     );
   }

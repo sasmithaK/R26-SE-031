@@ -36,27 +36,12 @@ class SortingGenerator {
       'vehicles/train.png',
       'vehicles/van.png',
     ],
-    'everyday': [
-      'everyday_objects/balloon.png',
-      'everyday_objects/bell.png',
-      'everyday_objects/book.png',
-      'everyday_objects/bucket.png',
-      'everyday_objects/candle.png',
-      'everyday_objects/chair.png',
-      'everyday_objects/clock.png',
-      'everyday_objects/shoe.png',
-      'everyday_objects/umbrella.png',
-      'everyday_objects/pencil.png',
-      'everyday_objects/key.png',
-      'everyday_objects/hat.png',
-      'everyday_objects/spoon.png',
-      'everyday_objects/teacup.png',
-      'everyday_objects/kite.png',
-    ],
-    'nature': [
-      'nature/flower.png',
-      'nature/leaf.png',
-      'nature/sun.png',
+    'flowers': [
+      'flowers/nil_manel.png',
+      'flowers/nelum.png',
+      'flowers/araliya.png',
+      'flowers/wada_mal.png',
+      'flowers/flower_05.png',
     ],
   };
 
@@ -64,23 +49,21 @@ class SortingGenerator {
     'animals': 'සතුන්',
     'fruits': 'පලතුරු',
     'vehicles': 'වාහන',
-    'everyday': 'එදිනෙදා දේවල්',
-    'nature': 'ස්වභාවය',
+    'flowers': 'මල්',
   };
 
   static const Map<String, String> _categoryIcons = {
     'animals': 'animals/elephant.png',
     'fruits': 'fruits_food/apple.png',
     'vehicles': 'vehicles/van.png',
-    'everyday': 'everyday_objects/key.png',
-    'nature': 'nature/flower.png',
+    'flowers': 'flowers/nelum.png',
   };
 
   /// Generates 5 progressive sorting rounds.
   static List<SortingRound> generateRounds() {
     // We have 5 categories with enough items. Pick combinations for each round.
     // Shuffle the category pool to keep things fresh each session.
-    final allCategoryKeys = _categoryAssets.keys.toList()..shuffle(_rng);
+    final allCategoryKeys = _categoryAssets.keys.toList();
 
     // Ensure we always have usable combinations by picking from shuffled pool:
     // Round 1: 2 categories, 4 objects (2 each)
@@ -120,8 +103,8 @@ class SortingGenerator {
     List<String> exclude = const [],
   }) {
     // Prefer categories not in exclude list
-    final preferred = pool.where((c) => !exclude.contains(c)).toList()..shuffle(_rng);
-    final fallback = pool.where((c) => exclude.contains(c)).toList()..shuffle(_rng);
+    final preferred = pool.where((c) => !exclude.contains(c)).toList();
+    final fallback = pool.where((c) => exclude.contains(c)).toList();
 
     final result = <String>[];
     for (final c in preferred) {
@@ -151,7 +134,7 @@ class SortingGenerator {
 
     for (int i = 0; i < categoryKeys.length; i++) {
       final key = categoryKeys[i];
-      final available = List<String>.from(_categoryAssets[key]!)..shuffle(_rng);
+      final available = List<String>.from(_categoryAssets[key]!);
 
       int count;
       if (objectsPerCategory is List<int>) {

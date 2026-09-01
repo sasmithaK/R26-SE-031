@@ -30,9 +30,9 @@ class PatternGenerator {
     'everyday_objects/bucket.png',
     'everyday_objects/kite.png',
     'everyday_objects/oil_lamp.png',
-    'nature/flower.png',
-    'nature/sun.png',
-    'nature/leaf.png',
+    'flowers/nil_manel.png',
+    'flowers/nelum.png',
+    'flowers/flower_05.png',
     'animals/dog.png',
     'animals/rabbit.png',
     'animals/turtle.png',
@@ -68,7 +68,7 @@ class PatternGenerator {
 
   static PatternRound _generateRound1(Random rng) {
     // Round 1 (Very Easy): A B A ? (2 choices)
-    final assets = List<String>.from(allAssets)..shuffle(rng);
+    final assets = List<String>.from(allAssets);
     final A = assets[0];
     final B = assets[1];
     
@@ -89,7 +89,7 @@ class PatternGenerator {
 
   static PatternRound _generateRound2(Random rng) {
     // Round 2 (Easy): A A B ? (3 choices)
-    final assets = List<String>.from(allAssets)..shuffle(rng);
+    final assets = List<String>.from(allAssets);
     final A = assets[0];
     final B = assets[1];
     
@@ -110,7 +110,7 @@ class PatternGenerator {
 
   static PatternRound _generateRound3(Random rng) {
     // Round 3 (Medium): A B C A ? (3 choices)
-    final assets = List<String>.from(allAssets)..shuffle(rng);
+    final assets = List<String>.from(allAssets);
     final A = assets[0];
     final B = assets[1];
     final C = assets[2];
@@ -132,7 +132,7 @@ class PatternGenerator {
 
   static PatternRound _generateRound4(Random rng) {
     // Round 4 (Hard): A B C D A ? (4 choices)
-    final assets = List<String>.from(allAssets)..shuffle(rng);
+    final assets = List<String>.from(allAssets);
     final A = assets[0];
     final B = assets[1];
     final C = assets[2];
@@ -155,7 +155,7 @@ class PatternGenerator {
 
   static PatternRound _generateRound5(Random rng) {
     // Round 5 (Challenge): A B B C A B ? (4 choices)
-    final assets = List<String>.from(allAssets)..shuffle(rng);
+    final assets = List<String>.from(allAssets);
     final A = assets[0];
     final B = assets[1];
     final C = assets[2];

@@ -1,20 +1,25 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../widgets/telemetry_wrapper.dart';
 import '../../../../models/curriculum_models.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
 import '../../../../services/progress_service.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
+import '../../../../services/tts_service.dart';
 
 class Skill2Act1OddOneOut extends StatefulWidget {
   final ActivityNode? activityNode;
+  final Map<String, dynamic>? studentData;
   final bool isRemedial;
 
   const Skill2Act1OddOneOut({
     super.key,
     this.activityNode,
     this.isRemedial = false,
+    this.studentData,
   });
 
   @override
@@ -22,15 +27,16 @@ class Skill2Act1OddOneOut extends StatefulWidget {
 }
 
 class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
+  String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
   int _currentRoundIndex = 0;
   bool _isRoundComplete = false;
   bool _isActivityComplete = false;
-  
+
   late List<Map<String, dynamic>> _shuffledItems;
   Set<int> _foundIndices = {};
   int _targetCount = 0;
-  
+
   // Track temporarily tapped incorrect items for red flash
   Set<int> _wrongIndices = {};
 
@@ -42,13 +48,29 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     final skillId = widget.activityNode?.skillId ?? '';
     final activityId = widget.activityNode?.id ?? '';
     if (skillId.isNotEmpty && activityId.isNotEmpty) {
-      _currentRoundIndex = ProgressService().getActivityState(skillId, activityId);
+      _currentRoundIndex = ProgressService().getActivityState(
+        skillId,
+        activityId,
+      );
     }
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
       _currentRoundIndex = 0;
     }
     _setupRound();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _playCurrentInstruction(autoPlay: true);
+    });
+  }
+
+  void _playCurrentInstruction({bool autoPlay = false}) {
+    String spokenInstruction = 'කොටුවේ පෙන්වා ඇති අකුර සොයන්න.';
+    
+    if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
+      return;
+    }
+    _lastSpokenInstruction = spokenInstruction;
+    TtsService().speak(spokenInstruction, folder: 'skill_2');
   }
 
   @override
@@ -61,16 +83,18 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
       final currentRound = rounds[_currentRoundIndex];
-      
+
       final rawItems = currentRound['items'] as List<dynamic>? ?? [];
-      final items = rawItems.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      
+      final items = rawItems
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+
       // Shuffle the items for this round
       items.shuffle(Random());
       _shuffledItems = items;
-      
+
       final targetLetter = currentRound['target_letter']?.toString();
-      
+
       // Count targets (support both new 'is_target' boolean and old 'target_letter' string)
       _targetCount = items.where((item) {
         if (item.containsKey('is_target')) {
@@ -78,7 +102,6 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
         }
         return item['value'] == targetLetter;
       }).length;
-
     } else {
       _shuffledItems = [];
       _targetCount = 0;
@@ -95,36 +118,53 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     final item = _shuffledItems[index];
     final currentRound = widget.activityNode?.rounds[_currentRoundIndex] ?? {};
     final targetLetter = currentRound['target_letter']?.toString();
-    
-    final isCorrect = item['is_target'] == true || (item['is_target'] == null && item['value'] == targetLetter);
+
+    final isCorrect =
+        item['is_target'] == true ||
+        (item['is_target'] == null && item['value'] == targetLetter);
 
     if (isCorrect) {
       setState(() {
         _foundIndices.add(index);
       });
-      await _audioPlayer.play(AssetSource('audio/correct.mp3'));
-      
+      SoundUtils.playFeedback('audio/correct.mp3');
+
       if (_foundIndices.length == _targetCount) {
         setState(() {
           _isRoundComplete = true;
         });
-        
+
         final rounds = widget.activityNode?.rounds ?? [];
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(100);
+        context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
+          100,
+          selectedAnswers: [item['value']?.toString() ?? ''],
+        );
 
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (!mounted) return;
           if (_currentRoundIndex < rounds.length - 1) {
             setState(() {
-              _currentRoundIndex++; print("SAVING STATE: ${widget.activityNode?.skillId} ${widget.activityNode?.id} $_currentRoundIndex");
+              _currentRoundIndex++;
+              print(
+                "SAVING STATE: ${widget.activityNode?.skillId} ${widget.activityNode?.id} $_currentRoundIndex",
+              );
               final sId = widget.activityNode?.skillId ?? '';
               final aId = widget.activityNode?.id ?? '';
               if (sId.isNotEmpty && aId.isNotEmpty) {
-                int progress = ((_currentRoundIndex / (widget.activityNode?.rounds.length ?? 1)) * 100).toInt();
+                int progress =
+                    ((_currentRoundIndex /
+                                (widget.activityNode?.rounds.length ?? 1)) *
+                            100)
+                        .toInt();
                 ProgressService().saveActivityScore(sId, aId, progress);
-                ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+                ProgressService().saveActivityState(
+                  sId,
+                  aId,
+                  _currentRoundIndex,
+                );
               }
               _setupRound();
+              _playCurrentInstruction(autoPlay: true);
             });
           } else {
             setState(() {
@@ -143,10 +183,14 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       setState(() {
         _wrongIndices.add(index);
       });
-      await _audioPlayer.play(AssetSource('audio/wrong.mp3'));
-      
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(0);
-      
+      SoundUtils.playFeedback('audio/wrong.mp3');
+
+      context.findAncestorStateOfType<TelemetryWrapperState>()?.logAttempt(
+        isCorrect: false,
+        errorType: 'unknown_error',
+        selectedAnswers: [item['value']?.toString() ?? ''],
+      );
+
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted && !_isRoundComplete) {
           setState(() {
@@ -165,9 +209,9 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     }
 
     final currentRound = rounds[_currentRoundIndex];
-    final promptText = currentRound['prompt']?.toString() ?? 'වෙනස් පින්තූරය සොයන්න.';
-    final titleText = widget.activityNode?.title ?? 'වෙනස් පින්තූරය සොයමු';
-    
+    final promptText = 'කොටුවේ පෙන්වා ඇති අකුර සොයන්න.';
+    final titleText = widget.activityNode?.title ?? 'නිවැරදි අකුර සොයමු';
+
     String? targetLetter;
     if (currentRound['items'] != null) {
       List<String> uniqueLetters = [];
@@ -185,13 +229,16 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     }
 
     return SharedGameLayout(
+      studentData: widget.studentData,
+      activityTitle: widget.activityNode?.title ?? '',
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
       totalRounds: rounds.length,
       isRoundComplete: _isRoundComplete,
       isActivityComplete: _isActivityComplete,
       onNext: () {
-        final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+        final wrapper = context
+            .findAncestorStateOfType<TelemetryWrapperState>();
         if (wrapper != null) {
           wrapper.completeActivity(context);
         } else {
@@ -205,17 +252,13 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
             // Skill 1 Style Instruction Card with Isolated Letter
             _buildInstructionCard(promptText, targetLetter),
             const SizedBox(height: 12),
-            
+
             // Found Counter
             _buildFoundCounter(),
             const SizedBox(height: 32),
-            
+
             // Giant Wooden Board with Grid of Tiles
-            Expanded(
-              child: Center(
-                child: _buildWoodenBoard(),
-              ),
-            ),
+            Expanded(child: Center(child: _buildWoodenBoard())),
             const SizedBox(height: 20),
           ],
         ),
@@ -226,10 +269,15 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
   Widget _buildInstructionCard(String instruction, [String? targetLetter]) {
     return GestureDetector(
       onTap: () async {
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.logAudioReplay();
-        if (widget.activityNode?.audioUrl != null && widget.activityNode!.audioUrl.isNotEmpty) {
-          await _audioPlayer.play(UrlSource(widget.activityNode!.audioUrl));
-        }
+        context
+            .findAncestorStateOfType<TelemetryWrapperState>()
+            ?.logAudioReplay();
+        String spokenInstruction = instruction
+            .replaceAll('මා', 'ම')
+            .replaceAll('\'ම\' අකුර', 'ම, අකුර')
+            .replaceAll('ම අකුර', 'ම, අකුර')
+            .replaceAll('ම පින්තූරය', 'ම, පින්තූරය');
+        TtsService().speak('කොටුවේ පෙන්වා ඇති අකුර සොයන්න.', folder: 'skill_2');
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -256,7 +304,12 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
                 ),
                 child: Center(
                   child: Transform.translate(
-                    offset: Offset(0, (targetLetter.contains('අ') || targetLetter.contains('ආ')) ? -4.0 : 0.0),
+                    offset: Offset(
+                      0,
+                      (targetLetter.contains('අ') || targetLetter.contains('ආ'))
+                          ? -4.0
+                          : 0.0,
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: FittedBox(
@@ -280,7 +333,11 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
             Flexible(
               child: Text(
                 instruction,
-                style: AppTypography.sinhala(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                style: AppTypography.sinhala(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -292,17 +349,24 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
                 shape: BoxShape.circle,
                 color: AppColors.warmAmber,
                 boxShadow: [
-                  BoxShadow(color: AppColors.warmAmber.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))
-                ]
+                  BoxShadow(
+                    color: AppColors.warmAmber.withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.volume_up_rounded, color: Colors.white, size: 26),
+              child: const Icon(
+                Icons.volume_up_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
             ),
           ],
         ),
       ),
     );
   }
-        
 
   Widget _buildFoundCounter() {
     return Container(
@@ -333,14 +397,19 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
             size: 20,
           ),
           const SizedBox(width: 8),
-          Text(
-            '${_foundIndices.length} / $_targetCount සොයා ගත්තා',
-            style: AppTypography.sinhala(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: _foundIndices.length == _targetCount
-                  ? const Color(0xFF4E9E4E)
-                  : const Color(0xFF6B7280),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '${_foundIndices.length} / $_targetCount සොයා ගත්තා',
+                style: AppTypography.sinhala(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: _foundIndices.length == _targetCount
+                      ? const Color(0xFF4E9E4E)
+                      : const Color(0xFF6B7280),
+                ),
+              ),
             ),
           ),
         ],
@@ -354,7 +423,10 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       decoration: BoxDecoration(
         color: const Color(0xFFE8C396), // Light warm wood inner
         borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: const Color(0xFF8B5A2B), width: 10), // Thick dark wood frame
+        border: Border.all(
+          color: const Color(0xFF8B5A2B),
+          width: 10,
+        ), // Thick dark wood frame
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.2),
@@ -366,8 +438,11 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
             color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 15,
             spreadRadius: -5,
-            offset: const Offset(0, 5), // Inner top shadow to make it feel recessed
-          )
+            offset: const Offset(
+              0,
+              5,
+            ), // Inner top shadow to make it feel recessed
+          ),
         ],
       ),
       child: _buildCardGrid(),
@@ -376,11 +451,11 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
 
   Widget _buildCardGrid() {
     final total = _shuffledItems.length;
-    
+
     // Dynamic sizing based on items to perfectly fit the board
     double itemSize;
     double spacing;
-    
+
     if (total <= 4) {
       itemSize = 115.0;
       spacing = 24.0;
@@ -407,10 +482,10 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     final item = _shuffledItems[index];
     final isFound = _foundIndices.contains(index);
     final isWrong = _wrongIndices.contains(index);
-    
+
     // 3D Press state
     final isPressed = isFound || isWrong;
-    
+
     // Base colors (Clean white for readability)
     Color tileColor = Colors.white;
     Color borderColor = Colors.black.withValues(alpha: 0.1);
@@ -437,10 +512,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     if (item['type'] == 'icon') {
       content = Padding(
         padding: const EdgeInsets.all(12.0),
-        child: Image.asset(
-          item['value'], 
-          fit: BoxFit.contain,
-        ),
+        child: Image.asset(item['value'], fit: BoxFit.contain),
       );
     } else {
       content = Center(
@@ -448,7 +520,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
           item['value'],
           style: TextStyle(
             fontFamily: 'IskoolaPota',
-            fontSize: _shuffledItems.length > 4 ? 44 : 54,
+            fontSize: _shuffledItems.length > 4 ? 56 : 72,
             fontWeight: FontWeight.bold,
             color: textColor,
           ),
@@ -477,7 +549,9 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
             color: tileColor,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isPressed ? borderColor : Colors.white.withValues(alpha: 0.5),
+              color: isPressed
+                  ? borderColor
+                  : Colors.white.withValues(alpha: 0.5),
               width: isPressed ? borderWidth : 2,
             ),
             boxShadow: [
@@ -494,7 +568,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
                   color: Colors.black.withValues(alpha: 0.25),
                   offset: const Offset(0, 12),
                   blurRadius: 10,
-                )
+                ),
             ],
           ),
           child: AnimatedScale(

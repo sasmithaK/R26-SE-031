@@ -155,28 +155,10 @@ class SkillDetail {
 
   static Future<SkillDetail> load(String fileName) async {
     final skillId = fileName.replaceAll('.json', '');
-    String responseData = '';
     
-    try {
-      // 1. Try fetching from CMS backend first
-      final studentId = ProgressService().currentStudentId;
-      final url = Uri.parse('$_baseUrl/activities/$skillId?student_id=$studentId');
-      final res = await http.get(url).timeout(const Duration(seconds: 3));
-      if (res.statusCode == 200) {
-        final decoded = json.decode(res.body);
-        // If it's a valid skill with activities, use it
-        if (decoded is Map && decoded.containsKey('activities') && (decoded['activities'] as List).isNotEmpty) {
-          responseData = res.body;
-        }
-      }
-    } catch (e) {
-      // Ignore network errors and fallback to local
-    }
-
-    // 2. Fallback to local hardcoded JSON if backend failed or returned empty
-    if (responseData.isEmpty) {
-      responseData = await rootBundle.loadString('assets/data/curriculum/$fileName');
-    }
+    // We strictly load from local JSON to ensure only the 5 correct activities are shown
+    // (Bypassing the CMS backend which was returning 11 incorrect activities)
+    String responseData = await rootBundle.loadString('assets/data/curriculum/$fileName');
 
     final skillDetail = SkillDetail.fromJson(json.decode(responseData), skillId, 'Skill Details');
 
@@ -223,6 +205,7 @@ class ActivityNode {
   final List<String> telemetryTags;
   final String templateType;
   final List<Map<String, dynamic>> rounds;
+  final ResearchMetadata? researchMetadata;
 
   ActivityNode({
     required this.id, 
@@ -235,7 +218,8 @@ class ActivityNode {
     this.filePath = '',
     required this.telemetryTags, 
     required this.templateType, 
-    required this.rounds
+    required this.rounds,
+    this.researchMetadata,
   });
 
   factory ActivityNode.fromJson(Map<String, dynamic> json) {
@@ -254,6 +238,147 @@ class ActivityNode {
           ? List<Map<String, dynamic>>.from(
               (json['rounds'] as Iterable).map((r) => Map<String, dynamic>.from(r as Map)))
           : <Map<String, dynamic>>[],
+      researchMetadata: json['research_metadata'] != null 
+          ? ResearchMetadata.fromJson(json['research_metadata']) 
+          : null,
     );
+  }
+}
+
+class ResearchMetadata {
+  final String knowledgeComponentId;
+  final String promptModality;
+  final String responseModality;
+  final String researchRole;
+
+  ResearchMetadata({
+    required this.knowledgeComponentId,
+    required this.promptModality,
+    required this.responseModality,
+    required this.researchRole,
+  });
+
+  factory ResearchMetadata.fromJson(Map<String, dynamic> json) {
+    return ResearchMetadata(
+      knowledgeComponentId: json['knowledge_component_id'] ?? 'KC_UNKNOWN',
+      promptModality: json['prompt_modality'] ?? 'visual',
+      responseModality: json['response_modality'] ?? 'tap',
+      researchRole: json['research_role'] ?? 'primary',
+    );
+  }
+}
+
+class CanonicalResearchItem {
+  final String itemId;
+  final int itemVersion;
+  final String difficultyLabel;
+  final double difficultyB;
+  final bool isAnchor;
+  
+  final List<String> targets;
+  final List<String> distractors;
+
+  CanonicalResearchItem({
+    required this.itemId,
+    required this.itemVersion,
+    required this.difficultyLabel,
+    required this.difficultyB,
+    required this.isAnchor,
+    required this.targets,
+    required this.distractors,
+  });
+}
+
+class CanonicalItemResolver {
+  static CanonicalResearchItem resolve(ActivityNode activity, Map<String, dynamic> roundData, int roundIndex) {
+    // Extract standard item metadata injected by python script
+    final itemId = roundData['item_id'] ?? '${activity.id}_R${roundIndex + 1}';
+    final itemVersion = roundData['item_version'] ?? 1;
+    final difficultyLabel = roundData['difficulty_label'] ?? 'medium';
+    final difficultyB = (roundData['difficulty_b'] as num?)?.toDouble() ?? 0.0;
+    final isAnchor = roundData['is_anchor'] ?? false;
+
+    List<String> targets = [];
+    List<String> distractors = [];
+
+    // Parse according to template_type
+    final type = activity.templateType;
+
+    if (type == 'visual_hidden_search' || type == 'skill2_identical_match') {
+      targets = _extractStringList(roundData['targets'] ?? roundData['letters']);
+      distractors = _extractStringList(roundData['distractors']);
+    } 
+    else if (type.contains('mcq') || type == 'skill2_audio' || type == 'interactive_story') {
+      final correctOpt = roundData['correctOption']?.toString();
+      if (correctOpt != null) targets.add(correctOpt);
+      
+      final options = _extractStringList(roundData['options']);
+      if (correctOpt != null) {
+        distractors = options.where((o) => o != correctOpt).toList();
+      } else {
+        distractors = options;
+      }
+    }
+    else if (type.contains('fill_blank') || type == 'skill4_act2_fill_blank') {
+      final correctOpt = roundData['correctOption']?.toString();
+      if (correctOpt != null) targets.add(correctOpt);
+      final options = _extractStringList(roundData['options']);
+      if (correctOpt != null) {
+        distractors = options.where((o) => o != correctOpt).toList();
+      }
+    }
+    else if (type.contains('odd_one_out')) {
+      final items = roundData['items'];
+      if (items is List && items.every((item) => item is Map)) {
+        for (final item in items) {
+          final value = item['value']?.toString();
+          if (value == null) continue;
+          final isTarget = item['is_target'] == true ||
+              (item['is_target'] == null && value == roundData['target_letter']);
+          (isTarget ? targets : distractors).add(value);
+        }
+      } else {
+        final correctOpt = roundData['correctOption']?.toString();
+        if (correctOpt != null) targets.add(correctOpt);
+        distractors = _extractStringList(roundData['options'])
+            .where((o) => o != correctOpt).toList();
+      }
+    }
+    else if (type.contains('jumbled_word') || type.contains('jumbled_sentence')) {
+      final correct = roundData['correct_word'] ?? roundData['correct_sentence'];
+      if (correct != null) targets.add(correct.toString());
+      distractors = _extractStringList(roundData['scrambled_letters'] ?? roundData['scrambled_words']);
+    }
+    else if (type == 'skill2_pattern_memory') {
+      targets = _extractStringList(roundData['pattern']);
+      distractors = _extractStringList(roundData['options']).where((o) => !targets.contains(o)).toList();
+    }
+    else {
+      // Fallback
+      final correctOpt = roundData['correctOption']?.toString();
+      if (correctOpt != null) targets.add(correctOpt);
+      final options = _extractStringList(roundData['options'] ?? roundData['items']);
+      if (correctOpt != null) {
+        distractors = options.where((o) => o != correctOpt).toList();
+      }
+    }
+
+    return CanonicalResearchItem(
+      itemId: itemId,
+      itemVersion: itemVersion,
+      difficultyLabel: difficultyLabel,
+      difficultyB: difficultyB,
+      isAnchor: isAnchor,
+      targets: targets,
+      distractors: distractors,
+    );
+  }
+
+  static List<String> _extractStringList(dynamic data) {
+    if (data == null) return [];
+    if (data is List) {
+      return data.map((e) => e.toString()).toList();
+    }
+    return [data.toString()];
   }
 }

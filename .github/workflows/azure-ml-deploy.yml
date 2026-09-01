@@ -1,6 +1,7 @@
 name: Build and Deploy ML Backend to Azure
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - dev

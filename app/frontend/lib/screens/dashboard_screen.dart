@@ -13,6 +13,7 @@ import 'select_student_screen.dart';
 import 'parent/parent_hub_screen.dart';
 import 'character_shop_screen.dart';
 import 'progress_analytics_screen.dart';
+import '../services/tts_service.dart';
 import '../models/curriculum_models.dart';
 import '../services/progress_service.dart';
 import 'loading_skill_screen.dart';
@@ -386,9 +387,56 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           onReturn: () {
             if (mounted) setState(() {});
           },
+          onNextSkill: (currentSkillId) {
+            _handleNextSkill(currentSkillId);
+          },
         );
       },
     );
+  }
+
+  void _handleNextSkill(String currentSkillId) async {
+    if (_curriculum == null) return;
+    int currentIndex = _curriculum!.skills.indexWhere((s) => s.id == currentSkillId);
+    if (currentIndex != -1 && currentIndex + 1 < _curriculum!.skills.length) {
+      final nextSkill = _curriculum!.skills[currentIndex + 1];
+      final prevTotal = _curriculum!.skills[currentIndex].totalActivities;
+      final bool isUnlocked = ProgressService().isSkillUnlocked(
+        currentIndex + 1,
+        nextSkill.id,
+        currentSkillId,
+        prevTotal,
+      );
+
+      if (isUnlocked) {
+        // Automatically launch the next skill's map!
+        if (mounted) setState(() {});
+        
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LoadingSkillScreen(
+              skill: nextSkill,
+              studentData: widget.studentData,
+              onReturn: () {
+                if (mounted) setState(() {});
+              },
+            ),
+          ),
+        );
+        
+        if (result == 'next_skill' && mounted) {
+           // If they somehow finish the next skill immediately, recursion!
+           _handleNextSkill(nextSkill.id);
+        } else if (mounted) {
+           setState(() {});
+        }
+      } else {
+        if (mounted) setState(() {});
+      }
+    } else {
+      if (mounted) setState(() {});
+    }
   }
 
   static final List<Map<String, dynamic>> _navItems = [
@@ -427,6 +475,7 @@ class _AnimatedSkillCard extends StatefulWidget {
   final bool isLocked;
   final DashboardConfig? dashConfig;
   final VoidCallback onReturn;
+  final Function(String)? onNextSkill;
 
   const _AnimatedSkillCard({
     required this.skill,
@@ -436,6 +485,7 @@ class _AnimatedSkillCard extends StatefulWidget {
     this.isLocked = false,
     this.dashConfig,
     required this.onReturn,
+    this.onNextSkill,
   });
 
   @override
@@ -578,7 +628,7 @@ class _AnimatedSkillCardState extends State<_AnimatedSkillCard> {
                       GestureDetector(
                         onTap: () async {
                           final url = widget.skill.audioUrl;
-                          if (url.isNotEmpty) {
+                          if (url.isNotEmpty && !url.contains('githubusercontent')) {
                             try {
                               await _audioPlayer.stop();
                               if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -589,7 +639,11 @@ class _AnimatedSkillCardState extends State<_AnimatedSkillCard> {
                               }
                             } catch (e) {
                               debugPrint('Error playing custom skill audio: $e');
+                              await TtsService().speak(widget.skill.title);
                             }
+                          } else {
+                            // Fallback to TTS if URL is empty or points to broken github url
+                            await TtsService().speak(widget.skill.title);
                           }
                         },
                         child: Container(
@@ -724,7 +778,7 @@ class _AnimatedSkillCardState extends State<_AnimatedSkillCard> {
           if (_isNavigating) return;
           if (mounted) setState(() => _isNavigating = true);
           try {
-            await Navigator.push(
+            final result = await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => LoadingSkillScreen(
@@ -735,7 +789,11 @@ class _AnimatedSkillCardState extends State<_AnimatedSkillCard> {
               ),
             );
             if (!mounted) return;
-            widget.onReturn();
+            if (result == 'next_skill' && widget.onNextSkill != null) {
+              widget.onNextSkill!(widget.skill.id);
+            } else {
+              widget.onReturn();
+            }
           } catch (e) {
             debugPrint('Error navigating to loading skill screen: $e');
           } finally {

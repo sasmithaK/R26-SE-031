@@ -46,7 +46,7 @@ class _ComprehensiveAssessmentSelectionScreenState
 
     if (mounted) {
       final student = students.firstWhere(
-        (s) => s['id'] == widget.studentId,
+        (s) => s['id'] == widget.studentId || s['_id'] == widget.studentId,
         orElse: () => null,
       );
       if (student != null) {

@@ -42,42 +42,63 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-              child: Text(
-                'my students',
-                style: AppTypography.heading(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'my students',
+                    style: AppTypography.heading(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded, color: AppColors.calmBlue),
+                    tooltip: 'Reload students',
+                    onPressed: () {
+                      setState(() => _isLoading = true);
+                      _fetchConnections();
+                    },
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 24),
             Expanded(
               child: _isLoading
                   ? const Center(child: AppLoadingIndicator())
-                  : _connections.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.group_off_rounded,
-                            size: 64,
-                            color: AppColors.textHint.withValues(alpha: 0.5),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            "No students assigned yet.",
-                            style: AppTypography.heading(
-                              fontSize: 20,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                  : RefreshIndicator(
+                      onRefresh: _fetchConnections,
+                      color: AppColors.calmBlue,
+                      child: _connections.isEmpty
+                          ? ListView(
+                              children: [
+                                const SizedBox(height: 100),
+                                Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.group_off_rounded,
+                                        size: 64,
+                                        color: AppColors.textHint.withValues(alpha: 0.5),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        "No students assigned yet.",
+                                        style: AppTypography.heading(
+                                          fontSize: 20,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
                       itemCount: _connections.length,
                       itemBuilder: (context, index) {
                         final conn = _connections[index];
@@ -231,13 +252,14 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
                             ],
                           ), // Closes Column
                         ), // Closes Container
-                        ); // Closes GestureDetector
+                        );
                       },
                     ),
-            ),
-          ],
+          ),
         ),
-      ),
-    );
+      ],
+    ),
+  ),
+);
   }
 }

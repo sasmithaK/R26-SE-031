@@ -1,0 +1,61 @@
+Skill: පින්තූර හඳුනාගනිමු (Visual Recognition) - ID: skill_1
+  - සැඟවුණු පින්තූර සොයමු (Hidden Picture Search):
+    Child is presented with a grid of pictures and must visually scan to find and tap all instances of a target picture hidden among distractors. Evaluates visual processing speed and attention to detail.
+  - සෙවණැල්ලට පින්තූරය ගළපමු (Shadow Matching):
+    Child must drag and drop colorful, fully detailed pictures onto their corresponding solid black silhouettes/shadows. Evaluates shape recognition and fine motor control.
+  - පින්තූර වෙන් කරමු (Sorting Adventure):
+    Child is presented with multiple categories (e.g., animals vs. vehicles) and must drag and drop items into the correct category buckets. Evaluates visual discrimination and categorization skills.
+  - රටාව සම්පූර්ණ කරමු (Pattern Completion):
+    Child observes a sequence of pictures following a logical pattern (e.g., A-B-A-B) and must select the missing picture to complete the pattern. Evaluates logical reasoning and sequence recognition.
+  - පින්තූර මතකයෙන් සොයමු (Memory Hats / Hidden Objects):
+    Child briefly sees objects hidden under hats or cards. After they are covered, the child must tap the correct hat to find a specific target object from memory. Evaluates short-term visual memory.
+
+Skill: මූලික අකුරු හඳුනාගනිමු (Basic Letter Recognition) - ID: skill_2
+  - නිවැරදි අකුර සොයමු (Odd One Out / Find Target):
+    Child is shown a target Sinhala letter and must tap all matching instances in a grid filled with visually similar distractor letters (orthographic confusion). Evaluates orthographic processing.
+  - සමාන අකුරු සොයමු (Identical Match):
+    Child must tap a letter from a top row, and then tap the matching identical letter in the bottom row to form a pair. Evaluates one-to-one visual matching.
+  - අකුර අසා හඳුනා ගනිමු (Audio to Letter Match):
+    Child listens to a spoken Sinhala letter sound (phoneme) and must select the corresponding written letter from multiple choices. Evaluates phoneme-grapheme mapping.
+  - අකුර සොයා තෝරමු (Letter MCQ):
+    Child is presented with a visual or audio prompt and must select the correct letter from a standard multiple-choice grid. Evaluates basic letter identification.
+  - අකුරු මතකයෙන් සකසමු (Pattern Memory):
+    Child watches a sequence of letters light up or appear. After a short countdown, the child must recreate the exact sequence from memory. Evaluates working memory and sequential processing.
+
+Skill: සරල වචන සකසමු (Simple Word Formation) - ID: skill_3
+  - පින්තූරයට වචනය තෝරමු (Image to Word MCQ):
+    Child sees a picture and must select the correctly spelled Sinhala word from multiple choices. Evaluates whole-word reading and vocabulary.
+  - අකුරුවලින් වචන හදමු (Word Formation MCQ):
+    Child must select the correct sequence of letters to form the word corresponding to a given picture or audio prompt. Evaluates spelling and grapheme sequencing.
+  - වචන අසා හඳුනා ගනිමු (Audio to Word Match):
+    Child listens to a spoken Sinhala word and must select the correct written word or corresponding image. Evaluates auditory processing and word recognition.
+  - අඩු අකුර සොයමු (Fill in the Blanks):
+    Child sees a word with a missing letter and must select or drag the correct Sinhala letter to complete the word. Evaluates orthographic awareness and vocabulary.
+  - අකුරු පිළිවෙළට සකසමු (Jumbled Word):
+    Child is given scrambled Sinhala letters and must drag them into the correct order to form a meaningful word. Evaluates spelling, sequencing, and fine motor skills.
+
+Skill: සරල වාක්‍ය සකසමු (Simple Sentence Formation) - ID: skill_4
+  - පින්තූරයට වාක්‍යය තෝරමු (Image to Sentence MCQ):
+    Child sees a picture depicting an action or scene and must select the correct descriptive Sinhala sentence. Evaluates reading comprehension at the sentence level.
+  - වචන යොදා වාක්‍ය හදමු (Fill in the Blanks - Sentence):
+    Child sees a sentence with a missing word and must select the correct word to complete it grammatically and contextually. Evaluates syntax and vocabulary context.
+  - වාක්‍ය අසා හඳුනා ගනිමු (Audio to Sentence Match):
+    Child listens to a spoken Sinhala sentence and must select the matching written sentence or picture. Evaluates auditory comprehension and sentence reading.
+  - වචන පිළිවෙළට සකසමු (Jumbled Sentence):
+    Child is given scrambled words and must drag them into the correct order to form a syntactically correct Sinhala sentence. Evaluates grammar, syntax, and sentence structure awareness.
+
+Skill: කියවා තේරුම් ගනිමු (Reading Comprehension) - ID: skill_5
+  - කියවා කරන්න (Read and Do):
+    Child reads a short instructional sentence and must perform the corresponding action or select the correct answer based on the instruction. Evaluates functional reading comprehension.
+  - කවුද? (Who?):
+    Child reads a short passage or sentence and answers a "Who" question by selecting the correct character or noun. Evaluates narrative comprehension.
+  - මොනවාද? (What?):
+    Child reads a short passage or sentence and answers a "What" question by selecting the correct object or action. Evaluates factual extraction from text.
+  - කොහෙද? (Where?):
+    Child reads a short passage or sentence and answers a "Where" question by selecting the correct location. Evaluates spatial and contextual comprehension.
+
+Skill: සිංහල පෙළපොත (Sinhala Textbook Reading / Fluency) - ID: skill_6
+  - පෙළපොතෙන් කියවමු - 1 (Read from Textbook 1):
+    Child is presented with an interactive story or standard Grade 1 textbook passage. They read the text aloud (triggering C2 acoustic analysis for fluency/latency metrics) or interact with the text. Evaluates reading fluency and expressive language.
+  - පෙළපොතෙන් කියවමු - 2 (Read from Textbook 2):
+    An advanced or subsequent level of textbook reading passages, functioning similarly to evaluate progressive reading performance and stamina.

@@ -6,20 +6,44 @@ MOCK_TELEMETRY_PAYLOAD = {
     "student_id": str(ObjectId()),
     "session_id": "session_test_123",
     "session_duration_seconds": 120,
+    "device_metrics": {"os": "android", "model": "Pixel 6"},
     "events": [
         {
+            "event_id": "test_evt_1",
             "activity_name": "Letter Matching",
             "round_number": 1,
             "is_correct": False,
             "score": 0,
-            "target_stimulus": "බ",
-            "selected_stimulus": "ඩ",
-            "stimulus_rendered_ts": 123456000,
-            "touch_stream": [
-                {"t_offset_ms": 100, "x": 0.5, "y": 0.5, "action": "DOWN"},
-                {"t_offset_ms": 500, "x": 0.6, "y": 0.6, "action": "MOVE"},
-                {"t_offset_ms": 1000, "x": 0.8, "y": 0.8, "action": "UP"}
-            ]
+            "timestamp": "2026-08-30T10:00:00Z",
+            "first_touch_latency_ms": 1200,
+            "total_round_latency_ms": 4500,
+            "misclick_count": 0,
+            "hesitation_count": 0,
+            "audio_replay_count": 0,
+            "correction_count": 0,
+            "hint_count": 0,
+            "is_abandoned": False,
+            "touch_path": [],
+            "attempt_count": 3,
+            "incorrect_attempt_count": 2,
+            "first_attempt_correct": False,
+            "final_correct": True,
+            "time_to_first_response_ms": 1200,
+            "time_to_correct_ms": 4500,
+            "skill_id": "skill_2",
+            "activity_id": "skill2_act1_odd_one_out",
+            "item_id": "S2A1R01",
+            "item_version": 1,
+            "knowledge_component_id": "KC_AKSHARA_IDENTITY",
+            "prompt_modality": "visual",
+            "response_modality": "tap",
+            "research_role": "primary",
+            "difficulty_label": "easy",
+            "difficulty_b": 0.2,
+            "is_anchor": False,
+            "targets": ["A", "A", "A", "B"],
+            "selected_answers": ["A", "A", "B"],
+            "error_type": "unknown_error"
         }
     ]
 }

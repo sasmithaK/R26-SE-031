@@ -1,5 +1,9 @@
 import librosa
-import parselmouth
+try:
+    import parselmouth
+    HAS_PARSELMOUTH = True
+except ImportError:
+    HAS_PARSELMOUTH = False
 import numpy as np
 import io
 import soundfile as sf
@@ -73,6 +77,10 @@ class AcousticAnalysisService:
         """
         Uses Parselmouth (Praat) to extract jitter and shimmer.
         """
+        if not HAS_PARSELMOUTH:
+            print("Parselmouth is not installed. Skipping prosody extraction.")
+            return None, None
+            
         try:
             sound = parselmouth.Sound(audio_file_path)
             pitch = sound.to_pitch()
@@ -82,13 +90,13 @@ class AcousticAnalysisService:
             shimmer = parselmouth.praat.call([sound, pulses], "Get shimmer (local)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
             
             # Handle NaN values
-            if math.isnan(jitter): jitter = 0.0
-            if math.isnan(shimmer): shimmer = 0.0
+            if math.isnan(jitter): jitter = None
+            if math.isnan(shimmer): shimmer = None
             
             return jitter, shimmer
         except Exception as e:
             print(f"Parselmouth error: {e}")
-            return 0.0, 0.0
+            return None, None
 
     def calculate_intra_word_silence(self, y: np.ndarray, sr: int, top_db: int = 20) -> float:
         """
@@ -150,11 +158,45 @@ class AcousticAnalysisService:
             peak_delta = abs(detected_peaks - expected_syllables)
             
             # 4. Clinical Prosody (Jitter/Shimmer)
+            # Apply pre-emphasis filter to stabilize Praat's F0 tracking on noisy/pediatric voices
+            filtered_y = librosa.effects.preemphasis(y)
+            sf.write(temp_wav_path, filtered_y, sr, subtype='PCM_16')
             jitter, shimmer = self.extract_prosody(temp_wav_path)
             
-            # 5. Intra-word Silence
-            silence_ratio = self.calculate_intra_word_silence(y, sr)
+            # 5. Intra-word Silence and Pauses
+            intervals = librosa.effects.split(y, top_db=20)
             
+            silence_ratio = 1.0
+            speech_duration_ms = 0.0
+            pause_count = 0
+            mean_pause_duration_ms = 0.0
+            pause_ratio = 1.0
+            
+            if len(intervals) > 0:
+                start_idx = intervals[0][0]
+                end_idx = intervals[-1][1]
+                total_speech_duration_samples = end_idx - start_idx
+                
+                if total_speech_duration_samples > 0:
+                    speech_duration_ms = float(total_speech_duration_samples) / sr * 1000.0
+                    active_duration = sum([end - start for start, end in intervals])
+                    silence_duration = total_speech_duration_samples - active_duration
+                    silence_ratio = float(silence_duration) / float(total_speech_duration_samples)
+                    
+                    # Calculate pauses between active intervals
+                    pauses = []
+                    for i in range(1, len(intervals)):
+                        pause_samples = intervals[i][0] - intervals[i-1][1]
+                        pause_ms = (float(pause_samples) / sr) * 1000.0
+                        if 200 <= pause_ms <= 3000:
+                            pauses.append(pause_ms)
+                    
+                    pause_count = len(pauses)
+                    mean_pause_duration_ms = sum(pauses) / len(pauses) if pauses else 0.0
+                    
+                    total_pause_ms = sum(pauses)
+                    pause_ratio = total_pause_ms / speech_duration_ms if speech_duration_ms > 0 else 0.0
+
             # STT fallback (just for logging/comparison)
             try:
                 from services.stt_service import get_stt_engine
@@ -163,15 +205,27 @@ class AcousticAnalysisService:
                 transcription = ""
 
             return {
-                "transcription": transcription, # Optional
+                "transcription": transcription, # Optional — Whisper (adult model, accuracy limited on children)
                 "Acoustic_Latency_ms": latency_ms,
                 "Voice_Onset_ms": t_voice_onset,
                 "Detected_Peaks": detected_peaks,
                 "Expected_Syllables": expected_syllables,
                 "Peak_Count_Delta": peak_delta,
                 "Intra_Word_Silence_Ratio": round(silence_ratio, 4),
-                "Local_Jitter": round(jitter, 6),
-                "Local_Shimmer": round(shimmer, 6)
+                "Speech_Duration_ms": round(speech_duration_ms, 2),
+                "Pause_Count": pause_count,
+                "Mean_Pause_Duration_ms": round(mean_pause_duration_ms, 2),
+                "Pause_Ratio": round(pause_ratio, 4),
+                "Local_Jitter": round(jitter, 6) if jitter is not None else None,
+                "Local_Shimmer": round(shimmer, 6) if shimmer is not None else None,
+                # Diagnostic quality flag: helps therapist interpret results
+                # "poor_prosody_extraction" = Praat failed on noisy audio (jitter/shimmer default to 0.0)
+                # "mostly_silence" = Child likely did not speak clearly
+                "recording_quality": (
+                    "mostly_silence" if silence_ratio > 0.90
+                    else "poor_prosody_extraction" if (jitter is None or shimmer is None)
+                    else "good"
+                ),
             }
             
         finally:

@@ -17,7 +17,8 @@ class ApiConfig {
     if (Platform.isAndroid) {
       return '10.0.2.2';
     }
-    return '127.0.0.1';
+    // Return Mac's local IP for physical iOS devices
+    return '192.168.1.2';
   }
 
   // --- Base URLs for specific backend microservices ---
@@ -54,6 +55,39 @@ class ApiConfig {
     }
     // Deployed to Azure ML Gateway
     return 'https://sipsara-ml-backend-app.azurewebsites.net/telemetry/api/v1/auth';
+  }
+
+  /// C1 Behavioral Analytics API (Port 8025 locally, /telemetry/api/v1/c1 on Azure)
+  static String get c1BaseUrl {
+    if (isDevelopment) {
+      return 'http://$_localHost:8025/api/v1/c1';
+    }
+    // Deployed to Azure ML Gateway
+    return 'https://sipsara-ml-backend-app.azurewebsites.net/telemetry/api/v1/c1';
+  }
+
+  /// Unified Learning API Gateway (Port 8015 locally, /learning on Azure)
+  static String get learningBaseUrl {
+    if (isDevelopment) {
+      return 'http://$_localHost:8015/api/v1/learning';
+    }
+    return 'https://adaptedmind-auth-api.onrender.com/api/v1/learning';
+  }
+
+  /// Parent Dashboard API (Port 8015 — auth service, NOT 8025)
+  static String get parentDashboardBaseUrl {
+    if (isDevelopment) {
+      return 'http://$_localHost:8015/api/v1/parent/students';
+    }
+    return 'https://adaptedmind-auth-api.onrender.com/api/v1/parent/students';
+  }
+
+  /// Therapist Dashboard API (Port 8015 — auth service, NOT 8025)
+  static String get therapistDashboardBaseUrl {
+    if (isDevelopment) {
+      return 'http://$_localHost:8015/api/v1/therapist/students';
+    }
+    return 'https://adaptedmind-auth-api.onrender.com/api/v1/therapist/students';
   }
 
   // --- Helper Methods ---

@@ -1,9 +1,12 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../../../theme/app_theme.dart';
+import '../../shared_widgets/shared_celebration_popup.dart';
 import '../../skill_1/widgets/pattern_background.dart';
 
 class SharedGameLayout extends StatefulWidget {
+  final Map<String, dynamic>? studentData;
+  final String activityTitle;
   final Widget child;
   final String title;
   final int currentRoundIndex;
@@ -14,6 +17,8 @@ class SharedGameLayout extends StatefulWidget {
 
   const SharedGameLayout({
     Key? key,
+    this.studentData,
+    required this.activityTitle,
     required this.child,
     required this.title,
     required this.currentRoundIndex,
@@ -211,107 +216,15 @@ class _SharedGameLayoutState extends State<SharedGameLayout> with TickerProvider
   }
 
   Widget _buildCelebrationOverlay() {
-    return AnimatedBuilder(
-      animation: _celebrationScale,
-      builder: (context, child) {
-        return Container(
-          color: Colors.black.withValues(alpha: 0.4 * _celebrationScale.value),
-          child: Center(
-            child: Transform.scale(
-              scale: _celebrationScale.value,
-              child: child,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 32),
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4A90D9).withValues(alpha: 0.2),
-              blurRadius: 30,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildStar(36),
-                const SizedBox(width: 10),
-                _buildStar(52),
-                const SizedBox(width: 10),
-                _buildStar(36),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Image.asset(
-              'assets/images/characters/mascots/solo_green.png',
-              width: 80,
-              height: 80,
-              fit: BoxFit.contain,
-              errorBuilder: (c, e, s) => const SizedBox(width: 80, height: 80),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'හොඳයි! 🎉',
-              style: AppTypography.sinhala(
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF3E3E3E),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'ඔබ සියල්ල අවසන් කළා!',
-              style: AppTypography.sinhala(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF6B7280),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 28),
-            GestureDetector(
-              onTap: widget.onNext,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6DBE6D), Color(0xFF4E9E4E)],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6DBE6D).withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  'ඉදිරියට යමු →',
-                  style: AppTypography.sinhala(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+    return Positioned.fill(
+      child: SharedCelebrationPopup(
+        studentData: widget.studentData,
+        activityTitle: widget.activityTitle,
+        scaleAnimation: _celebrationScale,
+        onFinish: widget.onNext,
       ),
     );
   }
-
   Widget _buildStar(double size) {
     return Icon(
       Icons.star_rounded,

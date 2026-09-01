@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../widgets/telemetry_wrapper.dart';
@@ -6,13 +7,20 @@ import '../../../../models/curriculum_models.dart';
 import '../../../../services/tts_service.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
 import '../../../../services/progress_service.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
 /// Skill 3 Activity 1 (Image MCQ)
 /// Premium redesign: Displays a central Image and the child must select the matching word.
 class Skill3Act1ImageMcq extends StatefulWidget {
   final ActivityNode? activityNode;
+  final Map<String, dynamic>? studentData;
   final bool isRemedial;
-  const Skill3Act1ImageMcq({super.key, this.activityNode, this.isRemedial = false});
+  const Skill3Act1ImageMcq({
+    super.key,
+    this.activityNode,
+    this.isRemedial = false,
+    this.studentData,
+  });
 
   @override
   State<Skill3Act1ImageMcq> createState() => _Skill3Act1ImageMcqState();
@@ -20,11 +28,13 @@ class Skill3Act1ImageMcq extends StatefulWidget {
 
 class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
     with TickerProviderStateMixin {
+  String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
   int? _selectedIndex;
   bool _isCorrect = false;
   bool _activityComplete = false;
   int _currentRoundIndex = 0;
+  int _attemptCount = 0;
 
   // Animations
   late AnimationController _pulseController;
@@ -39,7 +49,10 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
     final skillId = widget.activityNode?.skillId ?? '';
     final activityId = widget.activityNode?.id ?? '';
     if (skillId.isNotEmpty && activityId.isNotEmpty) {
-      _currentRoundIndex = ProgressService().getActivityState(skillId, activityId);
+      _currentRoundIndex = ProgressService().getActivityState(
+        skillId,
+        activityId,
+      );
     }
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
@@ -61,7 +74,10 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
       duration: const Duration(milliseconds: 400),
     );
     _speakerBounceAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _speakerBounceController, curve: Curves.elasticOut),
+      CurvedAnimation(
+        parent: _speakerBounceController,
+        curve: Curves.elasticOut,
+      ),
     );
 
     // Image pop-in animation
@@ -72,7 +88,7 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
     _imageBounceController.forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playAudioPrompt();
+      _playAudioPrompt(autoPlay: true);
     });
   }
 
@@ -85,13 +101,31 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
     super.dispose();
   }
 
-  void _playAudioPrompt() {
+  void _playAudioPrompt({bool autoPlay = false}) {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) return;
 
     final currentRound = rounds[_currentRoundIndex];
-    final audioText = currentRound['audio_text']?.toString() ?? currentRound['prompt']?.toString() ?? 'වෘත්තය';
-    TtsService().speak(audioText);
+    final audioText =
+        currentRound['audio_text']?.toString() ??
+        currentRound['prompt']?.toString() ??
+        'වෘත්තය';
+    String spokenInstruction = audioText
+        .replaceAll('මා', 'ම')
+        .replaceAllMapped(
+          RegExp(r"'?(.)'? අකුර"),
+          (match) => '${match.group(1)}, අකුර',
+        )
+        .replaceAllMapped(
+          RegExp(r"'?(.)'? පින්තූරය"),
+          (match) => '${match.group(1)}, පින්තූරය',
+        );
+    
+    if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
+      return;
+    }
+    _lastSpokenInstruction = spokenInstruction;
+    TtsService().speak(spokenInstruction, folder: 'skill_3');
 
     _speakerBounceController.forward().then((_) {
       _speakerBounceController.reverse();
@@ -102,44 +136,74 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
     if (_isCorrect) return;
     if (_selectedIndex != null) return;
 
+    _attemptCount++;
     setState(() {
       _selectedIndex = index;
     });
 
     final bool isRight = (index == correctIndex);
     int score = isRight ? 100 : 0;
-    context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(score);
 
     if (isRight) {
+      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
+        score,
+      );
       setState(() {
         _isCorrect = true;
       });
-      await _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
 
-      // Happy image bounce on success
       _imageBounceController.reset();
       _imageBounceController.forward();
 
-      Future.delayed(const Duration(milliseconds: 1400), () {
-        if (!mounted) return;
-        if (_currentRoundIndex < totalRounds - 1) {
+      _advanceRoundAfterDelay(totalRounds);
+    } else {
+      SoundUtils.playFeedback('audio/wrong.mp3');
+
+      if (_attemptCount >= 2) {
+        context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(0);
+        setState(() {
+          _selectedIndex = correctIndex;
+          _isCorrect = true;
+        });
+        _advanceRoundAfterDelay(totalRounds);
+      } else {
+        Future.delayed(const Duration(milliseconds: 700), () {
+          if (!mounted) return;
           setState(() {
-            _currentRoundIndex++;
-              final sId = widget.activityNode?.skillId ?? '';
-              final aId = widget.activityNode?.id ?? '';
-              if (sId.isNotEmpty && aId.isNotEmpty) {
-                int progress = ((_currentRoundIndex / (widget.activityNode?.rounds.length ?? 1)) * 100).toInt();
-                ProgressService().saveActivityScore(sId, aId, progress);
-                ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
-              }
             _selectedIndex = null;
-            _isCorrect = false;
           });
-          _imageBounceController.reset();
-          _imageBounceController.forward();
-          _playAudioPrompt();
-        } else {
-          setState(() {
+        });
+      }
+    }
+  }
+
+  void _advanceRoundAfterDelay(int totalRounds) {
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (!mounted) return;
+      if (_currentRoundIndex < totalRounds - 1) {
+        setState(() {
+          _currentRoundIndex++;
+          _attemptCount = 0;
+          final sId = widget.activityNode?.skillId ?? '';
+          final aId = widget.activityNode?.id ?? '';
+          if (sId.isNotEmpty && aId.isNotEmpty) {
+            int progress =
+                ((_currentRoundIndex /
+                            (widget.activityNode?.rounds.length ?? 1)) *
+                        100)
+                    .toInt();
+            ProgressService().saveActivityScore(sId, aId, progress);
+            ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+          }
+          _selectedIndex = null;
+          _isCorrect = false;
+        });
+        _imageBounceController.reset();
+        _imageBounceController.forward();
+        _playAudioPrompt(autoPlay: true);
+      } else {
+        setState(() {
           _activityComplete = true;
           final sId = widget.activityNode?.skillId ?? '';
           final aId = widget.activityNode?.id ?? '';
@@ -148,17 +212,8 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
             ProgressService().clearActivityState(sId, aId);
           }
         });
-        }
-      });
-    } else {
-      await _audioPlayer.play(AssetSource('audio/wrong.mp3'));
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (!mounted) return;
-        setState(() {
-          _selectedIndex = null;
-        });
-      });
-    }
+      }
+    });
   }
 
   @override
@@ -176,11 +231,15 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
     }
 
     final currentRound = rounds[_currentRoundIndex];
-    final titleText = widget.activityNode?.title ?? 'පින්තූරයට ගැලපෙන වචනය තෝරන්න';
-    final promptText = currentRound['prompt']?.toString() ?? 'පින්තූරයට ගැලපෙන වචනය තෝරන්න';
+    final titleText =
+        widget.activityNode?.title ?? 'පින්තූරයට ගැලපෙන වචනය තෝරන්න';
+    final promptText =
+        currentRound['prompt']?.toString() ?? 'පින්තූරයට ගැලපෙන වචනය තෝරන්න';
     final imageUrl = currentRound['image_url']?.toString() ?? '';
-    
-    var options = (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ?? ['🔵', '🟥', '🔺', '⭐'];
+
+    var options =
+        (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ??
+        ['🔵', '🟥', '🔺', '⭐'];
     var correctIndex = (currentRound['correct_index'] as int?) ?? 0;
 
     if (widget.isRemedial && options.length > 2) {
@@ -193,13 +252,16 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
     }
 
     return SharedGameLayout(
+      studentData: widget.studentData,
+      activityTitle: widget.activityNode?.title ?? '',
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
       totalRounds: rounds.length,
       isRoundComplete: _isCorrect,
       isActivityComplete: _activityComplete,
       onNext: () {
-        final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+        final wrapper = context
+            .findAncestorStateOfType<TelemetryWrapperState>();
         if (wrapper != null) {
           wrapper.completeActivity(context);
         } else {
@@ -207,26 +269,28 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
         }
       },
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Column(
           children: [
             const SizedBox(height: 8),
 
-            // ── Premium Speaker Card (Instruction) ──
+            // ── Instruction Card ──
             _buildSpeakerCard(promptText),
 
-            const Spacer(flex: 1),
+            const SizedBox(height: 16),
+
+            // ── Image Card ──
+            _buildImageSection(imageUrl),
 
             const SizedBox(height: 16),
-            // ── Visual Image Card ──
-            _buildImageCard(imageUrl),
 
-            const SizedBox(height: 24),
+            // ── Answer Pool Container ──
+            Flexible(
+              fit: FlexFit.loose,
+              child: _buildAnswerPool(options, correctIndex, rounds.length),
+            ),
 
-            // ── Premium Answer Pool ──
-            _buildAnswerPool(options, correctIndex, rounds.length),
-
-            const Spacer(flex: 2),
+            const SizedBox(height: 12),
           ],
         ),
       ),
@@ -236,7 +300,9 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
   Widget _buildSpeakerCard(String promptText) {
     return GestureDetector(
       onTap: () {
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.logAudioReplay();
+        context
+            .findAncestorStateOfType<TelemetryWrapperState>()
+            ?.logAudioReplay();
         _playAudioPrompt();
       },
       child: Container(
@@ -265,18 +331,18 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
             ScaleTransition(
               scale: _speakerBounceAnimation,
               child: Container(
-              width: 48,
-              height: 48,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.warmAmber,
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.warmAmber,
+                ),
+                child: const Icon(
+                  Icons.volume_up_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
               ),
-              child: const Icon(
-                Icons.volume_up_rounded,
-                color: Colors.white,
-                size: 28,
-              ),
-            ),
             ),
           ],
         ),
@@ -284,29 +350,81 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
     );
   }
 
-  /// Visually stunning central card that displays the real PNG image
-  Widget _buildImageCard(String imageUrl) {
+  /// Answer pool in its own styled container
+  Widget _buildAnswerPool(
+    List<String> options,
+    int correctIndex,
+    int totalRounds,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.85),
+            Colors.white.withValues(alpha: 0.5),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(36),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.9),
+          width: 3,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Wrap(
+        key: ValueKey('round_$_currentRoundIndex'),
+        spacing: 12,
+        runSpacing: 12,
+        alignment: WrapAlignment.center,
+        children: List.generate(options.length, (index) {
+          return _buildOptionTile(
+            index,
+            options[index],
+            correctIndex,
+            totalRounds,
+            options.length,
+          );
+        }),
+      ),
+    );
+  }
+
+  /// Image display with bounce animation
+  Widget _buildImageSection(String imageUrl) {
     return ScaleTransition(
       scale: Tween<double>(begin: 0.5, end: 1.0).animate(
-        CurvedAnimation(parent: _imageBounceController, curve: Curves.elasticOut),
+        CurvedAnimation(
+          parent: _imageBounceController,
+          curve: Curves.elasticOut,
+        ),
       ),
       child: Container(
-        width: 200,
-        height: 200,
+        width: 170,
+        height: 170,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: AppColors.warmAmber.withValues(alpha: 0.4),
-            width: 3,
+            color: AppColors.warmAmber.withValues(alpha: 0.35),
+            width: 2.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.warmAmber.withValues(alpha: 0.2),
-              blurRadius: 16,
+              color: AppColors.warmAmber.withValues(alpha: 0.15),
+              blurRadius: 14,
               offset: const Offset(0, 4),
-            )
+            ),
           ],
         ),
         child: Center(
@@ -317,10 +435,9 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
             },
             child: Image.asset(
               imageUrl,
-              key: ValueKey<String>(imageUrl), // Forces animation on change
+              key: ValueKey<String>(imageUrl),
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
-                // Fallback if the image doesn't exist yet
                 return const Icon(
                   Icons.image_not_supported_rounded,
                   color: Colors.grey,
@@ -334,24 +451,14 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
     );
   }
 
-  /// Premium answer pool container with frosted glass effect
-  Widget _buildAnswerPool(List<String> options, int correctIndex, int totalRounds) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: Wrap(
-        spacing: 16,
-        runSpacing: 16,
-        alignment: WrapAlignment.center,
-        children: List.generate(options.length, (index) {
-          return _buildOptionTile(index, options[index], correctIndex, totalRounds, options.length);
-        }),
-      ),
-    );
-  }
-
   /// Individual interactive option tile with bouncy feedback
-  Widget _buildOptionTile(int index, String optionText, int correctIndex, int totalRounds, int totalOptions) {
+  Widget _buildOptionTile(
+    int index,
+    String optionText,
+    int correctIndex,
+    int totalRounds,
+    int totalOptions,
+  ) {
     final isSelected = (_selectedIndex == index);
     final isRight = isSelected && (index == correctIndex);
     final isWrong = isSelected && (index != correctIndex);
@@ -383,9 +490,8 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
           color: const Color(0xFF6DBE6D).withValues(alpha: 0.3),
           blurRadius: 16,
           spreadRadius: 2,
-        )
+        ),
       ];
-      
     } else if (isWrong) {
       tileColor = const Color(0xFFE87C6D).withValues(alpha: 0.15);
       borderColor = const Color(0xFFE87C6D);
@@ -395,9 +501,8 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
           color: const Color(0xFFE87C6D).withValues(alpha: 0.3),
           blurRadius: 16,
           spreadRadius: 2,
-        )
+        ),
       ];
-      
     }
 
     return GestureDetector(
@@ -414,10 +519,7 @@ class _Skill3Act1ImageMcqState extends State<Skill3Act1ImageMcq>
           decoration: BoxDecoration(
             color: tileColor,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: borderColor,
-              width: borderWidth,
-            ),
+            border: Border.all(color: borderColor, width: borderWidth),
             boxShadow: shadows,
           ),
           child: Center(

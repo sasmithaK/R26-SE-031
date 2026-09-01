@@ -64,7 +64,7 @@ def generate_synthetic_data(num_samples=1000):
         'local_shimmer': shimmer,
         'time_to_first_touch_ms': t_first_touch,
         'orthographic_confusion_index': oci,
-        'path_efficiency': path_efficiency,
+        'path_efficiency_ratio': path_efficiency,  # matches comp2_kinematics.py + schemas.py
         'dimensionless_jerk': dj,
         'dwell_time_ms': dwell_time,
         'age': age,
@@ -75,9 +75,17 @@ def generate_synthetic_data(num_samples=1000):
     return df, y
 
 def train_and_save():
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import classification_report
+
     print("Generating synthetic clinical data...")
     X, y = generate_synthetic_data(1500)
     
+    # Proper 80/20 stratified split for honest evaluation
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
+    )
+
     model = xgb.XGBClassifier(
         objective='multi:softprob',
         num_class=4,
@@ -87,23 +95,42 @@ def train_and_save():
         random_state=42
     )
     
-    print("Training XGBoost Multi-Class model...")
-    model.fit(X, y)
+    print("Training XGBoost Multi-Class model on 80% training set...")
+    model.fit(X_train, y_train)
     
-    # Evaluate accuracy just to be sure it learned the rules
-    preds = model.predict(X)
-    acc = np.mean(preds == y)
-    print(f"Training Accuracy (Synthetic): {acc*100:.2f}%")
+    # Evaluate on HELD-OUT test set (not training set)
+    preds_test = model.predict(X_test)
+    print("\n=== Held-Out Test Set Evaluation (20% = 300 samples) ===")
+    print(classification_report(
+        y_test, preds_test,
+        target_names=["Typical", "Phonological", "Visual-Orthographic", "Combined"]
+    ))
     
-    # Save the model
+    # Also report training accuracy for comparison (to show gap)
+    preds_train = model.predict(X_train)
+    train_acc = np.mean(preds_train == y_train)
+    print(f"Training Accuracy (in-sample, N={len(X_train)}): {train_acc*100:.2f}%")
+    
+    # Save the model (retrain on full data for deployment)
+    model_full = xgb.XGBClassifier(
+        objective='multi:softprob',
+        num_class=4,
+        n_estimators=100,
+        max_depth=4,
+        learning_rate=0.1,
+        random_state=42
+    )
+    model_full.fit(X, y)
+
     os.makedirs("../models", exist_ok=True)
     model_path = "../models/xgboost_clinical_fusion.pkl"
-    joblib.dump(model, model_path)
-    print(f"Model successfully saved to {model_path}")
+    joblib.dump(model_full, model_path)
+    print(f"\nFull model saved to {model_path}")
     
     # Save feature names for reference during SHAP
     feature_names = X.columns.tolist()
     joblib.dump(feature_names, "../models/feature_names.pkl")
+    print(f"Feature names saved: {feature_names}")
 
 if __name__ == "__main__":
     # Go to script directory to ensure relative paths work

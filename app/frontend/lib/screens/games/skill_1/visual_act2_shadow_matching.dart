@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import '../../../widgets/app_loading_indicator.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../models/curriculum_models.dart';
@@ -12,6 +13,7 @@ import '../../../../services/progress_service.dart';
 import 'logic/shadow_generator.dart';
 import 'models/shadow_round.dart';
 import 'widgets/pattern_background.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
 // ──────────────────────────────────────────────────────────────
 // Activity 04: Shadow Matching Adventure
@@ -20,8 +22,9 @@ import 'widgets/pattern_background.dart';
 
 class VisualAct2ShadowMatching extends StatefulWidget {
   final ActivityNode activityNode;
+  final Map<String, dynamic>? studentData;
 
-  const VisualAct2ShadowMatching({Key? key, required this.activityNode})
+  const VisualAct2ShadowMatching({Key? key, required this.activityNode, this.studentData})
       : super(key: key);
 
   @override
@@ -31,6 +34,7 @@ class VisualAct2ShadowMatching extends StatefulWidget {
 
 class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
     with TickerProviderStateMixin {
+  String _lastSpokenInstruction = '';
   // ── Game state ──
   int _currentRoundIndex = 0;
   late List<ShadowRound> _rounds;
@@ -78,8 +82,6 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   // ── Sinhala instructions ──
   static const List<String> _instructions = [
     'සෙවනැල්ලට ගැලපෙන පින්තූරය තෝරන්න!',
-    'සෙවනැල්ලට ගැලපෙන පින්තූරය අදින්න!',
-    'හරිම සෙවනැල්ල හොයමු!',
   ];
   late String _currentInstruction;
 
@@ -161,12 +163,17 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
     _roundTransitionController.forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playInstruction();
+      _playInstruction(autoPlay: true);
     });
   }
 
-  void _playInstruction() {
-    TtsService().speak(_currentInstruction);
+  void _playInstruction({bool autoPlay = false}) {
+    
+    if (autoPlay && _lastSpokenInstruction == _currentInstruction) {
+      return;
+    }
+    _lastSpokenInstruction = _currentInstruction;
+    TtsService().speak(_currentInstruction, folder: 'skill_1');
     _speakerBounceController.forward().then((_) {
       _speakerBounceController.reverse();
     });
@@ -240,6 +247,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
     super.dispose();
   }
 
+
   // ── Game logic ──
 
   ShadowRound get _currentRound => _rounds[_currentRoundIndex];
@@ -251,7 +259,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
 
     if (object == targetShadow) {
       // Correct!
-      _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
       
       setState(() {
         _matchedObjects.add(object);
@@ -268,7 +276,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
       }
     } else {
       // Wrong!
-      _audioPlayer.play(AssetSource('audio/wrong.mp3'));
+      SoundUtils.playFeedback('audio/wrong.mp3');
       context.findAncestorStateOfType<TelemetryWrapperState>()?.recordMisclick();
       
       setState(() {
@@ -584,7 +592,8 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
               }
             }
             
-            if (maxCardSize > 120.0) maxCardSize = 120.0;
+            final double limit = (_currentRoundIndex <= 4) ? 160.0 : 120.0;
+            if (maxCardSize > limit) maxCardSize = limit;
 
             return Center(
               child: Wrap(
@@ -722,11 +731,13 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   // ── Object Tray ──
   Widget _buildObjectTray() {
     if (_roundComplete) {
-      return const SizedBox(height: 150); // Keep space but show nothing
+      return _currentRoundIndex == 0 
+          ? const Expanded(flex: 2, child: SizedBox())
+          : const SizedBox(height: 150); // Keep space but show nothing
     }
     
-    return Container(
-      height: 150, // Slightly taller for premium look
+    final content = Container(
+      height: _currentRoundIndex == 0 ? null : 150,
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.5),
@@ -740,7 +751,28 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
           ),
         ],
       ),
-      child: SingleChildScrollView(
+      child: _currentRoundIndex == 0
+          ? LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                controller: _trayScrollController,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                child: Container(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight - 32),
+                  alignment: Alignment.center,
+                  child: Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: _shuffledTrayObjects.map((object) {
+                      return _buildDraggableObject(object);
+                    }).toList(),
+                  ),
+                ),
+              ),
+            )
+          : SingleChildScrollView(
               controller: _trayScrollController,
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -753,6 +785,12 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
               ),
             ),
     );
+
+    if (_currentRoundIndex == 0) {
+      return Expanded(flex: 2, child: content);
+    } else {
+      return content;
+    }
   }
 
   Widget _buildDraggableObject(String object) {
@@ -763,7 +801,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOutBack,
       child: isMatched
-          ? const SizedBox(width: 0, height: 120) // Shrinks to 0 width and disappears smoothly
+          ? SizedBox(width: 0, height: _currentRoundIndex == 0 ? 140 : 120) // Shrinks to 0 width and disappears smoothly
           : Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: AnimatedBuilder(
@@ -785,7 +823,6 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
                   data: object,
                   maxSimultaneousDrags: 1,
                   onDragStarted: () {
-                    _audioPlayer.play(AssetSource('audio/pop.mp3'));
                     setState(() { _isDragging = true; });
                   },
                   onDragEnd: (_) {
@@ -801,9 +838,10 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   }
 
   Widget _buildObjectCard(String object) {
+    final double size = _currentRoundIndex == 0 ? 140 : 120;
     return Container(
-      width: 120,
-      height: 120,
+      width: size,
+      height: size,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -843,8 +881,8 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
         child: Transform.scale(
           scale: 1.1,
           child: Container(
-            width: 140,
-            height: 140,
+            width: _currentRoundIndex == 0 ? 160 : 140,
+            height: _currentRoundIndex == 0 ? 160 : 140,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -880,9 +918,10 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   }
 
   Widget _buildDragGhost() {
+    final double size = _currentRoundIndex == 0 ? 140 : 120;
     return Container(
-      width: 120,
-      height: 120,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(28),
@@ -966,103 +1005,12 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
 
   // ── Celebration Overlay ──
   Widget _buildCelebrationOverlay() {
-    return AnimatedBuilder(
-      animation: _celebrationScale,
-      builder: (context, child) {
-        return Container(
-          color: Colors.black.withValues(alpha: 0.4 * _celebrationScale.value),
-          child: Center(
-            child: Transform.scale(
-              scale: _celebrationScale.value,
-              child: child,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 32),
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4A90D9).withValues(alpha: 0.2),
-              blurRadius: 30,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildStar(36),
-                const SizedBox(width: 10),
-                _buildStar(52),
-                const SizedBox(width: 10),
-                _buildStar(36),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Image.asset(
-              _currentMascot,
-              width: 80,
-              height: 80,
-              fit: BoxFit.contain,
-              errorBuilder: (c, e, s) => const SizedBox(width: 80, height: 80),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'හොඳයි! 🎉',
-              style: AppTypography.sinhala(
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF3E3E3E),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'ඔබ සියලුම පින්තූර ගැලපුවා!',
-              style: AppTypography.sinhala(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF6B7280),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 28),
-            GestureDetector(
-              onTap: _finishActivity,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6DBE6D), Color(0xFF4E9E4E)],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6DBE6D).withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  'ඉදිරියට යමු →',
-                  style: AppTypography.sinhala(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+    return Positioned.fill(
+      child: SharedCelebrationPopup(
+        studentData: widget.studentData,
+        activityTitle: widget.activityNode.title,
+        scaleAnimation: _celebrationScale,
+        onFinish: _finishActivity,
       ),
     );
   }

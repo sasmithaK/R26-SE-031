@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'select_student_screen.dart';
 import 'therapist/therapist_dashboard_screen.dart';
+import 'character_intro_screen.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import '../widgets/sliding_role_toggle.dart';
@@ -143,12 +144,12 @@ class _SignInScreenState extends State<SignInScreen>
         return Scaffold(
           backgroundColor: AppColors.cream,
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
                   Stack(
                     alignment: Alignment.topCenter,
                     children: [
@@ -195,27 +196,35 @@ class _SignInScreenState extends State<SignInScreen>
                     ],
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
                   // Heading
-                  Text(
-                    LocalizationService.instance.t('signin_title'),
-                    style: AppTypography.heading(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      LocalizationService.instance.t('signin_title'),
+                      maxLines: 1,
+                      style: AppTypography.heading(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    LocalizationService.instance.t('signin_subtitle'),
-                    style: AppTypography.body(
-                      fontSize: 16,
-                      color: AppColors.textSecondary,
+                  const SizedBox(height: 2),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      LocalizationService.instance.t('signin_subtitle'),
+                      maxLines: 1,
+                      style: AppTypography.body(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
                   // Form container
                   Container(
@@ -392,10 +401,10 @@ class _SignInScreenState extends State<SignInScreen>
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                 ],
               ),
-            ),
+        ),
       ),
     );
       },

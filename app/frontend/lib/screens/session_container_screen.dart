@@ -21,6 +21,31 @@ class _SessionContainerScreenState extends State<SessionContainerScreen> {
   @override
   void initState() {
     super.initState();
+    
+    final studentId = widget.studentData?['student_id'] ?? widget.studentData?['id'] ?? widget.studentData?['_id'];
+    if (studentId == null || studentId.toString().trim().isEmpty || studentId == 'STU001' || studentId == 'unknown_student') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Data Capture Error'),
+            content: const Text('A valid student ID is strictly required to begin an activity session.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pop(context);
+                },
+                child: const Text('Go Back'),
+              ),
+            ],
+          ),
+        );
+      });
+      return;
+    }
+
     _playlist = SessionManager().generateDailySession();
     
     // Start telemetry
@@ -29,7 +54,7 @@ class _SessionContainerScreenState extends State<SessionContainerScreen> {
     // Give it a brief moment before starting the first game
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 1500), () {
-        _launchNextActivity();
+        if (mounted) _launchNextActivity();
       });
     });
   }
@@ -41,8 +66,12 @@ class _SessionContainerScreenState extends State<SessionContainerScreen> {
         _isSessionFinished = true;
       });
       // Submit telemetry
-      final studentId = widget.studentData?['id'] ?? 'unknown_student';
-      await TelemetryService().endSessionAndSubmit(studentId.toString());
+      final studentId = widget.studentData?['id'] ?? widget.studentData?['_id'];
+      if (studentId != null && studentId.toString().isNotEmpty) {
+        await TelemetryService().endSessionAndSubmit(studentId.toString());
+      } else {
+        debugPrint('Telemetry session submission skipped: No active student ID provided.');
+      }
       return;
     }
 

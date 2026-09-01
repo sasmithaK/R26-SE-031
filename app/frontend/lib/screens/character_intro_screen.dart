@@ -4,9 +4,10 @@ import '../widgets/monster_character.dart';
 import '../widgets/speech_bubble.dart';
 import '../widgets/gradient_button.dart';
 import 'select_student_screen.dart';
+import '../services/localization_service.dart';
 
-/// Screen 3: Character Introduction
-/// Dyslexia-accessible: crème bg, mint green speech bubble, calm blue accents.
+/// Screen 3: Character Introduction & App Onboarding
+/// Dyslexia-accessible: crème bg, calm blue accents.
 class CharacterIntroScreen extends StatefulWidget {
   const CharacterIntroScreen({super.key});
 
@@ -16,6 +17,9 @@ class CharacterIntroScreen extends StatefulWidget {
 
 class _CharacterIntroScreenState extends State<CharacterIntroScreen>
     with TickerProviderStateMixin {
+  final PageController _pageController = PageController();
+  int _currentPageIndex = 0;
+
   late AnimationController _contentController;
   late Animation<double> _contentFade;
   late Animation<Offset> _contentSlide;
@@ -44,147 +48,229 @@ class _CharacterIntroScreenState extends State<CharacterIntroScreen>
 
   @override
   void dispose() {
+    _pageController.dispose();
     _contentController.dispose();
     super.dispose();
   }
 
+  void _nextPage() {
+    if (_currentPageIndex < 2) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const SelectStudentScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1, 0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 400),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.cream,
-      body: Stack(
-        children: [
-          // Subtle gradient accent — warm amber glow
-          Positioned(
-            top: -100,
-            right: -50,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.warmAmber.withValues(alpha: 0.08),
-                    Colors.transparent,
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.cream,
+          body: Stack(
+            children: [
+              // Subtle gradient accent — warm amber glow
+              Positioned(
+                top: -100,
+                right: -50,
+                child: Container(
+                  width: 250,
+                  height: 250,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.warmAmber.withValues(alpha: 0.08),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              SafeArea(
+                child: Column(
+                  children: [
+                    // Top bar with back button and progress indicator
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          _buildBackButton(context),
+                          const Spacer(),
+                          // Progress indicator dots
+                          Row(
+                            children: List.generate(3, (i) {
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                width: _currentPageIndex == i ? 24 : 8,
+                                height: 8,
+                                margin: const EdgeInsets.symmetric(horizontal: 3),
+                                decoration: BoxDecoration(
+                                  color: _currentPageIndex == i
+                                      ? AppColors.calmBlue
+                                      : AppColors.borderLight,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // PageView Content
+                    Expanded(
+                      child: SlideTransition(
+                        position: _contentSlide,
+                        child: FadeTransition(
+                          opacity: _contentFade,
+                          child: PageView(
+                            controller: _pageController,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _currentPageIndex = index;
+                              });
+                            },
+                            children: [
+                              _buildPage1(),
+                              _buildPage2(),
+                              _buildPage3(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Bottom Action Button
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: SlideTransition(
+                        position: _contentSlide,
+                        child: FadeTransition(
+                          opacity: _contentFade,
+                          child: GradientButton(
+                            text: _currentPageIndex == 2
+                                ? LocalizationService.instance.t('get_started_btn')
+                                : LocalizationService.instance.t('continue_btn'),
+                            onPressed: _nextPage,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
-            ),
+            ],
           ),
+        );
+      }
+    );
+  }
 
-          SafeArea(
-            child: Column(
-              children: [
-                // Top bar with back button
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      _buildBackButton(context),
-                      const Spacer(),
-                      // Progress indicator dots
-                      Row(
-                        children: List.generate(3, (i) {
-                          return Container(
-                            width: i == 0 ? 24 : 8,
-                            height: 8,
-                            margin: const EdgeInsets.symmetric(horizontal: 3),
-                            decoration: BoxDecoration(
-                              color: i == 0
-                                  ? AppColors.calmBlue
-                                  : AppColors.borderLight,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
+  Widget _buildPage1() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Spacer(flex: 2),
+        SpeechBubble(
+          text: LocalizationService.instance.t('intro_page1_title'),
+          delay: const Duration(milliseconds: 600),
+        ),
+        const SizedBox(height: 16),
+        const MonsterCharacter(
+          size: 220,
+          animation: MonsterAnimation.excited,
+          showBody: true,
+          imagePath: 'assets/images/characters/mascots/solo_yellow_straight.png',
+        ),
+        const Spacer(flex: 3),
+      ],
+    );
+  }
 
-                const Spacer(flex: 2),
+  Widget _buildPage2() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Spacer(flex: 2),
+        SpeechBubble(
+          text: LocalizationService.instance.t('intro_page2_title'),
+          delay: const Duration(milliseconds: 600),
+        ),
+        const SizedBox(height: 16),
+        const MonsterCharacter(
+          size: 220,
+          animation: MonsterAnimation.wave,
+          showBody: true,
+          imagePath: 'assets/images/characters/mascots/solo_blue.png',
+        ),
+        const Spacer(flex: 3),
+      ],
+    );
+  }
 
-                // Speech bubble
-                SlideTransition(
-                  position: _contentSlide,
-                  child: FadeTransition(
-                    opacity: _contentFade,
-                    child: const SpeechBubble(
-                      text: "Hi there! I'm Moko!\nI'm so excited to meet you!",
-                      delay: Duration(milliseconds: 600),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Character
-                FadeTransition(
-                  opacity: _contentFade,
-                  child: const MonsterCharacter(
-                    size: 220,
-                    animation: MonsterAnimation.none,
-                    showBody: true,
-                    imagePath: 'assets/images/characters/mascots/solo_yellow_straight.png',
-                  ),
-                ),
-
-                const Spacer(flex: 3),
-
-                // Continue button
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: SlideTransition(
-                    position: _contentSlide,
-                    child: FadeTransition(
-                      opacity: _contentFade,
-                      child: GradientButton(
-                        text: 'continue',
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            PageRouteBuilder(
-                              pageBuilder: (context, animation,
-                                      secondaryAnimation) =>
-                                  const SelectStudentScreen(),
-                              transitionsBuilder: (context, animation,
-                                  secondaryAnimation, child) {
-                                return SlideTransition(
-                                  position: Tween<Offset>(
-                                    begin: const Offset(1, 0),
-                                    end: Offset.zero,
-                                  ).animate(CurvedAnimation(
-                                    parent: animation,
-                                    curve: Curves.easeOutCubic,
-                                  )),
-                                  child: child,
-                                );
-                              },
-                              transitionDuration:
-                                  const Duration(milliseconds: 400),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-              ],
-            ),
-          ),
-        ],
-      ),
+  Widget _buildPage3() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Spacer(flex: 2),
+        SpeechBubble(
+          text: LocalizationService.instance.t('intro_page3_title'),
+          delay: const Duration(milliseconds: 600),
+        ),
+        const SizedBox(height: 16),
+        const MonsterCharacter(
+          size: 220,
+          animation: MonsterAnimation.idle,
+          showBody: true,
+          imagePath: 'assets/images/characters/mascots/solo_pink.png',
+        ),
+        const Spacer(flex: 3),
+      ],
     );
   }
 
   Widget _buildBackButton(BuildContext context) {
+    if (_currentPageIndex == 0) {
+      // Hide the back button on the first slide
+      return const SizedBox(width: 48, height: 48);
+    }
+
     return GestureDetector(
-      onTap: () => Navigator.of(context).pop(),
+      onTap: () {
+        _pageController.previousPage(
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      },
       child: Container(
         width: 48,
         height: 48,

@@ -31,15 +31,17 @@ class IRTEngine:
             
         return 1.0 / math.sqrt(info_sum)
 
-    def should_terminate_session(self, theta: float, item_difficulties: List[float]) -> bool:
+    def update_theta(self, theta_old: float, is_correct: bool, b_i: float, learning_rate: float = 0.5) -> float:
         """
-        Checks standard error stopping rules for fatigue mitigation.
-        Triggers if SE < 0.30.
+        Online update of ability estimate θ using Stochastic Gradient Descent step.
         """
-        if not item_difficulties:
-            return False
-            
-        se = self.calculate_standard_error(theta, item_difficulties)
-        return se < self.se_threshold
+        p_i = self.calculate_probability(theta_old, b_i)
+        response = 1.0 if is_correct else 0.0
+        
+        # Simple SGD update: theta_new = theta_old + alpha * (Response - Probability)
+        theta_new = theta_old + learning_rate * (response - p_i)
+        
+        # Clamp theta to reasonable bounds [-4.0, 4.0]
+        return max(-4.0, min(4.0, theta_new))
 
 irt_engine = IRTEngine()

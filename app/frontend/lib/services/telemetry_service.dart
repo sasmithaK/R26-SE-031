@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart'; // For PointerEvent
@@ -56,11 +57,41 @@ class TelemetryEvent {
   /// Number of times the student replayed the audio instruction
   final int audioReplayCount;
 
+  /// Number of self-corrections made during the round
+  final int correctionCount;
+
+  /// Number of hints requested or given during the round
+  final int hintCount;
+
   /// True if the user exited the activity before completing all rounds
   final bool isAbandoned;
 
   /// Normalized (x%, y%) touch path captured during the round
   final List<TouchPoint> touchPath;
+
+  // --- Attempt & Accuracy Tracking ---
+  final int attemptCount;
+  final int incorrectAttemptCount;
+  final bool? firstAttemptCorrect;
+  final bool finalCorrect;
+  final int timeToFirstResponseMs;
+  final int timeToCorrectMs;
+
+  // --- Research & Canonical Item Metadata ---
+  final String skillId;
+  final String activityId;
+  final String itemId;
+  final int itemVersion;
+  final String knowledgeComponentId;
+  final String promptModality;
+  final String responseModality;
+  final String researchRole;
+  final String difficultyLabel;
+  final double difficultyB;
+  final bool isAnchor;
+  final List<String> targets;
+  final List<String> selectedAnswers;
+  final String errorType;
 
   const TelemetryEvent({
     required this.activityName,
@@ -75,6 +106,28 @@ class TelemetryEvent {
     required this.audioReplayCount,
     required this.isAbandoned,
     required this.touchPath,
+    this.attemptCount = 1,
+    this.incorrectAttemptCount = 0,
+    this.firstAttemptCorrect,
+    this.finalCorrect = false,
+    this.timeToFirstResponseMs = 0,
+    this.timeToCorrectMs = 0,
+    this.correctionCount = 0,
+    this.hintCount = 0,
+    this.skillId = '',
+    this.activityId = '',
+    this.itemId = 'unknown',
+    this.itemVersion = 1,
+    this.knowledgeComponentId = 'KC_UNKNOWN',
+    this.promptModality = 'visual',
+    this.responseModality = 'tap',
+    this.researchRole = 'primary',
+    this.difficultyLabel = 'medium',
+    this.difficultyB = 0.0,
+    this.isAnchor = false,
+    this.targets = const [],
+    this.selectedAnswers = const [],
+    this.errorType = 'unknown_error',
   });
 
   Map<String, dynamic> toJson() => {
@@ -88,8 +141,30 @@ class TelemetryEvent {
         'misclick_count': misclickCount,
         'hesitation_count': hesitationCount,
         'audio_replay_count': audioReplayCount,
+        'correction_count': correctionCount,
+        'hint_count': hintCount,
         'is_abandoned': isAbandoned,
         'touch_path': touchPath.map((p) => p.toJson()).toList(),
+        'attempt_count': attemptCount,
+        'incorrect_attempt_count': incorrectAttemptCount,
+        'first_attempt_correct': firstAttemptCorrect,
+        'final_correct': finalCorrect,
+        'time_to_first_response_ms': timeToFirstResponseMs,
+        'time_to_correct_ms': timeToCorrectMs,
+        'skill_id': skillId,
+        'activity_id': activityId,
+        'item_id': itemId,
+        'item_version': itemVersion,
+        'knowledge_component_id': knowledgeComponentId,
+        'prompt_modality': promptModality,
+        'response_modality': responseModality,
+        'research_role': researchRole,
+        'difficulty_label': difficultyLabel,
+        'difficulty_b': difficultyB,
+        'is_anchor': isAnchor,
+        'targets': targets,
+        'selected_answers': selectedAnswers,
+        'error_type': errorType,
       };
 }
 
@@ -105,6 +180,10 @@ class TelemetryService {
 
   final List<TelemetryEvent> _sessionEvents = [];
   DateTime? _sessionStartTime;
+  String? _sessionId;
+  String get sessionId => _sessionId ??= const Uuid().v4();
+  
+  DateTime? get sessionStartTime => _sessionStartTime;
   
   /// Expose the session events for debugging and the temporary dashboard
   List<TelemetryEvent> get sessionEvents => List.unmodifiable(_sessionEvents);
@@ -125,6 +204,7 @@ class TelemetryService {
 
   void startSession() {
     _sessionStartTime = DateTime.now();
+    _sessionId = const Uuid().v4();
     _sessionEvents.clear();
     debugPrint('Telemetry: Session started');
   }
@@ -170,12 +250,17 @@ class TelemetryService {
 
     // Grab a local copy of events and clear immediately to avoid race conditions
     // with newly started sessions while this submits in the background.
-    final eventsToSubmit = _sessionEvents.map((e) => e.toJson()).toList();
+    final sessionId = _sessionId ?? const Uuid().v4();
+    final eventsToSubmit = _sessionEvents.asMap().entries.map((entry) => {
+      ...entry.value.toJson(),
+      'event_id': '$sessionId:${entry.key}',
+    }).toList();
     final sessionEventCount = _sessionEvents.length;
     _sessionEvents.clear();
 
     final payload = {
       'student_id': studentId,
+      'session_id': sessionId,
       'session_duration_seconds': totalDuration,
       'events': eventsToSubmit,
       'device_metrics': await _getDeviceMetrics(),

@@ -1,51 +1,39 @@
+import os
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from services.tts_service import TTSService
-from database import get_fs
 
 router = APIRouter(prefix="/tts", tags=["Text-to-Speech"])
 
+from typing import Optional
 class TTSRequest(BaseModel):
     text: str
+    folder: Optional[str] = "general"
 
 @router.post("/generate")
-async def generate_speech(request: TTSRequest):
+def generate_speech(request: TTSRequest):
     """
     Converts Sinhala text into speech using Google TTS.
-    Returns the GridFS streaming URL for the generated MP3.
+    Returns the streaming URL for the generated MP3.
     """
     text = request.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Text cannot be empty")
         
     try:
-        text_hash = await TTSService.text_to_speech(text)
-        return {"file_path": f"/tts/audio/{text_hash}"}
+        file_path = TTSService.text_to_speech(text, request.folder)
+        return {"file_path": f"/tts/audio/{file_path}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/audio/{text_hash}")
-async def get_audio(text_hash: str):
+@router.api_route("/audio/{folder}/{text_hash}.wav", methods=["GET", "HEAD"])
+async def get_audio(folder: str, text_hash: str):
     """
-    Streams the TTS audio file directly from MongoDB GridFS.
+    Streams the TTS audio file directly from local filesystem.
     """
-    fs = get_fs()
-    
-    # Find the file in GridFS
-    cursor = fs.find({"filename": text_hash})
-    docs = await cursor.to_list(length=1)
-    if not docs:
+    local_path = os.path.join(os.path.dirname(__file__), "..", "local_audio", folder, f"{text_hash}.wav")
+    if not os.path.exists(local_path):
         raise HTTPException(status_code=404, detail="Audio not found")
-    
-    file_id = docs[0]["_id"]
-    grid_out = await fs.open_download_stream(file_id)
-    
-    async def stream_audio():
-        while True:
-            chunk = await grid_out.readchunk()
-            if not chunk:
-                break
-            yield chunk
-
-    return StreamingResponse(stream_audio(), media_type="audio/mpeg")
+        
+    return FileResponse(local_path, media_type="audio/wav")

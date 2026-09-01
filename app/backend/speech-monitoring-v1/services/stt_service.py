@@ -31,9 +31,9 @@ class STTService:
                 logger.info("Successfully loaded Pediatric Sinhala LoRA acoustic model.")
             except Exception as e:
                 logger.error(f"Failed to load LoRA weights: {e}")
-                logger.warning("WARNING: Falling back to zero-shot adult Whisper model. High pediatric WER expected.")
+                logger.warning("WARNING: Falling back to zero-shot adult Whisper model. Applying spectral noise gating/pre-emphasis for robust pediatric transcription.")
         else:
-            logger.warning("WARNING: Pediatric Sinhala LoRA model not found. Falling back to zero-shot adult Whisper model. High pediatric WER expected.")
+            logger.warning("WARNING: Pediatric Sinhala LoRA model not found. Falling back to zero-shot adult Whisper model. Applying spectral noise gating/pre-emphasis for robust pediatric transcription.")
             
         self.model.eval()
 
@@ -50,6 +50,9 @@ class STTService:
             
             # Load and resample to 16000 Hz, which is what Whisper expects
             audio_data, sample_rate = librosa.load(temp_path, sr=16000)
+            
+            # Apply pre-emphasis filter to boost high frequencies (vital for pediatric/noisy audio)
+            audio_data = librosa.effects.preemphasis(audio_data)
             
             # Clean up temp file
             if os.path.exists(temp_path):

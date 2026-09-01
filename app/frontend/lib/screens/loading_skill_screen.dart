@@ -52,7 +52,7 @@ class _LoadingSkillScreenState extends State<LoadingSkillScreen> {
       }
 
       if (!mounted) return;
-      await Navigator.push(
+      final result = await Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => LevelMapScreen(skillMap: skillDetail, studentData: widget.studentData)),
       );
@@ -61,7 +61,7 @@ class _LoadingSkillScreenState extends State<LoadingSkillScreen> {
         setState(() {
           _isPopping = true; // hide UI to prevent flash during pop
         });
-        Navigator.pop(context);
+        Navigator.pop(context, result);
       }
       
     } catch (e) {

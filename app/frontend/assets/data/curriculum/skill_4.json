@@ -23,7 +23,12 @@
               "අම්මා නිදාගන්නවා"
             ],
             "correctOption": "අම්මා උයනවා",
-            "correct_index": 0
+            "correct_index": 0,
+            "item_id": "S4_A1_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට ගැලපෙන වාක්‍යය තෝරන්න",
@@ -33,7 +38,12 @@
               "හඳ පායනවා"
             ],
             "correctOption": "ඉර පායනවා",
-            "correct_index": 0
+            "correct_index": 0,
+            "item_id": "S4_A1_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට ගැලපෙන වාක්‍යය තෝරන්න",
@@ -44,7 +54,12 @@
               "ඉර පායනවා"
             ],
             "correctOption": "ඔරුව පදිනවා",
-            "correct_index": 0
+            "correct_index": 0,
+            "item_id": "S4_A1_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට ගැලපෙන වාක්‍යය තෝරන්න",
@@ -55,7 +70,12 @@
               "ඉර පායනවා"
             ],
             "correctOption": "පොත කියවනවා",
-            "correct_index": 0
+            "correct_index": 0,
+            "item_id": "S4_A1_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "පින්තූරයට ගැලපෙන වාක්‍යය තෝරන්න",
@@ -67,13 +87,24 @@
               "ගුරුතුමී නිදාගන්නවා."
             ],
             "correctOption": "ගුරුතුමී අකුරු ලියනවා.",
-            "correct_index": 2
+            "correct_index": 2,
+            "item_id": "S4_A1_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_SENTENCE_LANGUAGE",
+          "prompt_modality": "image",
+          "response_modality": "tap",
+          "research_role": "secondary"
+        }
       },
       {
         "id": "act_2",
-        "title": "අඩු වචනය සොයමු",
+        "title": "වචන යොදා වාක්‍ය හදමු",
         "description": "වාක්‍යයේ හිස්තැනට සුදුසු වචනය තෝරන්න",
         "telemetry_tags": [
           "sentence_structure",
@@ -92,7 +123,13 @@
               "බත්"
             ],
             "correctOption": "හඳ",
-            "correct_index": 0
+            "correct_index": 0,
+            "image_url": "assets/images/games/moon_shining.png",
+            "item_id": "S4_A2_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "හිස්තැනට සුදුසු වචනය තෝරන්න",
@@ -105,7 +142,13 @@
               "මල්"
             ],
             "correctOption": "මල්",
-            "correct_index": 1
+            "correct_index": 1,
+            "image_url": "assets/images/games/flower_blooming.png",
+            "item_id": "S4_A2_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "හිස්තැනට සුදුසු වචනය තෝරන්න",
@@ -120,7 +163,13 @@
               "පොතක්"
             ],
             "correctOption": "පාසල්",
-            "correct_index": 0
+            "correct_index": 0,
+            "image_url": "assets/images/games/girl_going_to_school.png",
+            "item_id": "S4_A2_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "හිස්තැනට සුදුසු වචනය තෝරන්න",
@@ -136,7 +185,13 @@
               "ගල්"
             ],
             "correctOption": "කෑම",
-            "correct_index": 0
+            "correct_index": 0,
+            "image_url": "assets/images/games/mother_cooking.png",
+            "item_id": "S4_A2_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "හිස්තැනට සුදුසු වචනය තෝරන්න",
@@ -149,17 +204,28 @@
               "ගෙදර",
               "චිත්‍රයක්",
               "කිරි",
-              "සීනි",
-              "වතුර"
+              "සීනි"
             ],
             "correctOption": "චිත්‍රයක්",
-            "correct_index": 1
+            "correct_index": 1,
+            "image_url": "assets/images/games/boy_drawing.png",
+            "item_id": "S4_A2_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_SENTENCE_LANGUAGE",
+          "prompt_modality": "visual_text",
+          "response_modality": "tap",
+          "research_role": "secondary"
+        }
       },
       {
         "id": "act_3",
-        "title": "වචන යොදා වාක්‍ය හදමු",
+        "title": "වාක්‍ය අසා හඳුනා ගනිමු",
         "description": "වචන නිවැරදිව ගලපා වාක්‍යය සාදමු",
         "telemetry_tags": [
           "sentence_structure",
@@ -175,7 +241,12 @@
             ],
             "correctOption": "පාසල් යනවා.",
             "correct_index": 0,
-            "audio_text": "පාසල් යනවා."
+            "audio_text": "පාසල් යනවා.",
+            "item_id": "S4_A3_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "ශබ්දයට සවන් දී නිවැරදි වාක්‍ය තෝරන්න",
@@ -185,7 +256,12 @@
             ],
             "correctOption": "පොත බලනවා.",
             "correct_index": 0,
-            "audio_text": "පොත බලනවා."
+            "audio_text": "පොත බලනවා.",
+            "item_id": "S4_A3_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "ශබ්දයට සවන් දී නිවැරදි වාක්‍ය තෝරන්න",
@@ -196,7 +272,12 @@
             ],
             "correctOption": "අම්මා කෑම උයයි.",
             "correct_index": 2,
-            "audio_text": "අම්මා කෑම උයයි."
+            "audio_text": "අම්මා කෑම උයයි.",
+            "item_id": "S4_A3_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "ශබ්දයට සවන් දී නිවැරදි වාක්‍ය තෝරන්න",
@@ -208,7 +289,12 @@
             ],
             "correctOption": "ගුරුතුමී අකුරු ලියනවා.",
             "correct_index": 0,
-            "audio_text": "ගුරුතුමී අකුරු ලියනවා."
+            "audio_text": "ගුරුතුමී අකුරු ලියනවා.",
+            "item_id": "S4_A3_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "ශබ්දයට සවන් දී නිවැරදි වාක්‍ය තෝරන්න",
@@ -220,9 +306,20 @@
             ],
             "correctOption": "පවනි සෙල්ලම් කරනවා.",
             "correct_index": 0,
-            "audio_text": "පවනි සෙල්ලම් කරනවා."
+            "audio_text": "පවනි සෙල්ලම් කරනවා.",
+            "item_id": "S4_A3_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_SENTENCE_LANGUAGE",
+          "prompt_modality": "audio",
+          "response_modality": "tap",
+          "research_role": "secondary"
+        }
       },
       {
         "id": "act_4",
@@ -242,7 +339,12 @@
               "යනවා",
               "පාසල්"
             ],
-            "image_url": "assets/images/games/girl_going_to_school.png"
+            "image_url": "assets/images/games/girl_going_to_school.png",
+            "item_id": "S4_A4_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට අදාළ වාක්‍යය සාදන්න",
@@ -251,7 +353,12 @@
               "කියවනවා",
               "පොතක්"
             ],
-            "image_url": "assets/images/games/girl_reading_tree.jpg"
+            "image_url": "assets/images/games/girl_reading_tree.jpg",
+            "item_id": "S4_A4_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට අදාළ වාක්‍යය සාදන්න",
@@ -261,7 +368,12 @@
               "මල්ලි",
               "සරුංගලයක්"
             ],
-            "image_url": "assets/images/games/boy_flying_kite.png"
+            "image_url": "assets/images/games/boy_flying_kite.png",
+            "item_id": "S4_A4_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට අදාළ වාක්‍යය සාදන්න",
@@ -271,7 +383,12 @@
               "දෙනවා",
               "බල්ලාට"
             ],
-            "image_url": "assets/images/games/boy_feeding_dog.jpg"
+            "image_url": "assets/images/games/boy_feeding_dog.jpg",
+            "item_id": "S4_A4_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "පින්තූරයට අදාළ වාක්‍යය සාදන්න",
@@ -282,9 +399,20 @@
               "කරනවා",
               "දෙන්නා"
             ],
-            "image_url": "assets/images/games/children_playing_ball.jpg"
+            "image_url": "assets/images/games/children_playing_ball.jpg",
+            "item_id": "S4_A4_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_SENTENCE_LANGUAGE",
+          "prompt_modality": "image_text",
+          "response_modality": "drag",
+          "research_role": "secondary"
+        }
       }
     ],
     "total_activities": 4

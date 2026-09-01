@@ -7,6 +7,8 @@ class AssessmentQuestion {
     required this.yesWeight,
   });
 
+  String get id => 'q_${questionText.hashCode.abs()}';
+
   static const List<AssessmentQuestion> allQuestions = [
     AssessmentQuestion(
       questionText: 'Do you find it difficult telling your left from right?',

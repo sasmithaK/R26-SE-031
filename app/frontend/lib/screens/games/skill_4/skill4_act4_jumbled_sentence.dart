@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../widgets/telemetry_wrapper.dart';
@@ -7,6 +8,7 @@ import '../../../../models/curriculum_models.dart';
 import '../../../../services/tts_service.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
 import '../../../../services/progress_service.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
 class PlacedWord {
   final String word;
@@ -17,13 +19,15 @@ class PlacedWord {
 class Skill4Act4JumbledSentence extends StatefulWidget {
   final ActivityNode? activityNode;
   final bool isRemedial;
-  const Skill4Act4JumbledSentence({super.key, this.activityNode, this.isRemedial = false});
+  final Map<String, dynamic>? studentData;
+  const Skill4Act4JumbledSentence({super.key, this.activityNode, this.isRemedial = false, this.studentData});
 
   @override
   State<Skill4Act4JumbledSentence> createState() => _Skill4Act4JumbledSentenceState();
 }
 
 class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> with SingleTickerProviderStateMixin {
+  String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isCorrect = false;
   bool _activityComplete = false;
@@ -55,6 +59,9 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
         .animate(_shakeController);
 
     _initRound();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _playCurrentInstruction(autoPlay: true);
+    });
   }
 
   @override
@@ -80,6 +87,19 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
     });
   }
 
+  void _playCurrentInstruction({bool autoPlay = false}) {
+    final rounds = widget.activityNode?.rounds ?? [];
+    if (rounds.isEmpty) return;
+    final currentRound = rounds[_currentRoundIndex];
+    final instructionText = currentRound['prompt']?.toString() ?? 'පින්තූරයට අදාළ වාක්‍යය සාදන්න';
+    
+    if (autoPlay && _lastSpokenInstruction == instructionText) {
+      return;
+    }
+    _lastSpokenInstruction = instructionText;
+    TtsService().speak(instructionText, folder: 'skill_4');
+  }
+
   void _onPoolWordTapped(int poolIndex) async {
     if (_isChecking || _poolWords[poolIndex] == null) return;
 
@@ -93,8 +113,7 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
         _showError = false;
       });
       
-      // Speak the word
-      TtsService().speak(word);
+      // Do not speak the word to prevent overlapping with success audio
       
       // Check if all slots are filled
       if (!_filledSlots.contains(null)) {
@@ -133,7 +152,7 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
         _isCorrect = true;
       });
       context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(100);
-      await _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
 
       Future.delayed(const Duration(milliseconds: 1500), () {
         if (!mounted) return;
@@ -147,6 +166,7 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
                 ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
               }
           _initRound();
+          _playCurrentInstruction(autoPlay: true);
         } else {
           setState(() {
           _activityComplete = true;
@@ -162,7 +182,7 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
     } else {
       // Incorrect
       context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(0);
-      await _audioPlayer.play(AssetSource('audio/wrong.mp3'));
+      SoundUtils.playFeedback('audio/wrong.mp3');
       
       setState(() {
         _showError = true;
@@ -210,6 +230,8 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
     final imageUrl = currentRound['image_url']?.toString();
 
     return SharedGameLayout(
+      studentData: widget.studentData,
+      activityTitle: widget.activityNode?.title ?? '',
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
       totalRounds: rounds.length,
@@ -465,7 +487,7 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
     return GestureDetector(
       onTap: () {
         context.findAncestorStateOfType<TelemetryWrapperState>()?.logAudioReplay();
-        TtsService().speak(instruction);
+        TtsService().speak(instruction, folder: 'skill_4');
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),

@@ -13,11 +13,11 @@ class Database:
 db_instance = Database()
 
 async def connect_to_mongo():
-    mongo_url = os.getenv("MONGODB_URL")
-    if not mongo_url:
+    MONGODB_URL = os.getenv("MONGODB_URL")
+    if not MONGODB_URL:
         raise ValueError("MONGODB_URL environment variable is not set!")
     
-    db_instance.client = AsyncIOMotorClient(mongo_url, tlsCAFile=certifi.where())
+    db_instance.client = AsyncIOMotorClient(MONGODB_URL, tlsCAFile=certifi.where())
     
     # Initialize GridFS bucket
     db_name = os.getenv("MONGODB_DB_NAME", "r26_se_031")
@@ -33,3 +33,9 @@ async def close_mongo_connection():
 
 def get_fs() -> AsyncIOMotorGridFSBucket:
     return db_instance.fs
+
+def get_db():
+    if db_instance.client is None:
+        raise RuntimeError("Database not initialized")
+    db_name = os.getenv("MONGODB_DB_NAME", "r26_se_031")
+    return db_instance.client[db_name]

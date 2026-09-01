@@ -97,9 +97,14 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       _isLoading = true;
     });
 
+    final payload = List.generate(_questions.length, (i) => {
+      'question_id': _questions[i].id,
+      'answer': _answers[i]!,
+    });
+
     final error = await StudentService().submitAssessment(
       widget.studentId,
-      _answers.cast<bool>(),
+      payload,
     );
     
     if (!mounted) return;

@@ -13,7 +13,7 @@ python-dotenv>=1.0.1
 # NLP and Audio Processing
 torch
 transformers
-gTTS
+google-genai
 librosa
 praat-parselmouth
 soundfile

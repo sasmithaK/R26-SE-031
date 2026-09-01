@@ -1,0 +1,14 @@
+{
+  "c1_random_forest": {
+    "version": "1.0.0",
+    "feature_schema": "c1-features-v1",
+    "training_dataset": "synthetic-v1",
+    "algorithm": "RandomForestClassifier",
+    "class_names": [
+      "TYPICAL",
+      "VISUAL_ORTHOGRAPHIC_PATTERN",
+      "PHONOLOGICAL_PATTERN",
+      "COMBINED_PATTERN"
+    ]
+  }
+}

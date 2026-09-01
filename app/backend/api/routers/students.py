@@ -167,6 +167,14 @@ async def submit_assessment(student_id: str, request: AssessmentSubmit, current_
         {"$set": {"assessment_results": request.assessment_results}}
     )
 
+    await db.assessment_submissions.insert_one({
+        "student_id": str(obj_id),
+        "parent_id": str(parent_oid),
+        "assessment_type": "initial",
+        "results": request.assessment_results,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+
     return StudentResponse(
         id=str(obj_id),
         first_name=existing_student["first_name"],
@@ -271,10 +279,23 @@ async def submit_comprehensive_assessment(student_id: str, category: str, reques
 
     # Update the specific category within comprehensive_assessment_results
     update_field = f"comprehensive_assessment_results.{category}"
+    update_doc = {update_field: request.assessment_results}
+    if category == "basic":
+        update_doc["assessment_results"] = request.assessment_results
+
     await db.students.update_one(
         {"_id": obj_id},
-        {"$set": {update_field: request.assessment_results}}
+        {"$set": update_doc}
     )
+
+    await db.assessment_submissions.insert_one({
+        "student_id": str(obj_id),
+        "parent_id": str(parent_oid),
+        "assessment_type": "comprehensive",
+        "category": category,
+        "results": request.assessment_results,
+        "timestamp": datetime.utcnow().isoformat()
+    })
 
     # Fetch updated student to return full response
     updated_student = await db.students.find_one({"_id": obj_id})

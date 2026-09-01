@@ -32,7 +32,7 @@ async def get_activities_for_skill(
     # --- ML Engine Interception ---
     if student_id:
         # Fetch the last 10 telemetry events for this student to determine load
-        cursor = db.telemetry_events.find({"student_id": student_id}).sort("submitted_at", -1).limit(10)
+        cursor = db.telemetry_events.find({"student_id": student_id, "schema_version": "2.0"}).sort("submitted_at", -1).limit(10)
         recent_telemetry = await cursor.to_list(length=10)
         
         classification = CognitiveLoadClassifier.classify(recent_telemetry)

@@ -7,8 +7,8 @@
     "activities": [
       {
         "id": "act_1",
-        "title": "සඟවුණු පින්තූර සොයමු",
-        "description": "සඟවා ඇති පින්තූර සොයන්න.",
+        "title": "සැඟවුණු පින්තූර සොයමු",
+        "description": "සැඟවා ඇති පින්තූර සොයන්න.",
         "file_path": "",
         "telemetry_tags": [
           "visual",
@@ -27,7 +27,12 @@
               "animals/bird.png"
             ],
             "distractor_count": 3,
-            "instruction": "බල්ලා සොයන්න!"
+            "instruction": "බල්ලා සොයන්න!",
+            "item_id": "S1_A1_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "targets": [
@@ -42,7 +47,12 @@
               "animals/fish.png"
             ],
             "distractor_count": 6,
-            "instruction": "අලියන් දෙදෙනා සොයන්න!"
+            "instruction": "අලියන් දෙදෙනා සොයන්න!",
+            "item_id": "S1_A1_R02",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "targets": [
@@ -58,21 +68,38 @@
               "animals/rabbit.png"
             ],
             "distractor_count": 9,
-            "instruction": "සමනලුන් තුන්දෙනා සොයන්න!"
+            "instruction": "සමනලුන් තුන්දෙනා සොයන්න!",
+            "item_id": "S1_A1_R03",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_VISUAL_SUPPORT",
+          "prompt_modality": "visual",
+          "response_modality": "tap",
+          "research_role": "supportive"
+        }
       },
       {
         "id": "act_2",
-        "title": "වෙනස් පින්තූරය සොයමු",
-        "description": "වෙනස් පින්තූරය තෝරන්න.",
+        "title": "සෙවණැල්ලට පින්තූරය ගළපමු",
+        "description": "සෙවණැල්ලට ගැලපෙන පින්තූරය තෝරන්න.",
         "file_path": "skill_visual/activity_4.json",
         "telemetry_tags": [
           "visual",
           "odd_one_out"
         ],
         "template_type": "visual_odd_one_out",
-        "rounds": []
+        "rounds": [],
+        "research_metadata": {
+          "knowledge_component_id": "KC_VISUAL_SUPPORT",
+          "prompt_modality": "visual",
+          "response_modality": "tap",
+          "research_role": "supportive"
+        }
       },
       {
         "id": "act_3",
@@ -84,7 +111,13 @@
           "sorting_adventure"
         ],
         "template_type": "visual_sorting_adventure",
-        "rounds": []
+        "rounds": [],
+        "research_metadata": {
+          "knowledge_component_id": "KC_VISUAL_SUPPORT",
+          "prompt_modality": "visual",
+          "response_modality": "drag",
+          "research_role": "supportive"
+        }
       },
       {
         "id": "act_4",
@@ -96,7 +129,13 @@
           "pattern_adventure"
         ],
         "template_type": "visual_pattern_adventure",
-        "rounds": []
+        "rounds": [],
+        "research_metadata": {
+          "knowledge_component_id": "KC_VISUAL_SUPPORT",
+          "prompt_modality": "visual",
+          "response_modality": "tap",
+          "research_role": "supportive"
+        }
       },
       {
         "id": "act_5",
@@ -108,7 +147,13 @@
           "memory_hats"
         ],
         "template_type": "visual_memory_hats",
-        "rounds": []
+        "rounds": [],
+        "research_metadata": {
+          "knowledge_component_id": "KC_VISUAL_SUPPORT",
+          "prompt_modality": "visual",
+          "response_modality": "tap",
+          "research_role": "supportive"
+        }
       }
     ]
   }

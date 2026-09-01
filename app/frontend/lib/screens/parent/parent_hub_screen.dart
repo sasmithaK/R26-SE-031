@@ -6,6 +6,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../../services/student_service.dart';
+import '../../services/c1_parent_service.dart';
 import 'child_progress_screen.dart';
 import 'therapist_management_screen.dart';
 import 'notifications_screen.dart';
@@ -586,14 +587,19 @@ class _ParentHubScreenState extends State<ParentHubScreen>
     final studentId = student['id'] ?? student['_id'];
 
     return FutureBuilder<List<dynamic>>(
-      future: StudentService().getTelemetry(studentId.toString()),
+      future: Future.wait([
+        StudentService().getTelemetry(studentId.toString()),
+        C1ParentService().getSummary(studentId.toString()),
+      ]),
       builder: (context, snapshot) {
         int streak = 0;
         double weeklyProgress = 0.0;
         String lastActive = LocalizationService.instance.t('never');
+        dynamic summary;
 
-        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-          final sessions = snapshot.data!;
+        if (snapshot.hasData) {
+          final sessions = snapshot.data![0] as List<dynamic>;
+          summary = snapshot.data![1];
           final now = DateTime.now();
           Set<String> activeDates = {};
           int actsThisWeek = 0;
@@ -720,50 +726,91 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                   ],
                 ),
                 const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      LocalizationService.instance.t('skills_mastered'),
-                      style: AppTypography.caption(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '${(weeklyProgress * 100).round()}%',
-                      style: AppTypography.caption(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.gentleGreen,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: weeklyProgress,
-                    minHeight: 8,
-                    backgroundColor: AppColors.borderLight,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.gentleGreen),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const FaIcon(FontAwesomeIcons.clock,
-                            size: 12, color: AppColors.textHint),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${LocalizationService.instance.t("last_active_prefix")}$lastActive',
-                          style: AppTypography.caption(
-                              fontSize: 11, color: AppColors.textHint),
+                if (summary != null) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Accuracy', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                            Text('${summary.accuracy}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ],
                         ),
-                      ],
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Progress', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                            Text('${summary.overallProgress}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Attention', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                            Text('${summary.attention}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.green)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ] else ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        LocalizationService.instance.t('skills_mastered'),
+                        style: AppTypography.caption(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${(weeklyProgress * 100).round()}%',
+                        style: AppTypography.caption(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.gentleGreen,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: weeklyProgress,
+                      minHeight: 8,
+                      backgroundColor: AppColors.borderLight,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.gentleGreen),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          const FaIcon(FontAwesomeIcons.clock,
+                              size: 12, color: AppColors.textHint),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${LocalizationService.instance.t("last_active_prefix")}$lastActive',
+                              style: AppTypography.caption(
+                                  fontSize: 11, color: AppColors.textHint),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Text(
                       LocalizationService.instance.t('view_progress_btn'),
                       style: AppTypography.caption(

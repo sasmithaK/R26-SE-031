@@ -4,11 +4,11 @@ import certifi
 from pymongo import MongoClient
 
 # Setup connection
-MONGO_URL = os.getenv("MONGODB_URL", "mongodb+srv://kavindugunasena_db_user:vsqocmP1Fcu8wgYm@cluster0.ypxuqen.mongodb.net/")
+MONGODB_URL = os.getenv("MONGODB_URL", "mongodb+srv://kavindugunasena_db_user:vsqocmP1Fcu8wgYm@cluster0.ypxuqen.mongodb.net/")
 DB_NAME = os.getenv("MONGODB_DB_NAME", "r26_se_031")
 
 def seed():
-    client = MongoClient(MONGO_URL, tlsCAFile=certifi.where())
+    client = MongoClient(MONGODB_URL, tlsCAFile=certifi.where())
     db = client[DB_NAME]
     curriculum_collection = db["curriculum"]
 

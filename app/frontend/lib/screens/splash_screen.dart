@@ -54,10 +54,15 @@ class _SplashScreenState extends State<SplashScreen>
         if (token != null) {
           // Use cached role first so we don't wait 30s for Render server cold boot
           final cachedRole = await AuthService().getCachedRole();
-          final isTherapist = cachedRole == 'therapist';
+          final isTherapist = cachedRole == 'therapist' || cachedRole == 'specialist';
           
           // We can let getUserProfile run in the background if we want, but no need to await it here
-          AuthService().getUserProfile().then((_) {}).catchError((_) {});
+          void fetchProfile() async {
+            try {
+              await AuthService().getUserProfile();
+            } catch (_) {}
+          }
+          fetchProfile();
 
           if (!mounted) return;
           Navigator.of(context).pushReplacement(

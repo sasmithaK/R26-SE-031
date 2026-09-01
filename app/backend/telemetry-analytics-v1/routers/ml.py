@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from bson.objectid import ObjectId
 from pydantic import BaseModel, Field
 
-from shared.database import get_db
+from database import get_db
 from dependencies import get_current_user
 from services.ml_comparative import train_and_compare
 

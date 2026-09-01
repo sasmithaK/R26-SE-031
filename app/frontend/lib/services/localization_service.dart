@@ -15,13 +15,28 @@ class LocalizationService extends ChangeNotifier {
   String get currentLocale => _currentLocale;
   bool get hasSetLanguage => _hasSetLanguage;
 
-  static const String _localeKey = 'sipsara_language_code';
+  static const String _localeKeyParent = 'sipsara_language_code';
+  static const String _localeKeyTherapist = 'sipsara_language_code_therapist';
   static const String _hasSetLanguageKey = 'sipsara_has_set_language';
+  
+  String _currentRole = 'parent';
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    _currentLocale = prefs.getString(_localeKey) ?? 'si';
+    _currentRole = prefs.getString('cached_user_role') ?? 'parent';
+    await loadForRole(_currentRole);
+  }
+
+  Future<void> loadForRole(String role) async {
+    _currentRole = role;
+    final prefs = await SharedPreferences.getInstance();
+    
+    String key = role == 'therapist' ? _localeKeyTherapist : _localeKeyParent;
+    String defaultLocale = role == 'therapist' ? 'en' : 'si';
+    
+    _currentLocale = prefs.getString(key) ?? defaultLocale;
     _hasSetLanguage = prefs.getBool(_hasSetLanguageKey) ?? false;
+    notifyListeners();
   }
 
   Future<void> setLocale(String localeCode) async {
@@ -32,7 +47,9 @@ class LocalizationService extends ChangeNotifier {
     _hasSetLanguage = true;
     
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_localeKey, _currentLocale);
+    String key = _currentRole == 'therapist' ? _localeKeyTherapist : _localeKeyParent;
+    
+    await prefs.setString(key, _currentLocale);
     await prefs.setBool(_hasSetLanguageKey, true);
     
     notifyListeners();
@@ -128,7 +145,7 @@ class LocalizationService extends ChangeNotifier {
       'messages': 'පණිවිඩ',
       'therapists': 'චිකිත්සකයින්',
       'your_children': 'ඔබේ දරුවන්',
-      'select_a_child': 'දරුවෙකු තෝරන්න',
+      'select_a_child': 'සිසුවෙකු තෝරන්න',
       'recent_activity': 'මෑත ක්‍රියාකාරකම්',
       'last_played': 'අවසන් වරට ක්‍රීඩා කළේ',
       'skills_mastered': 'කුසලතා ප්‍රගතිය',
@@ -137,10 +154,10 @@ class LocalizationService extends ChangeNotifier {
       'show_less': 'අඩුවෙන් පෙන්වන්න',
       'student_added': 'සිසුවා එකතු කරන ලදී!',
       'student_setup_ready_1': ' සියල්ල සකසා ඇති අතර ඉගෙනීමට සූදානම්.',
-      'personalize_learning': 'පුද්ගලීකරණ ඉගෙනීම',
+      'personalize_learning': 'සිසුවට ගැළපෙන ඉගෙනීම',
       'evaluation_desc_1': 'විනාඩි 2ක කෙටි ඇගයීමක් මගින් ',
       'evaluation_desc_2': 'ගේ සුවිශේෂී ඉගෙනුම් රටාව තේරුම් ගෙන ඔවුන්ට ගැලපෙන ක්‍රියාකාරකම් සකස් කිරීමට අපට උපකාරී වේ.',
-      'personalized': 'පුද්ගලීකරණය කළ',
+      'personalized': 'සිසුවට ගැළපෙන පාඩම්',
       '2_min': 'විනාඩි 2යි',
       'private': 'පෞද්ගලිකයි',
       'assessment_prompt_desc': 'විනාඩි 2ක කෙටි ඇගයීමක් මගින් ඔවුන්ගේ සුවිශේෂී ඉගෙනුම් රටාව තේරුම් ගෙන ඔවුන්ට ගැලපෙන ක්‍රියාකාරකම් සකස් කිරීමට අපට උපකාරී වේ.',
@@ -343,11 +360,11 @@ class LocalizationService extends ChangeNotifier {
       'score': 'ලකුණු',
       'time': 'කාලය',
       'no_data_available': 'මෙම කුසලතාව සඳහා දත්ත නොමැත.',
-      'add_therapist': 'චිකිත්සකයා එකතු කරන්න',
+      'add_therapist': 'චිකිත්සකයෙකු එකතු කරන්න',
       'therapist_connections': 'චිකිත්සක සම්බන්ධතා',
       'manage_specialist_access': 'ඔබගේ දරුවාගේ දත්ත වෙත චිකිත්සක ප්‍රවේශය කළමනාකරණය කරන්න',
       'no_therapists_connected': 'චිකිත්සකයින් සම්බන්ධ කර නොමැත',
-      'connect_reading_specialist': 'ඉගෙනුම් දත්ත සුරක්ෂිතව බෙදා ගැනීමට ඔබේ දරුවාගේ විශේෂඥයා සම්බන්ධ කරන්න.',
+      'connect_reading_specialist': 'ඉගෙනුම් දත්ත සුරක්ෂිතව බෙදා ගැනීමට ඔබේ දරුවාගේ විශේෂඥයෙකු සමග සම්බන්ධ කරන්න.',
       'my_therapists': 'මගේ චිකිත්සකයින්',
       'pending_requests': 'පොරොත්තු ඉල්ලීම්',
       'find_therapists': 'චිකිත්සකයින් සොයන්න',
@@ -395,6 +412,62 @@ class LocalizationService extends ChangeNotifier {
       'dash_nav_shop': 'සාප්පුව',
       'dash_nav_progress': 'ප්‍රගතිය',
       'dash_nav_parents': 'දෙමාපියන්',
+      'change_photo': 'ඡායාරූපය වෙනස් කරන්න',
+      'remove_photo': 'ඡායාරූපය ඉවත් කරන්න',
+      'profile_photo': 'ගිණුමෙහි ඡායාරූපය',
+      'scan_clinic_code': 'සායන කේතය පරිලෝකනය කරන්න',
+      'connect_specialist_title': 'විශේෂඥයෙකු සම්බන්ධ කරන්න',
+      'connect_specialist_desc': 'ඔබේ දරුවාගේ ගිණුම ඔවුන්ගේ චිකිත්සකයා හෝ විශේෂඥයා වෙත සම්බන්ධ කරන්න.',
+      'clinic_code': 'සායන කේතය',
+      'scan_qr_code': 'නැතහොත් QR කේතය ස්කෑන් කරන්න',
+      'select_child': 'දරුවා තෝරන්න',
+      'student': 'සිසුවා',
+      'continue_to_consent': 'කැමැත්ත ලබා දීමට ඉදිරියට යන්න',
+      'enter_valid_clinic_code': 'කරුණාකර නිවැරදි සායන කේතයක් ඇතුළත් කරන්න',
+      'please_select_child': 'කරුණාකර දරුවෙකු තෝරන්න',
+      'please_tap_checkbox': 'කරුණාකර එකඟ වීමට කොටුව මත තට්ටු කරන්න.',
+      'successfully_connected': 'සාර්ථකව සම්බන්ධ විය!',
+      'privacy_consent': 'පෞද්ගලිකත්ව කැමැත්ත',
+      'what_you_are_sharing': 'ඔබ බෙදාගන්නා දේවල්:',
+      'consent_bullet_1': 'ශබ්ද විද්‍යාත්මක දෝෂ රටා (උදා: b/d වැනි දෘශ්‍ය වැරදීම්)',
+      'consent_bullet_2': 'ඉගෙනුම් ක්‍රියාකාරකම් සඳහා ගත කළ කාලය',
+      'consent_bullet_3': 'සමස්ත කියවීමේ මට්ටමේ ප්‍රගතිය',
+      'why_we_share_this': 'ඔබ මෙය බෙදා ගන්නේ ඇයි:',
+      'why_we_share_desc': 'මෙය ඔබගේ දරුවාගේ විශේෂඥයාට ඔවුන්ගේ ප්‍රතිචාරය (RTI) තත්‍ය කාලීනව නිරීක්ෂණය කිරීමට ඉඩ සලසයි, එය චිකිත්සක සැසි සකස් කිරීමට උපකාරී වේ.',
+      'consent_agree_text': 'සායන කේතය {clinicCode} සමඟ සම්බන්ධිත විශේෂඥයා සමඟ මගේ දරුවාගේ ඉගෙනුම් දත්ත බෙදා ගැනීමට මම කැමැත්තෙමි.',
+      'connecting': 'සම්බන්ධ කරමින්...',
+      'agree_connect': 'එකඟ වී සම්බන්ධ වන්න',
+      
+      // Therapist Profile Additions
+      'therapist_account': 'චිකිත්සක ගිණුම',
+      'clinic_connection': 'සායන සම්බන්ධතාවය',
+      'scan_qr_code_therapist': 'මෙම QR කේතය දෙමාපියන්ට ස්කෑන් කිරීමට ලබා දෙන්න',
+      'or_enter_code': 'හෝ කේතය ඇතුලත් කරන්න: ',
+      'share_invite_code': 'කේතය බෙදාගන්න',
+      'not_set': 'සකසා නැත',
+      'contact_support': 'සහාය අමතන්න',
+      'in_app_notifications': 'යෙදුම තුළ නිවේදන',
+      'in_app_notifications_desc': 'යෙදුම තුළ වැදගත් දැනුම්දීම් ලබා ගන්න.',
+      'update_clinic_name': 'සායනයේ නම යාවත්කාලීන කරන්න',
+      'update_clinic_name_desc': 'ඔබගේ ගිණුමෙහි දිස්වීමට අවශ්‍ය සායනයේ නම ඇතුළත් කරන්න.',
+      'clinic_name_updated': 'සායනයේ නම සාර්ථකව යාවත්කාලීන කරන ලදී!',
+      'update_specialization': 'විශේෂඥතාව යාවත්කාලීන කරන්න',
+      'update_specialization_desc': 'ඔබගේ ගිණුමෙහි දිස්වීමට අවශ්‍ය විශේෂඥතාව ඇතුළත් කරන්න.',
+      'specialization_updated': 'විශේෂඥතාව සාර්ථකව යාවත්කාලීන කරන ලදී!',
+      'share_invite_text': 'ආයුබෝවන්! සිප්සර හරහා ඔබ සමඟ සම්බන්ධ වීමට ලැබීම සතුටක්.\n\nකරුණාකර අපගේ ගිණුම් සම්බන්ධ කිරීම සඳහා මෙම ආරක්‍ෂිත සම්බන්ධතා කේතය [{clinicCode}] භාවිතා කරන්න. ඔබ යෙදුම ස්ථාපනය කර ඇත්නම්, දෙමාපියන්ගේ පිටුව හරහා කේතය ඇතුළත් කළ හැක.',
+      'share_invite_subject': 'සිප්සර සම්බන්ධතා කේතය',
+      'update_password_desc': 'පහතින් ඔබගේ නව මුරපදය ඇතුළත් කරන්න.',
+      'current_password': 'වත්මන් මුරපදය',
+      'new_password': 'නව මුරපදය',
+      'delete_forever': 'සදහටම මකා දමන්න',
+      'nav_students': 'සිසුන්',
+      'nav_profile': 'ගිණුම',
+      'moko_greeting': 'ආයුබෝවන්! මම මොකෝ!\nඔබව හමුවීම ගැන මට ගොඩක් සතුටුයි!',
+      'intro_page1_title': 'ආයුබෝවන්! මම මොකෝ!\nමම තමයි ඔබේ දරුවාගේ අලුත් ඉගෙනුම් මිතුරා!',
+      'intro_page2_title': 'විනෝදජනක ක්‍රීඩා මගින් සිංහල ඉගෙනීමට සිප්සර ඔබට උදව් කරනවා!',
+      'intro_page3_title': 'ඔබට ඔවුන්ගේ ප්‍රගතිය නිරීක්ෂණය කර පහසුවෙන් විශේෂඥයින් සම්බන්ධ කරගන්න පුළුවන්!',
+      'continue_btn': 'ඉදිරියට යන්න',
+      'get_started_btn': 'ආරම්භ කරන්න',
     },
     'en': {
       'welcome_title': 'Welcome!',
@@ -738,6 +811,62 @@ class LocalizationService extends ChangeNotifier {
       'dash_nav_shop': 'shop',
       'dash_nav_progress': 'progress',
       'dash_nav_parents': 'parents',
+      'change_photo': 'Change Photo',
+      'remove_photo': 'Remove Photo',
+      'profile_photo': 'Profile Photo',
+      'scan_clinic_code': 'scan clinic code',
+      'connect_specialist_title': 'connect specialist',
+      'connect_specialist_desc': 'link your child\'s account to their therapist or reading specialist.',
+      'clinic_code': 'clinic code',
+      'scan_qr_code': 'or scan QR code',
+      'select_child': 'select child',
+      'student': 'student',
+      'continue_to_consent': 'continue to consent',
+      'enter_valid_clinic_code': 'please enter a valid 6-digit clinic code',
+      'please_select_child': 'please select a child',
+      'please_tap_checkbox': 'please tap the checkbox to agree.',
+      'successfully_connected': 'successfully connected!',
+      'privacy_consent': 'privacy consent',
+      'what_you_are_sharing': 'what you are sharing:',
+      'consent_bullet_1': 'phonetic error patterns (e.g., visual reversals like b/d)',
+      'consent_bullet_2': 'time spent on learning activities',
+      'consent_bullet_3': 'overall reading level progression',
+      'why_we_share_this': 'why we share this:',
+      'why_we_share_desc': 'this allows your child\'s specialist to track their response to intervention (RTI) in real-time, helping them adjust therapy sessions.',
+      'consent_agree_text': 'i consent to sharing my child\'s learning data with the specialist associated with clinic code {clinicCode}.',
+      'connecting': 'connecting...',
+      'agree_connect': 'agree & connect',
+      
+      // Therapist Profile Additions
+      'therapist_account': 'therapist account',
+      'clinic_connection': 'clinic connection',
+      'scan_qr_code_therapist': 'Have parents scan this QR code',
+      'or_enter_code': 'or enter code: ',
+      'share_invite_code': 'share invite code',
+      'not_set': 'not set',
+      'contact_support': 'contact support',
+      'in_app_notifications': 'in-app notifications',
+      'in_app_notifications_desc': 'receive important alerts within the app.',
+      'update_clinic_name': 'Update Clinic Name',
+      'update_clinic_name_desc': 'Enter the clinic name to display on your profile.',
+      'clinic_name_updated': 'Clinic name updated successfully!',
+      'update_specialization': 'Update Specialization',
+      'update_specialization_desc': 'Enter your specialization to display on your profile.',
+      'specialization_updated': 'Specialization updated successfully!',
+      'share_invite_text': 'Hello! I am excited to work with you on Sipsara.\n\nPlease use my secure connection code [{clinicCode}] to link our accounts. If you have the app installed, you can enter the code in the Parent Hub.',
+      'share_invite_subject': 'Sipsara Connection Code',
+      'update_password_desc': 'Enter your new password below.',
+      'current_password': 'Current Password',
+      'new_password': 'New Password',
+      'delete_forever': 'Delete Forever',
+      'nav_students': 'Students',
+      'nav_profile': 'Profile',
+      'moko_greeting': "Hi there! I'm Moko!\nI'm so excited to meet you!",
+      'intro_page1_title': "Hi! I'm Moko!\nI'll be your child's new learning buddy!",
+      'intro_page2_title': 'Sipsara makes learning Sinhala fun with adaptive games!',
+      'intro_page3_title': 'You can easily track their progress and connect with therapists!',
+      'continue_btn': 'continue',
+      'get_started_btn': 'get started',
     }
   };
 }

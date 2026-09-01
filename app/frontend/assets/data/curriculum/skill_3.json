@@ -23,7 +23,12 @@
             ],
             "correctOption": "ඉර",
             "correct_index": 1,
-            "image_url": "assets/images/activity_icons/nature/sun.png"
+            "image_url": "assets/images/activity_icons/nature/sun.png",
+            "item_id": "S3_A1_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට ගැලපෙන වචනය තෝරන්න",
@@ -34,7 +39,12 @@
             ],
             "correctOption": "හඳ",
             "correct_index": 0,
-            "image_url": "assets/images/activity_icons/nature/moon.png"
+            "image_url": "assets/images/activity_icons/nature/moon.png",
+            "item_id": "S3_A1_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට ගැලපෙන වචනය තෝරන්න",
@@ -46,7 +56,12 @@
             ],
             "correctOption": "බසය",
             "correct_index": 0,
-            "image_url": "assets/images/activity_icons/vehicles/bus.png"
+            "image_url": "assets/images/activity_icons/vehicles/bus.png",
+            "item_id": "S3_A1_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට ගැලපෙන වචනය තෝරන්න",
@@ -58,7 +73,12 @@
             ],
             "correctOption": "යතුර",
             "correct_index": 0,
-            "image_url": "assets/images/activity_icons/everyday_objects/key.png"
+            "image_url": "assets/images/activity_icons/everyday_objects/key.png",
+            "item_id": "S3_A1_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "පින්තූරයට ගැලපෙන වචනය තෝරන්න",
@@ -69,9 +89,20 @@
             ],
             "correctOption": "සීනුව",
             "correct_index": 0,
-            "image_url": "assets/images/activity_icons/everyday_objects/bell.png"
+            "image_url": "assets/images/activity_icons/everyday_objects/bell.png",
+            "item_id": "S3_A1_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_WORD_RECOGNITION",
+          "prompt_modality": "image",
+          "response_modality": "tap",
+          "research_role": "primary"
+        }
       },
       {
         "id": "act_2",
@@ -90,7 +121,12 @@
               "මල"
             ],
             "correctOption": "මල",
-            "correct_index": 1
+            "correct_index": 1,
+            "item_id": "S3_A2_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "'පෑ' + 'න' එකතු වූ විට හැදෙන වචනය කුමක්ද?",
@@ -100,7 +136,12 @@
               "කෑම"
             ],
             "correctOption": "පෑන",
-            "correct_index": 0
+            "correct_index": 0,
+            "item_id": "S3_A2_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "'ත' + 'රු' + 'ව' එකතු වූ විට හැදෙන වචනය කුමක්ද?",
@@ -110,7 +151,12 @@
               "ඉර"
             ],
             "correctOption": "තරුව",
-            "correct_index": 1
+            "correct_index": 1,
+            "item_id": "S3_A2_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "'ම' + 'ල්' + 'ලි' එකතු වූ විට හැදෙන වචනය කුමක්ද?",
@@ -121,7 +167,12 @@
               "මල්ලි"
             ],
             "correctOption": "මල්ලි",
-            "correct_index": 3
+            "correct_index": 3,
+            "item_id": "S3_A2_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "'පු' + 'ටු' + 'ව' එකතු වූ විට හැදෙන වචනය කුමක්ද?",
@@ -131,13 +182,24 @@
               "පුටුව"
             ],
             "correctOption": "පුටුව",
-            "correct_index": 2
+            "correct_index": 2,
+            "item_id": "S3_A2_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_SPELLING_SEQUENCE",
+          "prompt_modality": "visual_text",
+          "response_modality": "tap",
+          "research_role": "primary"
+        }
       },
       {
         "id": "act_3",
-        "title": "ශබ්දයට වචනය තෝරමු",
+        "title": "වචන අසා හඳුනා ගනිමු",
         "description": "ශබ්දයට සවන් දී නිවැරදි වචනය තෝරන්න",
         "telemetry_tags": [
           "listening_comprehension",
@@ -153,7 +215,12 @@
               "පය"
             ],
             "correctOption": "අත",
-            "correct_index": 0
+            "correct_index": 0,
+            "item_id": "S3_A3_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "ශබ්දයට සවන් දී වචනය තෝරන්න",
@@ -164,7 +231,12 @@
               "ගඟ"
             ],
             "correctOption": "පාර",
-            "correct_index": 1
+            "correct_index": 1,
+            "item_id": "S3_A3_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "ශබ්දයට සවන් දී වචනය තෝරන්න",
@@ -175,7 +247,12 @@
               "වත්ත"
             ],
             "correctOption": "ගෙදර",
-            "correct_index": 1
+            "correct_index": 1,
+            "item_id": "S3_A3_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "ශබ්දයට සවන් දී වචනය තෝරන්න",
@@ -187,7 +264,12 @@
               "මල්ලි"
             ],
             "correctOption": "අක්කා",
-            "correct_index": 1
+            "correct_index": 1,
+            "item_id": "S3_A3_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "ශබ්දයට සවන් දී වචනය තෝරන්න",
@@ -199,13 +281,24 @@
               "බල්ලා"
             ],
             "correctOption": "බල්ලා",
-            "correct_index": 3
+            "correct_index": 3,
+            "item_id": "S3_A3_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_WORD_RECOGNITION",
+          "prompt_modality": "audio",
+          "response_modality": "tap",
+          "research_role": "primary"
+        }
       },
       {
         "id": "act_4",
-        "title": "අඩු අකුර පුරවමු",
+        "title": "අඩු අකුර සොයමු",
         "description": "වචනයේ හිස්තැනට සුදුසු අකුර තෝරන්න",
         "telemetry_tags": [
           "spelling",
@@ -224,7 +317,13 @@
               "ග"
             ],
             "correctOption": "ග",
-            "correct_index": 1
+            "correct_index": 1,
+            "image_url": "assets/images/activity_icons/plants/tree.png",
+            "item_id": "S3_A4_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "හිස්තැනට සුදුසු අකුර තෝරන්න",
@@ -238,7 +337,13 @@
               "ර"
             ],
             "correctOption": "ත",
-            "correct_index": 1
+            "correct_index": 1,
+            "image_url": "assets/images/activity_icons/everyday_objects/book.png",
+            "item_id": "S3_A4_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "හිස්තැනට සුදුසු අකුර තෝරන්න",
@@ -253,7 +358,13 @@
               "ස"
             ],
             "correctOption": "ස",
-            "correct_index": 2
+            "correct_index": 2,
+            "image_url": "assets/images/activity_icons/places/school.png",
+            "item_id": "S3_A4_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "හිස්තැනට සුදුසු අකුර තෝරන්න",
@@ -269,7 +380,13 @@
               "ල්"
             ],
             "correctOption": "ම්",
-            "correct_index": 1
+            "correct_index": 1,
+            "image_url": "assets/images/activity_icons/people/mother.png",
+            "item_id": "S3_A4_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "හිස්තැනට සුදුසු අකුර තෝරන්න",
@@ -282,13 +399,24 @@
               "මා",
               "නා",
               "ගා",
-              "තා",
-              "රා"
+              "තා"
             ],
             "correctOption": "තා",
-            "correct_index": 3
+            "correct_index": 3,
+            "image_url": "assets/images/activity_icons/people/father.png",
+            "item_id": "S3_A4_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_SPELLING_SEQUENCE",
+          "prompt_modality": "visual_text",
+          "response_modality": "tap",
+          "research_role": "primary"
+        }
       },
       {
         "id": "act_5",
@@ -308,7 +436,12 @@
               "ල",
               "ම"
             ],
-            "image_url": "assets/images/activity_icons/nature/flower.png"
+            "image_url": "assets/images/activity_icons/flowers/flower_05.png",
+            "item_id": "S3_A5_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
@@ -317,7 +450,12 @@
               "ස",
               "ඇ"
             ],
-            "image_url": "assets/images/activity_icons/body_parts/eye.png"
+            "image_url": "assets/images/activity_icons/body_parts/eye.png",
+            "item_id": "S3_A5_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
@@ -327,7 +465,12 @@
               "ප",
               "න"
             ],
-            "image_url": "assets/images/activity_icons/everyday_objects/oil_lamp.png"
+            "image_url": "assets/images/activity_icons/everyday_objects/oil_lamp.png",
+            "item_id": "S3_A5_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
@@ -337,7 +480,12 @@
               "ප",
               "ව"
             ],
-            "image_url": "assets/images/activity_icons/everyday_objects/comb.png"
+            "image_url": "assets/images/activity_icons/everyday_objects/comb.png",
+            "item_id": "S3_A5_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
@@ -347,9 +495,20 @@
               "පු",
               "ව"
             ],
-            "image_url": "assets/images/activity_icons/everyday_objects/chair.png"
+            "image_url": "assets/images/activity_icons/everyday_objects/chair.png",
+            "item_id": "S3_A5_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "research_metadata": {
+          "knowledge_component_id": "KC_SPELLING_SEQUENCE",
+          "prompt_modality": "image_text",
+          "response_modality": "drag",
+          "research_role": "primary"
+        }
       }
     ],
     "total_activities": 5

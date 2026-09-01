@@ -1,0 +1,19 @@
+visual_processing:
+  midpoint_ms: 3500
+  scale: 1000
+
+phonological:
+  midpoint_ms: 4000
+  scale: 1000
+
+attention:
+  hesitation_scale: 2.0
+
+fatigue:
+  low_max: 0.30
+  moderate_max: 0.60
+  high_max: 0.80
+
+interaction_state:
+  engaged_max: 0.40
+  moderate_max: 0.70

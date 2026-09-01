@@ -136,6 +136,10 @@ class VoiceAnalysisService {
     File audioFile, 
     String expectedText,
     {
+      String? studentId,
+      String? sessionId,
+      String? activityId,
+      String? itemId,
       int expectedSyllables = 0,
       int tStimulus = 0,
       int tRecordStart = 0,
@@ -152,6 +156,10 @@ class VoiceAnalysisService {
       var request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/analyze-acoustics'));
       request.headers['Authorization'] = 'Bearer $token';
       
+      if (studentId != null) request.fields['student_id'] = studentId;
+      if (sessionId != null) request.fields['session_id'] = sessionId;
+      if (activityId != null) request.fields['activity_id'] = activityId;
+      if (itemId != null) request.fields['item_id'] = itemId;
       request.fields['expected_text'] = expectedText;
       request.fields['expected_syllables'] = expectedSyllables.toString();
       request.fields['t_stimulus'] = tStimulus.toString();
@@ -170,16 +178,18 @@ class VoiceAnalysisService {
         print('VoiceAnalysisService API Error: ${response.body}');
         return {
           'transcription': '',
-          'word_error_rate': 1.0,
-          'Acoustic_Latency_ms': 0,
+          'word_error_rate': null,
+          'Acoustic_Latency_ms': null,
+          'measurement_status': 'request_failed',
         };
       }
     } catch (e) {
       print('VoiceAnalysisService Network Error: $e');
       return {
         'transcription': '',
-        'word_error_rate': 1.0,
-        'Acoustic_Latency_ms': 0,
+        'word_error_rate': null,
+        'Acoustic_Latency_ms': null,
+        'measurement_status': 'request_failed',
       };
     }
   }

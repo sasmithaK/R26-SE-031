@@ -1,33 +1,40 @@
 from typing import Dict, Any
 
 class PolicyEngine:
-    def determine_scaffolding(self, target_kc: str, current_prob: float, dyslexia_risk_profile: Dict[str, float]) -> Dict[str, bool]:
+    def get_next_action(self, kc_mastery: float, fatigue_score: float, current_activity: str, learner_profile: Dict[str, float] = None) -> Dict[str, Any]:
         """
-        Zone of Proximal Development (ZPD) orchestrator.
-        Returns UI scaffolding flags based on KC mastery and dyslexia risk profile.
+        Adaptive policy combining BKT mastery and fatigue state.
+        Returns next_activity, next_item, difficulty, scaffold, and decision.
         """
-        ui_scaffolding = {
-            "enable_high_contrast": False,
-            "slow_playback": False,
-            "highlight_diacritics": False,
-            "show_visual_cues": False
+        decision = "CONTINUE"
+        
+        # 1. Fatigue check -> Terminate if too fatigued
+        if fatigue_score > 0.8:
+            decision = "TERMINATE"
+            
+        # 2. Mastery logic -> Advance if mastered
+        next_activity = current_activity
+        target_difficulty_b = 0.0 # default medium
+        
+        if kc_mastery > 0.85:
+            # High mastery -> Hard items
+            target_difficulty_b = 1.0
+        elif kc_mastery < 0.3:
+            # Low mastery -> Easy items
+            target_difficulty_b = -1.0
+            
+        # 3. Scaffolding level (0 to 3) based on learner profile
+        scaffold_level = 0
+        if learner_profile:
+            vo_risk = learner_profile.get("Visual-Orthographic Learning Pattern", 0.0)
+            if kc_mastery < 0.5 and vo_risk > 0.5:
+                scaffold_level = 1
+        
+        return {
+            "next_activity": next_activity,
+            "target_difficulty_b": target_difficulty_b,
+            "scaffold_level": scaffold_level,
+            "decision": decision
         }
-        
-        # Risk thresholds
-        visual_orthographic_risk = dyslexia_risk_profile.get("visual_orthographic", 0.0)
-        phonological_risk = dyslexia_risk_profile.get("phonological", 0.0)
-        
-        # Scaffolding policy
-        if current_prob < 0.40:
-            if visual_orthographic_risk > 0.5:
-                ui_scaffolding["enable_high_contrast"] = True
-                ui_scaffolding["show_visual_cues"] = True
-                if target_kc == "KC_vowel_diacritics":
-                    ui_scaffolding["highlight_diacritics"] = True
-                    
-            if phonological_risk > 0.5:
-                ui_scaffolding["slow_playback"] = True
-                
-        return ui_scaffolding
 
 policy_engine = PolicyEngine()

@@ -55,53 +55,90 @@ class _DemoReadingAloudState extends State<DemoReadingAloud>
       _isAnalyzing = true;
     });
 
+    final telemetry = TelemetryWrapper.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     // Stop recording and get the file
     final audioFile = await VoiceAnalysisService().stopRecording();
 
-    // Stopped recording
-
     if (audioFile != null) {
-      // Send to backend for STT and WER calculation
+      String? studentId;
+      String sessionId = DateTime.now().toIso8601String();
+      String activityId = widget.activityNode.id;
+      String itemId = 'demo_item';
+      
+      if (telemetry != null) {
+        studentId = telemetry.widget.studentData?['id']?.toString() ?? telemetry.widget.studentData?['_id']?.toString();
+      }
+      
+      if (studentId == null || studentId.isEmpty) {
+        debugPrint('Voice analysis skipped: No valid student ID found in session context.');
+        if (mounted) {
+          setState(() {
+            _isAnalyzing = false;
+          });
+        }
+        return;
+      }
+      
       final results = await VoiceAnalysisService().analyzeAudio(
         audioFile,
         _targetSentence,
+        studentId: studentId,
+        sessionId: sessionId,
+        activityId: activityId,
+        itemId: itemId,
       );
 
-      setState(() {
-        _isAnalyzing = false;
-        _analysisResults = results;
-      });
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+          _analysisResults = results;
+        });
+      }
 
       // Log the WER to the Telemetry Wrapper
       final double wer = (results['word_error_rate'] ?? 1.0) as double;
-      final int hesitation = (results['hesitation_ms'] ?? 0) as int;
-
-      // Results retrieved successfully.
 
       // Finish the round based on WER
       if (wer < 0.5) {
         Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) TelemetryWrapper.of(context)?.completeRound(100);
+          if (mounted) {
+            telemetry?.completeRound(
+              100,
+              selectedAnswers: [_targetSentence],
+              errorType: 'none',
+            );
+          }
         });
       } else {
         // Did not read well enough, let them try again
-        ScaffoldMessenger.of(context).showSnackBar(
+        telemetry?.logAttempt(
+          isCorrect: false,
+          selectedAnswers: [_targetSentence],
+          errorType: 'unknown_error', // STT errors should not create child behavioral errors for C1
+        );
+        if (mounted) {
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(
+              content: Text('Please try reading that again clearly!'),
+              backgroundColor: AppColors.warmAmber,
+            ),
+          );
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+        });
+        scaffoldMessenger.showSnackBar(
           const SnackBar(
-            content: Text('Please try reading that again clearly!'),
-            backgroundColor: AppColors.warmAmber,
+            content: Text('Failed to record audio. Check permissions.'),
+            backgroundColor: AppColors.softCoral,
           ),
         );
       }
-    } else {
-      setState(() {
-        _isAnalyzing = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to record audio. Check permissions.'),
-          backgroundColor: AppColors.softCoral,
-        ),
-      );
     }
   }
 

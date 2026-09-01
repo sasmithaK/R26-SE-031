@@ -1,0 +1,24 @@
+{
+  "schema_version": "c1-features-v1",
+  "features": [
+    "accuracy",
+    "mean_latency_ms",
+    "median_latency_ms",
+    "latency_std_ms",
+    "mean_first_touch_latency_ms",
+    "hesitation_rate",
+    "misclick_rate",
+    "replay_rate",
+    "completion_rate",
+    "latency_drift",
+    "error_drift",
+    "hesitation_drift",
+    "accuracy_slope",
+    "visual_processing_index",
+    "phonological_task_index",
+    "motor_interaction_index",
+    "attention_stability_index",
+    "fatigue_score",
+    "cognitive_load_score"
+  ]
+}

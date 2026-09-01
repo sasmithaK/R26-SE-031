@@ -1,24 +1,36 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../widgets/telemetry_wrapper.dart';
 import '../../../../models/curriculum_models.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
 import '../../../../services/progress_service.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
+import '../../../../services/tts_service.dart';
 
 /// Activity 3: රටාව මතක තබා ගනිමු (Remember the Pattern)
 /// Template: pattern_memory_game
 class Skill2Act5PatternMemory extends StatefulWidget {
   final ActivityNode? activityNode;
+  final Map<String, dynamic>? studentData;
   final bool isRemedial;
-  const Skill2Act5PatternMemory({super.key, this.activityNode, this.isRemedial = false});
+  const Skill2Act5PatternMemory({
+    super.key,
+    this.activityNode,
+    this.isRemedial = false,
+    this.studentData,
+  });
 
   @override
-  State<Skill2Act5PatternMemory> createState() => _Skill2Act5PatternMemoryState();
+  State<Skill2Act5PatternMemory> createState() =>
+      _Skill2Act5PatternMemoryState();
 }
 
-class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with SingleTickerProviderStateMixin {
+class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
+    with SingleTickerProviderStateMixin {
+  Set<String> _spokenInstructions = {};
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isMemorizing = true;
   int _countdown = 3;
@@ -29,7 +41,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
   bool _isCorrect = false;
   bool _activityComplete = false;
   int _currentRoundIndex = 0;
-  
+
   String? _wrongTappedOption;
   String? _correctTappedOption;
 
@@ -39,7 +51,10 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
     final skillId = widget.activityNode?.skillId ?? '';
     final activityId = widget.activityNode?.id ?? '';
     if (skillId.isNotEmpty && activityId.isNotEmpty) {
-      _currentRoundIndex = ProgressService().getActivityState(skillId, activityId);
+      _currentRoundIndex = ProgressService().getActivityState(
+        skillId,
+        activityId,
+      );
     }
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
@@ -62,6 +77,26 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
     return r.length > 5 ? r.sublist(0, 5) : r;
   }
 
+  void _playCurrentInstruction({bool autoPlay = false}) {
+    final promptText = _isMemorizing ? 'රටාව මතක තබා ගන්න!' : 'රටාව නැවත සකසන්න';
+    String spokenInstruction = promptText
+        .replaceAll('මා', 'ම')
+        .replaceAllMapped(
+          RegExp(r"'?(.)'? අකුර"),
+          (match) => '${match.group(1)}, අකුර',
+        )
+        .replaceAllMapped(
+          RegExp(r"'?(.)'? පින්තූරය"),
+          (match) => '${match.group(1)}, පින්තූරය',
+        );
+    
+    if (autoPlay && _spokenInstructions.contains(spokenInstruction)) {
+      return;
+    }
+    _spokenInstructions.add(spokenInstruction);
+    TtsService().speak(spokenInstruction, folder: 'skill_2');
+  }
+
   void _startMemorizeTimer() {
     final rounds = _rounds;
     if (rounds.isEmpty) return;
@@ -75,7 +110,9 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
       _userSequence.clear();
       _isCorrect = false;
     });
-    
+
+    _playCurrentInstruction(autoPlay: true);
+
     _timerController.duration = Duration(seconds: showSeconds);
     _timerController.forward(from: 0.0);
 
@@ -90,11 +127,16 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
         setState(() {
           _isMemorizing = false;
         });
+        _playCurrentInstruction(autoPlay: true);
       }
     });
   }
 
-  void _addItemToUserSequence(String item, List<String> targetPattern, int totalRounds) async {
+  void _addItemToUserSequence(
+    String item,
+    List<String> targetPattern,
+    int totalRounds,
+  ) async {
     if (_isCorrect || _isMemorizing || _wrongTappedOption != null) return;
 
     setState(() {
@@ -108,7 +150,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
       setState(() {
         _wrongTappedOption = item;
       });
-      await _audioPlayer.play(AssetSource('audio/wrong.mp3'));
+      SoundUtils.playFeedback('audio/wrong.mp3');
       Future.delayed(const Duration(milliseconds: 600), () {
         if (mounted) {
           setState(() {
@@ -136,34 +178,40 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
 
     // Check if pattern completed
     if (_userSequence.length == targetPattern.length) {
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(100);
+      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
+        100,
+      );
       setState(() {
         _isCorrect = true;
       });
-      await _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
 
       Future.delayed(const Duration(milliseconds: 1400), () {
         if (!mounted) return;
         if (_currentRoundIndex < totalRounds - 1) {
           _currentRoundIndex++;
-              final sId = widget.activityNode?.skillId ?? '';
-              final aId = widget.activityNode?.id ?? '';
-              if (sId.isNotEmpty && aId.isNotEmpty) {
-                int progress = ((_currentRoundIndex / (widget.activityNode?.rounds.length ?? 1)) * 100).toInt();
-                ProgressService().saveActivityScore(sId, aId, progress);
-                ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
-              }
-          _startMemorizeTimer();
-        } else {
-          setState(() {
-          _activityComplete = true;
           final sId = widget.activityNode?.skillId ?? '';
           final aId = widget.activityNode?.id ?? '';
           if (sId.isNotEmpty && aId.isNotEmpty) {
-            ProgressService().saveActivityScore(sId, aId, 100);
-            ProgressService().clearActivityState(sId, aId);
+            int progress =
+                ((_currentRoundIndex /
+                            (widget.activityNode?.rounds.length ?? 1)) *
+                        100)
+                    .toInt();
+            ProgressService().saveActivityScore(sId, aId, progress);
+            ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
           }
-        });
+          _startMemorizeTimer();
+        } else {
+          setState(() {
+            _activityComplete = true;
+            final sId = widget.activityNode?.skillId ?? '';
+            final aId = widget.activityNode?.id ?? '';
+            if (sId.isNotEmpty && aId.isNotEmpty) {
+              ProgressService().saveActivityScore(sId, aId, 100);
+              ProgressService().clearActivityState(sId, aId);
+            }
+          });
         }
       });
     }
@@ -181,13 +229,19 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
 
     final currentRound = rounds[_currentRoundIndex];
     final titleText = widget.activityNode?.title ?? 'රටාව මතක තබා ගනිමු';
-    final targetPattern = (currentRound['pattern'] as List?)?.map((e) => e.toString()).toList() ?? ['🔴', '🔵'];
-    var options = (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ?? ['🔴', '🔵', '🟢'];
+    final targetPattern =
+        (currentRound['pattern'] as List?)?.map((e) => e.toString()).toList() ??
+        ['🔴', '🔵'];
+    var options =
+        (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ??
+        ['🔴', '🔵', '🟢'];
 
     if (widget.isRemedial && options.length > 2) {
       // Reduce distractors: Keep only items in the target pattern + 1 distractor (if any)
       final requiredItems = targetPattern.toSet();
-      final distractors = options.where((o) => !requiredItems.contains(o)).toList();
+      final distractors = options
+          .where((o) => !requiredItems.contains(o))
+          .toList();
       options = requiredItems.toList();
       if (distractors.isNotEmpty) {
         options.add(distractors.first);
@@ -199,7 +253,9 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
     double spacing;
     double fontSize;
     final total = options.length;
-    final bool hasLongText = options.any((opt) => opt.toString().length > 4 || opt.toString().contains(' '));
+    final bool hasLongText = options.any(
+      (opt) => opt.toString().length > 4 || opt.toString().contains(' '),
+    );
 
     if (total <= 2) {
       itemSize = 150.0;
@@ -210,11 +266,11 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
       spacing = 16.0;
       fontSize = 64.0;
     } else if (total <= 6) {
-      itemSize = 100.0; 
+      itemSize = 100.0;
       spacing = 12.0;
       fontSize = 56.0;
     } else {
-      itemSize = 80.0; 
+      itemSize = 80.0;
       spacing = 8.0;
       fontSize = 44.0;
     }
@@ -236,15 +292,17 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
       topFontShrinkSize = 44.0;
     }
 
-
     return SharedGameLayout(
+      studentData: widget.studentData,
+      activityTitle: widget.activityNode?.title ?? '',
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
       totalRounds: rounds.length,
       isRoundComplete: _isCorrect,
       isActivityComplete: _activityComplete,
       onNext: () {
-        final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+        final wrapper = context
+            .findAncestorStateOfType<TelemetryWrapperState>();
         if (wrapper != null) {
           wrapper.completeActivity(context);
         } else {
@@ -255,200 +313,253 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
         padding: const EdgeInsets.symmetric(horizontal: 20.0),
         child: Column(
           children: [
-
             Expanded(
               child: Column(
-                  children: [
-                    // Instruction Banner
-                    _buildInstructionCard(
-                      _isMemorizing ? 'රටාව මතක තබා ගන්න!' : 'රටාව නැවත සකසන්න'
+                children: [
+                  // Instruction Banner
+                  _buildInstructionCard(
+                    _isMemorizing ? 'රටාව මතක තබා ගන්න!' : 'රටාව නැවත සකසන්න',
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Timer Bar
+                  _buildTimerBar(),
+                  const SizedBox(height: 16),
+
+                  // Target Pattern View / Recall Slots (Premium Wooden Board)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 20,
                     ),
-                    const SizedBox(height: 8),
-                    
-                    // Timer Bar
-                    _buildTimerBar(),
-                    const SizedBox(height: 16),
-
-                    // Target Pattern View / Recall Slots (Premium Wooden Board)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3E5AB), // Light wooden board
-                        borderRadius: BorderRadius.circular(32),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.brown.withValues(alpha: 0.2),
-                            blurRadius: 16,
-                            offset: const Offset(0, 8),
-                          ),
-                          const BoxShadow(
-                            color: Colors.white,
-                            blurRadius: 4,
-                            offset: Offset(-2, -2),
-                          ),
-                        ],
-                        border: Border.all(color: const Color(0xFFD4B872), width: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3E5AB), // Light wooden board
+                      borderRadius: BorderRadius.circular(32),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.brown.withValues(alpha: 0.2),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                        ),
+                        const BoxShadow(
+                          color: Colors.white,
+                          blurRadius: 4,
+                          offset: Offset(-2, -2),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: const Color(0xFFD4B872),
+                        width: 4,
                       ),
-                      child: Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
-                        alignment: WrapAlignment.center,
-                        children: List.generate(targetPattern.length, (i) {
-                          final itemToShow = _isMemorizing
-                              ? targetPattern[i]
-                              : (i < _userSequence.length ? _userSequence[i] : '?');
-                          final isFilled = _isMemorizing || i < _userSequence.length;
-                          final isCurrentWrong = (_wrongTappedOption != null) && (i == _userSequence.length - 1);
+                    ),
+                    child: Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      alignment: WrapAlignment.center,
+                      children: List.generate(targetPattern.length, (i) {
+                        final itemToShow = _isMemorizing
+                            ? targetPattern[i]
+                            : (i < _userSequence.length
+                                  ? _userSequence[i]
+                                  : '?');
+                        final isFilled =
+                            _isMemorizing || i < _userSequence.length;
+                        final isCurrentWrong =
+                            (_wrongTappedOption != null) &&
+                            (i == _userSequence.length - 1);
 
-                          return AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: _isMemorizing ? topSlotSize : topSlotShrinkSize,
-                            height: _isMemorizing ? topSlotSize : topSlotShrinkSize,
-                            decoration: BoxDecoration(
-                              color: isCurrentWrong 
-                                  ? const Color(0xFFE87C6D) 
-                                  : (isFilled 
-                                      ? (_isMemorizing ? Colors.white : const Color(0xFF6DBE6D)) 
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: _isMemorizing
+                              ? topSlotSize
+                              : topSlotShrinkSize,
+                          height: _isMemorizing
+                              ? topSlotSize
+                              : topSlotShrinkSize,
+                          decoration: BoxDecoration(
+                            color: isCurrentWrong
+                                ? const Color(0xFFE87C6D)
+                                : (isFilled
+                                      ? (_isMemorizing
+                                            ? Colors.white
+                                            : const Color(0xFF6DBE6D))
                                       : Colors.black.withValues(alpha: 0.04)),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isCurrentWrong 
-                                    ? const Color(0xFFE87C6D) 
-                                    : (isFilled 
-                                        ? (_isMemorizing ? AppColors.warmAmber.withValues(alpha: 0.4) : const Color(0xFF6DBE6D)) 
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isCurrentWrong
+                                  ? const Color(0xFFE87C6D)
+                                  : (isFilled
+                                        ? (_isMemorizing
+                                              ? AppColors.warmAmber.withValues(
+                                                  alpha: 0.4,
+                                                )
+                                              : const Color(0xFF6DBE6D))
                                         : Colors.black.withValues(alpha: 0.1)),
-                                width: 2.0,
-                              ),
-                              boxShadow: (isFilled && isCurrentWrong)
-                                  ? [
-                                      BoxShadow(
-                                        color: const Color(0xFFE87C6D).withValues(alpha: 0.3),
-                                        blurRadius: 16,
-                                        spreadRadius: 2,
-                                      )
-                                    ]
-                                  : null,
+                              width: 2.0,
                             ),
-                            child: Center(
-                              child: Text(
-                                itemToShow,
-                                style: TextStyle(
-                                  fontSize: _isMemorizing ? topFontSize : topFontShrinkSize,
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.1,
-                                  color: isCurrentWrong 
-                                      ? Colors.white 
-                                      : (isFilled 
-                                          ? (_isMemorizing ? AppColors.textPrimary : Colors.white) 
+                            boxShadow: (isFilled && isCurrentWrong)
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFFE87C6D,
+                                      ).withValues(alpha: 0.3),
+                                      blurRadius: 16,
+                                      spreadRadius: 2,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Center(
+                            child: Text(
+                              itemToShow,
+                              style: TextStyle(
+                                fontSize: _isMemorizing
+                                    ? topFontSize
+                                    : topFontShrinkSize,
+                                fontWeight: FontWeight.bold,
+                                height: 1.1,
+                                color: isCurrentWrong
+                                    ? Colors.white
+                                    : (isFilled
+                                          ? (_isMemorizing
+                                                ? AppColors.textPrimary
+                                                : Colors.white)
                                           : Colors.black26),
-                                ),
                               ),
                             ),
-                          );
-                        }),
-                      ),
+                          ),
+                        );
+                      }),
                     ),
+                  ),
 
-                    const SizedBox(height: 32),
+                  const SizedBox(height: 32),
 
-                    // Recall Candidate Palette (Disabled while memorizing)
-                    if (!_isMemorizing) ...[
-                      Expanded(
-                        child: SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: const Color(0xFFE2E8F0), width: 2),
-                              ),
-                              child: Wrap(
-                          spacing: 16.0,
-                          runSpacing: 16.0,
-                          alignment: WrapAlignment.center,
-                          children: options.map((opt) {
-                            final isWrong = _wrongTappedOption == opt;
-                            final isCorrect = _correctTappedOption == opt;
-                            final isPressed = isWrong || isCorrect;
-                            
-                            Color tileColor = Colors.white;
-                            Color borderColor = Colors.transparent;
-                            Color textColor = AppColors.textPrimary;
-                            double borderWidth = isPressed ? 4.0 : 1.0;
+                  // Recall Candidate Palette (Disabled while memorizing)
+                  if (!_isMemorizing) ...[
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 24,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: const Color(0xFFE2E8F0),
+                              width: 2,
+                            ),
+                          ),
+                          child: Wrap(
+                            spacing: 16.0,
+                            runSpacing: 16.0,
+                            alignment: WrapAlignment.center,
+                            children: options.map((opt) {
+                              final isWrong = _wrongTappedOption == opt;
+                              final isCorrect = _correctTappedOption == opt;
+                              final isPressed = isWrong || isCorrect;
 
-                            if (isCorrect) {
-                              tileColor = const Color(0xFF6DBE6D).withValues(alpha: 0.15);
-                              borderColor = const Color(0xFF6DBE6D);
-                              textColor = const Color(0xFF6DBE6D);
-                            } else if (isWrong) {
-                              tileColor = const Color(0xFFE87C6D).withValues(alpha: 0.15);
-                              borderColor = const Color(0xFFE87C6D);
-                              textColor = const Color(0xFFE87C6D);
-                            }
+                              Color tileColor = Colors.white;
+                              Color borderColor = Colors.transparent;
+                              Color textColor = AppColors.textPrimary;
+                              double borderWidth = isPressed ? 4.0 : 1.0;
 
-                            return GestureDetector(
-                              onTap: () => _addItemToUserSequence(opt, targetPattern, rounds.length),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 150),
-                                margin: EdgeInsets.all(spacing / 2),
-                                width: hasLongText ? null : itemSize,
-                                height: hasLongText ? null : itemSize,
-                                padding: hasLongText ? const EdgeInsets.symmetric(horizontal: 24, vertical: 16) : null,
-                                decoration: BoxDecoration(
-                                  color: tileColor,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: isPressed ? borderColor : const Color(0xFFE2E8F0), 
-                                    width: borderWidth
-                                  ),
-                                  boxShadow: [
-                                    if (isCorrect)
-                                      BoxShadow(
-                                        color: const Color(0xFF6DBE6D).withValues(alpha: 0.3),
-                                        blurRadius: 16,
-                                        spreadRadius: 2,
-                                      )
-                                    else if (isWrong)
-                                      BoxShadow(
-                                        color: const Color(0xFFE87C6D).withValues(alpha: 0.3),
-                                        blurRadius: 16,
-                                        spreadRadius: 2,
-                                      )
-                                    else if (!isPressed)
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.08),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 4),
-                                      )
-                                  ],
+                              if (isCorrect) {
+                                tileColor = const Color(
+                                  0xFF6DBE6D,
+                                ).withValues(alpha: 0.15);
+                                borderColor = const Color(0xFF6DBE6D);
+                                textColor = const Color(0xFF6DBE6D);
+                              } else if (isWrong) {
+                                tileColor = const Color(
+                                  0xFFE87C6D,
+                                ).withValues(alpha: 0.15);
+                                borderColor = const Color(0xFFE87C6D);
+                                textColor = const Color(0xFFE87C6D);
+                              }
+
+                              return GestureDetector(
+                                onTap: () => _addItemToUserSequence(
+                                  opt,
+                                  targetPattern,
+                                  rounds.length,
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    opt, 
-                                    style: TextStyle(
-                                      fontSize: hasLongText ? 40.0 : fontSize, 
-                                      fontWeight: FontWeight.bold,
-                                      height: 1.1,
-                                      color: textColor
-                                    ), 
-                                    textAlign: TextAlign.center
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  margin: EdgeInsets.all(spacing / 2),
+                                  width: hasLongText ? null : itemSize,
+                                  height: hasLongText ? null : itemSize,
+                                  padding: hasLongText
+                                      ? const EdgeInsets.symmetric(
+                                          horizontal: 24,
+                                          vertical: 16,
+                                        )
+                                      : null,
+                                  decoration: BoxDecoration(
+                                    color: tileColor,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: isPressed
+                                          ? borderColor
+                                          : const Color(0xFFE2E8F0),
+                                      width: borderWidth,
+                                    ),
+                                    boxShadow: [
+                                      if (isCorrect)
+                                        BoxShadow(
+                                          color: const Color(
+                                            0xFF6DBE6D,
+                                          ).withValues(alpha: 0.3),
+                                          blurRadius: 16,
+                                          spreadRadius: 2,
+                                        )
+                                      else if (isWrong)
+                                        BoxShadow(
+                                          color: const Color(
+                                            0xFFE87C6D,
+                                          ).withValues(alpha: 0.3),
+                                          blurRadius: 16,
+                                          spreadRadius: 2,
+                                        )
+                                      else if (!isPressed)
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.08,
+                                          ),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      opt,
+                                      style: TextStyle(
+                                        fontSize: hasLongText ? 40.0 : fontSize,
+                                        fontWeight: FontWeight.bold,
+                                        height: 1.1,
+                                        color: textColor,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                              );
+                            }).toList(),
                           ),
                         ),
                       ),
-                    ] else ...[
-                      const Spacer(),
-                    ],
-                    const SizedBox(height: 24),
+                    ),
+                  ] else ...[
+                    const Spacer(),
                   ],
-                ),
+                  const SizedBox(height: 24),
+                ],
               ),
+            ),
           ],
         ),
       ),
@@ -458,10 +569,10 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
   Widget _buildInstructionCard(String instruction) {
     return GestureDetector(
       onTap: () async {
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.logAudioReplay();
-        if (widget.activityNode?.audioUrl != null && widget.activityNode!.audioUrl.isNotEmpty) {
-          await _audioPlayer.play(UrlSource(widget.activityNode!.audioUrl));
-        }
+        context
+            .findAncestorStateOfType<TelemetryWrapperState>()
+            ?.logAudioReplay();
+        _playCurrentInstruction();
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -477,7 +588,11 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
             Flexible(
               child: Text(
                 instruction,
-                style: AppTypography.sinhala(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                style: AppTypography.sinhala(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -489,17 +604,24 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
                 shape: BoxShape.circle,
                 color: AppColors.warmAmber,
                 boxShadow: [
-                  BoxShadow(color: AppColors.warmAmber.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))
-                ]
+                  BoxShadow(
+                    color: AppColors.warmAmber.withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.volume_up_rounded, color: Colors.white, size: 26),
+              child: const Icon(
+                Icons.volume_up_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
             ),
           ],
         ),
       ),
     );
   }
-        
 
   Widget _buildTimerBar() {
     if (!_isMemorizing) return const SizedBox.shrink();
@@ -510,7 +632,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
         animation: _timerController,
         builder: (context, child) {
           final progress = (1.0 - _timerController.value).clamp(0.0, 1.0);
-          
+
           Color barColor = const Color(0xFF6DBE6D);
           if (progress < 0.25) {
             barColor = const Color(0xFFFF4B4B);
@@ -529,7 +651,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory> with 
                   color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
-                )
+                ),
               ],
               border: Border.all(color: const Color(0xFFE0E0E0), width: 2),
             ),

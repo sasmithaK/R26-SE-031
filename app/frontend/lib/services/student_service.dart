@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
@@ -166,7 +166,7 @@ class StudentService {
 
   /// Submit assessment results for an existing student.
   /// Returns null on success, or an error message string on failure.
-  Future<String?> submitAssessment(String studentId, List<bool> assessmentResults) async {
+  Future<String?> submitAssessment(String studentId, List<Map<String, dynamic>> assessmentResults) async {
     try {
       final token = await _getAccessToken();
       if (token == null) return 'Not authenticated.';
@@ -196,10 +196,13 @@ class StudentService {
 
   /// Submit comprehensive assessment results for a specific category.
   /// Returns null on success, or an error message string on failure.
-  Future<String?> submitComprehensiveAssessment(String studentId, String category, List<bool> assessmentResults) async {
+  Future<String?> submitComprehensiveAssessment(String studentId, String category, List<Map<String, dynamic>> assessmentResults) async {
     try {
       final token = await _getAccessToken();
       if (token == null) return 'Not authenticated.';
+
+      debugPrint('[STUDENT_SERVICE] Submitting $category comprehensive assessment for student: $studentId');
+      debugPrint('[STUDENT_SERVICE] Payload answers count: ${assessmentResults.length}');
 
       final response = await http.patch(
         Uri.parse('$_baseUrl/students/$studentId/comprehensive-assessment/$category'),
@@ -210,7 +213,14 @@ class StudentService {
         body: jsonEncode({'assessment_results': assessmentResults}),
       );
 
+      debugPrint('[STUDENT_SERVICE] Server response status: ${response.statusCode}');
+      debugPrint('[STUDENT_SERVICE] Server response body: ${response.body}');
+
       if (response.statusCode == 200) {
+        try {
+          final updatedStudent = jsonDecode(response.body);
+          await _updateCachedStudent(studentId, updatedStudent);
+        } catch (_) {}
         return null; // Success
       } else {
         final data = jsonDecode(response.body);
@@ -220,7 +230,27 @@ class StudentService {
         return 'Failed to submit comprehensive assessment.';
       }
     } catch (e) {
+      debugPrint('[STUDENT_SERVICE] Network error submitting assessment: $e');
       return 'Failed to connect to the server.';
+    }
+  }
+
+  Future<void> _updateCachedStudent(String studentId, Map<String, dynamic> updatedStudent) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString('cached_students_list');
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(cachedStr);
+        final index = list.indexWhere((s) => s['id'] == studentId || s['_id'] == studentId);
+        if (index != -1) {
+          list[index] = updatedStudent;
+        } else {
+          list.add(updatedStudent);
+        }
+        await prefs.setString('cached_students_list', jsonEncode(list));
+      }
+    } catch (e) {
+      debugPrint('[STUDENT_SERVICE] Error updating cached student: $e');
     }
   }
 
@@ -257,19 +287,22 @@ class StudentService {
     }
   }
 
+  Future<Map<String, String>> _getHeaders() async {
+    final token = await _getAccessToken();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
   /// Submit telemetry session data to the backend.
   /// Returns null on success, or an error message string on failure.
   Future<String?> submitTelemetry(Map<String, dynamic> payload) async {
     try {
-      final token = await _getAccessToken();
-      if (token == null) return 'Not authenticated.';
-
+      final headers = await _getHeaders();
       final response = await http.post(
-        Uri.parse('$_telemetryBaseUrl/telemetry'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+        Uri.parse('${ApiConfig.telemetryBaseUrl}/telemetry'),
+        headers: headers,
         body: jsonEncode(payload),
       );
 
@@ -284,6 +317,28 @@ class StudentService {
       }
     } catch (e) {
       return 'Failed to connect to the server.';
+    }
+  }
+
+  /// Submit real-time interaction to the unified C1-C4 pipeline.
+  Future<Map<String, dynamic>?> submitInteraction(Map<String, dynamic> payload) async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.post(
+        Uri.parse('${ApiConfig.learningBaseUrl}/interaction'),
+        headers: headers,
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        debugPrint('Failed to submit interaction: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Error submitting interaction: $e');
+      return null;
     }
   }
 
@@ -418,6 +473,29 @@ class StudentService {
       }
     } catch (e) {
       return 'Failed to connect to the server.';
+    }
+  }
+
+  /// Fetch C1 Behavioral Learner-State history for a student
+  Future<List<dynamic>> getC1History(String studentId, {int limit = 5}) async {
+    try {
+      final token = await _getAccessToken();
+      if (token == null) return [];
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.c1BaseUrl}/student/$studentId/history?limit=$limit'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as List<dynamic>;
+      }
+      return [];
+    } catch (e) {
+      return [];
     }
   }
 }

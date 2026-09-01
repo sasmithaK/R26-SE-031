@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../models/curriculum_models.dart';
+import '../utils/avatar_utils.dart';
 import 'telemetry_debug_screen.dart';
 
-class ActivityCompleteScreen extends StatelessWidget {
+class ActivityCompleteScreen extends StatefulWidget {
   final ActivityNode activityNode;
   final String skillId;
   final int score;
@@ -22,12 +25,51 @@ class ActivityCompleteScreen extends StatelessWidget {
   });
 
   @override
+  State<ActivityCompleteScreen> createState() => _ActivityCompleteScreenState();
+}
+
+class _ActivityCompleteScreenState extends State<ActivityCompleteScreen> {
+  String? _avatarUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvatar();
+  }
+
+  Future<void> _loadAvatar() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final studentId = prefs.getString('current_student_id');
+      final cachedStr = prefs.getString('cached_students_list');
+      if (studentId != null && cachedStr != null && cachedStr.isNotEmpty) {
+        final List<dynamic> cachedStudents = jsonDecode(cachedStr);
+        final student = cachedStudents.firstWhere(
+          (s) => s['id'] == studentId,
+          orElse: () => null,
+        );
+        if (student != null && mounted) {
+          setState(() {
+            _avatarUrl = student['avatar_url'] as String?;
+          });
+        }
+      }
+    } catch (e) {
+      // Ignore cache errors
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final stars = (score / 100 * 5).round().clamp(1, 5);
-    final titleText = score >= 100 ? 'හොඳයි! ඔයා විශිෂ්ටයි! 🌟' : 'සුබ පැතුම්! 👏';
-    final subtitleText = score >= 100
-        ? 'ඔයා සියලු ප්‍රශ්න සාර්ථකව විසඳුවා!'
-        : 'ඔයා හොඳ ප්‍රගතියක් ලබා ගත්තා!';
+    const stars = 5;
+    const titleText = 'සුබ පැතුම්!';
+    const subtitleText = 'ඔබ ක්‍රියාකාරකම සාර්ථකව අවසන් කළා!';
+    const displayScore = 100;
+    
+    final avatarPath = AvatarUtils.getCorrectedAvatarPath(
+      _avatarUrl,
+      'assets/images/characters/mascots/solo_blue.png',
+    );
 
     return Scaffold(
       backgroundColor: AppColors.cream,
@@ -64,7 +106,7 @@ class ActivityCompleteScreen extends StatelessWidget {
                     ),
                   ),
                   Image.asset(
-                    'assets/images/characters/human/human_student_1.png',
+                    avatarPath,
                     height: 130,
                     fit: BoxFit.contain,
                   ),
@@ -72,7 +114,7 @@ class ActivityCompleteScreen extends StatelessWidget {
               ),
 
               // Activity Name Badge
-              if (activityNode.title.isNotEmpty) ...[
+              if (widget.activityNode.title.isNotEmpty) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
@@ -81,7 +123,7 @@ class ActivityCompleteScreen extends StatelessWidget {
                     border: Border.all(color: AppColors.calmBlue.withValues(alpha: 0.4), width: 1.5),
                   ),
                   child: Text(
-                    activityNode.title,
+                    widget.activityNode.title,
                     style: AppTypography.heading(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -135,7 +177,7 @@ class ActivityCompleteScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     Text(
-                      '$score%',
+                      '$displayScore%',
                       style: AppTypography.heading(
                         fontSize: 38,
                         fontWeight: FontWeight.w900,
@@ -170,8 +212,8 @@ class ActivityCompleteScreen extends StatelessWidget {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        if (onRetake != null) {
-                          onRetake!();
+                        if (widget.onRetake != null) {
+                          widget.onRetake!();
                         } else {
                           Navigator.pop(context, 'retake');
                         }
@@ -187,7 +229,7 @@ class ActivityCompleteScreen extends StatelessWidget {
                       ),
                       icon: const Icon(Icons.refresh_rounded, size: 22),
                       label: Text(
-                        'Play Again',
+                        'නැවත ක්‍රීඩා කරමු',
                         style: AppTypography.button(fontSize: 16),
                       ),
                     ),
@@ -199,8 +241,8 @@ class ActivityCompleteScreen extends StatelessWidget {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        if (onContinue != null) {
-                          onContinue!();
+                        if (widget.onContinue != null) {
+                          widget.onContinue!();
                         } else {
                           Navigator.pop(context, 'continue');
                         }
@@ -216,7 +258,7 @@ class ActivityCompleteScreen extends StatelessWidget {
                       ),
                       icon: const Icon(Icons.arrow_forward_rounded, size: 22),
                       label: Text(
-                        isRevisiting ? 'Back to Map' : 'Continue',
+                        widget.isRevisiting ? 'සිතියමට යමු' : 'ඉදිරියට යමු',
                         style: AppTypography.button(fontSize: 16),
                       ),
                     ),

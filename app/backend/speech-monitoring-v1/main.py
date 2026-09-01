@@ -21,6 +21,7 @@ app = FastAPI(
     description="Microservice for STT, TTS, and Acoustic Hesitation Analysis",
     version="1.0.0",
     lifespan=lifespan,
+    root_path=os.getenv("ROOT_PATH", ""),
 )
 
 # Allow CORS for local dev and production
@@ -46,4 +47,4 @@ if __name__ == "__main__":
     import uvicorn
     # Run on port 8020
     port = int(os.getenv("PORT", "8020"))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)

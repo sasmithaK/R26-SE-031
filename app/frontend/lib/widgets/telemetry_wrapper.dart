@@ -1,5 +1,3 @@
-import 'dart:math';
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/telemetry_service.dart';
 import '../services/telemetry/plugins/voice_analysis_plugin.dart';
@@ -8,6 +6,7 @@ import '../models/curriculum_models.dart';
 import '../screens/activity_complete_screen.dart';
 import '../screens/games/game_factory.dart';
 import '../services/tts_service.dart';
+import '../services/student_service.dart';
 
 /// A wrapper widget that tracks all touch events, latency, and coordinates
 /// before they reach the underlying game template.
@@ -22,12 +21,14 @@ class TelemetryWrapper extends StatefulWidget {
   final ActivityNode activityNode;
   final Widget child;
   final Function(int score) onRoundComplete;
+  final Map<String, dynamic>? studentData;
 
   const TelemetryWrapper({
     super.key,
     required this.activityNode,
     required this.child,
     required this.onRoundComplete,
+    this.studentData,
   });
 
   @override
@@ -49,7 +50,16 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
   int _misclickCount = 0;
   int _hesitationCount = 0;
   int _audioReplayCount = 0;
+  int _correctionCount = 0;
+  int _hintCount = 0;
   bool _firstTouchRecorded = false;
+
+  // ---- Attempt Tracking ----
+  int _attemptCount = 0;
+  int _incorrectAttemptCount = 0;
+  bool? _firstAttemptCorrect;
+  final List<String> _accumulatedAnswers = [];
+  String? _firstErrorType;
 
   // ---- Session accumulators ----
   int _totalScore = 0;
@@ -98,7 +108,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
       isCorrect: false,
       score: 0,
       timestamp: DateTime.now(),
-      firstTouchLatencyMs: _firstTouchLatencyMs,
+      firstTouchLatencyMs: _firstTouchLatencyMs < 0 ? 0 : _firstTouchLatencyMs,
       totalRoundLatencyMs: totalRoundLatency,
       misclickCount: _misclickCount,
       hesitationCount: _hesitationCount,
@@ -189,10 +199,54 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     debugPrint('TELEMETRY: Audio replay recorded (total: $_audioReplayCount).');
   }
 
+  /// Game activities should call this when the child corrects/revises a previous action.
+  void logCorrection() {
+    _correctionCount++;
+    debugPrint('TELEMETRY: Correction recorded (total: $_correctionCount).');
+  }
+
+  /// Game activities should call this when a hint is provided to the child.
+  void logHint() {
+    _hintCount++;
+    debugPrint('TELEMETRY: Hint recorded (total: $_hintCount).');
+  }
+
+  /// Log a child's attempt at answering the prompt.
+  void logAttempt({
+    required bool isCorrect,
+    List<String> selectedAnswers = const [],
+    String? errorType,
+  }) {
+    _attemptCount++;
+    if (_firstAttemptCorrect == null) {
+      _firstAttemptCorrect = isCorrect;
+    }
+    if (!isCorrect) {
+      _incorrectAttemptCount++;
+    }
+    _accumulatedAnswers.addAll(selectedAnswers);
+    if (errorType != null && _firstErrorType == null) {
+      _firstErrorType = errorType;
+    }
+  }
+
   /// Called by individual game activities when a round is completed.
-  void completeRound(int baseScore) {
+  void completeRound(int baseScore, {
+    String errorType = 'unknown_error',
+    List<String> selectedAnswers = const [],
+    int correctionCount = 0,
+    int hintCount = 0,
+  }) {
+    bool isCorrect = baseScore > 0;
+    
+    // Automatically log this attempt if none was logged manually, or include the final correct attempt
+    logAttempt(isCorrect: isCorrect, selectedAnswers: selectedAnswers, errorType: errorType);
+
     _roundStopwatch.stop();
     final totalRoundLatency = _roundStopwatch.elapsedMilliseconds;
+    
+    int timeToFirstResponseMs = _firstTouchLatencyMs >= 0 ? _firstTouchLatencyMs : 0;
+    int timeToCorrectMs = isCorrect ? totalRoundLatency : 0;
 
     // Nuanced Scoring: Apply penalties for cognitive effort struggles
     int penalty = (_misclickCount * 5) + (_hesitationCount * 2);
@@ -201,24 +255,97 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     _totalScore += finalRoundScore;
     _roundsCompletedTotal++;
 
+    // Resolve Canonical Metadata
+    var rounds = widget.activityNode.rounds;
+    Map<String, dynamic> roundData = _currentRound <= rounds.length ? rounds[_currentRound - 1] : {};
+    
+    final canonical = CanonicalItemResolver.resolve(widget.activityNode, roundData, _currentRound - 1);
+    final researchMeta = widget.activityNode.researchMetadata;
+
     // Build and log the rich telemetry event
     final event = TelemetryEvent(
       activityName: widget.activityNode.templateType,
       roundNumber: _currentRound,
-      isCorrect: finalRoundScore > 0,
+      isCorrect: isCorrect,
       score: finalRoundScore,
       timestamp: DateTime.now(),
-      firstTouchLatencyMs: _firstTouchLatencyMs >= 0 ? _firstTouchLatencyMs : 0,
+      firstTouchLatencyMs: timeToFirstResponseMs,
       totalRoundLatencyMs: totalRoundLatency,
       misclickCount: _misclickCount,
       hesitationCount: _hesitationCount,
       audioReplayCount: _audioReplayCount,
+      correctionCount: _correctionCount + correctionCount,
+      hintCount: _hintCount + hintCount,
       isAbandoned: false,
       touchPath: List.unmodifiable(_currentTouchPath),
+      attemptCount: _attemptCount,
+      incorrectAttemptCount: _incorrectAttemptCount,
+      firstAttemptCorrect: _firstAttemptCorrect,
+      finalCorrect: isCorrect,
+      timeToFirstResponseMs: timeToFirstResponseMs,
+      timeToCorrectMs: timeToCorrectMs,
+      skillId: widget.activityNode.skillId,
+      activityId: widget.activityNode.id,
+      itemId: canonical.itemId,
+      itemVersion: canonical.itemVersion,
+      knowledgeComponentId: researchMeta?.knowledgeComponentId ?? 'KC_UNKNOWN',
+      promptModality: researchMeta?.promptModality ?? 'visual',
+      responseModality: researchMeta?.responseModality ?? 'tap',
+      researchRole: researchMeta?.researchRole ?? 'primary',
+      difficultyLabel: canonical.difficultyLabel,
+      difficultyB: canonical.difficultyB,
+      isAnchor: canonical.isAnchor,
+      targets: canonical.targets,
+      selectedAnswers: List.unmodifiable(_accumulatedAnswers),
+      errorType: _firstErrorType ?? errorType,
     );
 
     TelemetryService().broadcastRoundComplete(finalRoundScore, totalRoundLatency);
     TelemetryService().logInteraction(event);
+
+    // --- NEW: Real-time Orchestrator Submission (C1-C4) ---
+    final studentId = widget.studentData?['student_id'] ?? widget.studentData?['id'] ?? widget.studentData?['_id'];
+    if (studentId == null || studentId.toString().isEmpty) {
+      debugPrint('TELEMETRY: Skipped real-time submission because student_id is unavailable.');
+    } else {
+      final sessionId = TelemetryService().sessionId;
+
+    final payload = {
+      "schema_version": "2.0",
+      "student_id": studentId,
+      "session_id": sessionId,
+      "activity_id": widget.activityNode.id,
+      "item_id": canonical.itemId,
+      "knowledge_component_id": event.knowledgeComponentId,
+      "event_id": '$sessionId:${TelemetryService().sessionEvents.length - 1}',
+      "difficulty_b": canonical.difficultyB,
+      "is_anchor": canonical.isAnchor,
+      "first_attempt_correct": event.firstAttemptCorrect,
+      "attempt_count": event.attemptCount,
+      "incorrect_attempt_count": event.incorrectAttemptCount,
+      "first_error_type": event.errorType,
+      "hint_count": event.hintCount,
+      "correction_count": event.correctionCount,
+      "response": {
+        "selected_character": "item", 
+        "is_correct": event.firstAttemptCorrect ?? event.isCorrect
+      },
+      "telemetry": {
+        "first_touch_latency_ms": event.firstTouchLatencyMs >= 0 ? event.firstTouchLatencyMs : 0,
+        "total_round_latency_ms": event.totalRoundLatencyMs,
+        "hesitation_count": event.hesitationCount,
+        "misclick_count": event.misclickCount,
+        "touch_stream": event.touchPath.map((p) => p.toJson()).toList()
+      }
+    };
+    
+    // Fire and forget
+      StudentService().submitInteraction(payload).then((result) {
+        if (result != null) {
+          debugPrint('TELEMETRY: Received C1-C4 result: $result');
+        }
+      });
+    }
 
     debugPrint(
       'TELEMETRY: Round $_currentRound | '
@@ -243,6 +370,13 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     _misclickCount = 0;
     _hesitationCount = 0;
     _audioReplayCount = 0;
+    _correctionCount = 0;
+    _hintCount = 0;
+    _attemptCount = 0;
+    _incorrectAttemptCount = 0;
+    _firstAttemptCorrect = null;
+    _accumulatedAnswers.clear();
+    _firstErrorType = null;
     _roundStopwatch.reset();
     _roundStopwatch.start();
     _hesitationStopwatch.reset();
@@ -257,10 +391,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
 
   /// Called after all rounds are completed to show the completion screen.
   void completeActivity(BuildContext context) {
-    int finalScore = 0;
-    if (_roundsCompletedTotal > 0) {
-      finalScore = (_totalScore / _roundsCompletedTotal).round().clamp(0, 100);
-    }
+    int finalScore = 100; // Always award 100% for completing the activity
 
     Navigator.push(
       context,
@@ -284,7 +415,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => GameFactory.buildGame(widget.activityNode),
+              builder: (context) => GameFactory.buildGame(widget.activityNode, studentData: widget.studentData),
             ),
           );
         } else {

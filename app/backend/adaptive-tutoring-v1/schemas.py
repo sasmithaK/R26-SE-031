@@ -3,21 +3,26 @@ from typing import Dict, Any, List, Optional
 
 class InteractionRequest(BaseModel):
     student_id: str
-    target_kc: str
+    session_id: str
+    activity_id: str
+    knowledge_component_id: str
+    item_id: str
     is_correct: bool
-    dyslexia_risk_profile: Dict[str, float] = Field(
-        default_factory=dict, 
-        description="Risk probabilities from Component 3 (e.g., visual_orthographic, phonological)"
-    )
+    difficulty_b: float = Field(default=0.0)
+    is_anchor: bool = Field(default=False)
+    current_session_duration_sec: int
+    fatigue_score: float = 0.0
+    learner_profile: Optional[Dict[str, float]] = None
 
 class NextAction(BaseModel):
-    terminate_session: bool
-    ui_scaffolding: Dict[str, bool] = Field(
-        default_factory=dict,
-        description="Flags for UI adaptations (e.g., enable_high_contrast, slow_playback)"
-    )
-
+    next_activity: str
+    next_item: str
+    difficulty: float
+    scaffold_level: int = Field(default=0)
+    decision: str
+    
 class TutoringResponse(BaseModel):
     student_id: str
     updated_knowledge_state: Dict[str, float]
+    previous_knowledge_state: Dict[str, float] = Field(default_factory=dict)
     next_action: NextAction

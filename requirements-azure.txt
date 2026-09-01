@@ -16,7 +16,7 @@ PyJWT>=2.8.0
 # NLP and Audio
 torch
 transformers
-gTTS
+google-genai
 librosa
 praat-parselmouth
 soundfile

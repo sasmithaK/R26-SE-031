@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import '../../../widgets/app_loading_indicator.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../models/curriculum_models.dart';
@@ -12,6 +13,7 @@ import '../../../../services/progress_service.dart';
 import 'logic/sorting_generator.dart';
 import 'models/sorting_round.dart';
 import 'widgets/pattern_background.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
 // ──────────────────────────────────────────────────────────────
 // Activity 03: Sorting Adventure (Premium Drag & Drop Redesign)
@@ -20,8 +22,9 @@ import 'widgets/pattern_background.dart';
 
 class VisualAct3SortingAdventure extends StatefulWidget {
   final ActivityNode activityNode;
+  final Map<String, dynamic>? studentData;
 
-  const VisualAct3SortingAdventure({Key? key, required this.activityNode})
+  const VisualAct3SortingAdventure({Key? key, required this.activityNode, this.studentData})
       : super(key: key);
 
   @override
@@ -31,6 +34,7 @@ class VisualAct3SortingAdventure extends StatefulWidget {
 
 class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
     with TickerProviderStateMixin {
+  String _lastSpokenInstruction = '';
   // ── Game state ──
   int _currentRoundIndex = 0;
   late List<SortingRound> _rounds;
@@ -102,9 +106,7 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
 
   // ── Sinhala instructions ──
   static const List<String> _instructions = [
-    'පින්තූර නිවැරදි තැනට අදින්න!',
-    'කණ්ඩායම් වලට වෙන් කරමු!',
-    'නිවැරදි කොටුවට දමන්න!',
+    'පින්තූර නිවැරදි කූඩයට දමන්න!',
   ];
   late String _currentInstruction;
 
@@ -176,12 +178,17 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
     _roundTransitionController.forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playInstruction();
+      _playInstruction(autoPlay: true);
     });
   }
 
-  void _playInstruction() {
-    TtsService().speak(_currentInstruction);
+  void _playInstruction({bool autoPlay = false}) {
+    
+    if (autoPlay && _lastSpokenInstruction == _currentInstruction) {
+      return;
+    }
+    _lastSpokenInstruction = _currentInstruction;
+    TtsService().speak(_currentInstruction, folder: 'skill_1');
     _speakerBounceController.forward().then((_) {
       _speakerBounceController.reverse();
     });
@@ -252,6 +259,7 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
     super.dispose();
   }
 
+
   // ── Game logic ──
 
   SortingRound get _currentRound => _rounds[_currentRoundIndex];
@@ -268,7 +276,7 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
     
     if (correctCategory == categoryKey) {
       // Correct!
-      _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
       
       setState(() {
         _visibleObjects.remove(object);
@@ -303,7 +311,7 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
       }
     } else {
       // Wrong!
-      _audioPlayer.play(AssetSource('audio/wrong.mp3'));
+      SoundUtils.playFeedback('audio/wrong.mp3');
       context.findAncestorStateOfType<TelemetryWrapperState>()?.recordMisclick();
       
       setState(() {
@@ -589,60 +597,65 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
     );
   }
 
-  Widget _buildVerticalProgressBar() {
+  Widget _buildHorizontalProgressBar() {
     final progress = _totalObjects == 0 ? 0.0 : _sortedCount / _totalObjects;
     return Container(
-      width: 12,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final safeMaxHeight = constraints.maxHeight.isFinite && constraints.maxHeight > 0 ? constraints.maxHeight : 100.0;
-          final barHeight = safeMaxHeight * 0.8; // Exactly 80% of available height
-          return SizedBox(
-            height: barHeight,
-            child: Stack(
-              alignment: Alignment.bottomCenter,
-              children: [
-                // Track
-                Container(
-                  width: 12,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      width: 1,
-                    ),
-                  ),
+      height: 12,
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          // Track
+          Container(
+            width: double.infinity,
+            height: 12,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.06),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  width: 1,
                 ),
-                // Filled glowing bar
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 600),
-                  curve: Curves.easeOutCubic,
-                  width: 12,
-                  height: (progress * barHeight).clamp(0.0, barHeight),
-                  decoration: BoxDecoration(
+              ),
+            ),
+          ),
+          // Filled glowing bar
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                height: 12,
+                width: (progress * constraints.maxWidth).clamp(0.0, constraints.maxWidth),
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
                   gradient: const LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
                     colors: [Color(0xFF6DBE6D), Color(0xFF86D286)], // Beautiful soft green
                   ),
-                  borderRadius: BorderRadius.circular(6),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF6DBE6D).withValues(alpha: 0.25),
+                      color: const Color(0xFF6DBE6D).withValues(alpha: 0.3),
                       blurRadius: 4,
-                      spreadRadius: 1,
                       offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-              ),
-            ],
+              );
+            },
           ),
-        );
-      },
-    ),
-  );
+        ],
+      ),
+    );
   }
 
   // ── Shelf Area (Conveyor Belt of Draggables) ──
@@ -653,12 +666,11 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            _buildVerticalProgressBar(),
-            const SizedBox(width: 20),
             Expanded(
               child: _roundComplete 
                 ? const SizedBox() // Disappear entirely when round is complete
                 : Container(
+                    clipBehavior: Clip.hardEdge,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(24),
@@ -667,21 +679,28 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
                         width: 2.0,
                       ),
                     ),
-                    child: Center(
-                      child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
-                  child: Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    alignment: WrapAlignment.center,
-                    children: _visibleObjects.map((obj) => _buildDraggableObject(obj)).toList(),
+                    child: Column(
+                      children: [
+                        _buildHorizontalProgressBar(),
+                        Expanded(
+                          child: Center(
+                            child: SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
+                                child: Wrap(
+                                  spacing: 16,
+                                  runSpacing: 16,
+                                  alignment: WrapAlignment.center,
+                                  children: _visibleObjects.map((obj) => _buildDraggableObject(obj)).toList(),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-                ),
-              ),
             ),
           ],
         ),
@@ -833,11 +852,11 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
   }
 
   // ── Category Zones (Drag Targets) ──
-  Widget _buildCategoryZones() {
-    final categories = _currentRound.categories.keys.toList();
-    
+  Widget _buildCategoryZones({List<String>? customCategories, int flex = 4}) {
+    final categories = customCategories ?? _currentRound.categories.keys.toList();
+    if (categories.isEmpty) return const SizedBox();
     return Expanded(
-      flex: 4,
+      flex: flex,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
@@ -926,49 +945,7 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
                             ),
                           ),
                           
-                          const SizedBox(height: 4),
-                          
-                          // Pill Label below the basket
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: accentColor, // The vibrant category color
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: accentColor.withValues(alpha: 0.4),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    label,
-                                    style: AppTypography.sinhala(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  if (isComplete) ...[
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.check_circle, color: Colors.white, size: 16),
-                                  ]
-                                ],
-                              ),
-                            ),
-                          ),
+
                         ],
                       ),
 
@@ -1018,10 +995,10 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
         secondaryColor = const Color(0xFFD9A000);
         decorationPattern = '⭐';
         break;
-      case 'nature':
-        categoryIcon = Icons.eco_rounded;
-        secondaryColor = const Color(0xFF9E639E);
-        decorationPattern = '🌿';
+      case 'flowers':
+        categoryIcon = Icons.local_florist_rounded;
+        secondaryColor = const Color(0xFFD81B60);
+        decorationPattern = '🌸';
         break;
       default:
         categoryIcon = Icons.category_rounded;
@@ -1033,177 +1010,25 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
     bool isWrong = _lastWrongCategory == categoryKey;
 
     return SizedBox(
-      width: 120,
-      height: 100,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        clipBehavior: Clip.none,
-        children: [
-          // Back inside of bucket
-          Positioned(
-            top: 8,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 100,
-              height: 35,
-              decoration: BoxDecoration(
-                color: isCorrect 
-                    ? const Color(0xFF5AB65A) // Darker green for inside
-                    : (isWrong ? const Color(0xFFD6695A) : secondaryColor), // Darker red for inside
-                borderRadius: BorderRadius.circular(50),
-              ),
+      width: 180,
+      height: 150,
+      child: AnimatedScale(
+        scale: isCorrect ? 1.1 : (isWrong ? 0.9 : 1.0),
+        duration: const Duration(milliseconds: 300),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: isCorrect ? Colors.green : (isWrong ? Colors.red : Colors.transparent),
+              width: (isCorrect || isWrong) ? 3 : 0,
             ),
+            borderRadius: BorderRadius.circular(20),
           ),
-          // Deep shadow hole
-          Positioned(
-            top: 14,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 86,
-              height: 22,
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(40),
-              ),
-            ),
+          child: Image.asset(
+            'assets/images/activity_icons/basket/basket_$categoryKey.png',
+            fit: BoxFit.contain,
           ),
-          // Main Body
-          Positioned(
-            bottom: 5, // Lifted slightly to make room for emblem overflow
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 110,
-              height: 75,
-              decoration: BoxDecoration(
-                gradient: isCorrect 
-                    ? const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF6DBE6D), Color(0xFF5AB65A)],
-                      )
-                    : (isWrong 
-                        ? const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFFE87C6D), Color(0xFFD6695A)],
-                          )
-                        : LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [accentColor, secondaryColor],
-                          )),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
-                ),
-                boxShadow: [
-                  if (isCorrect)
-                    BoxShadow(
-                      color: const Color(0xFF6DBE6D).withValues(alpha: 0.6),
-                      blurRadius: 16,
-                      spreadRadius: 2,
-                    )
-                  else if (isWrong)
-                    BoxShadow(
-                      color: const Color(0xFFE87C6D).withValues(alpha: 0.6),
-                      blurRadius: 16,
-                      spreadRadius: 2,
-                    )
-                  else
-                    BoxShadow(
-                      color: secondaryColor.withValues(alpha: 0.5),
-                      offset: const Offset(0, 6),
-                      blurRadius: 10,
-                    ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  // Subtle Pattern
-                  Positioned(
-                    left: 15,
-                    top: 15,
-                    child: Transform.rotate(
-                      angle: -0.2,
-                      child: Text(decorationPattern, style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.5))),
-                    ),
-                  ),
-                  Positioned(
-                    right: 15,
-                    bottom: 25,
-                    child: Transform.rotate(
-                      angle: 0.2,
-                      child: Text(decorationPattern, style: TextStyle(fontSize: 16, color: Colors.white.withValues(alpha: 0.5))),
-                    ),
-                  ),
-                  // Shine highlight on left edge
-                  Positioned(
-                    left: 12,
-                    top: 8,
-                    bottom: 12,
-                    child: Container(
-                      width: 8,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Front Rim
-          Positioned(
-            top: 8,
-            child: Container(
-              width: 110,
-              height: 35,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.4),
-                    Colors.white.withValues(alpha: 0.0),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(55),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  width: 3,
-                ),
-              ),
-            ),
-          ),
-          // Front Emblem (Category Indicator)
-          Positioned(
-            bottom: -5,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: accentColor, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Icon(
-                  categoryIcon,
-                  color: secondaryColor,
-                  size: 24,
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1268,103 +1093,12 @@ class _VisualAct3SortingAdventureState extends State<VisualAct3SortingAdventure>
 
   // ── Celebration Overlay ──
   Widget _buildCelebrationOverlay() {
-    return AnimatedBuilder(
-      animation: _celebrationScale,
-      builder: (context, child) {
-        return Container(
-          color: Colors.black.withValues(alpha: 0.4 * _celebrationScale.value),
-          child: Center(
-            child: Transform.scale(
-              scale: _celebrationScale.value,
-              child: child,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 32),
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4A90D9).withValues(alpha: 0.2),
-              blurRadius: 30,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildStar(36),
-                const SizedBox(width: 10),
-                _buildStar(52),
-                const SizedBox(width: 10),
-                _buildStar(36),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Image.asset(
-              _currentMascot,
-              width: 80,
-              height: 80,
-              fit: BoxFit.contain,
-              errorBuilder: (c, e, s) => const SizedBox(width: 80, height: 80),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'හොඳයි! 🎉',
-              style: AppTypography.sinhala(
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF3E3E3E),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'ඔබ සියල්ල වර්ග කළා!',
-              style: AppTypography.sinhala(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF6B7280),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 28),
-            GestureDetector(
-              onTap: _finishActivity,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6DBE6D), Color(0xFF4E9E4E)],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6DBE6D).withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  'ඉදිරියට යමු →',
-                  style: AppTypography.sinhala(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+    return Positioned.fill(
+      child: SharedCelebrationPopup(
+        studentData: widget.studentData,
+        activityTitle: widget.activityNode.title,
+        scaleAnimation: _celebrationScale,
+        onFinish: _finishActivity,
       ),
     );
   }

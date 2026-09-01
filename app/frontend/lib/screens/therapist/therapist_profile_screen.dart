@@ -8,6 +8,7 @@ import '../../services/auth_service.dart';
 import '../welcome_screen.dart';
 import '../../config/api_config.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../../services/localization_service.dart';
 
 class TherapistProfileScreen extends StatefulWidget {
   const TherapistProfileScreen({super.key});
@@ -100,14 +101,14 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Profile Photo', style: AppTypography.heading(fontSize: 18)),
+              Text(LocalizationService.instance.t('profile_photo'), style: AppTypography.heading(fontSize: 18)),
               const SizedBox(height: 24),
               ListTile(
                 leading: const Icon(
                   Icons.photo_library,
                   color: AppColors.calmBlue,
                 ),
-                title: const Text('Change Photo'),
+                title: Text(LocalizationService.instance.t('change_photo')),
                 onTap: () {
                   Navigator.pop(context);
                   _openPicker();
@@ -115,10 +116,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
               ),
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text(
-                  'Remove Photo',
-                  style: TextStyle(color: Colors.red),
-                ),
+                title: Text(LocalizationService.instance.t('remove_photo'), style: const TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(context);
                   _removePhoto();
@@ -232,7 +230,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Change Password',
+                      LocalizationService.instance.t('update_password'),
                       style: AppTypography.heading(
                         fontSize: 22,
                         color: AppColors.textPrimary,
@@ -240,7 +238,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Protect your account with a strong new password.',
+                      LocalizationService.instance.t('update_password_desc'),
                       style: AppTypography.body(
                         fontSize: 14,
                         color: AppColors.textSecondary,
@@ -283,7 +281,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                       obscureText: true,
                       style: AppTypography.body(fontSize: 16),
                       decoration: InputDecoration(
-                        hintText: 'Current Password',
+                        hintText: LocalizationService.instance.t('current_password'),
                         hintStyle: AppTypography.body(
                           color: AppColors.textHint,
                         ),
@@ -309,7 +307,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                       obscureText: true,
                       style: AppTypography.body(fontSize: 16),
                       decoration: InputDecoration(
-                        hintText: 'New Password',
+                        hintText: LocalizationService.instance.t('new_password'),
                         hintStyle: AppTypography.body(
                           color: AppColors.textHint,
                         ),
@@ -356,8 +354,8 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                                   if (!ctx.mounted || !mounted) return;
                                   Navigator.pop(ctx);
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Password changed!'),
+                                    SnackBar(
+                                      content: Text(LocalizationService.instance.t('password_changed')),
                                       backgroundColor: AppColors.gentleGreen,
                                     ),
                                   );
@@ -380,7 +378,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                                 ),
                               )
                             : Text(
-                                'Update Password',
+                                LocalizationService.instance.t('update_password'),
                                 style: AppTypography.button(
                                   fontSize: 16,
                                   color: Colors.white,
@@ -400,28 +398,33 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.cream,
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: AppColors.calmBlue),
-              )
-            : SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  children: [
-                    _buildHeader(),
-                    _buildProfileCard(),
-                    const SizedBox(height: 8),
-                    _buildCollapsibleSections(),
-                    const SizedBox(height: 16),
-                    _buildLogoutButton(),
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-      ),
+    return ListenableBuilder(
+      listenable: LocalizationService.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.cream,
+          body: SafeArea(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.calmBlue),
+                  )
+                : SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      children: [
+                        _buildHeader(),
+                        _buildProfileCard(),
+                        const SizedBox(height: 8),
+                        _buildCollapsibleSections(),
+                        const SizedBox(height: 16),
+                        _buildLogoutButton(),
+                        const SizedBox(height: 32),
+                      ],
+                    ),
+                  ),
+          ),
+        );
+      }
     );
   }
 
@@ -450,7 +453,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
             ),
           if (Navigator.canPop(context)) const SizedBox(width: 14),
           Text(
-            'therapist account',
+            LocalizationService.instance.t('therapist_account'),
             style: AppTypography.heading(
               fontSize: 22,
               fontWeight: FontWeight.w700,
@@ -621,25 +624,25 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
           children: [
             _buildExpansionSection(
               icon: Icons.local_hospital_rounded,
-              title: 'clinic connection',
+              title: LocalizationService.instance.t('clinic_connection'),
               child: _buildClinicContent(),
             ),
             _divider(),
             _buildExpansionSection(
               icon: Icons.person_outline_rounded,
-              title: 'account & security',
+              title: LocalizationService.instance.t('account_security'),
               child: _buildAccountContent(),
             ),
             _divider(),
             _buildExpansionSection(
               icon: Icons.notifications_none_rounded,
-              title: 'notifications',
+              title: LocalizationService.instance.t('notifications'),
               child: _buildNotificationsContent(),
             ),
             _divider(),
             _buildExpansionSection(
               icon: Icons.help_outline_rounded,
-              title: 'help & support',
+              title: LocalizationService.instance.t('help_support'),
               child: _buildHelpContent(),
             ),
           ],
@@ -657,7 +660,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
       child: Column(
         children: [
           Text(
-            'Have parents scan this QR code',
+            LocalizationService.instance.t('scan_qr_code_therapist'),
             style: AppTypography.caption(
               fontSize: 13,
               color: AppColors.textSecondary,
@@ -696,7 +699,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'or enter code: ',
+                  LocalizationService.instance.t('or_enter_code'),
                   style: AppTypography.caption(
                     fontSize: 14,
                     color: AppColors.textSecondary,
@@ -720,8 +723,8 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
             child: ElevatedButton.icon(
               onPressed: () {
                 Share.share(
-                  'Hello! I am excited to work with you on Sipsara.\n\nPlease use my secure connection code [$clinicCode] to link our accounts. If you have the app installed, you can enter the code in the Parent Hub.',
-                  subject: 'Sipsara Connection Code',
+                  LocalizationService.instance.t('share_invite_text').replaceAll('{clinicCode}', clinicCode),
+                  subject: LocalizationService.instance.t('share_invite_subject'),
                 );
               },
               icon: const Icon(
@@ -730,7 +733,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                 color: Colors.white,
               ),
               label: Text(
-                'share invite code',
+                LocalizationService.instance.t('share_invite_code'),
                 style: AppTypography.button(fontSize: 14),
               ),
               style: ElevatedButton.styleFrom(
@@ -750,33 +753,42 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
   Widget _buildAccountContent() {
     return Column(
       children: [
+
         _buildEditableRow(
-          label: 'full name',
+          label: LocalizationService.instance.t('full_name'),
           value: _userName,
           onEdit: () => _showEditNameDialog(),
         ),
         _buildEditableRow(
-          label: 'specialization',
-          value: _specialization.isEmpty ? 'not set' : _specialization,
+          label: LocalizationService.instance.t('specialization_hint'),
+          value: _specialization.isEmpty ? LocalizationService.instance.t('not_set') : _specialization,
           onEdit: () => _showEditSpecializationDialog(),
         ),
         _buildEditableRow(
-          label: 'clinic name',
-          value: _clinicName.isEmpty ? 'not set' : _clinicName,
+          label: LocalizationService.instance.t('clinic_hint'),
+          value: _clinicName.isEmpty ? LocalizationService.instance.t('not_set') : _clinicName,
           onEdit: () => _showEditClinicDialog(),
         ),
         _buildEditableRow(
-          label: 'email',
+          label: LocalizationService.instance.t('email'),
           value: _userEmail,
           onEdit: _isSocialLogin ? null : () => _showEditEmailDialog(),
           subtitle: _isSocialLogin ? 'managed by $_authProvider' : null,
         ),
         _buildEditableRow(
-          label: 'password',
+          label: LocalizationService.instance.t('password'),
           value: '••••••••',
-          editLabel: 'change',
+          editLabel: LocalizationService.instance.t('change'),
           onEdit: _isSocialLogin ? null : () => _showChangePasswordDialog(),
           subtitle: _isSocialLogin ? 'managed by $_authProvider' : null,
+        ),
+        _buildEditableRow(
+          label: LocalizationService.instance.t('language'),
+          value: LocalizationService.instance.currentLocale == 'si'
+              ? 'සිංහල'
+              : 'English',
+          onEdit: () => _showLanguageBottomSheet(),
+          editLabel: LocalizationService.instance.t('edit'),
         ),
         const SizedBox(height: 24),
         // Delete Account
@@ -790,7 +802,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
               size: 20,
             ),
             label: Text(
-              'delete account',
+              LocalizationService.instance.t('delete_account'),
               style: AppTypography.body(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -813,9 +825,9 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
       child: Column(
         children: [
           _buildEditableRow(
-            label: 'contact support',
+            label: LocalizationService.instance.t('contact_support'),
             value: 'support@sipsara.app',
-            editLabel: 'email',
+            editLabel: LocalizationService.instance.t('email'),
             onEdit: () {},
           ),
         ],
@@ -961,7 +973,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
             );
           },
           icon: const Icon(Icons.logout_rounded, size: 20),
-          label: Text('logout', style: AppTypography.button(fontSize: 15)),
+          label: Text(LocalizationService.instance.t('logout'), style: AppTypography.button(fontSize: 15)),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.redAccent,
             foregroundColor: Colors.white,
@@ -1027,7 +1039,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Update Name',
+                      LocalizationService.instance.t('update_name'),
                       style: AppTypography.heading(
                         fontSize: 22,
                         color: AppColors.textPrimary,
@@ -1035,7 +1047,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Enter your full name to update your profile.',
+                      LocalizationService.instance.t('update_name_desc'),
                       style: AppTypography.body(
                         fontSize: 14,
                         color: AppColors.textSecondary,
@@ -1077,7 +1089,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                       controller: controller,
                       style: AppTypography.body(fontSize: 16),
                       decoration: InputDecoration(
-                        hintText: 'Full Name',
+                        hintText: LocalizationService.instance.t('full_name'),
                         hintStyle: AppTypography.body(
                           color: AppColors.textHint,
                         ),
@@ -1227,7 +1239,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Update Email',
+                      LocalizationService.instance.t('update_email_title'),
                       style: AppTypography.heading(
                         fontSize: 22,
                         color: AppColors.textPrimary,
@@ -1235,7 +1247,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Enter a new email address. We will send a verification code to confirm.',
+                      LocalizationService.instance.t('update_email_desc'),
                       style: AppTypography.body(
                         fontSize: 14,
                         color: AppColors.textSecondary,
@@ -1278,7 +1290,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                       keyboardType: TextInputType.emailAddress,
                       style: AppTypography.body(fontSize: 16),
                       decoration: InputDecoration(
-                        hintText: 'Email Address',
+                        hintText: LocalizationService.instance.t('email_hint'),
                         hintStyle: AppTypography.body(
                           color: AppColors.textHint,
                         ),
@@ -1350,7 +1362,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                                 ),
                               )
                             : Text(
-                                'Send Verification Code',
+                                LocalizationService.instance.t('send_verification_code'),
                                 style: AppTypography.button(
                                   fontSize: 16,
                                   color: Colors.white,
@@ -1365,6 +1377,108 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
           },
         );
       },
+    );
+  }
+
+  void _showLanguageBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.cardSurface,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                LocalizationService.instance.t('select_language'),
+                style: AppTypography.heading(fontSize: 20, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 24),
+              _buildLanguageOptionSheet(
+                ctx,
+                title: 'English',
+                localeCode: 'en',
+                icon: Icons.language_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildLanguageOptionSheet(
+                ctx,
+                title: 'සිංහල',
+                localeCode: 'si',
+                icon: Icons.translate_rounded,
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLanguageOptionSheet(BuildContext ctx, {required String title, required String localeCode, required IconData icon}) {
+    final bool isSelected = LocalizationService.instance.currentLocale == localeCode;
+    return GestureDetector(
+      onTap: () {
+        LocalizationService.instance.setLocale(localeCode);
+        Navigator.pop(ctx);
+        setState(() {});
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.calmBlue.withValues(alpha: 0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.calmBlue : AppColors.borderLight,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? AppColors.calmBlue : AppColors.textSecondary,
+              size: 24,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: AppTypography.body(
+                  fontSize: 16,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? AppColors.calmBlue : AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (isSelected)
+              const Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.calmBlue,
+                size: 24,
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1386,7 +1500,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                 borderRadius: BorderRadius.circular(20),
               ),
               title: Text(
-                'Delete Account',
+                LocalizationService.instance.t('delete_account'),
                 style: AppTypography.heading(
                   fontSize: 22,
                   color: Colors.redAccent,
@@ -1397,12 +1511,12 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'This action is irreversible. All your data and student profiles will be permanently deleted.',
+                    LocalizationService.instance.t('delete_account_desc'),
                     style: AppTypography.body(fontSize: 15),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'To confirm, type your full name:',
+                    LocalizationService.instance.t('delete_account_confirm'),
                     style: AppTypography.caption(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -1437,7 +1551,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                 TextButton(
                   onPressed: isLoading ? null : () => Navigator.pop(ctx),
                   child: Text(
-                    'Cancel',
+                    LocalizationService.instance.t('cancel'),
                     style: AppTypography.body(color: AppColors.textSecondary),
                   ),
                 ),
@@ -1482,7 +1596,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                           ),
                         )
                       : Text(
-                          'Delete Permanently',
+                          LocalizationService.instance.t('delete_forever'),
                           style: AppTypography.body(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
@@ -1501,14 +1615,14 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
     return Column(
       children: [
         _buildNotifToggle(
-          'login alerts',
-          'get notified when your account is accessed from a new device.',
+          LocalizationService.instance.t('login_alerts'),
+          LocalizationService.instance.t('login_alerts_desc'),
           _loginAlertsEnabled,
           (v) => _toggleLoginAlerts(v),
         ),
         _buildNotifToggle(
-          'in-app notifications',
-          'receive important alerts within the app.',
+          LocalizationService.instance.t('in_app_notifications'),
+          LocalizationService.instance.t('in_app_notifications_desc'),
           _inAppNotifications,
           (v) => setState(() => _inAppNotifications = v),
         ),
@@ -1853,7 +1967,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Update Clinic Name',
+                      LocalizationService.instance.t('update_clinic_name'),
                       style: AppTypography.heading(
                         fontSize: 22,
                         color: AppColors.textPrimary,
@@ -1861,7 +1975,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Enter your clinic name to update your profile.',
+                      LocalizationService.instance.t('update_clinic_name_desc'),
                       style: AppTypography.body(
                         fontSize: 14,
                         color: AppColors.textSecondary,
@@ -1903,7 +2017,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                       controller: controller,
                       style: AppTypography.body(fontSize: 16),
                       decoration: InputDecoration(
-                        hintText: 'Clinic Name',
+                        hintText: LocalizationService.instance.t('clinic_hint'),
                         hintStyle: AppTypography.body(
                           color: AppColors.textHint,
                         ),
@@ -1958,9 +2072,9 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                                   Navigator.pop(ctx);
                                   setState(() => _clinicName = newName);
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
-                                        'Name updated successfully!',
+                                        LocalizationService.instance.t('clinic_name_updated'),
                                       ),
                                       backgroundColor: AppColors.gentleGreen,
                                     ),
@@ -1984,7 +2098,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                                 ),
                               )
                             : Text(
-                                'Save Changes',
+                                LocalizationService.instance.t('save_changes'),
                                 style: AppTypography.button(
                                   fontSize: 16,
                                   color: Colors.white,
@@ -2053,7 +2167,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Update Specialization',
+                      LocalizationService.instance.t('update_specialization'),
                       style: AppTypography.heading(
                         fontSize: 22,
                         color: AppColors.textPrimary,
@@ -2061,7 +2175,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Enter your specialization to update your profile.',
+                      LocalizationService.instance.t('update_specialization_desc'),
                       style: AppTypography.body(
                         fontSize: 14,
                         color: AppColors.textSecondary,
@@ -2103,7 +2217,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                       controller: controller,
                       style: AppTypography.body(fontSize: 16),
                       decoration: InputDecoration(
-                        hintText: 'Specialization',
+                        hintText: LocalizationService.instance.t('specialization_hint'),
                         hintStyle: AppTypography.body(
                           color: AppColors.textHint,
                         ),
@@ -2158,9 +2272,9 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                                   Navigator.pop(ctx);
                                   setState(() => _specialization = newName);
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
-                                        'Name updated successfully!',
+                                        LocalizationService.instance.t('specialization_updated'),
                                       ),
                                       backgroundColor: AppColors.gentleGreen,
                                     ),
@@ -2184,7 +2298,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen>
                                 ),
                               )
                             : Text(
-                                'Save Changes',
+                                LocalizationService.instance.t('save_changes'),
                                 style: AppTypography.button(
                                   fontSize: 16,
                                   color: Colors.white,

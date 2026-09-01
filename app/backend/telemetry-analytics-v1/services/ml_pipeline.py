@@ -32,26 +32,31 @@ from services.comp2_kinematics import extract_comp2_features
 # Cognitive Index Tags — maps activity template types to cognitive domains
 # ---------------------------------------------------------------------------
 VISUAL_SKILLS_TEMPLATES = {
-    "hidden_picture_game",
-    "spot_difference",
-    "shape_match",
-    "visual_tracking",
-    "pattern_completion",
+    # Current Sinhala curriculum activity names
+    "visual_act1_hidden_search", "visual_act2_shadow_matching",
+    "visual_act3_sorting_adventure", "visual_act4_pattern_adventure",
+    "visual_act5_memory_hats",
+    # Legacy / generic names
+    "hidden_picture_game", "spot_difference", "shape_match",
+    "visual_tracking", "pattern_completion",
 }
 
 PHONOLOGICAL_TEMPLATES = {
-    "syllable_tap",
-    "word_match",
-    "letter_sound",
-    "rhyme_sort",
-    "phoneme_blend",
+    # Current Sinhala curriculum activity names
+    "skill2_act1_odd_one_out", "skill2_act2_identical_match",
+    "skill2_act3_audio", "skill2_act4_mcq", "skill2_act5_pattern_memory",
+    "skill3_act3_audio_mcq", "skill3_act4_fill_blank",
+    "skill5_act1_mcq", "skill5_act2_mcq", "skill5_act3_mcq", "skill5_act4_mcq",
+    # Legacy names
+    "syllable_tap", "word_match", "letter_sound", "rhyme_sort", "phoneme_blend",
 }
 
 MOTOR_TEMPLATES = {
-    "trace_letter",
-    "drag_drop",
-    "connect_dots",
-    "shape_trace",
+    # Current Sinhala curriculum activity names
+    "skill3_act2_word_formation_mcq", "skill3_act5_jumbled_word",
+    "skill4_act4_jumbled_sentence", "skill4_act2_fill_blank",
+    # Legacy names
+    "trace_letter", "drag_drop", "connect_dots", "shape_trace",
 }
 
 
@@ -128,17 +133,22 @@ def extract_features(events: list[dict[str, Any]]) -> dict[str, float]:
         phonological_latency = 1500.0  # neutral baseline
 
     # ---- Fatigue Drift (last-3 vs first-3 latency delta) -------------------
-    if n >= 6:
-        early_latency = statistics.mean(
-            e.get("total_round_latency_ms", 0) for e in events[:3]
-        )
-        late_latency = statistics.mean(
-            e.get("total_round_latency_ms", 0) for e in events[-3:]
-        )
-        # Relative fatigue: percentage slowdown
-        fatigue_drift = ((late_latency / early_latency) - 1.0) if early_latency > 0 else 0.0
+    if n >= 4:
+        early_latency = statistics.mean(e.get("total_round_latency_ms", 1) for e in events[:2])
+        late_latency = statistics.mean(e.get("total_round_latency_ms", 1) for e in events[-2:])
+        latency_drift = ((late_latency / early_latency) - 1.0) if early_latency > 0 else 0.0
+
+        early_errors = statistics.mean(1.0 if not e.get("is_correct") else 0.0 for e in events[:2])
+        late_errors = statistics.mean(1.0 if not e.get("is_correct") else 0.0 for e in events[-2:])
+        error_drift = late_errors - early_errors
+
+        early_hes = statistics.mean(e.get("hesitation_count", 0) for e in events[:2])
+        late_hes = statistics.mean(e.get("hesitation_count", 0) for e in events[-2:])
+        hesitation_drift = late_hes - early_hes
     else:
-        fatigue_drift = 0.0
+        latency_drift = 0.0
+        error_drift = 0.0
+        hesitation_drift = 0.0
 
     return {
         "visual_processing_speed": round(visual_processing_speed, 2),
@@ -146,9 +156,10 @@ def extract_features(events: list[dict[str, Any]]) -> dict[str, float]:
         "hesitation_ratio": round(hesitation_ratio, 3),
         "accuracy_slope": round(accuracy_slope, 3),
         "phonological_latency": round(phonological_latency, 2),
-        "fatigue_drift": round(fatigue_drift, 2),
+        "latency_drift": round(latency_drift, 3),
+        "error_drift": round(error_drift, 3),
+        "hesitation_drift": round(hesitation_drift, 3),
     }
-
 
 # ---------------------------------------------------------------------------
 # Cognitive Index Computation (0-100 scores for each domain)
@@ -172,10 +183,17 @@ def compute_cognitive_indices(features: dict[str, float]) -> dict[str, float]:
     sustained_attention_score = _clamp(100.0 * math.exp(-features["hesitation_ratio"] / 2.0))
 
     return {
-        "visual_processing_score": round(visual_processing_score, 1),
-        "phonological_awareness_score": round(phonological_awareness_score, 1),
-        "motor_precision_score": round(motor_precision_score, 1),
-        "sustained_attention_score": round(sustained_attention_score, 1),
+        # New non-overclaiming behavioral terminology
+        "visual_task_performance": round(visual_processing_score, 1),
+        "phonological_task_performance": round(phonological_awareness_score, 1),
+        "motor_interaction_pattern": round(motor_precision_score, 1),
+        "attention_interaction_indicator": round(sustained_attention_score, 1),
+
+        # Legacy fields preserved temporarily for UI compatibility
+        "visual_processing_index": round(visual_processing_score, 1),
+        "phonological_task_index": round(phonological_awareness_score, 1),
+        "motor_interaction_index": round(motor_precision_score, 1),
+        "attention_stability_index": round(sustained_attention_score, 1),
     }
 
 
@@ -215,9 +233,11 @@ def classify_risk(
             
             return {
                 "overall_risk": overall_risk,
-                "dyslexia_risk": overall_risk,
-                "dyspraxia_risk": overall_risk,
-                "adhd_risk": overall_risk,
+                # Use the same key names as the heuristic path so generate_interventions works
+                "visual_dyslexia_risk": overall_risk,
+                "phonological_dyslexia_risk": overall_risk,
+                "motor_dysgraphia_risk": overall_risk,
+                "attention_risk": overall_risk,
                 "model_used": "RandomForest"
             }
         except Exception as e:
@@ -236,22 +256,22 @@ def classify_risk(
     enough labelled data accumulates.
     """
     visual_risk = _threshold_risk(
-        score=indices["visual_processing_score"],
+        score=indices["visual_processing_index"],
         high_threshold=40,
         moderate_threshold=65,
     )
     phonological_risk = _threshold_risk(
-        score=indices["phonological_awareness_score"],
+        score=indices["phonological_task_index"],
         high_threshold=40,
         moderate_threshold=65,
     )
     motor_risk = _threshold_risk(
-        score=indices["motor_precision_score"],
+        score=indices["motor_interaction_index"],
         high_threshold=50,
         moderate_threshold=72,
     )
     attention_risk = _threshold_risk(
-        score=indices["sustained_attention_score"],
+        score=indices["attention_stability_index"],
         high_threshold=45,
         moderate_threshold=68,
     )
@@ -312,9 +332,10 @@ def generate_interventions(
             "to reduce cognitive fatigue and improve sustained attention."
         )
 
-    if features["fatigue_drift"] > 1500:
+    if features.get("latency_drift", 0.0) > 0.30:
         interventions.append(
-            "The child shows significant fatigue during longer activity sessions. "
+            "The child shows significant fatigue during longer activity sessions — "
+            "response time increased by more than 30% towards session end. "
             "Enabling the Daily Limit feature is recommended."
         )
 
@@ -369,6 +390,8 @@ def generate_cognitive_profile(
 ) -> dict[str, Any]:
     """
     Full end-to-end ML analytics pipeline.
+    Requires at least 4 telemetry events to produce meaningful drift features.
+    Returns a status='insufficient_data' dict if not enough data.
     """
     all_events: list[dict[str, Any]] = []
     latest_device_metrics = {}
@@ -378,13 +401,21 @@ def generate_cognitive_profile(
         if session.get("device_metrics"):
             latest_device_metrics = session.get("device_metrics")
 
+    # Cold-start guard: require minimum 4 rounds for meaningful drift features
+    if len(all_events) < 4:
+        return {
+            "status": "insufficient_data",
+            "message": f"Minimum 4 rounds required for profiling. Got {len(all_events)}.",
+            "data_points": len(all_events),
+        }
+
     base_features = extract_features(all_events)
     advanced_features = extract_advanced_features(all_events)
     
     # Normalize features using device metrics
     advanced_features = normalize_features_for_device(advanced_features, latest_device_metrics)
     
-    # Combine into 19-dimensional feature vector (STT features stubbed for now)
+    # Combine into feature vector
     features = {
         **base_features,
         **advanced_features,
@@ -392,6 +423,14 @@ def generate_cognitive_profile(
         "voice_hesitation_ms": 0.0,
         "assessment_risk_score": round(assessment_risk_score, 4),
     }
+    
+    # Calculate deterministic fatigue score (weighted composite, clamped to [0, 1])
+    fatigue_score = (
+        (0.5 * base_features.get("latency_drift", 0.0)) +
+        (0.3 * base_features.get("error_drift", 0.0)) +
+        (0.2 * base_features.get("hesitation_drift", 0.0))
+    )
+    fatigue_score = max(0.0, min(1.0, fatigue_score))
 
     # Cognitive indices currently only use the base features
     indices = compute_cognitive_indices(base_features)
@@ -401,6 +440,7 @@ def generate_cognitive_profile(
     return {
         "feature_vector": features,
         "cognitive_indices": indices,
+        "fatigue_score": round(fatigue_score, 3),
         "risk_assessment": risk,
         "recommended_interventions": interventions,
         "data_points": len(all_events),
@@ -494,5 +534,7 @@ def _zero_features() -> dict[str, float]:
         "hesitation_ratio": 0.0,
         "accuracy_slope": 0.0,
         "phonological_latency": 1500.0,
-        "fatigue_drift": 0.0,
+        "latency_drift": 0.0,
+        "error_drift": 0.0,
+        "hesitation_drift": 0.0,
     }

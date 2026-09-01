@@ -19,9 +19,11 @@ class ShadowGenerator {
     'animals/rabbit.png',
     'animals/snail.png',
     'animals/turtle.png',
-    'nature/flower.png',
-    'nature/leaf.png',
-    'nature/sun.png',
+    'flowers/nil_manel.png',
+    'flowers/nelum.png',
+    'flowers/araliya.png',
+    'flowers/wada_mal.png',
+    'flowers/flower_05.png',
     'fruits_food/apple.png',
     'fruits_food/banana.png',
     'fruits_food/grapes.png',
@@ -60,7 +62,7 @@ class ShadowGenerator {
 
   static ShadowRound _buildRound({required int count, required int difficulty}) {
     // Shuffle the available distinct assets to ensure fresh gameplay
-    final available = List<String>.from(_distinctAssets)..shuffle(_rng);
+    final available = List<String>.from(_distinctAssets);
     
     // Take exactly [count] items
     final selected = available.take(count).toList();

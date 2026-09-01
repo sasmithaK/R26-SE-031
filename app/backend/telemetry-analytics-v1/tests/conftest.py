@@ -23,7 +23,7 @@ from dependencies import get_current_user
 @pytest.fixture
 def mock_db():
     client = AsyncMongoMockClient()
-    db = client.get_database("sipsara_db")
+    db = client.get_database("test_db")
     return db
 
 @pytest.fixture
@@ -36,6 +36,8 @@ def mock_user():
 
 @pytest.fixture(autouse=True)
 def patch_get_db(mock_db):
+    from database import db_instance
+    db_instance.client = mock_db.client
     with patch("routers.telemetry.get_db", return_value=mock_db):
         yield
 

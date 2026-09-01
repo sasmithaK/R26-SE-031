@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../widgets/telemetry_wrapper.dart';
@@ -6,28 +7,33 @@ import '../../../../models/curriculum_models.dart';
 import '../../../../services/tts_service.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
 import '../../../../services/progress_service.dart';
+import '../shared_widgets/shared_celebration_popup.dart';
 
 /// Activity 9: වචනයට සවන් දී පින්තූරය සොයමු (Listen to Word & Find Image)
 /// Template: audio_image_match_game
 class Skill4Act1Mcq extends StatefulWidget {
   final ActivityNode? activityNode;
+  final Map<String, dynamic>? studentData;
   final bool isRemedial;
-  const Skill4Act1Mcq({super.key, this.activityNode, this.isRemedial = false});
+  const Skill4Act1Mcq({super.key, this.activityNode, this.isRemedial = false, this.studentData});
 
   @override
   State<Skill4Act1Mcq> createState() => _Skill4Act1McqState();
 }
 
 class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
+  String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
   int? _selectedIndex;
   bool _isCorrect = false;
   bool _activityComplete = false;
   int _currentRoundIndex = 0;
+  int _attemptCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _attemptCount = 0;
     final skillId = widget.activityNode?.skillId ?? '';
     final activityId = widget.activityNode?.id ?? '';
     if (skillId.isNotEmpty && activityId.isNotEmpty) {
@@ -38,7 +44,7 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
       _currentRoundIndex = 0;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playAudioPrompt();
+      _playAudioPrompt(autoPlay: true);
     });
   }
 
@@ -48,50 +54,81 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
     super.dispose();
   }
 
-  void _playAudioPrompt() {
+  void _playAudioPrompt({bool autoPlay = false}) {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) return;
 
     final currentRound = rounds[_currentRoundIndex];
     final audioText = currentRound['audio_text']?.toString() ?? currentRound['prompt']?.toString() ?? 'වෘත්තය';
-    TtsService().speak(audioText);
+    
+    if (autoPlay && _lastSpokenInstruction == audioText) {
+      return;
+    }
+    _lastSpokenInstruction = audioText;
+    TtsService().speak(audioText, folder: 'skill_4');
   }
 
   void _checkAnswer(int index, int correctIndex, int totalRounds) async {
     if (_isCorrect) return;
 
+    _attemptCount++;
     setState(() {
       _selectedIndex = index;
     });
 
     final bool isRight = (index == correctIndex);
     int score = isRight ? 100 : 0;
-    context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(score);
 
     if (isRight) {
+      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(score);
       setState(() {
         _isCorrect = true;
       });
-      await _audioPlayer.play(AssetSource('audio/correct.mp3'));
+      SoundUtils.playFeedback('audio/correct.mp3');
 
-      Future.delayed(const Duration(milliseconds: 1400), () {
-        if (!mounted) return;
-        if (_currentRoundIndex < totalRounds - 1) {
-          setState(() {
-            _currentRoundIndex++;
-              final sId = widget.activityNode?.skillId ?? '';
-              final aId = widget.activityNode?.id ?? '';
-              if (sId.isNotEmpty && aId.isNotEmpty) {
-                int progress = ((_currentRoundIndex / (widget.activityNode?.rounds.length ?? 1)) * 100).toInt();
-                ProgressService().saveActivityScore(sId, aId, progress);
-                ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
-              }
-            _selectedIndex = null;
-            _isCorrect = false;
-          });
-          _playAudioPrompt();
-        } else {
-          setState(() {
+      _advanceRoundAfterDelay(totalRounds);
+    } else {
+      SoundUtils.playFeedback('audio/wrong.mp3');
+
+      if (_attemptCount >= 2) {
+        context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(0);
+        setState(() {
+          _selectedIndex = correctIndex;
+          _isCorrect = true;
+        });
+        _advanceRoundAfterDelay(totalRounds);
+      } else {
+        Future.delayed(const Duration(milliseconds: 700), () {
+          if (mounted && !_isCorrect) {
+            setState(() {
+              _selectedIndex = null;
+            });
+          }
+        });
+      }
+    }
+  }
+
+  void _advanceRoundAfterDelay(int totalRounds) {
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (!mounted) return;
+      if (_currentRoundIndex < totalRounds - 1) {
+        setState(() {
+          _currentRoundIndex++;
+          _attemptCount = 0;
+          final sId = widget.activityNode?.skillId ?? '';
+          final aId = widget.activityNode?.id ?? '';
+          if (sId.isNotEmpty && aId.isNotEmpty) {
+            int progress = ((_currentRoundIndex / (widget.activityNode?.rounds.length ?? 1)) * 100).toInt();
+            ProgressService().saveActivityScore(sId, aId, progress);
+            ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+          }
+          _selectedIndex = null;
+          _isCorrect = false;
+        });
+        _playAudioPrompt(autoPlay: true);
+      } else {
+        setState(() {
           _activityComplete = true;
           final sId = widget.activityNode?.skillId ?? '';
           final aId = widget.activityNode?.id ?? '';
@@ -100,18 +137,8 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
             ProgressService().clearActivityState(sId, aId);
           }
         });
-        }
-      });
-    } else {
-      await _audioPlayer.play(AssetSource('audio/wrong.mp3'));
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (mounted && !_isCorrect) {
-          setState(() {
-            _selectedIndex = null;
-          });
-        }
-      });
-    }
+      }
+    });
   }
 
   @override
@@ -174,6 +201,8 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
     }
 
     return SharedGameLayout(
+      studentData: widget.studentData,
+      activityTitle: widget.activityNode?.title ?? '',
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
       totalRounds: rounds.length,
@@ -237,12 +266,12 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
                 ),
               ),
             ),
-            SizedBox(height: options.length > 3 ? 16 : 32),
+            const SizedBox(height: 16),
             if (imageUrl != null)
               Container(
-                margin: EdgeInsets.only(bottom: options.length > 3 ? 16 : 32),
-                width: options.length > 3 ? 180 : 240,
-                height: options.length > 3 ? 180 : 240,
+                margin: const EdgeInsets.only(bottom: 16),
+                width: 200,
+                height: 200,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),

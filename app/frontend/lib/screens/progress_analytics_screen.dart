@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../widgets/app_loading_indicator.dart';
 import '../theme/app_theme.dart';
@@ -165,7 +166,8 @@ class _ProgressAnalyticsScreenState extends State<ProgressAnalyticsScreen> {
 
   Widget _buildSkillProgressCard(SkillSummary skill, SkillDetail? detail) {
     final double progress = ProgressService().getSkillProgress(skill.id, skill.totalActivities);
-    final int completedCount = ProgressService().getCompletedActivitiesCount(skill.id);
+    final int rawCompletedCount = ProgressService().getCompletedActivitiesCount(skill.id);
+    final int completedCount = math.min(rawCompletedCount, skill.totalActivities);
     
     return Card(
       margin: const EdgeInsets.only(bottom: 20),

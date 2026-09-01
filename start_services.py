@@ -35,11 +35,10 @@ except:
 BASE = Path(__file__).parent
 
 SERVICES = [
-    {"name": "C1-CBME", "path": "monitoring-service-v1", "port": 8011, "desc": "Cognitive Behavioral Monitoring Engine"},
-    {"name": "C2-AVLI", "path": "visual-service-v1", "port": 8014, "desc": "Adaptive Visual Learning Interface"},
-    {"name": "C3-PLCE", "path": "content-service-v1", "port": 8012, "desc": "Content Engine"},
-    {"name": "C4-IIGE", "path": "intervention-service-v1", "port": 8013, "desc": "Intervention Engine"},
-    {"name": "C5-AUTH", "path": "app/backend/api", "port": 8015, "desc": "Authentication Engine"},
+    {"name": "C1-CBME", "path": "app/backend/telemetry-analytics-v1", "port": 9014, "desc": "Cognitive Behavioral Monitoring Engine"},
+    {"name": "C2-AVLI", "path": "app/backend/speech-monitoring-v1", "port": 9011, "desc": "Adaptive Visual Learning Interface"},
+    {"name": "C3-PLCE", "path": "app/backend/diagnostic-fusion-v1", "port": 9016, "desc": "Content Engine"},
+    {"name": "C4-IIGE", "path": "app/backend/adaptive-tutoring-v1", "port": 9017, "desc": "Intervention Engine"},
 ]
 
 def check_port_available(port):

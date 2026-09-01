@@ -17,38 +17,106 @@
           {
             "prompt": "ගස",
             "overlays": [
-              { "text": "ගස", "align_x": 0.0, "align_y": 0.6 }
-            ]
+              {
+                "text": "ගස",
+                "align_x": 0.0,
+                "align_y": 0.6
+              }
+            ],
+            "item_id": "S6_A1_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "ගඟ\nමල",
             "overlays": [
-              { "text": "ගඟ", "align_x": -0.6, "align_y": -0.3 },
-              { "text": "මල", "align_x": 0.6, "align_y": 0.3 }
-            ]
+              {
+                "text": "ගඟ",
+                "align_x": -0.6,
+                "align_y": -0.3
+              },
+              {
+                "text": "මල",
+                "align_x": 0.6,
+                "align_y": 0.3
+              }
+            ],
+            "item_id": "S6_A1_R02",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
             "prompt": "ගඟ ළඟ ගස\nගස යට මල",
             "overlays": [
-              { "text": "ගඟ ළඟ ගස", "align_x": 0.0, "align_y": 0.3 },
-              { "text": "ගස යට මල", "align_x": 0.0, "align_y": 0.5 }
-            ]
+              {
+                "text": "ගඟ ළඟ ගස",
+                "align_x": 0.0,
+                "align_y": 0.3
+              },
+              {
+                "text": "ගස යට මල",
+                "align_x": 0.0,
+                "align_y": 0.5
+              }
+            ],
+            "item_id": "S6_A1_R03",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
             "prompt": "ගගන නයන\nඅර බලන්න.",
             "overlays": [
-              { "text": "ගගන නයන", "align_x": -0.4, "align_y": 0.4 },
-              { "text": "අර බලන්න.", "align_x": 0.4, "align_y": 0.6 }
-            ]
+              {
+                "text": "ගගන නයන",
+                "align_x": -0.4,
+                "align_y": 0.4
+              },
+              {
+                "text": "අර බලන්න.",
+                "align_x": 0.4,
+                "align_y": 0.6
+              }
+            ],
+            "item_id": "S6_A1_R04",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": true
           },
           {
             "prompt": "ගස වට කර මල්\nඉහළ පහළ මල්",
             "overlays": [
-              { "text": "ගස වට කර මල්", "align_x": 0.0, "align_y": 0.3 },
-              { "text": "ඉහළ පහළ මල්", "align_x": 0.0, "align_y": 0.5 }
-            ]
+              {
+                "text": "ගස වට කර මල්",
+                "align_x": 0.0,
+                "align_y": 0.3
+              },
+              {
+                "text": "ඉහළ පහළ මල්",
+                "align_x": 0.0,
+                "align_y": 0.5
+              }
+            ],
+            "item_id": "S6_A1_R05",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "requires_speech_monitoring": true,
+        "research_metadata": {
+          "knowledge_component_id": "KC_ORAL_READING_FLUENCY",
+          "prompt_modality": "visual_text",
+          "response_modality": "speech",
+          "research_role": "primary"
+        }
       },
       {
         "id": "act_2",
@@ -58,36 +126,61 @@
           "reading_comprehension",
           "textbook_reading"
         ],
-        "template_type": "generic_mcq_game",
+        "template_type": "interactive_story",
         "rounds": [
           {
-            "options": [
-              "පාසලට",
-              "කඩේට"
+            "prompt": "රෝස මල",
+            "overlays": [
+              {
+                "text": "රෝස මල",
+                "align_x": 0.0,
+                "align_y": 0.5
+              }
             ],
-            "correctOption": "පාසලට",
-            "correct_index": 0,
-            "prompt": "ළමයා පාසලට යයි. කොහෙද යන්නේ?"
+            "item_id": "S6_A2_R01",
+            "item_version": 1,
+            "difficulty_label": "easy",
+            "difficulty_b": -1.0,
+            "is_anchor": false
           },
           {
-            "options": [
-              "පොත",
-              "පෑන"
+            "prompt": "මව කිරිබත් උයයි.",
+            "overlays": [
+              {
+                "text": "මව කිරිබත් උයයි.",
+                "align_x": 0.0,
+                "align_y": 0.5
+              }
             ],
-            "correctOption": "පොත",
-            "correct_index": 0,
-            "prompt": "මල්ලී පොත කියවයි. මොනවාද කියවන්නේ?"
+            "item_id": "S6_A2_R02",
+            "item_version": 1,
+            "difficulty_label": "medium",
+            "difficulty_b": 0.0,
+            "is_anchor": false
           },
           {
-            "options": [
-              "බත්",
-              "පාන්"
+            "prompt": "පියා කඩේ යයි.",
+            "overlays": [
+              {
+                "text": "පියා කඩේ යයි.",
+                "align_x": 0.0,
+                "align_y": 0.5
+              }
             ],
-            "correctOption": "බත්",
-            "correct_index": 0,
-            "prompt": "නංගී බත් කයි. මොනවාද කන්නේ?"
+            "item_id": "S6_A2_R03",
+            "item_version": 1,
+            "difficulty_label": "hard",
+            "difficulty_b": 1.0,
+            "is_anchor": false
           }
-        ]
+        ],
+        "requires_speech_monitoring": true,
+        "research_metadata": {
+          "knowledge_component_id": "KC_ORAL_READING_FLUENCY",
+          "prompt_modality": "visual_text",
+          "response_modality": "speech",
+          "research_role": "secondary"
+        }
       }
     ]
   }
