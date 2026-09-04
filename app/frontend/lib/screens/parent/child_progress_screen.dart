@@ -1,9 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../services/parent_dashboard_service.dart';
 import '../../utils/avatar_utils.dart';
 import '../../widgets/app_loading_indicator.dart';
 import '../../widgets/trend_chart.dart';
+import '../../models/curriculum_models.dart';
+import '../games/game_factory.dart';
 
 class ChildProgressScreen extends StatefulWidget {
   final Map<String, dynamic> studentData;
@@ -22,6 +26,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
   Map<String, dynamic>? _skills;
   Map<String, dynamic>? _learningPattern;
   Map<String, dynamic>? _activityHistory;
+  Map<String, dynamic>? _adaptiveInsights;
   String _currentFilter = "limit=10";
 
   @override
@@ -42,6 +47,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
       _dashboardService.getSkills(studentId),
       _dashboardService.getLearningPattern(studentId),
       _dashboardService.getActivityHistory(studentId, _currentFilter),
+      _dashboardService.getAdaptiveInsights(studentId),
     ]);
 
     setState(() {
@@ -49,6 +55,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
       _skills = responses[1];
       _learningPattern = responses[2];
       _activityHistory = responses[3];
+      _adaptiveInsights = responses[4];
       _isLoading = false;
     });
   }
@@ -62,7 +69,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         'assets/images/characters/human/human_student_1.png');
 
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         backgroundColor: AppColors.cream,
         appBar: AppBar(
@@ -125,6 +132,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               Tab(text: "Reading Progress"),
               Tab(text: "Reading Pattern"),
               Tab(text: "Activity History"),
+              Tab(text: "Adaptive Insights"),
               Tab(text: "Reports"),
             ],
           ),
@@ -137,6 +145,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   _buildReadingProgressTab(),
                   _buildReadingPatternTab(),
                   _buildActivityHistoryTab(),
+                  _buildAdaptiveInsightsTab(),
                   _buildReportsTab(),
                 ],
               ),
@@ -407,5 +416,448 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         ],
       ),
     );
+  }
+
+  // ─── Adaptive Insights Tab (Skill 2) ───
+  Widget _buildAdaptiveInsightsTab() {
+    final activities = (_adaptiveInsights?['activities'] as List<dynamic>?) ?? [];
+
+    if (activities.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.auto_awesome, size: 64, color: AppColors.calmBlue.withValues(alpha: 0.4)),
+              const SizedBox(height: 20),
+              Text(
+                "No adaptive learning data yet",
+                style: AppTypography.heading(fontSize: 18, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Once your child completes Skill 2 activities, personalised insights will appear here.",
+                textAlign: TextAlign.center,
+                style: AppTypography.caption(fontSize: 14, color: AppColors.textHint),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section Header
+          Row(
+            children: [
+              Icon(Icons.psychology_rounded, color: AppColors.calmBlue, size: 24),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text("Adaptive Learning Insights",
+                    style: AppTypography.heading(fontSize: 20, color: AppColors.calmBlue)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "How the app personalised learning for your child.",
+            style: AppTypography.caption(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 20),
+
+          // Activity Cards
+          ...activities.map((act) => _buildInsightCard(act as Map<String, dynamic>)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInsightCard(Map<String, dynamic> act) {
+    final activityName = act['activity_name'] ?? 'Activity';
+    final roundsCompleted = (act['rounds_completed'] ?? 0) as int;
+    final roundsTotal = (act['rounds_total'] ?? 5) as int;
+    final isComplete = act['is_activity_complete'] == true;
+    final completionText = act['completion_text'] ?? '';
+    final accuracyText = act['accuracy_text'] ?? '';
+    final adaptationText = act['adaptation_text'] ?? '';
+    final independenceText = act['independence_text'] ?? '';
+    final independenceBadge = act['independence_badge'] ?? '';
+    final roundJourney = (act['round_journey'] as List<dynamic>?) ?? [];
+    final starRating = (act['star_rating'] ?? 1) as int;
+    final ratingText = act['rating_text'] ?? '';
+    final timesPlayed = (act['times_played'] ?? 0) as int;
+    final lastPlayed = act['last_played'] ?? '';
+    final recommendations = (act['recommendations'] as List<dynamic>?) ?? [];
+
+    // Card accent color based on completion
+    Color accentColor = isComplete
+        ? AppColors.gentleGreen
+        : (roundsCompleted > 0 ? AppColors.warmAmber : AppColors.softCoral);
+
+    // Format last played date
+    String formattedDate = '';
+    if (lastPlayed.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(lastPlayed);
+        formattedDate = '${dt.day}/${dt.month}/${dt.year}';
+      } catch (_) {
+        formattedDate = lastPlayed;
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: accentColor.withValues(alpha: 0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ─── Header: Activity Name + Star Rating + Plays ───
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.06),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(activityName,
+                          style: AppTypography.heading(fontSize: 15, color: AppColors.textPrimary)),
+                      const SizedBox(height: 4),
+                      Text(ratingText,
+                          style: AppTypography.caption(fontSize: 13, fontWeight: FontWeight.w700, color: accentColor)),
+                    ],
+                  ),
+                ),
+                // Plays badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.calmBlue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$timesPlayed rounds',
+                    style: AppTypography.caption(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.calmBlue),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ─── 1. Completion Progress (Step Bar) ───
+                Row(
+                  children: [
+                    Icon(
+                      isComplete ? Icons.check_circle_rounded : Icons.hourglass_top_rounded,
+                      size: 18,
+                      color: accentColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(completionText,
+                          style: AppTypography.caption(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Step dots
+                Row(
+                  children: List.generate(roundsTotal, (i) {
+                    final completed = i < roundsCompleted;
+                    return Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: completed ? accentColor : AppColors.borderLight,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+
+                // ─── 2 & 3. Accuracy + Adaptation (2 info rows) ───
+                _buildInfoRow(Icons.star_rounded, accuracyText, AppColors.warmAmber),
+                const SizedBox(height: 8),
+                _buildInfoRow(Icons.tune_rounded, adaptationText, AppColors.calmBlue),
+                const SizedBox(height: 8),
+
+                // ─── 4. Independence Badge ───
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.calmBlue.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.calmBlue.withValues(alpha: 0.12)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_rounded, size: 18, color: AppColors.calmBlue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(independenceBadge,
+                                style: AppTypography.caption(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.calmBlue)),
+                            Text(independenceText,
+                                style: AppTypography.caption(fontSize: 11, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ─── 5. Round Journey Timeline ───
+                if (roundJourney.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text("Round-by-Round Journey",
+                      style: AppTypography.caption(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                  const SizedBox(height: 8),
+                  ...roundJourney.map((r) {
+                    final round = r as Map<String, dynamic>;
+                    final rn = round['round_number'] ?? 0;
+                    final icon = round['result_icon'] ?? '👍';
+                    final text = round['result_text'] ?? '';
+                    final neededRem = round['needed_remediation'] == true;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          // Round circle
+                          Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: neededRem
+                                  ? AppColors.warmAmber.withValues(alpha: 0.15)
+                                  : AppColors.gentleGreen.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text('$rn',
+                                  style: AppTypography.caption(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: neededRem ? AppColors.warmAmber : AppColors.gentleGreen)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(icon, style: const TextStyle(fontSize: 16)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(text,
+                                style: AppTypography.caption(fontSize: 12, color: AppColors.textPrimary)),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+
+                // ─── 7. Recommended Practice ───
+                if (recommendations.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Icon(Icons.auto_awesome, size: 16, color: AppColors.warmAmber),
+                      const SizedBox(width: 6),
+                      Text("Recommended Practice",
+                          style: AppTypography.caption(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.warmAmber)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...recommendations.map((rec) {
+                    final r = rec as Map<String, dynamic>;
+                    return _buildRecommendationCard(r);
+                  }),
+                ] else if (roundJourney.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.gentleGreen.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Text("🎉", style: const TextStyle(fontSize: 16)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text("Great work! No extra practice needed.",
+                              style: AppTypography.caption(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.gentleGreen)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // ─── Footer: Last Played ───
+                if (formattedDate.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time_rounded, size: 14, color: AppColors.textHint),
+                      const SizedBox(width: 4),
+                      Text('Last played: $formattedDate',
+                          style: AppTypography.caption(fontSize: 11, color: AppColors.textHint)),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text, Color color) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(text,
+              style: AppTypography.caption(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecommendationCard(Map<String, dynamic> rec) {
+    final activityName = rec['activity_name'] ?? 'Activity';
+    final description = rec['description'] ?? '';
+    final roundsCount = rec['rounds_count'] ?? 5;
+
+    return GestureDetector(
+      onTap: () => _navigateToRecommendedActivity(rec),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.calmBlue.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.calmBlue.withValues(alpha: 0.15)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.calmBlue.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.extension_rounded, size: 20, color: AppColors.calmBlue),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(activityName,
+                      style: AppTypography.caption(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text(description,
+                      style: AppTypography.caption(fontSize: 11, color: AppColors.textSecondary)),
+                  Text('Same difficulty · $roundsCount puzzles',
+                      style: AppTypography.caption(fontSize: 10, color: AppColors.textHint)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 22, color: AppColors.calmBlue),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _navigateToRecommendedActivity(Map<String, dynamic> rec) async {
+    final activityId = rec['activity_id'] ?? '';
+    final templateType = rec['template_type'] ?? '';
+
+    if (activityId.isEmpty || templateType.isEmpty) return;
+
+    try {
+      // Load the skill_2 curriculum JSON
+      final String jsonStr = await rootBundle.loadString('assets/data/curriculum/skill_2.json');
+      final decoded = json.decode(jsonStr);
+
+      // Parse the skill detail
+      final skillDetail = SkillDetail.fromJson(decoded, 'skill_2', 'Skill 2');
+
+      // Find the matching activity by template_type
+      ActivityNode? targetActivity;
+      for (final act in skillDetail.activities) {
+        if (act.templateType == templateType) {
+          targetActivity = act;
+          break;
+        }
+      }
+
+      if (targetActivity == null) return;
+
+      // Set skill metadata
+      targetActivity.skillId = 'skill_2';
+      targetActivity.skillTitle = skillDetail.title;
+
+      if (!mounted) return;
+
+      // Navigate to the game screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => GameFactory.buildGame(
+            targetActivity!,
+            studentData: widget.studentData,
+          ),
+        ),
+      ).then((_) {
+        // Refresh insights after returning from the activity
+        _loadAllData();
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open activity: $e')),
+        );
+      }
+    }
   }
 }

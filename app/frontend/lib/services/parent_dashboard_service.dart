@@ -74,6 +74,21 @@ class ParentDashboardService {
     }
   }
 
+  Future<Map<String, dynamic>> getAdaptiveInsights(String studentId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/$studentId/adaptive-insights'),
+        headers: await _getHeaders(),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return _getMockAdaptiveInsights(studentId);
+    } catch (e) {
+      return _getMockAdaptiveInsights(studentId);
+    }
+  }
+
   // --- Mocks fallback ---
 
   Map<String, dynamic> _getMockOverview(String studentId) {
@@ -113,6 +128,15 @@ class ParentDashboardService {
       "history": [
         {"session_date": "2026-08-28", "activity_name": "Game 1", "accuracy": 80, "duration_minutes": 10}
       ]
+    };
+  }
+
+  Map<String, dynamic> _getMockAdaptiveInsights(String studentId) {
+    return {
+      "updated_at": DateTime.now().toIso8601String(),
+      "student_id": studentId,
+      "reporting_period": "All Time",
+      "activities": []
     };
   }
 }

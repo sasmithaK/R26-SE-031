@@ -41,6 +41,54 @@ class ActivityHistoryItem(BaseModel):
 class ParentActivityHistoryDTO(APIResponseBase):
     history: List[ActivityHistoryItem]
 
+class RoundJourneyItem(BaseModel):
+    round_number: int
+    result_icon: str            # "⭐" / "👍" / "💡" / "📝"
+    result_text: str            # "Got it right!" / "Needed a hint" / "Got extra practice"
+    was_first_try: bool
+    needed_remediation: bool
+
+class RecommendedPracticeItem(BaseModel):
+    activity_id: str            # "2.1"
+    activity_name: str          # "අකුරු හඳුනමු (Letter Identification)"
+    description: str            # "Strengthens letter recognition"
+    template_type: str          # "skill2_odd_one_out"
+    rounds_count: int           # 7
+
+class AdaptiveInsightItem(BaseModel):
+    activity_id: str
+    activity_name: str
+    # 1. Completion Progress
+    rounds_completed: int
+    rounds_total: int
+    is_activity_complete: bool
+    completion_text: str        # "3 of 5 puzzles done" / "Activity Complete!"
+    # 2. First-Try Accuracy
+    first_try_correct: int
+    first_try_total: int
+    accuracy_text: str          # "Got 4 right on first try!"
+    # 3. App Adaptation Story
+    remediation_count: int
+    adaptation_text: str        # "App gave extra practice on 2 tricky puzzles"
+    # 4. Independence Level
+    independent_rounds: int
+    guided_rounds: int
+    independence_text: str      # "Solved 4 independently"
+    independence_badge: str     # "Independent Learner 🌟" / "Guided Learner 💡"
+    # 5. Round Journey
+    round_journey: List[RoundJourneyItem]
+    # 6. Overall Rating
+    star_rating: int            # 1-3
+    rating_text: str            # "⭐⭐⭐ Excellent!" / "⭐⭐ Good Progress!"
+    # 7. Recommended Practice
+    recommendations: List[RecommendedPracticeItem]
+    # Meta
+    last_played: str
+    times_played: int
+
+class ParentAdaptiveInsightsDTO(APIResponseBase):
+    activities: List[AdaptiveInsightItem]
+
 # ==========================================
 # THERAPIST DASHBOARD DTOs
 # ==========================================
