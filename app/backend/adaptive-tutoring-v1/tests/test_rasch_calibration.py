@@ -46,15 +46,19 @@ def test_calibration_ignores_retried_legacy_event_ids():
         def find(self, _query, _projection):
             return [
                 {
-                    "event_id": "same-event",
+                    "event_id": "session:ITEM-1:complete",
                     "student_id": "learner-1",
+                    "session_id": "session",
                     "item_id": "ITEM-1",
+                    "phase": "COMPLETE",
                     "first_attempt_correct": True,
                 },
                 {
-                    "event_id": "same-event",
+                    "event_id": "session:ITEM-1:complete",
                     "student_id": "learner-1",
+                    "session_id": "session",
                     "item_id": "ITEM-1",
+                    "phase": "COMPLETE",
                     "first_attempt_correct": True,
                 },
             ]
@@ -66,6 +70,82 @@ def test_calibration_ignores_retried_legacy_event_ids():
         {
             "student_id": "learner-1",
             "item_id": "ITEM-1",
+            "is_correct": True,
+        }
+    ]
+
+
+def test_calibration_excludes_attempts_and_semantic_batch_duplicates():
+    class Events:
+        def find(self, _query, _projection):
+            return [
+                {
+                    "event_id": "session:ITEM-1:attempt:1",
+                    "student_id": "learner-1",
+                    "session_id": "session",
+                    "item_id": "ITEM-1",
+                    "phase": "ATTEMPT",
+                    "is_correct": False,
+                },
+                {
+                    "event_id": "session:ITEM-1:complete",
+                    "student_id": "learner-1",
+                    "session_id": "session",
+                    "item_id": "ITEM-1",
+                    "phase": "COMPLETE",
+                    "first_attempt_correct": False,
+                },
+                {
+                    "event_id": "session:0",
+                    "student_id": "learner-1",
+                    "session_id": "session",
+                    "item_id": "ITEM-1",
+                    "final_correct": True,
+                    "first_attempt_correct": False,
+                },
+                {
+                    "event_id": "another-copy:complete",
+                    "student_id": "learner-1",
+                    "session_id": "session",
+                    "item_id": "ITEM-1",
+                    "phase": "COMPLETE",
+                    "first_attempt_correct": False,
+                },
+            ]
+
+    class Database:
+        telemetry_events = Events()
+
+    assert _independent_responses(Database()) == [
+        {
+            "student_id": "learner-1",
+            "item_id": "ITEM-1",
+            "is_correct": False,
+        }
+    ]
+
+
+def test_calibration_accepts_one_legacy_batch_only_completion():
+    class Events:
+        def find(self, _query, _projection):
+            return [
+                {
+                    "event_id": "legacy-session:0",
+                    "student_id": "learner-2",
+                    "session_id": "legacy-session",
+                    "item_id": "ITEM-2",
+                    "final_correct": True,
+                    "first_attempt_correct": True,
+                }
+            ]
+
+    class Database:
+        telemetry_events = Events()
+
+    assert _independent_responses(Database()) == [
+        {
+            "student_id": "learner-2",
+            "item_id": "ITEM-2",
             "is_correct": True,
         }
     ]
