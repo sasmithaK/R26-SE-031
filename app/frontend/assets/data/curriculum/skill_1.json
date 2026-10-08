@@ -395,7 +395,7 @@
           }
         ],
         "research_metadata": {
-          "knowledge_component_id": "KC_VISUAL_SUPPORT",
+          "knowledge_component_id": "KC_VISUAL_IDENTIFICATION",
           "prompt_modality": "visual",
           "response_modality": "tap",
           "research_role": "supportive"
@@ -680,7 +680,7 @@
           }
         ],
         "research_metadata": {
-          "knowledge_component_id": "KC_VISUAL_SUPPORT",
+          "knowledge_component_id": "KC_VISUAL_MATCHING",
           "prompt_modality": "visual",
           "response_modality": "tap",
           "research_role": "supportive"
@@ -1252,7 +1252,7 @@
           }
         ],
         "research_metadata": {
-          "knowledge_component_id": "KC_VISUAL_SUPPORT",
+          "knowledge_component_id": "KC_VISUAL_CATEGORIZATION",
           "prompt_modality": "visual",
           "response_modality": "drag",
           "research_role": "supportive"
@@ -1666,7 +1666,7 @@
           }
         ],
         "research_metadata": {
-          "knowledge_component_id": "KC_VISUAL_SUPPORT",
+          "knowledge_component_id": "KC_VISUAL_PATTERN",
           "prompt_modality": "visual",
           "response_modality": "tap",
           "research_role": "supportive"
@@ -1957,7 +1957,7 @@
           }
         ],
         "research_metadata": {
-          "knowledge_component_id": "KC_VISUAL_SUPPORT",
+          "knowledge_component_id": "KC_VISUAL_MEMORY",
           "prompt_modality": "visual",
           "response_modality": "tap",
           "research_role": "supportive"

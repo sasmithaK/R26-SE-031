@@ -1,4 +1,11 @@
-from item_bank_builder import build_items, normalize_item_id, validation_summary
+import json
+
+from item_bank_builder import (
+    DEFAULT_CURRICULUM_DIR,
+    build_items,
+    normalize_item_id,
+    validation_summary,
+)
 
 
 def test_item_bank_is_canonical_complete_and_research_ready():
@@ -94,6 +101,25 @@ def test_skill_one_sorting_never_classifies_ice_cream_as_fruit():
     for item in sorting_items:
         fruit_assets = item["content"]["categories"].get("fruits", [])
         assert "fruits_food/ice_cream.png" not in fruit_assets, item["item_id"]
+
+
+def test_skill_one_client_metadata_uses_the_same_official_kcs_as_item_bank():
+    decoded = json.loads(
+        (DEFAULT_CURRICULUM_DIR / "skill_1.json").read_text(encoding="utf-8")
+    )
+    activities = decoded[0]["activities"]
+    expected = {
+        "act_1": "KC_VISUAL_IDENTIFICATION",
+        "act_2": "KC_VISUAL_MATCHING",
+        "act_3": "KC_VISUAL_CATEGORIZATION",
+        "act_4": "KC_VISUAL_PATTERN",
+        "act_5": "KC_VISUAL_MEMORY",
+    }
+
+    assert {
+        activity["id"]: activity["research_metadata"]["knowledge_component_id"]
+        for activity in activities
+    } == expected
 
 
 def _response_load(content):

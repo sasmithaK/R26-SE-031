@@ -52,6 +52,14 @@ FRUIT_ASSETS = [
     "fruits_food/watermelon.png",
 ]
 
+SKILL1_ACTIVITY_KCS = {
+    1: "KC_VISUAL_IDENTIFICATION",
+    2: "KC_VISUAL_MATCHING",
+    3: "KC_VISUAL_CATEGORIZATION",
+    4: "KC_VISUAL_PATTERN",
+    5: "KC_VISUAL_MEMORY",
+}
+
 ASSET_NAMES = {
     "animals/bird.png": "කුරුල්ලා", "animals/butterfly.png": "සමනලයා",
     "animals/cat.png": "පූසා", "animals/cow.png": "එළදෙන",
@@ -555,6 +563,11 @@ def build() -> None:
             if skill == 1 and activity["id"] in skill1:
                 activity["rounds"] = skill1[activity["id"]]
                 activity["file_path"] = ""
+            if skill == 1:
+                research = activity.setdefault("research_metadata", {})
+                research["knowledge_component_id"] = SKILL1_ACTIVITY_KCS[
+                    activity_number
+                ]
             rounds = activity.get("rounds") or activity.get("core_rounds") or []
             for round_index, round_data in enumerate(rounds, start=1):
                 item_id = canonical(round_data.get("item_id") or f"S{skill}A{activity_number}R{round_index:02d}")
