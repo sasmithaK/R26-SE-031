@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from datetime import datetime
+from datetime import datetime, timezone
 from schemas import InteractionRequest, TutoringResponse, NextAction
 from database import connect_to_mongo, close_mongo_connection
 import database
@@ -70,6 +70,10 @@ async def startup_db_client():
         if bkt_engine.apply_calibrated_parameters(
             model.get("knowledge_component_id", ""),
             model.get("parameters", {}),
+            model_version=model.get(
+                "model_version", "bkt_calibrated_unknown_version"
+            ),
+            calibrated_at=model.get("calibrated_at"),
         ):
             loaded += 1
     if loaded:
@@ -259,7 +263,7 @@ async def update_interaction(request: InteractionRequest):
             "theta_estimate": theta,
             "theta_by_kc": theta_by_kc,
             "adaptive_states": adaptive_states,
-            "last_updated": datetime.utcnow().isoformat()
+            "last_updated": datetime.now(timezone.utc).isoformat()
         }
         # Keep old state for rollback safety
         if student_doc and "s2a2_state" in student_doc:
@@ -317,7 +321,19 @@ async def update_interaction(request: InteractionRequest):
     
     # Override response quality if scaffolding was used during this item's attempts
     frontend_scaffold = getattr(request.telemetry, "scaffold_level_used", 0)
-    if request.is_correct and (adaptive_state.get("highest_scaffold_level_used", 0) > 0 or frontend_scaffold > 0):
+    application_levels = [
+        int(application.get("scaffold_level", 0) or 0)
+        for application in (
+            getattr(request.telemetry, "scaffold_applications", None) or []
+        )
+        if isinstance(application, dict)
+    ]
+    scaffold_level_used = max(
+        int(adaptive_state.get("highest_scaffold_level_used", 0) or 0),
+        int(frontend_scaffold or 0),
+        *application_levels,
+    )
+    if request.is_correct and scaffold_level_used > 0:
         # We cap response quality to ASSISTED_SUCCESS if any scaffolding was needed
         # (even if they solved it in 1 attempt from the frontend perspective).
         if response_quality in ["MASTERED", "INDEPENDENT_SUCCESS", "CLEAN_SUCCESS"]:
@@ -328,10 +344,7 @@ async def update_interaction(request: InteractionRequest):
     # success from being misrepresented as independent mastery.
     first_attempt_correct = getattr(request.telemetry, "first_attempt_correct", None)
     if first_attempt_correct is None:
-        scaffold_was_used = (
-            adaptive_state.get("highest_scaffold_level_used", 0) > 0
-            or frontend_scaffold > 0
-        )
+        scaffold_was_used = scaffold_level_used > 0
         learning_observation_correct = bool(request.is_correct and not scaffold_was_used)
     else:
         learning_observation_correct = bool(first_attempt_correct)
@@ -553,6 +566,7 @@ async def update_interaction(request: InteractionRequest):
         "observation_count": len(difficulty_history_after),
         "ability_scope": official_kc,
     }
+    bkt_model_evidence = bkt_engine.get_model_evidence(official_kc)
     
     # Progression Evidence
     from curriculum_mapping import ACTIVITY_TO_KC
@@ -599,6 +613,7 @@ async def update_interaction(request: InteractionRequest):
     # intentional repeat proceed while a new R01 after completion resets the
     # activity cleanly, including activities outside the original Skill 2 pilot.
     adaptive_state["expected_item_id"] = policy_output.get("next_item", "")
+    adaptive_state["next_phase"] = policy_output.get("next_phase", "CORE")
 
     if policy_output["decision"] == "TERMINATE":
         stop_reason = "SAFETY_FATIGUE_STOP"
@@ -631,19 +646,60 @@ async def update_interaction(request: InteractionRequest):
     adaptive_decision_record = {
         "student_id": request.student_id,
         "session_id": request.session_id,
-        "timestamp": datetime.utcnow().isoformat(),
+        "event_id": request.event_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "activity_id": canonical_act,
         "kc_id": official_kc,
         "current_item": canonical_item,
+        "item_role": (
+            item_doc.get("item_role") if item_doc else
+            getattr(request.telemetry, "item_role", None)
+        ),
+        "equivalent_group_id": (
+            item_doc.get("equivalent_group_id") if item_doc else
+            getattr(request.telemetry, "equivalent_group_id", None)
+        ),
+        "response_load_relation": (
+            item_doc.get("response_load_relation") if item_doc else
+            getattr(request.telemetry, "response_load_relation", None)
+        ),
+        "item_version": item_doc.get("item_version", 1) if item_doc else 1,
+        "difficulty_label": (
+            item_doc.get("difficulty_label", "medium") if item_doc else "medium"
+        ),
+        "difficulty_b": diff_b,
+        "difficulty_source": (
+            item_doc.get("difficulty_source", "authored")
+            if item_doc else "fallback"
+        ),
+        "calibration_status": (
+            item_doc.get("calibration_status", "uncalibrated")
+            if item_doc else "item_not_found"
+        ),
+        "is_anchor": item_doc.get("is_anchor", False) if item_doc else False,
+        "submitted_kc_id": request.knowledge_component_id,
+        "target_ids": getattr(request.telemetry, "target_ids", None) or [],
+        "selected_answers": (
+            getattr(request.telemetry, "selected_answers", None) or []
+        ),
+        "scaffold_applications": (
+            getattr(request.telemetry, "scaffold_applications", None) or []
+        ),
         "is_correct": request.is_correct,
         "first_attempt_correct": first_attempt_correct,
         "learning_observation_correct": learning_observation_correct,
         "mastery_before": mastery_before,
         "mastery_after": new_prob,
+        "bkt_model_version": bkt_model_evidence["model_version"],
+        "bkt_calibration_status": bkt_model_evidence["calibration_status"],
+        "bkt_calibrated_at": bkt_model_evidence["calibrated_at"],
+        "bkt_parameters": bkt_model_evidence["parameters"],
         "theta_before": theta,
         "theta_after": theta_new,
         "theta_scope": official_kc,
+        "predicted_probability": irt_evidence["predicted_probability"],
         "measurement_standard_error": standard_error_after,
+        "test_information_after": irt_evidence["test_information_after"],
         "measurement_observation_count": len(difficulty_history_after),
         "measurement_stop_reason": stop_reason,
         "fatigue_score": request.fatigue_score,
@@ -655,8 +711,14 @@ async def update_interaction(request: InteractionRequest):
         "target_difficulty": policy_output["target_difficulty"],
         "selected_item": policy_output["next_item"],
         "selected_difficulty": next_action.difficulty,
-        "scaffold_level": next_action.scaffold_level,
+        # `scaffold_level` remains the dashboard-compatible treatment-fidelity
+        # value. The recommendation for the next item is stored separately.
+        "scaffold_level": scaffold_level_used,
+        "scaffold_level_used": scaffold_level_used,
+        "next_scaffold_level": next_action.scaffold_level,
         "decision": next_action.decision,
+        "next_phase": next_action.next_phase,
+        "policy_version": next_action.policy_version,
         "policy_reason": policy_output["policy_reason"],
         "progression_status": "PROGRESSED" if next_activity != canonical_act else "REMAINED",
         "previous_activity": canonical_act,
@@ -666,7 +728,17 @@ async def update_interaction(request: InteractionRequest):
         "progression_reason": progression_evidence["progression_reason"]
     }
     
-    await db.adaptive_decisions.insert_one(adaptive_decision_record)
+    if request.event_id:
+        # A retried mobile completion keeps one auditable decision record.
+        # Sequential retries are already rejected by the expected-item guard;
+        # this upsert also protects the research dataset from duplicate rows.
+        await db.adaptive_decisions.update_one(
+            {"student_id": request.student_id, "event_id": request.event_id},
+            {"$setOnInsert": adaptive_decision_record},
+            upsert=True,
+        )
+    else:
+        await db.adaptive_decisions.insert_one(adaptive_decision_record)
 
     adaptive_states = student_doc.get("adaptive_states", {}) if student_doc else {}
     adaptive_states[canonical_act] = adaptive_state
@@ -675,7 +747,7 @@ async def update_interaction(request: InteractionRequest):
         "theta_estimate": theta_new,
         "theta_by_kc": theta_by_kc,
         "adaptive_states": adaptive_states,
-        "last_updated": datetime.utcnow().isoformat(),
+        "last_updated": datetime.now(timezone.utc).isoformat(),
     }
     if student_doc and "s2a2_state" in student_doc:
         update_set["s2a2_state"] = student_doc["s2a2_state"]

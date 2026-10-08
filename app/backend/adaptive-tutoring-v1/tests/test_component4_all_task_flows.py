@@ -148,3 +148,65 @@ async def test_irreducible_first_task_uses_only_one_same_level_retry(client):
     assert body["next_action"]["next_phase"] == "CONFIRMATION"
     assert body["next_action"]["difficulty_b"] == -1.0
     assert "NO_VALID_LOWER_LOAD_ITEM" in body["next_action"]["reason_codes"]
+
+
+@pytest.mark.asyncio
+async def test_every_skill_one_activity_persists_a_terminal_complete_state(client):
+    kcs = {
+        "1.1": "KC_VISUAL_IDENTIFICATION",
+        "1.2": "KC_VISUAL_MATCHING",
+        "1.3": "KC_VISUAL_CATEGORIZATION",
+        "1.4": "KC_VISUAL_PATTERN",
+        "1.5": "KC_VISUAL_MEMORY",
+    }
+    all_items = build_items()
+
+    for activity_id, kc_id in kcs.items():
+        student_id = f"skill1-terminal-{activity_id}"
+        session_id = f"session-{activity_id}"
+        cores = sorted(
+            (
+                item
+                for item in all_items
+                if item["activity_id"] == activity_id and item["is_core"]
+            ),
+            key=lambda item: item["round"],
+        )
+
+        last_body = None
+        for core in cores:
+            response = client.post("/update_interaction", json={
+                "student_id": student_id,
+                "session_id": session_id,
+                "event_id": f'{session_id}:{core["item_id"]}:complete',
+                "skill_id": "skill_1",
+                "activity_id": activity_id,
+                "knowledge_component_id": kc_id,
+                "item_id": core["item_id"],
+                "is_correct": True,
+                "phase": "COMPLETE",
+                "current_session_duration_sec": 20,
+                "telemetry": {
+                    "attempt_count": 1,
+                    "incorrect_attempt_count": 0,
+                    "first_attempt_correct": True,
+                    "scaffold_level_used": 0,
+                },
+            })
+            assert response.status_code == 200, (core["item_id"], response.text)
+            last_body = response.json()
+
+        assert last_body is not None
+        assert last_body["next_action"]["decision"] == "ACTIVITY_COMPLETE"
+        assert last_body["next_action"]["next_item"] == "COMPLETE"
+        assert last_body["next_action"]["next_phase"] == "COMPLETE"
+
+        state_doc = await mock_db["knowledge_states"].find_one({
+            "student_id": student_id,
+        })
+        activity_state = state_doc["adaptive_states"][activity_id]
+        assert activity_state["expected_item_id"] == "COMPLETE"
+        assert activity_state["next_phase"] == "COMPLETE"
+        assert activity_state["measurement_stop_reason"] == (
+            "CORE_COVERAGE_AND_EQUIVALENT_FLOW_COMPLETE"
+        )
