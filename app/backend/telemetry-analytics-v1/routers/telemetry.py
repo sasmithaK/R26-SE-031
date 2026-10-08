@@ -109,14 +109,43 @@ async def submit_telemetry(
     session_doc["submitted_at"] = datetime.now(timezone.utc).isoformat()
     session_doc["schema_version"] = "2.0"
 
-    # Retried submissions update the same complete session and summary.
     session_key = {"student_id": req.student_id, "session_id": req.session_id}
+    existing_session = await db.telemetry_sessions.find_one(
+        session_key, {"session_number": 1}
+    )
+    if existing_session and existing_session.get("session_number"):
+        # An offline retry must retain its original longitudinal position.
+        session_doc["session_number"] = existing_session["session_number"]
+    else:
+        # MongoDB is authoritative for longitudinal order. Older clients sent
+        # `session_number: 1` for every standalone activity, so accepting the
+        # client value would silently corrupt the research sequence.
+        session_doc["session_number"] = (
+            await db.telemetry_sessions.count_documents(
+                {"student_id": req.student_id}
+            )
+        ) + 1
+
+    # Defensively derive session lineage for older clients. Standalone level
+    # activities resolve to one exact skill/activity; a multi-activity daily
+    # session is explicitly labelled `mixed` rather than silently `unknown`.
+    events_list = session_doc.get("events", [])
+    for field in ("skill_id", "activity_id"):
+        if session_doc.get(field) in (None, "", "unknown"):
+            values = {
+                str(event.get(field)).strip()
+                for event in events_list
+                if event.get(field) not in (None, "", "unknown")
+            }
+            if values:
+                session_doc[field] = next(iter(values)) if len(values) == 1 else "mixed"
+
+    # Retried submissions update the same complete session and summary.
     await db.telemetry_sessions.update_one(session_key, {"$set": session_doc}, upsert=True)
     
     # Store individual events idempotently. Legacy databases may contain
     # repeated event_id values, so reconcile one old record and then use a
     # unique v2 ingestion key for all later retries.
-    events_list = session_doc.get("events", [])
     if events_list:
         for event in events_list:
             event["schema_version"] = "2.0"
@@ -569,4 +598,3 @@ async def get_assessment_report_pdf(student_id: str, current_user: dict = Depend
         media_type="application/pdf", 
         headers={"Content-Disposition": f"attachment; filename=Assessment_Report_{student_id}.pdf"}
     )
-

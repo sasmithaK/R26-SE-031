@@ -4,7 +4,7 @@ from main import app
 
 client = TestClient(app)
 
-def test_c1_session_endpoint():
+def test_c1_session_endpoint(monkeypatch):
     payload = {
         "student_id": "test_student",
         "session_id": "sess_001",
@@ -42,17 +42,20 @@ def test_c1_session_endpoint():
     async def mock_save(*args, **kwargs):
         pass
         
-    telemetry_repository.save_session = mock_save
-    telemetry_repository.save_events = mock_save
-    c1_repository.save_c1_state = mock_save
-    
-    response = client.post("/api/v1/c1/session", json=payload)
-    
-    assert response.status_code == 201
-    data = response.json()
-    assert data["student_id"] == "test_student"
-    assert "behavior" in data
-    assert "indices" in data
-    assert "fatigue" in data
-    assert "interaction_state" in data
-    assert "model" in data
+    monkeypatch.setattr(telemetry_repository, "save_session", mock_save)
+    monkeypatch.setattr(telemetry_repository, "save_events", mock_save)
+    monkeypatch.setattr(c1_repository, "save_c1_state", mock_save)
+
+    try:
+        response = client.post("/api/v1/c1/session", json=payload)
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["student_id"] == "test_student"
+        assert "behavior" in data
+        assert "indices" in data
+        assert "fatigue" in data
+        assert "interaction_state" in data
+        assert "model" in data
+    finally:
+        app.dependency_overrides.clear()

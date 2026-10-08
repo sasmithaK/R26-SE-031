@@ -9,7 +9,12 @@ from . import quality
 def extract_features(events: List[dict]) -> dict:
     """Extracts the 13 canonical behavioral features from a list of telemetry events."""
     return {
+        # Keep `accuracy` for the existing C1 model contract, while exposing
+        # the two research meanings explicitly so assisted success is never
+        # mistaken for independent mastery in Component 4 analysis.
         "accuracy": feats.calculate_accuracy(events),
+        "independent_accuracy": feats.calculate_independent_accuracy(events),
+        "eventual_completion_accuracy": feats.calculate_eventual_completion_accuracy(events),
         "mean_latency_ms": feats.calculate_mean_latency(events),
         "median_latency_ms": feats.calculate_median_latency(events),
         "latency_std_ms": feats.calculate_latency_std(events),

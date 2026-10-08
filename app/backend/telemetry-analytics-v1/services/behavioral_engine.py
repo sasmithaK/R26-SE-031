@@ -1,5 +1,5 @@
 import statistics
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
 from schemas.telemetry import TelemetrySessionSubmit, TelemetryEvent
@@ -17,6 +17,54 @@ def _is_first_attempt_correct(e: TelemetryEvent) -> bool:
     if e.first_attempt_correct is not None:
         return e.first_attempt_correct
     return e.is_correct
+
+
+_ERROR_CATEGORIES = {
+    "visual_confusion": "visual_confusion",
+    "visual_search_miss": "visual_confusion",
+    "visual_matching_error": "visual_confusion",
+    "categorization_error": "visual_confusion",
+    "visual_memory_error": "visual_confusion",
+    "phonological_confusion": "phonological_confusion",
+    "sequence_error": "sequence_error",
+    "visual_pattern_error": "sequence_error",
+    "unknown_error": "unknown_error",
+}
+
+
+def _error_category(error_type: Optional[str]) -> str:
+    normalized = (error_type or "").strip().lower()
+    if normalized in {"", "none"}:
+        return "unknown_error"
+    return _ERROR_CATEGORIES.get(normalized, "unknown_error")
+
+
+def _session_bounds(session: TelemetrySessionSubmit) -> tuple[str, str]:
+    """Return genuine UTC session boundaries, with a safe legacy fallback."""
+    def parse(value: Optional[str]) -> Optional[datetime]:
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        except (TypeError, ValueError):
+            return None
+
+    started = parse(session.started_at)
+    completed = parse(session.completed_at)
+    duration = timedelta(seconds=max(0, session.session_duration_seconds))
+    if started is None and completed is None:
+        completed = datetime.now(timezone.utc)
+        started = completed - duration
+    elif started is None:
+        started = completed - duration
+    elif completed is None:
+        completed = started + duration
+    if started > completed:
+        started = completed - duration
+    return started.isoformat(), completed.isoformat()
 
 def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
     events = session.events
@@ -49,10 +97,10 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
     eventual_completion_rate = _safe_divide(len([e for e in valid_events if e.final_correct]), valid_trials)
     
     # Error breakdowns
-    visual_confusion_errors = len([e for e in incorrect_events if e.error_type == "visual_confusion"])
-    phonological_confusion_errors = len([e for e in incorrect_events if e.error_type == "phonological_confusion"])
-    sequence_errors = len([e for e in incorrect_events if e.error_type == "sequence_error"])
-    unknown_errors = len([e for e in incorrect_events if e.error_type == "unknown_error"])
+    visual_confusion_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "visual_confusion"])
+    phonological_confusion_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "phonological_confusion"])
+    sequence_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "sequence_error"])
+    unknown_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "unknown_error"])
     
     visual_confusion_rate = _safe_divide(visual_confusion_errors, incorrect_trials)
     phonological_confusion_rate = _safe_divide(phonological_confusion_errors, incorrect_trials)
@@ -102,11 +150,12 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
         "unknown_error_rate": _safe_divide(unknown_errors, incorrect_trials)
     }
     
+    started_at, completed_at = _session_bounds(session)
     return SessionSummary(
         student_id=session.student_id,
         session_id=session.session_id,
-        started_at=datetime.now(timezone.utc).isoformat(), # Ideally from payload
-        completed_at=datetime.now(timezone.utc).isoformat(),
+        started_at=started_at,
+        completed_at=completed_at,
         total_trials=total_trials,
         overall=overall,
         error_profile=error_profile,
@@ -131,7 +180,7 @@ def _aggregate_by_activity(events: List[TelemetryEvent]) -> dict:
         incorrect = len(evs) - correct
         accuracy = _safe_divide(correct, len(evs))
         median_lat = _median_or_none([e.first_touch_latency_ms for e in evs if e.first_touch_latency_ms > 0])
-        visual_errors = sum(1 for e in evs if not _is_first_attempt_correct(e) and e.error_type == "visual_confusion")
+        visual_errors = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "visual_confusion")
         
         result[aid] = {
             "trials": len(evs),
@@ -156,9 +205,9 @@ def _aggregate_by_kc(events: List[TelemetryEvent]) -> dict:
         accuracy = _safe_divide(correct, len(evs))
         median_lat = _median_or_none([e.first_touch_latency_ms for e in evs if e.first_touch_latency_ms > 0])
         
-        visual_confusions = sum(1 for e in evs if not _is_first_attempt_correct(e) and e.error_type == "visual_confusion")
-        unknown_errors = sum(1 for e in evs if not _is_first_attempt_correct(e) and e.error_type == "unknown_error")
-        phonological_confusions = sum(1 for e in evs if not _is_first_attempt_correct(e) and e.error_type == "phonological_confusion")
+        visual_confusions = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "visual_confusion")
+        unknown_errors = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "unknown_error")
+        phonological_confusions = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "phonological_confusion")
         
         err_dist = {}
         if incorrect > 0:
