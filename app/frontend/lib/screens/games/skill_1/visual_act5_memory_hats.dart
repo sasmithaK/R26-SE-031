@@ -761,6 +761,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats>
           _playInstruction(text);
         },
         child: Container(
+          width: double.infinity,
           margin: const EdgeInsets.symmetric(horizontal: 16),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
@@ -769,7 +770,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats>
             border: Border.all(color: AppColors.warmAmber, width: 3),
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             children: [
               if (isRecall) ...[
                 Container(
@@ -790,7 +791,7 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats>
                 ),
                 const SizedBox(width: 8),
               ],
-              Flexible(
+              Expanded(
                 child: Text(
                   text,
                   style: AppTypography.sinhala(
