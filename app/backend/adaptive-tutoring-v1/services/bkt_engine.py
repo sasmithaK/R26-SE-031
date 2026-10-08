@@ -1,4 +1,10 @@
 class BKTEngine:
+    # Never persist an absorbing probability of exactly 0 or 1. A 0.99 ceiling
+    # still represents very strong mastery, while allowing later independent
+    # evidence to correct an over-confident (including legacy 1.0) state.
+    MASTERY_FLOOR = 0.01
+    MASTERY_CEILING = 0.99
+
     def __init__(self):
         # Baseline priors for Sinhala Abugida script KCs
         # Format: "target_kc": (P(L0), P(T), P(G), P(S))
@@ -39,8 +45,16 @@ class BKTEngine:
             
             "default": proto_priors
         }
+        self.model_metadata = {}
 
-    def apply_calibrated_parameters(self, kc: str, parameters: dict) -> bool:
+    def apply_calibrated_parameters(
+        self,
+        kc: str,
+        parameters: dict,
+        *,
+        model_version: str = "bkt_calibrated_unknown_version",
+        calibrated_at=None,
+    ) -> bool:
         """Activate a validated registry record without changing call sites."""
         try:
             values = tuple(float(parameters[key]) for key in (
@@ -53,7 +67,31 @@ class BKTEngine:
         if values[2] + values[3] >= 0.5:
             return False
         self.priors[kc] = values
+        self.model_metadata[kc] = {
+            "model_version": model_version,
+            "calibration_status": "empirically_calibrated",
+            "calibrated_at": calibrated_at,
+        }
         return True
+
+    def get_model_evidence(self, kc: str) -> dict:
+        metadata = self.model_metadata.get(kc, {})
+        parameters = self.priors.get(kc, self.priors["default"])
+        return {
+            "model_version": metadata.get(
+                "model_version", "bkt_theory_provisional_v1"
+            ),
+            "calibration_status": metadata.get(
+                "calibration_status", "provisional"
+            ),
+            "calibrated_at": metadata.get("calibrated_at"),
+            "parameters": {
+                "p_initial": parameters[0],
+                "p_transition": parameters[1],
+                "p_guess": parameters[2],
+                "p_slip": parameters[3],
+            },
+        }
 
     def update_knowledge_state(self, current_prob: float, target_kc: str, is_correct: bool) -> float:
         """
@@ -63,8 +101,12 @@ class BKTEngine:
         priors = self.priors.get(target_kc, self.priors["default"])
         p_l_0, p_t, p_g, p_s = priors
         
-        # Calculate P(L_t-1)
-        p_prev = current_prob
+        # Calculate P(L_t-1). Clamp legacy saturated values before applying
+        # Bayes so an incorrect independent attempt can lower mastery again.
+        p_prev = min(
+            max(float(current_prob), self.MASTERY_FLOOR),
+            self.MASTERY_CEILING,
+        )
         
         # Calculate P(L_t | obs)
         if is_correct:
@@ -82,7 +124,11 @@ class BKTEngine:
         # P(L_t) = P(L_t | obs) + (1 - P(L_t | obs)) * P(T)
         p_new = p_obs + (1 - p_obs) * p_t
         
-        p_clamped = min(max(p_new, 0.0), 1.0)
-        return round(p_clamped, 4)
+        # Keep full precision internally. Rounding every update previously
+        # turned high probabilities into the absorbing value 1.0.
+        return min(
+            max(p_new, self.MASTERY_FLOOR),
+            self.MASTERY_CEILING,
+        )
 
 bkt_engine = BKTEngine()
