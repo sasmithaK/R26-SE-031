@@ -320,6 +320,8 @@ class CanonicalResearchItem {
   final double difficultyB;
   final bool isAnchor;
   final String? equivalentGroupId;
+  final String itemRole;
+  final String responseLoadRelation;
   final List<String> allowedScaffolds;
 
   final List<String> targets;
@@ -332,6 +334,8 @@ class CanonicalResearchItem {
     required this.difficultyB,
     required this.isAnchor,
     this.equivalentGroupId,
+    required this.itemRole,
+    required this.responseLoadRelation,
     this.allowedScaffolds = const <String>[],
     required this.targets,
     required this.distractors,
@@ -376,12 +380,17 @@ class CanonicalItemResolver {
         final content = variant['content'] is Map
             ? Map<String, dynamic>.from(variant['content'] as Map)
             : const <String, dynamic>{};
-        return resolve(activity, <String, dynamic>{
+        // Variant metadata is authoritative. Some early Skill 1 curriculum
+        // variants copied core research fields into `content`; leaving that
+        // nested map in place caused resolve() to merge it a second time and
+        // report the core item/difficulty for the displayed V1/V2 task.
+        final resolvedVariant = <String, dynamic>{
           ...core,
-          ...variant,
           ...content,
+          ...variant,
           'item_id': normalized,
-        }, roundIndex);
+        }..remove('content');
+        return resolve(activity, resolvedVariant, roundIndex);
       }
     }
 
@@ -417,6 +426,16 @@ class CanonicalItemResolver {
     final difficultyLabel = data['difficulty_label']?.toString() ?? 'medium';
     final difficultyB = (data['difficulty_b'] as num?)?.toDouble() ?? 0.0;
     final isAnchor = data['is_anchor'] == true;
+    final itemRole =
+        data['item_role']?.toString() ??
+        (itemId.endsWith('V1')
+            ? 'REMEDIATION'
+            : itemId.endsWith('V2')
+            ? 'CONFIRMATION'
+            : 'CORE');
+    final responseLoadRelation =
+        data['response_load_relation']?.toString() ??
+        (itemRole == 'CORE' ? 'core' : 'equivalent');
 
     List<String> targets = [];
     List<String> distractors = [];
@@ -427,6 +446,25 @@ class CanonicalItemResolver {
     if (type == 'visual_hidden_search' || type == 'skill2_identical_match') {
       targets = _extractStringList(data['targets'] ?? data['letters']);
       distractors = _extractStringList(data['distractors']);
+    } else if (type == 'visual_sorting_adventure') {
+      final categories = data['categories'];
+      if (categories is Map) {
+        for (final values in categories.values) {
+          targets.addAll(_extractStringList(values));
+        }
+      }
+    } else if (type == 'visual_pattern_adventure') {
+      final correct = data['correct_answer']?.toString();
+      if (correct != null) targets.add(correct);
+      distractors = _extractStringList(
+        data['options'],
+      ).where((option) => option != correct).toList();
+    } else if (type == 'visual_memory_hats') {
+      final target = data['target_asset']?.toString();
+      if (target != null) targets.add(target);
+      distractors = _extractStringList(
+        data['assets'],
+      ).where((asset) => asset != target).toList();
     } else if (type.contains('mcq') ||
         type == 'skill2_audio' ||
         type == 'interactive_story') {
@@ -450,6 +488,23 @@ class CanonicalItemResolver {
         distractors = options.where((o) => o != correctOpt).toList();
       }
     } else if (type.contains('odd_one_out')) {
+      final targetAssets = _extractStringList(data['target_assets']);
+      if (targetAssets.isNotEmpty) {
+        targets = targetAssets;
+        return CanonicalResearchItem(
+          itemId: itemId,
+          itemVersion: itemVersion,
+          difficultyLabel: difficultyLabel,
+          difficultyB: difficultyB,
+          isAnchor: isAnchor,
+          equivalentGroupId: data['equivalent_group_id']?.toString(),
+          itemRole: itemRole,
+          responseLoadRelation: responseLoadRelation,
+          allowedScaffolds: _extractStringList(data['allowed_scaffolds']),
+          targets: targets,
+          distractors: distractors,
+        );
+      }
       final items = data['items'];
       if (items is List && items.every((item) => item is Map)) {
         for (final item in items) {
@@ -498,6 +553,8 @@ class CanonicalItemResolver {
       difficultyB: difficultyB,
       isAnchor: isAnchor,
       equivalentGroupId: data['equivalent_group_id']?.toString(),
+      itemRole: itemRole,
+      responseLoadRelation: responseLoadRelation,
       allowedScaffolds: _extractStringList(data['allowed_scaffolds']),
       targets: targets,
       distractors: distractors,

@@ -22,10 +22,16 @@ class TelemetryData(BaseModel):
     first_attempt_correct: Optional[bool] = None
     correction_count: int = 0
     hint_count: int = 0
+    item_role: Optional[str] = None
+    equivalent_group_id: Optional[str] = None
+    response_load_relation: Optional[str] = None
+    target_ids: Optional[List[str]] = None
+    selected_answers: Optional[List[str]] = None
 
 class InteractionRequest(BaseModel):
     student_id: str
     session_id: str
+    event_id: Optional[str] = None
     activity_id: str
     knowledge_component_id: str
     item_id: str

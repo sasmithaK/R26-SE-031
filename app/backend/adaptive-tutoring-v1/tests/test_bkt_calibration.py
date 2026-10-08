@@ -45,13 +45,22 @@ def test_bkt_calibration_fits_valid_bounded_parameters_deterministically():
 
 def test_runtime_accepts_only_valid_active_registry_parameters():
     engine = BKTEngine()
-    assert engine.apply_calibrated_parameters("KC_TEST", {
-        "p_initial": 0.25,
-        "p_transition": 0.12,
-        "p_guess": 0.15,
-        "p_slip": 0.1,
-    })
+    assert engine.apply_calibrated_parameters(
+        "KC_TEST",
+        {
+            "p_initial": 0.25,
+            "p_transition": 0.12,
+            "p_guess": 0.15,
+            "p_slip": 0.1,
+        },
+        model_version="bkt_test_v1",
+        calibrated_at="2026-10-07T00:00:00Z",
+    )
     assert engine.priors["KC_TEST"] == (0.25, 0.12, 0.15, 0.1)
+    evidence = engine.get_model_evidence("KC_TEST")
+    assert evidence["model_version"] == "bkt_test_v1"
+    assert evidence["calibration_status"] == "empirically_calibrated"
+    assert evidence["parameters"]["p_guess"] == 0.15
 
     assert not engine.apply_calibrated_parameters("KC_BAD", {
         "p_initial": 0.25,
@@ -60,3 +69,27 @@ def test_runtime_accepts_only_valid_active_registry_parameters():
         "p_slip": 0.2,
     })
     assert "KC_BAD" not in engine.priors
+
+
+def test_saturated_legacy_mastery_can_recover_after_an_incorrect_attempt():
+    engine = BKTEngine()
+
+    after_error = engine.update_knowledge_state(
+        1.0, "KC_VISUAL_IDENTIFICATION", False
+    )
+
+    assert 0.0 < after_error < engine.MASTERY_CEILING
+
+
+def test_bkt_never_returns_an_absorbing_probability():
+    engine = BKTEngine()
+
+    after_success = engine.update_knowledge_state(
+        1.0, "KC_VISUAL_IDENTIFICATION", True
+    )
+    after_failure = engine.update_knowledge_state(
+        0.0, "KC_VISUAL_IDENTIFICATION", False
+    )
+
+    assert engine.MASTERY_FLOOR <= after_failure
+    assert after_success <= engine.MASTERY_CEILING

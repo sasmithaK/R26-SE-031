@@ -1,12 +1,39 @@
 import statistics
 from typing import List, Optional
 
+
+def _independent_outcome(event: dict) -> Optional[bool]:
+    """Return the unassisted first response, with a legacy fallback."""
+    first_attempt = event.get("first_attempt_correct")
+    if isinstance(first_attempt, bool):
+        return first_attempt
+    final_outcome = event.get("is_correct")
+    return final_outcome if isinstance(final_outcome, bool) else None
+
+
 def calculate_accuracy(events: List[dict]) -> Optional[float]:
+    """Legacy eventual-completion accuracy retained for model compatibility."""
     valid = [e for e in events if "is_correct" in e]
     if not valid:
         return None
     correct = sum(1 for e in valid if e["is_correct"])
     return correct / len(valid)
+
+
+def calculate_independent_accuracy(events: List[dict]) -> Optional[float]:
+    """Accuracy of the first independent response, before any scaffold."""
+    outcomes = [_independent_outcome(event) for event in events]
+    valid = [outcome for outcome in outcomes if outcome is not None]
+    if not valid:
+        return None
+    return sum(1 for outcome in valid if outcome) / len(valid)
+
+
+def calculate_eventual_completion_accuracy(
+    events: List[dict],
+) -> Optional[float]:
+    """Explicit name for the legacy final-correctness accuracy metric."""
+    return calculate_accuracy(events)
 
 def calculate_correct_count(events: List[dict]) -> int:
     valid = [e for e in events if "is_correct" in e]

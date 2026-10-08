@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../services/telemetry_service.dart';
 import '../services/telemetry/plugins/voice_analysis_plugin.dart';
@@ -11,6 +13,18 @@ import '../services/progress_service.dart';
 import '../adaptive/controllers/adaptive_choice_controller.dart';
 import '../adaptive/models/adaptive_scaffold_models.dart';
 
+@visibleForTesting
+int countInstructionalChoiceHints(Iterable<ScaffoldCommand> commands) {
+  return commands
+      .where(
+        (command) =>
+            command.type == ScaffoldActionType.highlightOptions ||
+            command.type == ScaffoldActionType.removeOptions ||
+            command.type == ScaffoldActionType.disableOptions,
+      )
+      .length;
+}
+
 /// A wrapper widget that tracks all touch events, latency, and coordinates
 /// before they reach the underlying game template.
 ///
@@ -18,7 +32,7 @@ import '../adaptive/models/adaptive_scaffold_models.dart';
 ///  - [firstTouchLatencyMs] — time from round start to first tap
 ///  - [totalRoundLatencyMs] — full time from round start to completion
 ///  - [misclickCount] — taps outside target areas (game must call [recordMisclick])
-///  - [hesitationCount] — pauses > 2s without any touch
+///  - [hesitationCount] — Grade 1 pauses > 8s without any touch
 ///  - [touchPath]       — normalized (x%, y%) coordinates for each touch
 class TelemetryWrapper extends StatefulWidget {
   final ActivityNode activityNode;
@@ -71,6 +85,8 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
   int _currentRound = 1;
   int _highestScaffoldUsed = 0;
   bool _activityCompleted = false;
+  bool _abandonmentLogged = false;
+  String? _activeItemId;
 
   @visibleForTesting
   int get currentRound => _currentRound;
@@ -89,6 +105,13 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
   @override
   void initState() {
     super.initState();
+    if (widget.activityNode.rounds.isNotEmpty) {
+      _activeItemId = CanonicalItemResolver.resolve(
+        widget.activityNode,
+        widget.activityNode.rounds.first,
+        0,
+      ).itemId;
+    }
     _roundStopwatch = Stopwatch()..start();
     _hesitationStopwatch = Stopwatch()..start();
     _initPluginsOnce();
@@ -117,11 +140,37 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
   }
 
   void _logAbandonment() {
-    if (_activityCompleted) return;
+    if (_activityCompleted || _abandonmentLogged) return;
+    // Seal the unfinished round exactly once. PopScope calls this while the
+    // route is still alive so the level map can submit the event immediately
+    // after Navigator.push completes. dispose() remains a defensive fallback.
+    _abandonmentLogged = true;
     _roundStopwatch.stop();
     final totalRoundLatency = _roundStopwatch.elapsedMilliseconds;
+    final roundIndex = widget.activityNode.rounds.isEmpty
+        ? 0
+        : (_currentRound - 1)
+              .clamp(0, widget.activityNode.rounds.length - 1)
+              .toInt();
+    final roundData = widget.activityNode.rounds.isEmpty
+        ? <String, dynamic>{}
+        : widget.activityNode.rounds[roundIndex];
+    final fallback = CanonicalItemResolver.resolve(
+      widget.activityNode,
+      roundData,
+      roundIndex,
+    );
+    final canonical = CanonicalItemResolver.resolveByItemId(
+      widget.activityNode,
+      _activeItemId ?? fallback.itemId,
+      roundIndex,
+    );
+    final researchMeta = widget.activityNode.researchMetadata;
+    final sessionId = TelemetryService().sessionId;
 
     final event = TelemetryEvent(
+      eventId: '$sessionId:${canonical.itemId}:abandoned',
+      phase: 'ABANDONED',
       activityName: widget.activityNode.templateType,
       roundNumber: _currentRound,
       isCorrect: false,
@@ -134,6 +183,35 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
       audioReplayCount: _audioReplayCount,
       isAbandoned: true, // FLAG SET!
       touchPath: List.unmodifiable(_currentTouchPath),
+      attemptCount: _attemptCount > 0 ? _attemptCount : 1,
+      incorrectAttemptCount: _incorrectAttemptCount,
+      firstAttemptCorrect: _firstAttemptCorrect,
+      finalCorrect: false,
+      timeToFirstResponseMs: _firstTouchLatencyMs < 0
+          ? 0
+          : _firstTouchLatencyMs,
+      timeToCorrectMs: 0,
+      skillId: widget.activityNode.skillId,
+      activityId: widget.activityNode.id,
+      itemId: canonical.itemId,
+      itemVersion: canonical.itemVersion,
+      knowledgeComponentId: researchMeta?.knowledgeComponentId ?? 'KC_UNKNOWN',
+      promptModality: researchMeta?.promptModality ?? 'visual',
+      responseModality: researchMeta?.responseModality ?? 'tap',
+      researchRole: researchMeta?.researchRole ?? 'primary',
+      itemRole: canonical.itemRole,
+      equivalentGroupId: canonical.equivalentGroupId,
+      responseLoadRelation: canonical.responseLoadRelation,
+      difficultyLabel: canonical.difficultyLabel,
+      difficultyB: canonical.difficultyB,
+      isAnchor: canonical.isAnchor,
+      targets: canonical.targets,
+      selectedAnswers: List.unmodifiable(_accumulatedAnswers),
+      errorType: _firstErrorType ?? 'abandoned_before_completion',
+      scaffoldLevelUsed: _highestScaffoldUsed,
+      scaffoldApplications: List<Map<String, dynamic>>.unmodifiable(
+        _scaffoldApplications,
+      ),
     );
     TelemetryService().logInteraction(event);
     debugPrint('TELEMETRY: ACTIVITY ABANDONED AT ROUND $_currentRound');
@@ -273,6 +351,21 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
             roundNumber: roundNumber,
           ),
     );
+    final canonical = CanonicalItemResolver.resolveByItemId(
+      widget.activityNode,
+      payloadItemId,
+      roundNumber - 1,
+    );
+    _activeItemId = canonical.itemId;
+    final researchMeta = widget.activityNode.researchMetadata;
+    final selectedAnswers = _extractSelectedAnswers(extraTelemetry);
+    final firstResponseMs = _firstTouchLatencyMs >= 0
+        ? _firstTouchLatencyMs
+        : 0;
+    final attemptErrorType =
+        _firstErrorType ??
+        extraTelemetry?['error_type']?.toString() ??
+        'incorrect_selection';
 
     // Build attempt payload
     final studentId = _studentId;
@@ -291,14 +384,18 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
       "round_number": roundNumber,
       "item_id": payloadItemId,
       "knowledge_component_id":
-          widget.activityNode.researchMetadata?.knowledgeComponentId ??
-          'KC_UNKNOWN',
+          researchMeta?.knowledgeComponentId ?? 'KC_UNKNOWN',
       "phase": "ATTEMPT",
-      "response": {"selected_character": "item", "is_correct": false},
+      "difficulty_b": canonical.difficultyB,
+      "is_anchor": canonical.isAnchor,
+      "response": {
+        "selected_character": selectedAnswers.isEmpty
+            ? "item"
+            : selectedAnswers.last,
+        "is_correct": false,
+      },
       "telemetry": {
-        "first_touch_latency_ms": _firstTouchLatencyMs >= 0
-            ? _firstTouchLatencyMs
-            : 0,
+        "first_touch_latency_ms": firstResponseMs,
         "total_round_latency_ms": _roundStopwatch.elapsedMilliseconds,
         "hesitation_count": _hesitationCount,
         "misclick_count": _misclickCount,
@@ -306,6 +403,29 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
         "scaffold_level_used": _highestScaffoldUsed,
         "touch_stream": _currentTouchPath.map((p) => p.toJson()).toList(),
         if (extraTelemetry != null) ...extraTelemetry,
+        // Canonical lineage is applied last so game-specific telemetry cannot
+        // accidentally replace the identity of the attempted V1/V2 item.
+        "item_version": canonical.itemVersion,
+        "prompt_modality": researchMeta?.promptModality ?? 'visual',
+        "response_modality": researchMeta?.responseModality ?? 'tap',
+        "research_role": researchMeta?.researchRole ?? 'primary',
+        "difficulty_label": canonical.difficultyLabel,
+        "error_type": attemptErrorType,
+        "final_correct": false,
+        "time_to_first_response_ms": firstResponseMs,
+        "time_to_correct_ms": 0,
+        "score": 0,
+        "is_abandoned": false,
+        "attempt_count": _attemptCount,
+        "incorrect_attempt_count": _incorrectAttemptCount,
+        "first_attempt_correct": false,
+        "correction_count": _correctionCount,
+        "hint_count": _hintCount,
+        "item_role": canonical.itemRole,
+        "equivalent_group_id": canonical.equivalentGroupId,
+        "response_load_relation": canonical.responseLoadRelation,
+        "target_ids": canonical.targets,
+        "selected_answers": selectedAnswers,
       },
     };
 
@@ -365,13 +485,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     }
     if (plan.isEmpty) return null;
     final report = controller.applyPlan(plan);
-    _hintCount += plan.commands
-        .where(
-          (command) =>
-              command.type == ScaffoldActionType.highlightOptions ||
-              command.type == ScaffoldActionType.removeOptions,
-        )
-        .length;
+    _hintCount += countInstructionalChoiceHints(plan.commands);
     _scaffoldApplications.add(<String, dynamic>{
       ...report.toJson(),
       'scaffold_level': plan.scaffoldLevel,
@@ -575,10 +689,22 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
       payloadItemId,
       _currentRound - 1,
     );
+    _activeItemId = canonical.itemId;
     final researchMeta = widget.activityNode.researchMetadata;
+    if (finalIsCorrect && selectedAnswers.isEmpty) {
+      for (final target in canonical.targets) {
+        if (!_accumulatedAnswers.contains(target)) {
+          _accumulatedAnswers.add(target);
+        }
+      }
+    }
+
+    final sessionId = TelemetryService().sessionId;
+    final completionEventId = '$sessionId:$payloadItemId:complete';
 
     // Build and log the rich telemetry event
     final event = TelemetryEvent(
+      eventId: completionEventId,
       activityName: widget.activityNode.templateType,
       roundNumber: _currentRound,
       isCorrect: finalIsCorrect,
@@ -607,12 +733,20 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
       promptModality: researchMeta?.promptModality ?? 'visual',
       responseModality: researchMeta?.responseModality ?? 'tap',
       researchRole: researchMeta?.researchRole ?? 'primary',
+      itemRole: canonical.itemRole,
+      equivalentGroupId: canonical.equivalentGroupId,
+      responseLoadRelation: canonical.responseLoadRelation,
       difficultyLabel: canonical.difficultyLabel,
       difficultyB: canonical.difficultyB,
       isAnchor: canonical.isAnchor,
       targets: canonical.targets,
       selectedAnswers: List.unmodifiable(_accumulatedAnswers),
       errorType: _firstErrorType ?? errorType ?? 'none',
+      phase: 'COMPLETE',
+      scaffoldLevelUsed: _highestScaffoldUsed,
+      scaffoldApplications: List<Map<String, dynamic>>.unmodifiable(
+        _scaffoldApplications,
+      ),
     );
 
     TelemetryService().broadcastRoundComplete(
@@ -623,13 +757,11 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
 
     // --- NEW: Real-time Orchestrator Submission (C1-C4) ---
     final studentId = _studentId;
-    final sessionId = TelemetryService().sessionId;
-
     final payload = {
       "schema_version": "2.0",
       "student_id": studentId,
       "session_id": sessionId,
-      "event_id": '$sessionId:$payloadItemId:complete',
+      "event_id": completionEventId,
       "skill_id": widget.activityNode.skillId,
       "activity_id": widget.activityNode.id,
       "round_number": _currentRound,
@@ -648,11 +780,27 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
         "audio_replay_count": event.audioReplayCount,
         "scaffold_level_used": _highestScaffoldUsed,
         "touch_stream": event.touchPath.map((p) => p.toJson()).toList(),
+        "item_version": event.itemVersion,
+        "prompt_modality": event.promptModality,
+        "response_modality": event.responseModality,
+        "research_role": event.researchRole,
+        "difficulty_label": event.difficultyLabel,
+        "error_type": event.errorType,
+        "final_correct": event.finalCorrect,
+        "time_to_first_response_ms": event.timeToFirstResponseMs,
+        "time_to_correct_ms": event.timeToCorrectMs,
+        "score": event.score,
+        "is_abandoned": event.isAbandoned,
         "attempt_count": event.attemptCount,
         "incorrect_attempt_count": event.incorrectAttemptCount,
         "first_attempt_correct": event.firstAttemptCorrect,
         "correction_count": event.correctionCount,
         "hint_count": event.hintCount,
+        "item_role": event.itemRole,
+        "equivalent_group_id": event.equivalentGroupId,
+        "response_load_relation": event.responseLoadRelation,
+        "target_ids": event.targets,
+        "selected_answers": event.selectedAnswers,
         "scaffold_applications": List<Map<String, dynamic>>.from(
           _scaffoldApplications,
         ),
@@ -769,6 +917,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
             final normalizedNextItem = CanonicalItemResolver.normalizeItemId(
               nextItem,
             );
+            _activeItemId = normalizedNextItem;
             final regex = RegExp(
               r'^S(\d+)A(\d+)R(\d+)(V\d+)?$',
               caseSensitive: false,
@@ -835,6 +984,14 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
 
     if (fallback) {
       _currentRound++;
+      if (_currentRound >= 1 &&
+          _currentRound <= widget.activityNode.rounds.length) {
+        _activeItemId = CanonicalItemResolver.resolve(
+          widget.activityNode,
+          widget.activityNode.rounds[_currentRound - 1],
+          _currentRound - 1,
+        ).itemId;
+      }
     }
   }
 
@@ -854,6 +1011,13 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
             Navigator.pop(context, 'retake');
           },
           onContinue: () {
+            final studentId = _studentId;
+            final telemetry = TelemetryService();
+            if (studentId != null && telemetry.submitOnActivityComplete) {
+              // Snapshot immediately; the level map awaits this same in-flight
+              // request before another activity can start.
+              unawaited(telemetry.endSessionAndSubmit(studentId));
+            }
             Navigator.pop(context, finalScore);
           },
         ),
@@ -861,15 +1025,11 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     ).then((value) {
       if (mounted) {
         if (value == 'retake') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => GameFactory.buildGame(
-                widget.activityNode,
-                studentData: widget.studentData,
-              ),
-            ),
-          );
+          // Return ownership to the level map. It closes the completed
+          // telemetry session before launching the retake as a new session.
+          // Replacing this route directly used to detach the retake from the
+          // level-map future, causing a later abandonment to be discarded.
+          Navigator.pop(context, 'retake');
         } else {
           Navigator.pop(context, value ?? finalScore);
         }
@@ -880,11 +1040,17 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
-    return Listener(
-      onPointerDown: (e) => _recordTouch(e, screenSize),
-      onPointerMove: (e) => _recordTouch(e, screenSize),
-      onPointerUp: (e) => _recordTouch(e, screenSize),
-      child: widget.child,
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) _logAbandonment();
+      },
+      child: Listener(
+        onPointerDown: (e) => _recordTouch(e, screenSize),
+        onPointerMove: (e) => _recordTouch(e, screenSize),
+        onPointerUp: (e) => _recordTouch(e, screenSize),
+        child: widget.child,
+      ),
     );
   }
 

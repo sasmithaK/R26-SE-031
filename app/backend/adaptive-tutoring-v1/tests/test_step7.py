@@ -276,6 +276,16 @@ async def test_10_adaptive_decision_persistence(client):
     
     payload = dict(MOCK_PAYLOAD)
     payload["student_id"] = "s10"
+    payload["event_id"] = "session_007:S2A1R01:complete"
+    payload["telemetry"] = {
+        "first_attempt_correct": True,
+        "item_role": "CORE",
+        "equivalent_group_id": "S2A1R01",
+        "response_load_relation": "core",
+        "target_ids": ["S2A1R01_O1"],
+        "selected_answers": ["S2A1R01_O1"],
+        "scaffold_applications": [],
+    }
     
     res = client.post("/update_interaction", json=payload)
     
@@ -284,11 +294,31 @@ async def test_10_adaptive_decision_persistence(client):
     
     assert doc is not None
     assert doc["activity_id"] == "2.1"
+    assert doc["event_id"] == "session_007:S2A1R01:complete"
     assert doc["kc_id"] == "KC_LETTER_IDENTIFICATION"
+    assert doc["submitted_kc_id"] == "UNKNOWN"
+    assert doc["item_role"] == "CORE"
+    assert doc["equivalent_group_id"] == "S2A1R01"
+    assert doc["response_load_relation"] == "core"
+    assert doc["item_version"] == 2
+    assert doc["difficulty_label"] == "easy"
+    assert doc["difficulty_b"] == -1.0
+    assert doc["difficulty_source"] == "expert_provisional"
+    assert doc["calibration_status"] == "not_empirically_calibrated"
+    assert doc["is_anchor"] is False
+    assert doc["target_ids"] == ["S2A1R01_O1"]
+    assert doc["selected_answers"] == ["S2A1R01_O1"]
     assert "mastery_after" in doc
+    assert doc["bkt_model_version"] == "bkt_theory_provisional_v1"
+    assert doc["bkt_calibration_status"] == "provisional"
+    assert doc["bkt_parameters"]["p_initial"] == 0.3
     assert "theta_after" in doc
+    assert 0.0 < doc["predicted_probability"] < 1.0
+    assert doc["test_information_after"] > 0.0
     assert "target_difficulty" in doc
     assert "selected_item" in doc
+    assert doc["next_phase"] == res.json()["next_action"]["next_phase"]
+    assert doc["policy_version"] == res.json()["next_action"]["policy_version"]
     assert "policy_reason" in doc
 
 
@@ -313,6 +343,12 @@ async def test_11_assisted_final_success_uses_first_attempt_for_mastery(client):
     assert body["bkt_evidence"]["mastery_after"] < body["bkt_evidence"]["mastery_before"]
     assert body["next_action"]["decision"] == "REMEDIATION"
     assert body["next_action"]["next_item"] == "S2A1R01V1"
+    decision = await mock_db["adaptive_decisions"].find_one(
+        {"student_id": "assisted_student"}
+    )
+    assert decision["scaffold_level"] == 1
+    assert decision["scaffold_level_used"] == 1
+    assert decision["next_scaffold_level"] == body["next_action"]["scaffold_level"]
 
 
 @pytest.mark.asyncio
@@ -360,6 +396,15 @@ async def test_12_skill1_activity1_serves_all_five_core_items_before_completion(
     assert served == [
         "S1A1R01", "S1A1R02", "S1A1R03", "S1A1R04", "S1A1R05"
     ]
+    state = await mock_db["knowledge_states"].find_one({"student_id": student_id})
+    assert state["adaptive_states"]["1.1"]["expected_item_id"] == "COMPLETE"
+    assert state["adaptive_states"]["1.1"]["next_phase"] == "COMPLETE"
+    terminal = await mock_db["adaptive_decisions"].find_one({
+        "student_id": student_id,
+        "decision": "ACTIVITY_COMPLETE",
+    })
+    assert terminal["next_phase"] == "COMPLETE"
+    assert terminal["timestamp"].endswith("+00:00")
 
 
 @pytest.mark.asyncio

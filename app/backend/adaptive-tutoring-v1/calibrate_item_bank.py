@@ -5,12 +5,65 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from collections import Counter
 from datetime import datetime, timezone
 
 from pymongo import MongoClient
 
 from services.rasch_calibration import fit_rasch
 from services.bkt_calibration import fit_bkt_by_kc
+
+
+def _is_canonical_completion(event: dict) -> bool:
+    """Accept completion evidence, including legacy batch-only session rows."""
+    if event.get("is_abandoned") is True:
+        return False
+    phase = str(event.get("phase") or "").upper()
+    event_id = str(event.get("event_id") or "")
+    if phase == "ATTEMPT" or ":attempt:" in event_id:
+        return False
+    has_completion_marker = (
+        phase == "COMPLETE"
+        or event_id.endswith(":complete")
+        or isinstance(event.get("final_correct"), bool)
+    )
+    if not has_completion_marker:
+        return False
+    return bool(
+        event.get("student_id")
+        and event.get("session_id")
+        and event.get("item_id")
+        and event.get("item_id") != "unknown"
+    )
+
+
+def _canonical_completion_events(db, projection: dict):
+    projection = {
+        **projection,
+        "item_id": 1,
+        "session_id": 1,
+        "phase": 1,
+        "is_abandoned": 1,
+        "final_correct": 1,
+    }
+    seen_event_ids = set()
+    seen_observations = set()
+    for event in db.telemetry_events.find({}, projection):
+        if not _is_canonical_completion(event):
+            continue
+        event_id = event.get("event_id")
+        if event_id in seen_event_ids:
+            continue
+        observation_key = (
+            event.get("student_id"),
+            event.get("session_id"),
+            event.get("item_id"),
+        )
+        if observation_key in seen_observations:
+            continue
+        seen_event_ids.add(event_id)
+        seen_observations.add(observation_key)
+        yield event
 
 
 def _independent_responses(db) -> list[dict]:
@@ -23,13 +76,7 @@ def _independent_responses(db) -> list[dict]:
         "scaffold_level_used": 1,
     }
     responses = []
-    seen_event_ids = set()
-    for event in db.telemetry_events.find({}, projection):
-        event_id = event.get("event_id")
-        if event_id and event_id in seen_event_ids:
-            continue
-        if event_id:
-            seen_event_ids.add(event_id)
+    for event in _canonical_completion_events(db, projection):
         first_attempt = event.get("first_attempt_correct")
         if isinstance(first_attempt, bool):
             correctness = first_attempt
@@ -56,13 +103,7 @@ def _independent_bkt_responses(db) -> list[dict]:
         "scaffold_level_used": 1,
     }
     responses = []
-    seen_event_ids = set()
-    for event in db.telemetry_events.find({}, projection):
-        event_id = event.get("event_id")
-        if event_id and event_id in seen_event_ids:
-            continue
-        if event_id:
-            seen_event_ids.add(event_id)
+    for event in _canonical_completion_events(db, projection):
         first_attempt = event.get("first_attempt_correct")
         if isinstance(first_attempt, bool):
             correctness = first_attempt
@@ -94,17 +135,32 @@ def main() -> None:
     client = MongoClient(mongo_url)
     db = client[os.getenv("MONGODB_DB", os.getenv("MONGODB_DB_NAME", "r26_se_031"))]
     try:
+        rasch_responses = _independent_responses(db)
+        bkt_responses = _independent_bkt_responses(db)
+        raw_item_counts = Counter(
+            response["item_id"] for response in rasch_responses
+        )
         result = fit_rasch(
-            _independent_responses(db),
+            rasch_responses,
             min_item_responses=args.min_item_responses,
         )
         bkt_result = fit_bkt_by_kc(
-            _independent_bkt_responses(db),
+            bkt_responses,
             min_kc_responses=args.min_kc_responses,
             min_students=args.min_kc_students,
         )
         report = {
             "mode": "apply" if args.apply else "dry_run",
+            "canonical_completion_observations": len(rasch_responses),
+            "canonical_students": len({
+                response["student_id"] for response in rasch_responses
+            }),
+            "observed_items": len(raw_item_counts),
+            "max_item_responses": max(raw_item_counts.values(), default=0),
+            "items_meeting_min_responses": sum(
+                count >= args.min_item_responses
+                for count in raw_item_counts.values()
+            ),
             "observations_used": result.observations_used,
             "eligible_items": len(result.item_difficulties),
             "log_loss": result.log_loss,

@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from schemas.telemetry import TelemetrySessionSubmit, TelemetryEvent
 from services.behavioral_engine import extract_session_features
 
@@ -76,3 +77,58 @@ def test_fatigue_with_insufficient_trials():
     session = TelemetrySessionSubmit(student_id="s1", session_id="ses1", session_duration_seconds=60, events=events)
     summary = extract_session_features(session)
     assert summary.behavioral_fatigue_proxy is None
+
+
+def test_skill1_error_types_map_to_research_categories():
+    events = [
+        create_mock_event(is_correct=False, error_type="visual_search_miss"),
+        create_mock_event(is_correct=False, error_type="visual_matching_error"),
+        create_mock_event(is_correct=False, error_type="categorization_error"),
+        create_mock_event(is_correct=False, error_type="visual_memory_error"),
+        create_mock_event(is_correct=False, error_type="visual_pattern_error"),
+    ]
+    session = TelemetrySessionSubmit(
+        student_id="s1",
+        session_id="skill1-errors",
+        session_duration_seconds=60,
+        events=events,
+    )
+
+    summary = extract_session_features(session)
+
+    assert summary.error_profile["visual_confusion_rate"] == pytest.approx(0.8)
+    assert summary.error_profile["sequence_error_rate"] == pytest.approx(0.2)
+    assert summary.error_profile["unknown_error_rate"] == 0.0
+
+
+def test_summary_uses_client_session_time_boundaries():
+    session = TelemetrySessionSubmit(
+        student_id="s1",
+        session_id="timed-session",
+        skill_id="skill_1",
+        activity_id="act_4",
+        started_at="2026-10-08T03:30:00Z",
+        completed_at="2026-10-08T03:31:00Z",
+        session_duration_seconds=60,
+        events=[create_mock_event()],
+    )
+
+    summary = extract_session_features(session)
+
+    assert summary.started_at == "2026-10-08T03:30:00+00:00"
+    assert summary.completed_at == "2026-10-08T03:31:00+00:00"
+
+
+def test_legacy_summary_bounds_preserve_duration():
+    session = TelemetrySessionSubmit(
+        student_id="s1",
+        session_id="legacy-session",
+        session_duration_seconds=75,
+        events=[create_mock_event()],
+    )
+
+    summary = extract_session_features(session)
+    started = datetime.fromisoformat(summary.started_at)
+    completed = datetime.fromisoformat(summary.completed_at)
+
+    assert (completed - started).total_seconds() == 75

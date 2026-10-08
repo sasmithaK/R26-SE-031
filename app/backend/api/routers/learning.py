@@ -5,7 +5,7 @@ import httpx
 import uuid
 import asyncio
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 import sys
 from pathlib import Path as PathLib
@@ -39,7 +39,23 @@ class TelemetryModel(BaseModel):
     first_attempt_correct: Optional[bool] = None
     correction_count: Optional[int] = 0
     hint_count: Optional[int] = 0
+    item_role: Optional[str] = None
+    equivalent_group_id: Optional[str] = None
+    response_load_relation: Optional[str] = None
+    target_ids: Optional[List[str]] = None
+    selected_answers: Optional[List[str]] = None
     touch_stream: List[Any] = Field(default_factory=list)
+    item_version: int = 1
+    prompt_modality: str = "visual"
+    response_modality: str = "tap"
+    research_role: str = "primary"
+    difficulty_label: str = "medium"
+    error_type: str = "unknown_error"
+    final_correct: Optional[bool] = None
+    time_to_first_response_ms: int = 0
+    time_to_correct_ms: int = 0
+    score: int = 0
+    is_abandoned: bool = False
 
 class InteractionPayload(BaseModel):
     event_id: Optional[str] = None
@@ -56,6 +72,37 @@ class InteractionPayload(BaseModel):
     phase: str = "COMPLETE"
     difficulty_b: float = 0.0
     is_anchor: bool = False
+
+
+def build_adaptive_submit(
+    payload: InteractionPayload,
+    *,
+    event_id: str,
+    canonical_activity_id: str,
+    canonical_item_id: str,
+    fatigue_score: float,
+    learner_profile: Dict[str, float],
+) -> Dict[str, Any]:
+    """Build the lossless C4 request shared by runtime code and contract tests."""
+    return {
+        "student_id": payload.student_id,
+        "session_id": payload.session_id,
+        "event_id": event_id,
+        "activity_id": canonical_activity_id,
+        "knowledge_component_id": payload.knowledge_component_id,
+        "item_id": canonical_item_id,
+        "is_correct": payload.response.is_correct,
+        "difficulty_b": payload.difficulty_b,
+        "is_anchor": payload.is_anchor,
+        "current_session_duration_sec": (
+            payload.telemetry.total_round_latency_ms // 1000
+        ),
+        "fatigue_score": fatigue_score,
+        "learner_profile": learner_profile,
+        "phase": payload.phase,
+        "telemetry": payload.telemetry.model_dump(),
+    }
+
 
 async def run_background_pipeline(payload: InteractionPayload, c4_result: dict, event_id: str):
     db = get_db()
@@ -75,10 +122,19 @@ async def run_background_pipeline(payload: InteractionPayload, c4_result: dict, 
         "difficulty_b": payload.difficulty_b,
         "is_anchor": payload.is_anchor,
         "phase": payload.phase,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "is_correct": payload.response.is_correct,
+        "final_correct": (
+            payload.telemetry.final_correct
+            if payload.telemetry.final_correct is not None
+            else payload.response.is_correct
+        ),
+        "score": payload.telemetry.score,
+        "is_abandoned": payload.telemetry.is_abandoned,
         "first_touch_latency_ms": payload.telemetry.first_touch_latency_ms,
         "total_round_latency_ms": payload.telemetry.total_round_latency_ms,
+        "time_to_first_response_ms": payload.telemetry.time_to_first_response_ms,
+        "time_to_correct_ms": payload.telemetry.time_to_correct_ms,
         "hesitation_count": payload.telemetry.hesitation_count,
         "misclick_count": payload.telemetry.misclick_count,
         "audio_replay_count": getattr(payload.telemetry, "audio_replay_count", 0),
@@ -89,6 +145,29 @@ async def run_background_pipeline(payload: InteractionPayload, c4_result: dict, 
         "first_attempt_correct": getattr(payload.telemetry, "first_attempt_correct", None),
         "correction_count": getattr(payload.telemetry, "correction_count", 0),
         "hint_count": getattr(payload.telemetry, "hint_count", 0),
+        "item_role": getattr(payload.telemetry, "item_role", None),
+        "item_version": payload.telemetry.item_version,
+        "prompt_modality": payload.telemetry.prompt_modality,
+        "response_modality": payload.telemetry.response_modality,
+        "research_role": payload.telemetry.research_role,
+        "difficulty_label": payload.telemetry.difficulty_label,
+        "error_type": payload.telemetry.error_type,
+        "equivalent_group_id": getattr(
+            payload.telemetry, "equivalent_group_id", None
+        ),
+        "response_load_relation": getattr(
+            payload.telemetry, "response_load_relation", None
+        ),
+        "targets": getattr(payload.telemetry, "target_ids", None) or [],
+        "target_ids": getattr(payload.telemetry, "target_ids", None) or [],
+        "selected_answers": (
+            getattr(payload.telemetry, "selected_answers", None) or []
+        ),
+        # Keep both names because the real-time gateway and the batch
+        # telemetry service historically used different field names.
+        "touch_stream": payload.telemetry.touch_stream,
+        "touch_path": payload.telemetry.touch_stream,
+        "event_source": "learning_interaction",
     }
     # Prefer the v2 key, while reconciling one pre-v2 record in place when it
     # exists. This keeps retries idempotent without deleting legacy records.
@@ -128,7 +207,7 @@ async def run_background_pipeline(payload: InteractionPayload, c4_result: dict, 
             "wer": payload.speech.get("word_error_rate", 0.0),
             "stt_confidence": 1.0 - (payload.speech.get("word_error_rate") or 0.0),
             "model_version": "whisper-si-v1",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         await db.speech_transcriptions.insert_one(speech_trans_doc)
         
@@ -150,7 +229,7 @@ async def run_background_pipeline(payload: InteractionPayload, c4_result: dict, 
             "analysis_confidence": 0.88 if payload.speech.get("recording_quality", "good") == "good" else 0.5,
             "feature_version": "speech-v1",
             "speech_data": payload.speech, # Kept for backward compatibility in other endpoints
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         await db.speech_features.insert_one(speech_feat_doc)
 
@@ -195,21 +274,14 @@ async def process_interaction(payload: InteractionPayload, background_tasks: Bac
     async with httpx.AsyncClient() as client:
         # Call Adaptive Tutoring (C4) synchronously
         try:
-            adaptive_submit = {
-                "student_id": payload.student_id,
-                "session_id": payload.session_id,
-                "activity_id": canonical_activity_id,
-                "knowledge_component_id": payload.knowledge_component_id,
-                "item_id": canonical_item_id,
-                "is_correct": payload.response.is_correct,
-                "difficulty_b": payload.difficulty_b,
-                "is_anchor": payload.is_anchor,
-                "current_session_duration_sec": payload.telemetry.total_round_latency_ms // 1000,
-                "fatigue_score": fatigue_score,
-                "learner_profile": learner_profile_dict,
-                "phase": payload.phase,
-                "telemetry": payload.telemetry.dict()
-            }
+            adaptive_submit = build_adaptive_submit(
+                payload,
+                event_id=event_id,
+                canonical_activity_id=canonical_activity_id,
+                canonical_item_id=canonical_item_id,
+                fatigue_score=fatigue_score,
+                learner_profile=learner_profile_dict,
+            )
             
             adaptive_api_url = os.getenv("ADAPTIVE_API_URL", "http://localhost:9017")
             

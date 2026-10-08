@@ -3,6 +3,8 @@ from typing import Optional, Dict
 
 class BehavioralFeatures(BaseModel):
     accuracy: Optional[float] = None
+    independent_accuracy: Optional[float] = None
+    eventual_completion_accuracy: Optional[float] = None
     mean_latency_ms: Optional[float] = None
     median_latency_ms: Optional[float] = None
     latency_std_ms: Optional[float] = None
@@ -143,4 +145,3 @@ class C3ReadyFeatures(BaseModel):
     audio_replay_rate: Optional[float] = None # Deprecated, use mean_audio_replays_per_audio_trial
     behavioral_fatigue_proxy: Optional[float] = None
     visual_support_accuracy: Optional[float] = None
-
