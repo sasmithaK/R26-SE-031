@@ -343,6 +343,28 @@ class CanonicalResearchItem {
 }
 
 class CanonicalItemResolver {
+  /// Merge playable variant content without retaining mutually exclusive
+  /// answer keys from the core item. This is essential when a two-target core
+  /// task uses a one-target remediation item, or vice versa.
+  static Map<String, dynamic> mergeVariantContent(
+    Map<String, dynamic> core,
+    Map<String, dynamic> variantContent,
+  ) {
+    final merged = <String, dynamic>{...core};
+    if (variantContent['correct_indices'] is List) {
+      merged
+        ..remove('correct_index')
+        ..remove('correctOption')
+        ..remove('correct_option');
+    } else if (variantContent.containsKey('correct_index') ||
+        variantContent.containsKey('correctOption') ||
+        variantContent.containsKey('correct_option')) {
+      merged.remove('correct_indices');
+    }
+    merged.addAll(variantContent);
+    return merged;
+  }
+
   /// Resolves the exact displayed item, including a V1/V2 equivalent nested
   /// under its core round.
   static CanonicalResearchItem resolveByItemId(
@@ -385,8 +407,7 @@ class CanonicalItemResolver {
         // nested map in place caused resolve() to merge it a second time and
         // report the core item/difficulty for the displayed V1/V2 task.
         final resolvedVariant = <String, dynamic>{
-          ...core,
-          ...content,
+          ...mergeVariantContent(core, content),
           ...variant,
           'item_id': normalized,
         }..remove('content');
@@ -468,15 +489,32 @@ class CanonicalItemResolver {
     } else if (type.contains('mcq') ||
         type == 'skill2_audio' ||
         type == 'interactive_story') {
+      final options = _extractStringList(data['options']);
       final correctOpt = (data['correctOption'] ?? data['correct_option'])
           ?.toString();
-      if (correctOpt != null) targets.add(correctOpt);
+      final correctIndices = <int>{};
+      final rawCorrectIndices = data['correct_indices'];
+      if (rawCorrectIndices is List) {
+        correctIndices.addAll(
+          rawCorrectIndices
+              .map((value) => value is int ? value : int.tryParse('$value'))
+              .whereType<int>(),
+        );
+      }
+      final rawCorrectIndex = data['correct_index'];
+      final correctIndex = rawCorrectIndex is int
+          ? rawCorrectIndex
+          : int.tryParse('${rawCorrectIndex ?? ''}');
+      if (correctIndex != null) correctIndices.add(correctIndex);
 
-      final options = _extractStringList(data['options']);
-      if (correctOpt != null) {
-        distractors = options.where((o) => o != correctOpt).toList();
-      } else {
-        distractors = options;
+      for (var index = 0; index < options.length; index++) {
+        final option = options[index];
+        final isTarget =
+            correctIndices.contains(index) ||
+            (correctIndices.isEmpty &&
+                correctOpt != null &&
+                option == correctOpt);
+        (isTarget ? targets : distractors).add(option);
       }
     } else if (type.contains('fill_blank') ||
         type == 'skill4_act2_fill_blank') {
@@ -507,13 +545,16 @@ class CanonicalItemResolver {
       }
       final items = data['items'];
       if (items is List && items.every((item) => item is Map)) {
-        for (final item in items) {
+        for (var index = 0; index < items.length; index++) {
+          final item = items[index] as Map;
           final value = item['value']?.toString();
           if (value == null) continue;
+          final optionId =
+              item['option_id']?.toString() ?? '${itemId}_O${index + 1}';
           final isTarget =
               item['is_target'] == true ||
               (item['is_target'] == null && value == data['target_letter']);
-          (isTarget ? targets : distractors).add(value);
+          (isTarget ? targets : distractors).add(optionId);
         }
       } else {
         final correctOpt = (data['correctOption'] ?? data['correct_option'])
