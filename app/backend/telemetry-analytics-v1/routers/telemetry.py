@@ -16,6 +16,7 @@ import httpx
 import asyncio
 import os
 import math
+import re
 from bson.objectid import ObjectId
 from datetime import datetime, timezone
 
@@ -29,6 +30,104 @@ from services.assessment_report_generator import generate_assessment_report
 from services.behavioral_engine import extract_session_features
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Telemetry"])
+
+
+_CANONICAL_ITEM_RE = re.compile(
+    r"^S(?P<skill>\d+)A(?P<activity>\d+)R(?P<round>\d{2})(?P<variant>V\d+)?$",
+    re.IGNORECASE,
+)
+
+
+def _normalize_item_id(value: object) -> str:
+    compact = re.sub(r"[_\-\s]", "", str(value or "")).upper()
+    match = re.fullmatch(
+        r"S(\d+)A(\d+)R(\d+)(V\d+)?",
+        compact,
+        re.IGNORECASE,
+    )
+    if not match:
+        return compact
+    return (
+        f"S{int(match.group(1))}A{int(match.group(2))}"
+        f"R{int(match.group(3)):02d}{(match.group(4) or '').upper()}"
+    )
+
+
+async def _validate_skill_two_research_event(db, event: dict) -> None:
+    """Validate immutable Skill 2 lineage against the canonical item bank.
+
+    Observation fields are never rewritten. Static item metadata is copied
+    from the bank, while any client mismatch is retained as an explicit audit
+    error and makes the row ineligible for model calibration.
+    """
+    raw_item_id = str(event.get("item_id") or "")
+    normalized_item_id = _normalize_item_id(raw_item_id)
+    item_match = _CANONICAL_ITEM_RE.fullmatch(normalized_item_id)
+    is_skill_two = (
+        event.get("skill_id") == "skill_2"
+        or (item_match is not None and item_match.group("skill") == "2")
+    )
+    if not is_skill_two:
+        return
+
+    errors = []
+    if raw_item_id != normalized_item_id:
+        errors.append("NON_CANONICAL_ITEM_ID")
+    bank_item = await db.item_bank.find_one({
+        "item_id": normalized_item_id,
+        "skill_id": "skill_2",
+        "is_active": {"$ne": False},
+    })
+    if bank_item is None:
+        event["research_eligible"] = False
+        event["research_validation_errors"] = [
+            *errors,
+            "ITEM_NOT_FOUND_IN_CANONICAL_BANK",
+        ]
+        return
+
+    expected = {
+        "skill_id": bank_item["skill_id"],
+        "knowledge_component_id": bank_item["knowledge_component_id"],
+        "prompt_modality": bank_item["prompt_modality"],
+        "response_modality": bank_item["response_modality"],
+        "item_role": bank_item["item_role"],
+        "equivalent_group_id": bank_item["equivalent_group_id"],
+        "response_load_relation": bank_item["response_load_relation"],
+        "difficulty_label": bank_item["difficulty_label"],
+        "difficulty_b": float(bank_item["difficulty_b"]),
+        "is_anchor": bool(bank_item["is_anchor"]),
+        "item_version": int(bank_item["item_version"]),
+    }
+    for field, expected_value in expected.items():
+        submitted_value = event.get(field)
+        if field == "difficulty_b":
+            try:
+                matches = abs(float(submitted_value) - expected_value) < 1e-9
+            except (TypeError, ValueError):
+                matches = False
+        else:
+            matches = submitted_value == expected_value
+        if not matches:
+            errors.append(f"{field.upper()}_MISMATCH")
+            event[f"submitted_{field}"] = submitted_value
+        event[field] = expected_value
+
+    canonical_activity = str(bank_item["activity_id"])
+    activity_number = canonical_activity.split(".")[-1]
+    accepted_activity_ids = {
+        canonical_activity,
+        f"act_{activity_number}",
+        f"skill_2_act_{activity_number}",
+    }
+    if event.get("activity_id") not in accepted_activity_ids:
+        errors.append("ACTIVITY_ID_MISMATCH")
+        event["submitted_activity_id"] = event.get("activity_id")
+    event["canonical_activity_id"] = canonical_activity
+
+    event["item_id"] = normalized_item_id
+    event["research_eligible"] = not errors
+    event["research_validation_errors"] = errors
 
 async def _trigger_c3_background(student_id: str, session_summary: dict):
     """Fuse only explicitly linked, complete inputs. C1 accuracy is not path efficiency."""
@@ -140,17 +239,22 @@ async def submit_telemetry(
             if values:
                 session_doc[field] = next(iter(values)) if len(values) == 1 else "mixed"
 
+    # Validate and enrich immutable research lineage before either the session
+    # or individual event copy is stored.
+    for event in events_list:
+        event["schema_version"] = "2.0"
+        event["session_id"] = req.session_id
+        event["student_id"] = req.student_id
+        await _validate_skill_two_research_event(db, event)
+
     # Retried submissions update the same complete session and summary.
     await db.telemetry_sessions.update_one(session_key, {"$set": session_doc}, upsert=True)
-    
+
     # Store individual events idempotently. Legacy databases may contain
     # repeated event_id values, so reconcile one old record and then use a
     # unique v2 ingestion key for all later retries.
     if events_list:
         for event in events_list:
-            event["schema_version"] = "2.0"
-            event["session_id"] = req.session_id
-            event["student_id"] = req.student_id
             event_id = event.get("event_id")
             if not event_id:
                 continue
@@ -172,7 +276,8 @@ async def submit_telemetry(
                 upsert=existing is None,
             )
 
-    summary = extract_session_features(req).model_dump()
+    validated_req = TelemetrySessionSubmit.model_validate(session_doc)
+    summary = extract_session_features(validated_req).model_dump()
     await db.session_summaries.update_one(
         {"student_id": req.student_id, "session_id": req.session_id},
         {"$set": summary}, upsert=True,
@@ -188,7 +293,10 @@ async def submit_telemetry(
     from repositories import c1_repository
     
     try:
-        events_data = [e.model_dump() if hasattr(e, "model_dump") else dict(e) for e in req.events]
+        events_data = [
+            e.model_dump() if hasattr(e, "model_dump") else dict(e)
+            for e in validated_req.events
+        ]
         for e in events_data:
             e["session_id"] = req.session_id
             e["student_id"] = req.student_id
