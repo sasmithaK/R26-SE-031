@@ -245,13 +245,17 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
   }
 
   /// Resets round and hesitation timers. Used after mandatory wait/memorization phases.
-  void resetRoundTimers() {
+  void resetRoundTimers({bool clearPreResponseEvidence = false}) {
     _roundStopwatch.reset();
     _roundStopwatch.start();
     _hesitationStopwatch.reset();
     _hesitationStopwatch.start();
     _firstTouchLatencyMs = -1;
     _firstTouchRecorded = false;
+    if (clearPreResponseEvidence) {
+      _hesitationCount = 0;
+      _currentTouchPath.clear();
+    }
     debugPrint('TELEMETRY: Round timers reset.');
   }
 

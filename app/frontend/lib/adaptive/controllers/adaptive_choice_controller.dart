@@ -118,6 +118,7 @@ class AdaptiveChoiceController<T> extends ChangeNotifier {
           }
           break;
         case ScaffoldActionType.highlightOptions:
+        case ScaffoldActionType.revealFirstToken:
           _highlightedIds
             ..clear()
             ..addAll(validIds.where((id) => !_removedIds.contains(id)));
@@ -131,7 +132,6 @@ class AdaptiveChoiceController<T> extends ChangeNotifier {
           break;
         case ScaffoldActionType.replayInstruction:
         case ScaffoldActionType.slowAudio:
-        case ScaffoldActionType.revealFirstToken:
         case ScaffoldActionType.lockCorrectToken:
         case ScaffoldActionType.showWorkedExample:
         case ScaffoldActionType.pauseSession:

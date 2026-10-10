@@ -188,6 +188,28 @@ void main() {
     expect(repeated.rejectedReasons, contains('DUPLICATE_ACTION:remove-once'));
   });
 
+  test('reveals the next sequence token as a visible hint', () {
+    final choices = controller();
+    final report = choices.applyPlan(
+      const ScaffoldPlan(
+        actionId: 'reveal-plan',
+        commands: <ScaffoldCommand>[
+          ScaffoldCommand(
+            actionId: 'reveal-first-token',
+            type: ScaffoldActionType.revealFirstToken,
+            targetOptionIds: <String>{'S2A1R01_O1'},
+          ),
+        ],
+      ),
+    );
+
+    expect(report.appliedOptionIds, contains('S2A1R01_O1'));
+    expect(
+      choices.visualStateFor('S2A1R01_O1'),
+      AdaptiveOptionVisualState.hint,
+    );
+  });
+
   testWidgets('answer pool rebuilds from visible options and closes the gap', (
     tester,
   ) async {
