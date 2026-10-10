@@ -30,22 +30,13 @@ def get_adaptive_state(student_doc: dict, activity_id: str) -> dict:
     return state if state else _get_default_state(activity_id)
 
 def _get_default_state(activity_id: str) -> dict:
-    if activity_id == "2.2":
-        return {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A2_CORE_V1"}
-    elif activity_id == "2.1":
-        return {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A1_CORE_V1"}
-    elif activity_id == "2.3":
-        return {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A3_CORE_V1"}
-    elif activity_id == "2.4":
-        return {"current_core_round": 1, "next_phase": "CORE", "adaptive_policy_version": "S2A4_CORE_V1"}
-    elif activity_id == "2.5":
+    if activity_id in {"2.1", "2.2", "2.3", "2.4", "2.5"}:
+        activity_number = activity_id.split(".")[1]
         return {
-            "current_core_round": 1, 
-            "next_phase": "CORE", 
-            "expected_item_id": "S2A5R01",
-            "used_variant_ids": [],
-            "scaffold_locked": False,
-            "adaptive_policy_version": "S2A5_CORE_V1"
+            "current_core_round": 1,
+            "next_phase": "CORE",
+            "expected_item_id": f"S2A{activity_number}R01",
+            "adaptive_policy_version": "C4_EQUIVALENT_TASK_V2",
         }
     return {}
 
@@ -160,8 +151,21 @@ async def update_interaction(request: InteractionRequest):
     if canonical_item == "RESET":
         is_fresh_start = True
     elif re.fullmatch(r"S\d+A\d+R01", canonical_item):
+        # A new level-map run has a new session ID.  A delayed/retried R01
+        # completion from the *same* session must never reset a state that has
+        # already advanced to R01V1/R01V2; the stale-item guard below will
+        # return the currently expected item instead.  This was the source of
+        # the Skill 2 first-task remediation loop.
         expected = adaptive_state.get("expected_item_id")
-        if expected != canonical_item:
+        if canonical_act.startswith("2."):
+            active_session_id = adaptive_state.get("active_session_id")
+            if (
+                expected != canonical_item
+                and active_session_id != request.session_id
+            ):
+                is_fresh_start = True
+        elif expected != canonical_item:
+            # Preserve the established behavior for already-validated skills.
             is_fresh_start = True
 
     if is_fresh_start:
@@ -177,6 +181,11 @@ async def update_interaction(request: InteractionRequest):
         if canonical_item == "RESET":
             # Save and return immediately if this was just a reset ping
             pass
+
+    # Persist session ownership on attempts as well as completions so retries
+    # can be distinguished from an intentional new activity/retake session.
+    if canonical_act.startswith("2."):
+        adaptive_state["active_session_id"] = request.session_id
 
     # Fetch Item parameters from Item Bank
     item_doc = await db.item_bank.find_one({"item_id": canonical_item})
@@ -384,6 +393,10 @@ async def update_interaction(request: InteractionRequest):
         current_item_id=canonical_item,
         has_reduced_remediation=bool(
             item_doc.get("has_reduced_remediation", False)
+            if item_doc else False
+        ),
+        has_floor_remediation=bool(
+            item_doc.get("has_floor_remediation", False)
             if item_doc else False
         ),
     )
@@ -644,6 +657,11 @@ async def update_interaction(request: InteractionRequest):
     
     # 8. Adaptive Decision Logging
     adaptive_decision_record = {
+        "schema_version": "2.0",
+        "research_eligible": item_doc is not None,
+        "research_validation_errors": (
+            [] if item_doc is not None else ["ITEM_NOT_FOUND_IN_CANONICAL_BANK"]
+        ),
         "student_id": request.student_id,
         "session_id": request.session_id,
         "event_id": request.event_id,
