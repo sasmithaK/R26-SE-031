@@ -10,6 +10,7 @@ import '../shared_widgets/shared_celebration_popup.dart';
 import '../../../services/tts_service.dart';
 import '../../../adaptive/controllers/adaptive_choice_controller.dart';
 import '../../../adaptive/models/adaptive_scaffold_models.dart';
+import 'skill2_round_resolver.dart';
 
 /// Activity 2: එක සමාන අකුරු (Matching Similar Letters)
 class Skill2Act2IdenticalMatch extends StatefulWidget {
@@ -29,7 +30,6 @@ class Skill2Act2IdenticalMatch extends StatefulWidget {
 }
 
 class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
-  String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   List<String> _topLetters = [];
@@ -43,6 +43,7 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
   bool _activityComplete = false;
   int _currentRoundIndex = 0;
   String? _currentVariantId;
+  String _currentItemId = '';
   final AdaptiveChoiceController<String> _pairController =
       AdaptiveChoiceController<String>();
   final Map<String, String> _pairIdByLetter = <String, String>{};
@@ -64,35 +65,26 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
     }
     _initRound();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playCurrentInstruction(autoPlay: true);
+      if (Skill2RoundResolver.shouldAutoplayActivityIntroduction(
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
+      )) {
+        _playCurrentInstruction();
+      }
     });
   }
 
   void _initRound() {
     var rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
-      final currentRound = rounds[_currentRoundIndex];
-
-      List<dynamic> lettersList = [];
-      if (currentRound is Map && currentRound.containsKey('content')) {
-        if (_currentVariantId != null) {
-          final variants =
-              currentRound['adaptive_variants'] as List<dynamic>? ?? [];
-          final variant = variants.firstWhere(
-            (v) => v['variant_id'] == _currentVariantId,
-            orElse: () => null,
-          );
-          if (variant != null && variant['content'] != null) {
-            lettersList = variant['content']['letters'] ?? [];
-          } else {
-            lettersList = currentRound['content']['letters'] ?? [];
-          }
-        } else {
-          lettersList = currentRound['content']['letters'] ?? [];
-        }
-      } else if (currentRound is Map) {
-        lettersList = currentRound['letters'] ?? [];
-      }
+      final resolved = Skill2RoundResolver.resolve(
+        activity: widget.activityNode,
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
+      );
+      _currentItemId = resolved.itemId;
+      _currentVariantId = resolved.variantId;
+      final lettersList = resolved.data['letters'] as List<dynamic>? ?? [];
 
       _topLetters = List<String>.from(lettersList);
       _pairIdByLetter
@@ -123,15 +115,6 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
     }
   }
 
-  String get _currentItemId {
-    final core = CanonicalItemResolver.canonicalItemId(
-      skillId: widget.activityNode?.skillId ?? 'skill_2',
-      activityId: widget.activityNode?.id ?? 'act_2',
-      roundNumber: _currentRoundIndex + 1,
-    );
-    return _currentVariantId == null ? core : '$core$_currentVariantId';
-  }
-
   String _pairId(String letter) =>
       _pairIdByLetter[letter] ??
       '${_currentItemId}_PAIR_${letter.codeUnits.join('_')}';
@@ -139,7 +122,7 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
   bool _isRemoved(String letter) =>
       _pairController.removedIds.contains(_pairId(letter));
 
-  void _playCurrentInstruction({bool autoPlay = false}) {
+  void _playCurrentInstruction() {
     final promptText =
         widget.activityNode?.description ?? "එක සමාන අකුරු යුගල තෝරන්න.";
     String spokenInstruction = promptText
@@ -153,10 +136,6 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
           (match) => '${match.group(1)}, පින්තූරය',
         );
 
-    if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
-      return;
-    }
-    _lastSpokenInstruction = spokenInstruction;
     TtsService().speak(spokenInstruction, folder: 'skill_2');
   }
 
@@ -206,20 +185,10 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
       final nextItem = CanonicalItemResolver.normalizeItemId(
         nextAction['next_item']?.toString() ?? "",
       );
-      final regex = RegExp(
-        r'^S(\d+)A(\d+)R(\d+)(V\d+)?$',
-        caseSensitive: false,
-      );
-      final match = regex.firstMatch(nextItem);
-
-      if (match != null) {
-        final pRound = int.tryParse(match.group(3) ?? '');
-        final pVariant = match.group(4);
-
-        if (pRound != null) {
-          _currentRoundIndex = pRound - 1;
-          _currentVariantId = pVariant;
-        }
+      final nextRound = Skill2RoundResolver.roundIndexFromItemId(nextItem);
+      if (nextRound != null) {
+        _currentRoundIndex = nextRound;
+        _currentVariantId = Skill2RoundResolver.variantFromItemId(nextItem);
       }
     } else {
       if (_currentRoundIndex < totalRounds - 1) {
@@ -249,7 +218,6 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
           ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
         }
         _initRound();
-        _playCurrentInstruction(autoPlay: true);
       });
     }
   }
@@ -334,7 +302,11 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
 
       final scaffoldResult = await context
           .findAncestorStateOfType<TelemetryWrapperState>()
-          ?.registerAdaptiveWrongAttempt(extraTelemetry: extraTelemetry);
+          ?.registerAdaptiveWrongAttempt(
+            itemId: _currentItemId,
+            currentRoundIndex: _currentRoundIndex,
+            extraTelemetry: extraTelemetry,
+          );
 
       if (scaffoldResult != null &&
           scaffoldResult.containsKey('next_action') &&

@@ -12,6 +12,7 @@ import '../../../services/tts_service.dart';
 import '../../../adaptive/controllers/adaptive_choice_controller.dart';
 import '../../../adaptive/models/adaptive_scaffold_models.dart';
 import '../../../adaptive/widgets/adaptive_answer_pool.dart';
+import 'skill2_round_resolver.dart';
 
 class Skill2Act1OddOneOut extends StatefulWidget {
   final ActivityNode? activityNode;
@@ -30,7 +31,6 @@ class Skill2Act1OddOneOut extends StatefulWidget {
 }
 
 class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
-  String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
   int _currentRoundIndex = 0;
   bool _isRoundComplete = false;
@@ -45,6 +45,8 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
   final AdaptiveChoiceController<int> _choiceController =
       AdaptiveChoiceController<int>();
   String? _currentVariantId;
+  String _currentItemId = '';
+  Map<String, dynamic> _activeRoundData = <String, dynamic>{};
 
   // No randomized colors; we use clean, readable white/cream tiles
 
@@ -65,17 +67,17 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     }
     _setupRound();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playCurrentInstruction(autoPlay: true);
+      if (Skill2RoundResolver.shouldAutoplayActivityIntroduction(
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
+      )) {
+        _playCurrentInstruction();
+      }
     });
   }
 
-  void _playCurrentInstruction({bool autoPlay = false}) {
+  void _playCurrentInstruction() {
     String spokenInstruction = 'කොටුවේ පෙන්වා ඇති අකුර සොයන්න.';
-
-    if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
-      return;
-    }
-    _lastSpokenInstruction = spokenInstruction;
     TtsService().speak(spokenInstruction, folder: 'skill_2');
   }
 
@@ -89,28 +91,16 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
   void _setupRound() {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
-      final currentRound = rounds[_currentRoundIndex];
+      final resolved = Skill2RoundResolver.resolve(
+        activity: widget.activityNode,
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
+      );
+      _currentItemId = resolved.itemId;
+      _currentVariantId = resolved.variantId;
+      _activeRoundData = resolved.data;
 
-      List<dynamic> rawItems = [];
-      if (currentRound.containsKey('content')) {
-        if (_currentVariantId != null) {
-          final variants =
-              currentRound['adaptive_variants'] as List<dynamic>? ?? [];
-          final variant = variants.firstWhere(
-            (v) => v['variant_id'] == _currentVariantId,
-            orElse: () => null,
-          );
-          if (variant != null && variant['content'] != null) {
-            rawItems = variant['content']['items'] ?? [];
-          } else {
-            rawItems = currentRound['content']['items'] ?? [];
-          }
-        } else {
-          rawItems = currentRound['content']['items'] ?? [];
-        }
-      } else {
-        rawItems = currentRound['items'] as List<dynamic>? ?? [];
-      }
+      final rawItems = _activeRoundData['items'] as List<dynamic>? ?? [];
       final items = rawItems.asMap().entries.map((entry) {
         final item = Map<String, dynamic>.from(entry.value as Map);
         item['option_id'] ??= '${_canonicalItemId()}_O${entry.key + 1}';
@@ -121,7 +111,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       items.shuffle(Random());
       _shuffledItems = items;
 
-      final targetLetter = currentRound['target_letter']?.toString();
+      final targetLetter = _activeRoundData['target_letter']?.toString();
 
       // Count targets (support both new 'is_target' boolean and old 'target_letter' string)
       _targetCount = items.where((item) {
@@ -150,6 +140,8 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     } else {
       _shuffledItems = [];
       _targetCount = 0;
+      _currentItemId = '';
+      _activeRoundData = <String, dynamic>{};
     }
 
     _foundIndices.clear();
@@ -158,12 +150,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
   }
 
   String _canonicalItemId() {
-    final core = CanonicalItemResolver.canonicalItemId(
-      skillId: widget.activityNode?.skillId ?? 'skill_2',
-      activityId: widget.activityNode?.id ?? 'act_1',
-      roundNumber: _currentRoundIndex + 1,
-    );
-    return _currentVariantId == null ? core : '$core$_currentVariantId';
+    return _currentItemId;
   }
 
   String _optionId(int index) =>
@@ -193,17 +180,8 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
 
       if (nextAction['next_item'] != null) {
         String nextItem = nextAction['next_item'];
-        if (nextItem.contains('V')) {
-          _currentVariantId = nextItem.split('V').last;
-          _currentVariantId = 'V$_currentVariantId';
-        } else {
-          _currentVariantId = null;
-        }
-
-        final match = RegExp(r'R(\d+)').firstMatch(nextItem);
-        if (match != null) {
-          nextIdx = int.parse(match.group(1)!) - 1;
-        }
+        _currentVariantId = Skill2RoundResolver.variantFromItemId(nextItem);
+        nextIdx = Skill2RoundResolver.roundIndexFromItemId(nextItem);
       }
     }
 
@@ -230,7 +208,6 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
           ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
         }
         _setupRound();
-        _playCurrentInstruction(autoPlay: true);
       });
     } else {
       setState(() {
@@ -252,8 +229,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       return;
 
     final item = _shuffledItems[index];
-    final currentRound = widget.activityNode?.rounds[_currentRoundIndex] ?? {};
-    final targetLetter = currentRound['target_letter']?.toString();
+    final targetLetter = _activeRoundData['target_letter']?.toString();
 
     final isCorrect =
         item['is_target'] == true ||
@@ -277,6 +253,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
               100,
               currentRoundIndex: _currentRoundIndex,
               itemId: _canonicalItemId(),
+              selectedAnswers: _foundIndices.map(_optionId).toList(),
             );
 
         Future.delayed(const Duration(milliseconds: 1500), () {
@@ -308,7 +285,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
         "incorrect_option_ids": List.generate(_shuffledItems.length, (i) => i)
             .where((i) {
               final it = _shuffledItems[i];
-              final tg = currentRound['target_letter']?.toString();
+              final tg = _activeRoundData['target_letter']?.toString();
               final isTarget =
                   it['is_target'] == true ||
                   (it['is_target'] == null && it['value'] == tg);
@@ -320,7 +297,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
         "remaining_target_ids": List.generate(_shuffledItems.length, (i) => i)
             .where((i) {
               final it = _shuffledItems[i];
-              final tg = currentRound['target_letter']?.toString();
+              final tg = _activeRoundData['target_letter']?.toString();
               return (it['is_target'] == true ||
                       (it['is_target'] == null && it['value'] == tg)) &&
                   !_foundIndices.contains(i);
@@ -348,6 +325,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
           .findAncestorStateOfType<TelemetryWrapperState>()
           ?.registerAdaptiveWrongAttempt(
             currentRoundIndex: _currentRoundIndex,
+            itemId: _canonicalItemId(),
             extraTelemetry: extraTelemetry,
           );
 
@@ -390,14 +368,11 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       return const Scaffold(body: Center(child: Text('No rounds available')));
     }
 
-    final currentRound = rounds[_currentRoundIndex];
     final promptText = 'කොටුවේ පෙන්වා ඇති අකුර සොයන්න.';
     final titleText = widget.activityNode?.title ?? 'නිවැරදි අකුර සොයමු';
 
     String? targetLetter;
-    final itemsList = currentRound.containsKey('content')
-        ? currentRound['content']['items']
-        : currentRound['items'];
+    final itemsList = _activeRoundData['items'];
     if (itemsList != null) {
       List<String> uniqueLetters = [];
       for (var item in itemsList) {
@@ -457,12 +432,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
         context
             .findAncestorStateOfType<TelemetryWrapperState>()
             ?.logAudioReplay();
-        String spokenInstruction = instruction
-            .replaceAll('මා', 'ම')
-            .replaceAll('\'ම\' අකුර', 'ම, අකුර')
-            .replaceAll('ම අකුර', 'ම, අකුර')
-            .replaceAll('ම පින්තූරය', 'ම, පින්තූරය');
-        TtsService().speak('කොටුවේ පෙන්වා ඇති අකුර සොයන්න.', folder: 'skill_2');
+        _playCurrentInstruction();
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
