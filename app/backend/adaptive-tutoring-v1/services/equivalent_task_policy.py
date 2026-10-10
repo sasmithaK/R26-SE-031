@@ -66,6 +66,7 @@ class EquivalentTaskPolicy:
         state: Optional[Dict[str, Any]],
         policy_reason: list[str],
         has_reduced_remediation: bool = True,
+        has_floor_remediation: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Return a forced equivalent item, or ``None`` for normal selection."""
         match = ITEM_RE.fullmatch(current_item_id or "")
@@ -119,6 +120,25 @@ class EquivalentTaskPolicy:
                 )
 
             if not has_reduced_remediation:
+                if has_floor_remediation:
+                    state["remediation_origin_difficulty_b"] = current_b
+                    policy_reason.extend([
+                        "CORE_ASSISTED_OR_FAILED",
+                        "NO_VALID_LOWER_LOAD_ITEM",
+                        "UNSEEN_FLOOR_REMEDIATION_REQUIRED",
+                    ])
+                    return self._result(
+                        activity_id=activity_id,
+                        next_item=f"{core_item}V1",
+                        next_phase="REMEDIATION",
+                        decision="REMEDIATION",
+                        current_b=current_b,
+                        state=state,
+                        reasons=policy_reason,
+                        confirmation_required=False,
+                        target_b=current_b,
+                        difficulty_direction="MAINTAIN",
+                    )
                 policy_reason.extend([
                     "CORE_ASSISTED_OR_FAILED",
                     "NO_VALID_LOWER_LOAD_ITEM",
