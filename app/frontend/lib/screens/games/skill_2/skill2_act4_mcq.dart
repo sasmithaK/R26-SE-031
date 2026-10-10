@@ -10,6 +10,7 @@ import '../../../services/progress_service.dart';
 import '../shared_widgets/shared_celebration_popup.dart';
 import '../../../adaptive/controllers/adaptive_choice_controller.dart';
 import '../../../adaptive/models/adaptive_scaffold_models.dart';
+import 'skill2_round_resolver.dart';
 
 /// Activity 4: වචනයට සවන් දී පින්තූරය සොයමු (Listen to Word & Find Image)
 /// Template: audio_image_match_game
@@ -29,7 +30,7 @@ class Skill2Act4Mcq extends StatefulWidget {
 }
 
 class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
-  String _lastSpokenInstruction = '';
+  final Skill2ItemAutoplayGate _autoplayGate = Skill2ItemAutoplayGate();
   final AudioPlayer _audioPlayer = AudioPlayer();
   final Set<int> _selectedIndices = {};
   final AdaptiveChoiceController<int> _choiceController =
@@ -37,6 +38,7 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
 
   bool _isCorrect = false;
   bool _activityComplete = false;
+  bool _audioPromptActive = false;
   int _attemptCount = 0;
   int _currentRoundIndex = 0;
   String _currentItemId = '';
@@ -73,35 +75,14 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
   void _setupRound() {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
-      final currentRound = rounds[_currentRoundIndex];
-      _currentItemId = CanonicalItemResolver.normalizeItemId(
-        currentRound['item_id']?.toString() ??
-            CanonicalItemResolver.canonicalItemId(
-              skillId: widget.activityNode?.skillId ?? 'skill_2',
-              activityId: widget.activityNode?.id ?? 'act_4',
-              roundNumber: _currentRoundIndex + 1,
-            ),
+      final resolved = Skill2RoundResolver.resolve(
+        activity: widget.activityNode,
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
       );
-
-      Map<String, dynamic> roundData = currentRound;
-
-      // If a variant is selected by C4, load its data instead
-      if (_currentVariantId != null &&
-          currentRound.containsKey('adaptive_variants')) {
-        final variants =
-            currentRound['adaptive_variants'] as List<dynamic>? ?? [];
-        final variant = variants.firstWhere(
-          (v) => v['variant_id'] == _currentVariantId,
-          orElse: () => null,
-        );
-        if (variant != null && variant.containsKey('content')) {
-          roundData = variant['content'] as Map<String, dynamic>;
-          _currentItemId =
-              variant['item_id']?.toString() ??
-              roundData['item_id']?.toString() ??
-              '';
-        }
-      }
+      _currentItemId = resolved.itemId;
+      _currentVariantId = resolved.variantId;
+      final roundData = resolved.data;
 
       _promptText =
           roundData['prompt']?.toString() ?? 'අසා සිටින පින්තූරය තෝරන්න';
@@ -152,7 +133,7 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
     super.dispose();
   }
 
-  void _playAudioPrompt({bool autoPlay = false}) {
+  Future<void> _playAudioPrompt({bool autoPlay = false}) async {
     String spokenInstruction = _promptText
         .replaceAll('මා', 'ම')
         .replaceAllMapped(
@@ -168,11 +149,32 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
           (match) => ' ${match.group(1)}යන්න තෝරන්න',
         );
 
-    if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
+    if (autoPlay && !_autoplayGate.shouldPlay(_currentItemId)) {
       return;
     }
-    _lastSpokenInstruction = spokenInstruction;
-    TtsService().speak(spokenInstruction, folder: 'skill_2');
+
+    final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+    wrapper?.pauseHesitationTimer();
+    if (mounted) {
+      setState(() => _audioPromptActive = true);
+    }
+    try {
+      await TtsService().speak(
+        spokenInstruction,
+        folder: 'skill_2',
+        waitUntilComplete: true,
+      );
+    } finally {
+      if (mounted) {
+        if (autoPlay) {
+          // Do not treat server/download/audio time as Grade-1 response time.
+          wrapper?.resetRoundTimers();
+        } else {
+          wrapper?.resumeHesitationTimer();
+        }
+        setState(() => _audioPromptActive = false);
+      }
+    }
   }
 
   void _transitionToNextRound(Map<String, dynamic>? nextAction) {
@@ -185,24 +187,13 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
     setState(() {
       if (nextAction != null && nextAction.containsKey('next_item')) {
         final nextItem = nextAction['next_item'].toString();
-
-        // Extract round number from strings like S2A4R01 or S2A4R01V1
-        final regex = RegExp(r'R(\d+)');
-        final match = regex.firstMatch(nextItem);
-        if (match != null && match.group(1) != null) {
-          int roundNum =
-              int.tryParse(match.group(1)!) ?? (_currentRoundIndex + 1);
-          _currentRoundIndex = roundNum - 1; // 0-indexed
+        final nextRound = Skill2RoundResolver.roundIndexFromItemId(nextItem);
+        if (nextRound != null) {
+          _currentRoundIndex = nextRound;
         } else {
           _currentRoundIndex++;
         }
-
-        if (nextItem.contains('V1'))
-          _currentVariantId = 'V1';
-        else if (nextItem.contains('V2'))
-          _currentVariantId = 'V2';
-        else
-          _currentVariantId = null;
+        _currentVariantId = Skill2RoundResolver.variantFromItemId(nextItem);
       } else {
         _currentVariantId = null;
         _currentRoundIndex++;
@@ -238,7 +229,9 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
   }
 
   void _checkAnswer(int index) async {
-    if (_isCorrect || _choiceController.removedIds.contains(_optionId(index)))
+    if (_audioPromptActive ||
+        _isCorrect ||
+        _choiceController.removedIds.contains(_optionId(index)))
       return;
 
     final bool wasSelected = _selectedIndices.contains(index);
@@ -608,7 +601,9 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
 
                               return GestureDetector(
                                 key: ValueKey(_optionId(index)),
-                                onTap: () => _checkAnswer(index),
+                                onTap: _audioPromptActive
+                                    ? null
+                                    : () => _checkAnswer(index),
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 250),
                                   width: hasLongText ? null : itemSize,
@@ -709,6 +704,7 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
   Widget _buildInstructionCard(String instruction) {
     return GestureDetector(
       onTap: () async {
+        if (_audioPromptActive) return;
         context
             .findAncestorStateOfType<TelemetryWrapperState>()
             ?.logAudioReplay();

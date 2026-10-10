@@ -12,6 +12,7 @@ import '../../../services/tts_service.dart';
 import '../../../adaptive/controllers/adaptive_choice_controller.dart';
 import '../../../adaptive/models/adaptive_scaffold_models.dart';
 import '../../../adaptive/widgets/adaptive_answer_pool.dart';
+import 'skill2_round_resolver.dart';
 
 /// Activity 5: අකුරු මතකයෙන් සකසමු (Remember the Pattern)
 /// Template: pattern_memory_game
@@ -33,7 +34,7 @@ class Skill2Act5PatternMemory extends StatefulWidget {
 
 class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
     with SingleTickerProviderStateMixin {
-  Set<String> _spokenInstructions = {};
+  final Skill2ItemAutoplayGate _autoplayGate = Skill2ItemAutoplayGate();
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isMemorizing = true;
   int _countdown = 3;
@@ -47,6 +48,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
 
   String _currentItemId = '';
   String? _currentVariantId;
+  Map<String, dynamic> _activeRoundData = <String, dynamic>{};
 
   String? _wrongTappedOption;
   String? _correctTappedOption;
@@ -77,35 +79,17 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
   void _setupRound() {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
-      final currentRound = rounds[_currentRoundIndex];
-      _currentItemId = CanonicalItemResolver.normalizeItemId(
-        currentRound['item_id']?.toString() ??
-            CanonicalItemResolver.canonicalItemId(
-              skillId: widget.activityNode?.skillId ?? 'skill_2',
-              activityId: widget.activityNode?.id ?? 'act_5',
-              roundNumber: _currentRoundIndex + 1,
-            ),
+      final resolved = Skill2RoundResolver.resolve(
+        activity: widget.activityNode,
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
       );
-
-      // If a variant is selected by C4, load its data instead
-      if (_currentVariantId != null &&
-          currentRound.containsKey('adaptive_variants')) {
-        final variants =
-            currentRound['adaptive_variants'] as List<dynamic>? ?? [];
-        final variant = variants.firstWhere(
-          (v) => v['variant_id'] == _currentVariantId,
-          orElse: () => null,
-        );
-        if (variant != null && variant.containsKey('content')) {
-          final variantId = variant['variant_id']?.toString();
-          final variantItemId = variant['item_id']?.toString();
-          _currentItemId = CanonicalItemResolver.normalizeItemId(
-            variantItemId != null && variantItemId.isNotEmpty
-                ? variantItemId
-                : '${_currentItemId}_${variantId ?? 'variant'}',
-          );
-        }
-      }
+      _currentItemId = resolved.itemId;
+      _currentVariantId = resolved.variantId;
+      _activeRoundData = resolved.data;
+    } else {
+      _currentItemId = '';
+      _activeRoundData = <String, dynamic>{};
     }
     final data = _getCurrentRoundData();
     final pattern =
@@ -146,25 +130,13 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
   }
 
   Map<String, dynamic> _getCurrentRoundData() {
-    final rounds = _rounds;
-    if (rounds.isEmpty || _currentRoundIndex >= rounds.length) return {};
-
-    Map<String, dynamic> roundData = rounds[_currentRoundIndex];
-    if (_currentVariantId != null &&
-        roundData.containsKey('adaptive_variants')) {
-      final variants = roundData['adaptive_variants'] as List<dynamic>? ?? [];
-      final variant = variants.firstWhere(
-        (v) => v['variant_id'] == _currentVariantId,
-        orElse: () => null,
-      );
-      if (variant != null && variant.containsKey('content')) {
-        roundData = variant['content'] as Map<String, dynamic>;
-      }
-    }
-    return roundData;
+    return _activeRoundData;
   }
 
-  void _playCurrentInstruction({bool autoPlay = false}) {
+  Future<void> _playCurrentInstruction({
+    bool autoPlay = false,
+    bool waitUntilComplete = false,
+  }) async {
     final promptText = _isMemorizing
         ? 'රටාව මතක තබා ගන්න!'
         : 'රටාව නැවත සකසන්න';
@@ -179,16 +151,37 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
           (match) => '${match.group(1)}, පින්තූරය',
         );
 
-    if (autoPlay && _spokenInstructions.contains(spokenInstruction)) {
+    final phase = _isMemorizing ? 'memorize' : 'recall';
+    if (autoPlay && !_autoplayGate.shouldPlay('$_currentItemId:$phase')) {
       return;
     }
-    _spokenInstructions.add(spokenInstruction);
-    TtsService().speak(spokenInstruction, folder: 'skill_2');
+
+    final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+    final isManualReplay = !autoPlay;
+    if (isManualReplay) {
+      wrapper?.pauseHesitationTimer();
+    }
+
+    try {
+      await TtsService().speak(
+        spokenInstruction,
+        folder: 'skill_2',
+        // A manual replay is learner-requested listening time, so wait for it
+        // to finish before restarting hesitation measurement.
+        waitUntilComplete: waitUntilComplete || isManualReplay,
+      );
+    } finally {
+      if (isManualReplay && mounted) {
+        wrapper?.resumeHesitationTimer();
+      }
+    }
   }
 
   void _startMemorizeTimer() {
     final roundData = _getCurrentRoundData();
     if (roundData.isEmpty) return;
+    final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+    wrapper?.pauseHesitationTimer();
 
     final showSeconds = (roundData['show_seconds'] as int?) ?? 4;
 
@@ -206,7 +199,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
     _timerController.forward(from: 0.0);
 
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (_countdown > 1) {
         setState(() {
           _countdown--;
@@ -216,12 +209,10 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
         setState(() {
           _isMemorizing = false;
         });
-        _playCurrentInstruction(autoPlay: true);
+        await _playCurrentInstruction(autoPlay: true, waitUntilComplete: true);
 
         // Reset telemetry timers so memorization time isn't counted as hesitation/latency
-        final wrapper = context
-            .findAncestorStateOfType<TelemetryWrapperState>();
-        wrapper?.resetRoundTimers();
+        wrapper?.resetRoundTimers(clearPreResponseEvidence: true);
       }
     });
   }
@@ -236,22 +227,13 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
     setState(() {
       if (nextAction != null && nextAction.containsKey('next_item')) {
         final nextItem = nextAction['next_item'].toString();
-        final regex = RegExp(r'R(\d+)');
-        final match = regex.firstMatch(nextItem);
-        if (match != null && match.group(1) != null) {
-          int roundNum =
-              int.tryParse(match.group(1)!) ?? (_currentRoundIndex + 1);
-          _currentRoundIndex = roundNum - 1;
+        final nextRound = Skill2RoundResolver.roundIndexFromItemId(nextItem);
+        if (nextRound != null) {
+          _currentRoundIndex = nextRound;
         } else {
           _currentRoundIndex++;
         }
-
-        if (nextItem.contains('V1'))
-          _currentVariantId = 'V1';
-        else if (nextItem.contains('V2'))
-          _currentVariantId = 'V2';
-        else
-          _currentVariantId = null;
+        _currentVariantId = Skill2RoundResolver.variantFromItemId(nextItem);
       } else {
         _currentVariantId = null;
         _currentRoundIndex++;
@@ -681,7 +663,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
         context
             .findAncestorStateOfType<TelemetryWrapperState>()
             ?.logAudioReplay();
-        _playCurrentInstruction();
+        await _playCurrentInstruction();
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
