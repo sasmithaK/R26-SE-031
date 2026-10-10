@@ -112,6 +112,102 @@ async def test_retried_session_is_idempotent(client, mock_db, mock_user):
 
 
 @pytest.mark.asyncio
+async def test_skill_two_lineage_is_validated_against_item_bank(
+    client, mock_db, mock_user
+):
+    student_id = MOCK_TELEMETRY_PAYLOAD["student_id"]
+    await mock_db.students.insert_one(
+        {"_id": ObjectId(student_id), "parent_id": mock_user["_id"]}
+    )
+    await mock_db.item_bank.insert_one({
+        "item_id": "S2A1R01",
+        "skill_id": "skill_2",
+        "activity_id": "2.1",
+        "knowledge_component_id": "KC_LETTER_IDENTIFICATION",
+        "prompt_modality": "visual",
+        "response_modality": "tap",
+        "item_role": "CORE",
+        "equivalent_group_id": "S2A1R01",
+        "response_load_relation": "core",
+        "difficulty_label": "easy",
+        "difficulty_b": -1.0,
+        "is_anchor": False,
+        "item_version": 2,
+        "is_active": True,
+    })
+
+    response = client.post(
+        "/api/v1/auth/telemetry",
+        json=MOCK_TELEMETRY_PAYLOAD,
+    )
+    assert response.status_code == 201
+
+    stored = await mock_db.telemetry_events.find_one({"event_id": "test_evt_1"})
+    assert stored["item_id"] == "S2A1R01"
+    assert stored["knowledge_component_id"] == "KC_LETTER_IDENTIFICATION"
+    assert stored["item_role"] == "CORE"
+    assert stored["response_load_relation"] == "core"
+    assert stored["difficulty_b"] == -1.0
+    assert stored["item_version"] == 2
+    assert stored["research_eligible"] is False
+    assert "KNOWLEDGE_COMPONENT_ID_MISMATCH" in (
+        stored["research_validation_errors"]
+    )
+    assert stored["submitted_knowledge_component_id"] == "KC_AKSHARA_IDENTITY"
+
+
+@pytest.mark.asyncio
+async def test_canonical_skill_two_lineage_is_research_eligible(
+    client, mock_db, mock_user
+):
+    student_id = MOCK_TELEMETRY_PAYLOAD["student_id"]
+    await mock_db.students.insert_one(
+        {"_id": ObjectId(student_id), "parent_id": mock_user["_id"]}
+    )
+    bank_item = {
+        "item_id": "S2A1R01V1",
+        "skill_id": "skill_2",
+        "activity_id": "2.1",
+        "knowledge_component_id": "KC_LETTER_IDENTIFICATION",
+        "prompt_modality": "visual",
+        "response_modality": "tap",
+        "item_role": "REMEDIATION",
+        "equivalent_group_id": "S2A1R01",
+        "response_load_relation": "reduced",
+        "difficulty_label": "easy",
+        "difficulty_b": -1.5,
+        "is_anchor": False,
+        "item_version": 2,
+        "is_active": True,
+    }
+    await mock_db.item_bank.insert_one(bank_item)
+    payload = copy.deepcopy(MOCK_TELEMETRY_PAYLOAD)
+    payload["session_id"] = "canonical-skill2-session"
+    event = payload["events"][0]
+    event.update({
+        "event_id": "canonical-skill2-session:S2A1R01V1:complete",
+        "activity_id": "act_1",
+        "item_id": "S2A1R01V1",
+        "knowledge_component_id": "KC_LETTER_IDENTIFICATION",
+        "item_role": "REMEDIATION",
+        "equivalent_group_id": "S2A1R01",
+        "response_load_relation": "reduced",
+        "difficulty_label": "easy",
+        "difficulty_b": -1.5,
+        "is_anchor": False,
+        "item_version": 2,
+    })
+
+    response = client.post("/api/v1/auth/telemetry", json=payload)
+    assert response.status_code == 201
+    stored = await mock_db.telemetry_events.find_one({
+        "event_id": event["event_id"],
+    })
+    assert stored["research_eligible"] is True
+    assert stored["research_validation_errors"] == []
+
+
+@pytest.mark.asyncio
 async def test_session_numbers_advance_and_retry_keeps_original_number(
     client, mock_db, mock_user
 ):
