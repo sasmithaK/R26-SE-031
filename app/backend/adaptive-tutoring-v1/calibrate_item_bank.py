@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from collections import Counter
 from datetime import datetime, timezone
 
@@ -12,6 +13,9 @@ from pymongo import MongoClient
 
 from services.rasch_calibration import fit_rasch
 from services.bkt_calibration import fit_bkt_by_kc
+
+
+SKILL_TWO_ITEM_RE = re.compile(r"^S2A\d+R\d{2}(?:V\d+)?$")
 
 
 def _is_canonical_completion(event: dict) -> bool:
@@ -45,11 +49,20 @@ def _canonical_completion_events(db, projection: dict):
         "phase": 1,
         "is_abandoned": 1,
         "final_correct": 1,
+        "research_eligible": 1,
+        "knowledge_component_id": 1,
+        "item_role": 1,
+        "equivalent_group_id": 1,
+        "item_version": 1,
+        "difficulty_b": 1,
     }
+    skill_two_bank = _skill_two_item_bank(db)
     seen_event_ids = set()
     seen_observations = set()
     for event in db.telemetry_events.find({}, projection):
         if not _is_canonical_completion(event):
+            continue
+        if not _is_research_eligible(event, skill_two_bank):
             continue
         event_id = event.get("event_id")
         if event_id in seen_event_ids:
@@ -64,6 +77,69 @@ def _canonical_completion_events(db, projection: dict):
         seen_event_ids.add(event_id)
         seen_observations.add(observation_key)
         yield event
+
+
+def _skill_two_item_bank(db) -> dict[str, dict]:
+    """Return the canonical Skill 2 bank when the database provides it.
+
+    Small unit-test doubles written before the item-bank integration have no
+    ``item_bank`` attribute; those tests retain their legacy filtering path.
+    """
+    try:
+        collection = db.item_bank
+    except AttributeError:
+        return {}
+    return {
+        item["item_id"]: item
+        for item in collection.find(
+            {"skill_id": "skill_2", "is_active": {"$ne": False}},
+            {
+                "item_id": 1,
+                "knowledge_component_id": 1,
+                "item_role": 1,
+                "equivalent_group_id": 1,
+                "item_version": 1,
+                "difficulty_b": 1,
+            },
+        )
+    }
+
+
+def _is_research_eligible(event: dict, skill_two_bank: dict[str, dict]) -> bool:
+    if event.get("research_eligible") is False:
+        return False
+    item_id = str(event.get("item_id") or "")
+    if not item_id.startswith("S2") and not item_id.startswith("s2"):
+        return True
+    if not SKILL_TWO_ITEM_RE.fullmatch(item_id.upper()):
+        return False
+    if not skill_two_bank:
+        return True
+    bank_item = skill_two_bank.get(item_id.upper())
+    if bank_item is None:
+        return False
+    if event.get("knowledge_component_id") != bank_item.get(
+        "knowledge_component_id"
+    ):
+        return False
+    if event.get("item_role") != bank_item.get("item_role"):
+        return False
+    if event.get("equivalent_group_id") != bank_item.get(
+        "equivalent_group_id"
+    ):
+        return False
+    try:
+        if int(event.get("item_version")) != int(bank_item.get("item_version")):
+            return False
+    except (TypeError, ValueError):
+        return False
+    try:
+        return abs(
+            float(event.get("difficulty_b"))
+            - float(bank_item.get("difficulty_b"))
+        ) < 1e-9
+    except (TypeError, ValueError):
+        return False
 
 
 def _independent_responses(db) -> list[dict]:
