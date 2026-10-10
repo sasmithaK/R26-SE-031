@@ -11,6 +11,7 @@ import '../shared_widgets/shared_celebration_popup.dart';
 import '../../../adaptive/controllers/adaptive_choice_controller.dart';
 import '../../../adaptive/models/adaptive_scaffold_models.dart';
 import '../../../adaptive/widgets/adaptive_answer_pool.dart';
+import 'skill2_round_resolver.dart';
 
 class Skill2Act3Audio extends StatefulWidget {
   final ActivityNode? activityNode;
@@ -29,7 +30,8 @@ class Skill2Act3Audio extends StatefulWidget {
 }
 
 class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
-  String _lastSpokenInstruction = '';
+  final Skill2ItemAutoplayGate _autoplayGate = Skill2ItemAutoplayGate();
+  final Skill2PromptReadiness _promptReadiness = Skill2PromptReadiness();
   final AudioPlayer _audioPlayer = AudioPlayer();
   int _currentRoundIndex = 0;
   bool _isRoundComplete = false;
@@ -61,8 +63,8 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
       _currentRoundIndex = 0;
     }
     _setupRound();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playAudioPrompt(autoPlay: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _playAudioPrompt(autoPlay: true);
     });
   }
 
@@ -76,35 +78,15 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
   void _setupRound() {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
-      final currentRound = rounds[_currentRoundIndex];
-      _currentItemId = CanonicalItemResolver.normalizeItemId(
-        currentRound['item_id']?.toString() ??
-            CanonicalItemResolver.canonicalItemId(
-              skillId: widget.activityNode?.skillId ?? 'skill_2',
-              activityId: widget.activityNode?.id ?? 'act_3',
-              roundNumber: _currentRoundIndex + 1,
-            ),
+      final resolved = Skill2RoundResolver.resolve(
+        activity: widget.activityNode,
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
       );
-
-      Map<String, dynamic> roundData = currentRound;
-
-      // If a variant is selected by C4, load its data instead
-      if (_currentVariantId != null &&
-          currentRound.containsKey('adaptive_variants')) {
-        final variants =
-            currentRound['adaptive_variants'] as List<dynamic>? ?? [];
-        final variant = variants.firstWhere(
-          (v) => v['variant_id'] == _currentVariantId,
-          orElse: () => null,
-        );
-        if (variant != null && variant.containsKey('content')) {
-          roundData = variant['content'] as Map<String, dynamic>;
-          _currentItemId =
-              variant['item_id']?.toString() ??
-              roundData['item_id']?.toString() ??
-              '';
-        }
-      }
+      _currentItemId = resolved.itemId;
+      _currentVariantId = resolved.variantId;
+      _promptReadiness.prepare(_currentItemId);
+      final roundData = resolved.data;
 
       _promptText =
           roundData['prompt']?.toString() ?? 'ශබ්දයට සවන්දී අකුර තෝරන්න';
@@ -161,17 +143,8 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
 
       if (nextAction['next_item'] != null) {
         String nextItem = nextAction['next_item'];
-        if (nextItem.contains('V')) {
-          _currentVariantId = nextItem.split('V').last;
-          _currentVariantId = 'V$_currentVariantId';
-        } else {
-          _currentVariantId = null;
-        }
-
-        final match = RegExp(r'R(\d+)').firstMatch(nextItem);
-        if (match != null) {
-          nextIdx = int.parse(match.group(1)!) - 1;
-        }
+        _currentVariantId = Skill2RoundResolver.variantFromItemId(nextItem);
+        nextIdx = Skill2RoundResolver.roundIndexFromItemId(nextItem);
       }
     }
 
@@ -185,13 +158,13 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
     });
 
     if (!_activityComplete) {
-      Future.delayed(const Duration(milliseconds: 300), () {
-        _playAudioPrompt(autoPlay: true);
+      Future.delayed(const Duration(milliseconds: 300), () async {
+        await _playAudioPrompt(autoPlay: true);
       });
     }
   }
 
-  void _playAudioPrompt({bool autoPlay = false}) {
+  Future<void> _playAudioPrompt({bool autoPlay = false}) async {
     String spokenInstruction = _promptText;
 
     if (_promptText.contains("ශබ්දයට සවන් දී අකුර තෝරන්න")) {
@@ -221,11 +194,40 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
           );
     }
 
-    if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
+    if (autoPlay && !_autoplayGate.shouldPlay(_currentItemId)) {
       return;
     }
-    _lastSpokenInstruction = spokenInstruction;
-    TtsService().speak(spokenInstruction, folder: 'skill_2');
+    if (_promptReadiness.isLoading) return;
+
+    final requestItemId = _currentItemId;
+    final requestToken = _promptReadiness.begin(requestItemId);
+    final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+    wrapper?.pauseHesitationTimer();
+    if (mounted) setState(() {});
+
+    final didPlay = await TtsService().speak(
+      spokenInstruction,
+      folder: 'skill_2',
+      waitUntilComplete: true,
+    );
+    if (!mounted ||
+        !_promptReadiness.finish(
+          itemId: requestItemId,
+          requestToken: requestToken,
+          didPlay: didPlay,
+        )) {
+      return;
+    }
+
+    setState(() {});
+    if (didPlay) {
+      if (autoPlay) {
+        // Required stimulus delivery is not part of the child's response time.
+        wrapper?.resetRoundTimers(clearPreResponseEvidence: true);
+      } else {
+        wrapper?.resumeHesitationTimer();
+      }
+    }
   }
 
   void _checkAnswer(int index) async {
@@ -454,10 +456,11 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
   Widget _buildInstructionCard(String instruction) {
     return GestureDetector(
       onTap: () async {
+        if (_promptReadiness.isLoading) return;
         context
             .findAncestorStateOfType<TelemetryWrapperState>()
             ?.logAudioReplay();
-        _playAudioPrompt();
+        await _playAudioPrompt();
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
