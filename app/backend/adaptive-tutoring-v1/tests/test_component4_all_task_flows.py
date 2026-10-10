@@ -8,6 +8,13 @@ from tests.conftest import mock_db
 
 
 SKILLS = {"skill_1", "skill_2", "skill_3", "skill_4"}
+SKILL2_KCS = {
+    "2.1": "KC_LETTER_IDENTIFICATION",
+    "2.2": "KC_LETTER_MATCHING",
+    "2.3": "KC_PHONEME_LETTER_MAPPING",
+    "2.4": "KC_LETTER_DECODING",
+    "2.5": "KC_LETTER_MEMORY",
+}
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -30,7 +37,40 @@ def _decide(core, item_id, quality, state):
         state=state,
         policy_reason=[f"RESPONSE_QUALITY: {quality}"],
         has_reduced_remediation=core["has_reduced_remediation"],
+        has_floor_remediation=core.get("has_floor_remediation", False),
     )
+
+
+def _complete_skill_two_item(
+    client,
+    *,
+    student_id,
+    session_id,
+    activity_id,
+    item_id,
+    assisted=False,
+    event_suffix="complete",
+):
+    response = client.post("/update_interaction", json={
+        "student_id": student_id,
+        "session_id": session_id,
+        "event_id": f"{session_id}:{item_id}:{event_suffix}",
+        "skill_id": "skill_2",
+        "activity_id": activity_id,
+        "knowledge_component_id": SKILL2_KCS[activity_id],
+        "item_id": item_id,
+        "is_correct": True,
+        "phase": "COMPLETE",
+        "current_session_duration_sec": 20,
+        "telemetry": {
+            "attempt_count": 2 if assisted else 1,
+            "incorrect_attempt_count": 1 if assisted else 0,
+            "first_attempt_correct": not assisted,
+            "scaffold_level_used": 1 if assisted else 0,
+        },
+    })
+    assert response.status_code == 200, (item_id, response.text)
+    return response.json()
 
 
 def test_every_skill_one_to_four_task_has_a_bounded_age_appropriate_flow():
@@ -47,11 +87,13 @@ def test_every_skill_one_to_four_task_has_a_bounded_age_appropriate_flow():
 
         state = {}
         assisted = _decide(core, core["item_id"], "ASSISTED_SUCCESS", state)
-        if core["has_reduced_remediation"]:
+        if core["has_reduced_remediation"] or core.get(
+            "has_floor_remediation", False
+        ):
             remediation_id = f'{core["item_id"]}V1'
             assert assisted["next_item"] == remediation_id, core["item_id"]
             assert assisted["next_phase"] == "REMEDIATION", core["item_id"]
-            assert by_id[remediation_id]["difficulty_b"] < core["difficulty_b"]
+            assert by_id[remediation_id]["difficulty_b"] <= core["difficulty_b"]
             confirmation = _decide(
                 core, remediation_id, "CLEAN_SUCCESS", state
             )
@@ -210,3 +252,164 @@ async def test_every_skill_one_activity_persists_a_terminal_complete_state(clien
         assert activity_state["measurement_stop_reason"] == (
             "CORE_COVERAGE_AND_EQUIVALENT_FLOW_COMPLETE"
         )
+
+
+@pytest.mark.asyncio
+async def test_every_skill_two_task_completes_its_bounded_equivalent_flow(client):
+    """Exercise all 27 Skill 2 core tasks through real API and DB state."""
+    all_items = build_items()
+
+    for activity_id, kc_id in SKILL2_KCS.items():
+        student_id = f"skill2-all-flows-{activity_id}"
+        session_id = f"skill2-session-{activity_id}"
+        cores = sorted(
+            (
+                item
+                for item in all_items
+                if item["activity_id"] == activity_id and item["is_core"]
+            ),
+            key=lambda item: item["round"],
+        )
+        assert len(cores) == (7 if activity_id == "2.1" else 5)
+
+        last_body = None
+        expected_decision_count = 0
+        for core_index, core in enumerate(cores):
+            core_id = core["item_id"]
+            body = _complete_skill_two_item(
+                client,
+                student_id=student_id,
+                session_id=session_id,
+                activity_id=activity_id,
+                item_id=core_id,
+                assisted=True,
+            )
+            expected_decision_count += 1
+            assert body["response_quality"] == "ASSISTED_SUCCESS"
+
+            if core["has_reduced_remediation"] or core.get(
+                "has_floor_remediation", False
+            ):
+                remediation_id = f"{core_id}V1"
+                assert body["next_action"]["decision"] == "REMEDIATION"
+                assert body["next_action"]["next_item"] == remediation_id
+                assert body["next_action"]["next_phase"] == "REMEDIATION"
+                body = _complete_skill_two_item(
+                    client,
+                    student_id=student_id,
+                    session_id=session_id,
+                    activity_id=activity_id,
+                    item_id=remediation_id,
+                )
+                expected_decision_count += 1
+            else:
+                assert "NO_VALID_LOWER_LOAD_ITEM" in (
+                    body["next_action"]["reason_codes"]
+                )
+
+            confirmation_id = f"{core_id}V2"
+            assert body["next_action"]["decision"] == "CONFIRMATION"
+            assert body["next_action"]["next_item"] == confirmation_id
+            assert body["next_action"]["next_phase"] == "CONFIRMATION"
+            body = _complete_skill_two_item(
+                client,
+                student_id=student_id,
+                session_id=session_id,
+                activity_id=activity_id,
+                item_id=confirmation_id,
+            )
+            expected_decision_count += 1
+            last_body = body
+
+            if core_index < len(cores) - 1:
+                assert body["next_action"]["decision"] == "CONTINUE"
+                assert body["next_action"]["next_item"] == (
+                    cores[core_index + 1]["item_id"]
+                )
+
+        assert last_body["next_action"]["decision"] == "ACTIVITY_COMPLETE"
+        assert last_body["next_action"]["next_item"] == "COMPLETE"
+        assert last_body["next_action"]["next_phase"] == "COMPLETE"
+
+        state_doc = await mock_db["knowledge_states"].find_one({
+            "student_id": student_id,
+        })
+        activity_state = state_doc["adaptive_states"][activity_id]
+        assert activity_state["expected_item_id"] == "COMPLETE"
+        assert activity_state["active_session_id"] == session_id
+        assert activity_state["adaptive_policy_version"] == (
+            "C4_EQUIVALENT_TASK_V2"
+        )
+        assert activity_state["measurement_stop_reason"] == (
+            "CORE_COVERAGE_AND_EQUIVALENT_FLOW_COMPLETE"
+        )
+
+        decisions = await mock_db["adaptive_decisions"].find({
+            "student_id": student_id,
+        }).to_list(length=200)
+        assert len(decisions) == expected_decision_count
+        assert {decision["kc_id"] for decision in decisions} == {kc_id}
+        assert all(decision["item_role"] in {
+            "CORE", "REMEDIATION", "CONFIRMATION"
+        } for decision in decisions)
+        assert all(decision["equivalent_group_id"] for decision in decisions)
+        assert all(decision["calibration_status"] for decision in decisions)
+        assert all(decision["schema_version"] == "2.0" for decision in decisions)
+        assert all(decision["research_eligible"] is True for decision in decisions)
+        assert all(not decision["research_validation_errors"] for decision in decisions)
+
+
+@pytest.mark.asyncio
+async def test_same_session_duplicate_first_completion_does_not_reset_skill_two(client):
+    student_id = "skill2-delayed-first-completion"
+    session_id = "skill2-delayed-first-session"
+
+    first = _complete_skill_two_item(
+        client,
+        student_id=student_id,
+        session_id=session_id,
+        activity_id="2.1",
+        item_id="S2A1R01",
+        assisted=True,
+    )
+    assert first["next_action"]["next_item"] == "S2A1R01V1"
+
+    duplicate = _complete_skill_two_item(
+        client,
+        student_id=student_id,
+        session_id=session_id,
+        activity_id="2.1",
+        item_id="S2A1R01",
+        assisted=True,
+        event_suffix="delayed-duplicate",
+    )
+    assert duplicate["next_action"]["decision"] == "RETRY_CURRENT"
+    assert duplicate["next_action"]["next_item"] == "S2A1R01V1"
+    assert duplicate["next_action"]["reason_codes"] == [
+        "STALE_OR_DUPLICATE_COMPLETION_IGNORED"
+    ]
+
+    remediation = _complete_skill_two_item(
+        client,
+        student_id=student_id,
+        session_id=session_id,
+        activity_id="2.1",
+        item_id="S2A1R01V1",
+    )
+    assert remediation["next_action"]["next_item"] == "S2A1R01V2"
+
+    confirmation = _complete_skill_two_item(
+        client,
+        student_id=student_id,
+        session_id=session_id,
+        activity_id="2.1",
+        item_id="S2A1R01V2",
+    )
+    assert confirmation["next_action"]["next_item"] == "S2A1R02"
+
+    decisions = await mock_db["adaptive_decisions"].find({
+        "student_id": student_id,
+    }).to_list(length=10)
+    assert [decision["current_item"] for decision in decisions] == [
+        "S2A1R01", "S2A1R01V1", "S2A1R01V2"
+    ]

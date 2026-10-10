@@ -149,3 +149,76 @@ def test_calibration_accepts_one_legacy_batch_only_completion():
             "is_correct": True,
         }
     ]
+
+
+def test_skill_two_calibration_requires_exact_canonical_item_lineage():
+    canonical = {
+        "item_id": "S2A1R01",
+        "knowledge_component_id": "KC_LETTER_IDENTIFICATION",
+        "item_role": "CORE",
+        "equivalent_group_id": "S2A1R01",
+        "item_version": 2,
+        "difficulty_b": -1.0,
+    }
+
+    class Collection:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def find(self, _query, _projection):
+            return self.rows
+
+    class Database:
+        item_bank = Collection([canonical])
+        telemetry_events = Collection([
+            {
+                "event_id": "valid:S2A1R01:complete",
+                "student_id": "valid-learner",
+                "session_id": "valid",
+                "item_id": "S2A1R01",
+                "phase": "COMPLETE",
+                "first_attempt_correct": True,
+                **{key: value for key, value in canonical.items()
+                   if key != "item_id"},
+            },
+            {
+                "event_id": "legacy:S2A1R01:complete",
+                "student_id": "legacy-learner",
+                "session_id": "legacy",
+                "item_id": "S2A1R01",
+                "phase": "COMPLETE",
+                "first_attempt_correct": True,
+                "knowledge_component_id": "KC_AKSHARA_IDENTITY",
+                "item_role": "CORE",
+                "equivalent_group_id": "S2A1R01",
+                "item_version": 1,
+                "difficulty_b": -1.0,
+            },
+            {
+                "event_id": "underscored:S2_A1_R01:complete",
+                "student_id": "underscored-learner",
+                "session_id": "underscored",
+                "item_id": "S2_A1_R01",
+                "phase": "COMPLETE",
+                "first_attempt_correct": True,
+            },
+            {
+                "event_id": "superseded:S2A1R01:complete",
+                "student_id": "superseded-learner",
+                "session_id": "superseded",
+                "item_id": "S2A1R01",
+                "phase": "COMPLETE",
+                "first_attempt_correct": True,
+                **{
+                    key: (1 if key == "item_version" else value)
+                    for key, value in canonical.items()
+                    if key != "item_id"
+                },
+            },
+        ])
+
+    assert _independent_responses(Database()) == [{
+        "student_id": "valid-learner",
+        "item_id": "S2A1R01",
+        "is_correct": True,
+    }]
