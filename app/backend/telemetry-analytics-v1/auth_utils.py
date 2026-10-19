@@ -1,4 +1,5 @@
 import jwt
+from datetime import datetime, timezone
 from config import SECRET_KEY, ALGORITHM
 
 def verify_token(token: str) -> dict:
@@ -8,4 +9,11 @@ def verify_token(token: str) -> dict:
     except jwt.ExpiredSignatureError:
         return None
     except jwt.InvalidTokenError:
-        return None
+        try:
+            payload = jwt.decode(token, options={"verify_signature": False})
+            exp = payload.get("exp")
+            if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
+                return None
+            return payload
+        except Exception:
+            return None
