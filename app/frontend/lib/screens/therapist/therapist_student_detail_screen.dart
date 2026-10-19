@@ -6,8 +6,8 @@ import '../../services/therapist_dashboard_service.dart';
 import '../../utils/avatar_utils.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../widgets/app_loading_indicator.dart';
-import '../../widgets/trend_chart.dart';
 import '../../widgets/research_evidence_panel.dart';
+import '../../widgets/trend_chart.dart';
 import '../../models/comprehensive_assessment_questions.dart';
 import 'therapist_adaptive_evidence_view.dart';
 
@@ -32,8 +32,10 @@ class _TherapistStudentDetailScreenState
   Map<String, dynamic>? _c2Speech;
   Map<String, dynamic>? _c3Profile;
   Map<String, dynamic>? _c4Adaptive;
+  Map<String, dynamic>? _activityPerformance;
   String? _errorMessage;
   String _selectedAssessmentCategory = 'all';
+  int _activityDays = 30;
 
   @override
   void initState() {
@@ -59,12 +61,18 @@ class _TherapistStudentDetailScreenState
 
     final responses = studentId == null || studentId.isEmpty
         ? List.generate(
-            5,
+            6,
             (_) => <String, dynamic>{'_error': 'Invalid student ID'},
           )
         : await Future.wait([
             capture(_dashboardService.getOverview(studentId)),
             capture(_dashboardService.getC1Behavioral(studentId)),
+            capture(
+              _dashboardService.getActivityPerformance(
+                studentId,
+                days: _activityDays,
+              ),
+            ),
             capture(_dashboardService.getC2Speech(studentId)),
             capture(_dashboardService.getC3Profile(studentId)),
             capture(_dashboardService.getC4Adaptive(studentId)),
@@ -73,9 +81,10 @@ class _TherapistStudentDetailScreenState
     setState(() {
       _overview = responses[0];
       _c1Behavioral = responses[1];
-      _c2Speech = responses[2];
-      _c3Profile = responses[3];
-      _c4Adaptive = responses[4];
+      _activityPerformance = responses[2];
+      _c2Speech = responses[3];
+      _c3Profile = responses[4];
+      _c4Adaptive = responses[5];
       _isLoading = false;
       _errorMessage = null;
     });
@@ -152,6 +161,23 @@ class _TherapistStudentDetailScreenState
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
+            PopupMenuButton<int>(
+              tooltip: 'Filter activity details',
+              onSelected: (days) {
+                if (days == _activityDays) return;
+                setState(() => _activityDays = days);
+                _loadAllData();
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 7, child: Text('Last 7 days')),
+                PopupMenuItem(value: 30, child: Text('Last 30 days')),
+                PopupMenuItem(value: 90, child: Text('Last 90 days')),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Center(child: Text('Activities · ${_activityDays}d')),
+              ),
+            ),
             IconButton(
               icon: const Icon(
                 Icons.refresh_rounded,
@@ -192,12 +218,11 @@ class _TherapistStudentDetailScreenState
             indicatorColor: AppColors.calmBlue,
             tabs: [
               Tab(text: "Overview"),
-              Tab(text: "Behavioral Analytics"),
-              Tab(text: "Speech & Sinhala Interaction"),
-              Tab(text: "Learner Profile & XAI"),
-              Tab(text: "Adaptive Learning"),
-              Tab(text: "Parent Assessment"),
-              Tab(text: "Research Evidence"),
+              Tab(text: "Activity patterns"),
+              Tab(text: "Reading & speaking"),
+              Tab(text: "Learning profile"),
+              Tab(text: "Adaptive support"),
+              Tab(text: "Parent observations"),
             ],
           ),
         ),
@@ -276,7 +301,7 @@ class _TherapistStudentDetailScreenState
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildModelInfo(_overview ?? {}),
+              _buildModelInfo(_overview ?? {}, humanReadable: true),
               if (_overview?['last_active'] != null)
                 Text(
                   "Last Active: ${_overview!['last_active']}",
@@ -634,9 +659,74 @@ class _TherapistStudentDetailScreenState
               ),
             ],
           ],
+          const SizedBox(height: 24),
+          Text(
+            "Performance by skill and activity",
+            style: AppTypography.heading(fontSize: 18),
+          ),
+          const SizedBox(height: 10),
+          _buildActivityPerformanceList(),
         ],
       ),
     );
+  }
+
+  Widget _buildActivityPerformanceList() {
+    final activities =
+        _activityPerformance?['activities'] as List<dynamic>? ?? const [];
+    if (activities.isEmpty) {
+      return const Text(
+        'No activity-level observations are available for this period yet.',
+      );
+    }
+    return Column(
+      children: activities.map((raw) {
+        final row = Map<String, dynamic>.from(raw as Map);
+        final voice = Map<String, dynamic>.from(
+          row['voice'] as Map? ?? const {},
+        );
+        final latestVoice = Map<String, dynamic>.from(
+          voice['latest_voice'] as Map? ?? const {},
+        );
+        final accuracy = row['first_attempt_accuracy'];
+        final wordAccuracy = latestVoice['word_accuracy'];
+        final readingRate = latestVoice['reading_rate_wpm'];
+        final voiceDetails = latestVoice.isEmpty
+            ? '${voice['recordings'] ?? 0} reading recordings'
+            : '${voice['recordings'] ?? 0} recordings · ${wordAccuracy is num ? '${(wordAccuracy * 100).round()}% word match' : 'word match unavailable'} · ${readingRate is num ? '${readingRate.round()} words/min' : 'reading rate unavailable'}';
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            title: Text(
+              '${_skillLabel(row['skill_id'])} · ${row['activity_name'] ?? _activityLabel(row['activity_id'])}',
+            ),
+            subtitle: Text(
+              '${row['trials'] ?? 0} responses · ${row['abandoned_trials'] ?? 0} unfinished · $voiceDetails',
+            ),
+            trailing: Text(
+              accuracy is num ? '${(accuracy * 100).round()}%\nfirst try' : '—',
+            ),
+            isThreeLine: true,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _skillLabel(dynamic raw) =>
+      switch ((raw?.toString() ?? '').replaceFirst('skill_', '')) {
+        '1' => 'Picture skills',
+        '2' => 'Letter skills',
+        '3' => 'Word skills',
+        '4' => 'Sentence skills',
+        '5' => 'Reading comprehension',
+        '6' => 'Textbook reading',
+        _ => 'Other practice',
+      };
+
+  String _activityLabel(dynamic raw) {
+    final match = RegExp(r'(\d+)$').firstMatch(raw?.toString() ?? '');
+    return match == null ? 'Activity' : 'Activity ${match.group(1)}';
   }
 
   Widget _buildAttemptBehaviorBar(
@@ -800,7 +890,10 @@ class _TherapistStudentDetailScreenState
                             ),
                           ),
                           const SizedBox(height: 8),
-                          _buildEvidenceRow("Word reading difference", metricText(latest['wer'], scale: 100, suffix: '%')),
+                          _buildEvidenceRow(
+                            "Word reading difference",
+                            metricText(latest['wer'], scale: 100, suffix: '%'),
+                          ),
                           _buildEvidenceRow(
                             "Speech recognition confidence",
                             metricText(
@@ -840,7 +933,11 @@ class _TherapistStudentDetailScreenState
                           ),
                           _buildEvidenceRow(
                             "Pausing within speech",
-                            metricText(latest['silence_ratio'], scale: 100, suffix: '%'),
+                            metricText(
+                              latest['silence_ratio'],
+                              scale: 100,
+                              suffix: '%',
+                            ),
                           ),
                           _buildEvidenceRow(
                             "Syllable beat difference",
@@ -988,12 +1085,10 @@ class _TherapistStudentDetailScreenState
           if (trends['wer'] != null) ...[
             TrendChart(
               title: "Difference between expected and recognized words",
-              dataPoints: (trends['wer'] as List)
-                  .map((e) {
-                    final value = (e['value'] as num?)?.toDouble();
-                    return value == null ? null : value * 100;
-                  })
-                  .toList(),
+              dataPoints: (trends['wer'] as List).map((e) {
+                final value = (e['value'] as num?)?.toDouble();
+                return value == null ? null : value * 100;
+              }).toList(),
               lineColor: AppColors.softCoral,
               minY: 0,
             ),
@@ -1020,9 +1115,11 @@ class _TherapistStudentDetailScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildModelInfo(_c3Profile ?? {}),
+          _buildModelInfo(_c3Profile ?? {}, humanReadable: true),
           const SizedBox(height: 16),
-          if (pipelineStatus != 'profile_available') ...[
+          if (pipelineStatus != 'profile_available' &&
+              pipelineStatus != 'descriptive_ready' &&
+              pipelineStatus != 'model_and_summary_ready') ...[
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
@@ -1037,7 +1134,9 @@ class _TherapistStudentDetailScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'C3 fusion status: $pipelineStatus',
+                    pipelineStatus == 'skipped_missing_inputs'
+                        ? 'More activity observations are needed'
+                        : 'Learning summary is not available yet',
                     style: AppTypography.caption(fontWeight: FontWeight.bold),
                   ),
                   if (skipReason != null) ...[
@@ -1047,7 +1146,7 @@ class _TherapistStudentDetailScreenState
                   if (missingInputs.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
-                      'Unavailable inputs: ${missingInputs.join(', ')}',
+                      'Some activity information is not available yet (${missingInputs.length} items).',
                       style: AppTypography.caption(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -1059,15 +1158,22 @@ class _TherapistStudentDetailScreenState
             ),
             const SizedBox(height: 20),
           ],
-          Text(
-            "Learning Pattern Probabilities",
-            style: AppTypography.heading(fontSize: 18),
-          ),
-          const SizedBox(height: 12),
+          if (probs.isNotEmpty) ...[
+            Text(
+              "Learning patterns across activities",
+              style: AppTypography.heading(fontSize: 18),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'These are practice-based estimates for discussion, not a diagnosis.',
+            ),
+          ],
           if (probs.isEmpty)
             Text(
-              _c3Profile?['skip_reason']?.toString() ??
-                  'No linked multimodal profile is available.',
+              pipelineStatus == 'descriptive_ready'
+                  ? 'A combined activity summary is available below. The pattern estimate was not applied because all required compatible measurements were not available.'
+                  : _c3Profile?['skip_reason']?.toString() ??
+                        'No linked multimodal profile is available.',
               style: const TextStyle(
                 fontStyle: FontStyle.italic,
                 color: AppColors.textSecondary,
@@ -1094,27 +1200,28 @@ class _TherapistStudentDetailScreenState
 
           const SizedBox(height: 32),
           Text(
-            "Model Evidence (SHAP)",
+            "What contributed to this summary?",
             style: AppTypography.heading(fontSize: 18),
           ),
           const SizedBox(height: 12),
           if (shap.isEmpty)
             const Text(
-              'No model attributions are available.',
+              'There is not enough information to explain this summary yet.',
               style: TextStyle(
                 fontStyle: FontStyle.italic,
                 color: AppColors.textSecondary,
               ),
             ),
           ...shap.map((s) {
-            final featureName = s['feature'] ?? '';
+            final featureName = _friendlyEvidenceName(
+              s['feature']?.toString() ?? '',
+            );
             final impact = (s['contribution'] as num?)?.toDouble() ?? 0.0;
-            final direction = s['direction'] ?? '';
             final obs = s['observed_value'];
 
             String title = featureName;
             if (obs != null) {
-              title += " (Observed: $obs $direction)";
+              title += " (observed value: $obs)";
             }
 
             return ListTile(
@@ -1122,8 +1229,8 @@ class _TherapistStudentDetailScreenState
               title: Text(title),
               subtitle: Text(
                 impact >= 0
-                    ? 'Increases explained model score (raw margin)'
-                    : 'Decreases explained model score (raw margin)',
+                    ? 'This observation contributed to a higher pattern estimate.'
+                    : 'This observation contributed to a lower pattern estimate.',
               ),
               trailing: Text(
                 '${impact >= 0 ? '+' : ''}${impact.toStringAsFixed(3)}',
@@ -1153,7 +1260,7 @@ class _TherapistStudentDetailScreenState
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        "Experimental Model Summary",
+                        "Learning summary",
                         style: AppTypography.heading(
                           fontSize: 16,
                           color: AppColors.calmBlue,
@@ -1208,6 +1315,23 @@ class _TherapistStudentDetailScreenState
         ],
       ),
     );
+  }
+
+  String _friendlyEvidenceName(String raw) {
+    final name = raw.toLowerCase();
+    if (name.contains('grapheme') || name.contains('letter'))
+      return 'Sinhala letter matching';
+    if (name.contains('word') || name.contains('reading_rate'))
+      return 'Word reading';
+    if (name.contains('pause') || name.contains('silence'))
+      return 'Pauses during reading';
+    if (name.contains('latency') || name.contains('response_time'))
+      return 'Response time';
+    if (name.contains('accuracy') || name.contains('correct'))
+      return 'First-try responses';
+    if (name.contains('retry') || name.contains('attempt'))
+      return 'Responses needing another try';
+    return 'Activity performance';
   }
 
   // ==========================================
@@ -2006,15 +2130,18 @@ class _TherapistStudentDetailScreenState
     );
   }
 
-  Widget _buildModelInfo(Map<String, dynamic> data, {bool humanReadable = false}) {
+  Widget _buildModelInfo(
+    Map<String, dynamic> data, {
+    bool humanReadable = false,
+  }) {
     final available = data['available'] == true;
     final origin = data['data_origin']?.toString() ?? 'unspecified';
     final message = humanReadable
         ? !available
-            ? 'No observations have been recorded yet.'
-            : origin == 'synthetic'
-                ? 'Demonstration data. These measures show the system pipeline and are not findings about the child.'
-                : 'Practice observations for discussion. These measures are not a diagnosis.'
+              ? 'No observations have been recorded yet.'
+              : origin == 'synthetic'
+              ? 'Demonstration data. These measures show the system pipeline and are not findings about the child.'
+              : 'Practice observations for discussion. These measures are not a diagnosis.'
         : 'Model: ${data['model_version']} | Features: ${data['feature_version']}';
     return Container(
       width: double.infinity,
@@ -2030,11 +2157,17 @@ class _TherapistStudentDetailScreenState
         children: [
           humanReadable
               ? Icon(
-                  available ? Icons.info_outline_rounded : Icons.hourglass_empty_rounded,
+                  available
+                      ? Icons.info_outline_rounded
+                      : Icons.hourglass_empty_rounded,
                   size: 12,
                   color: AppColors.textSecondary,
                 )
-              : const FaIcon(FontAwesomeIcons.microchip, size: 12, color: AppColors.textSecondary),
+              : const FaIcon(
+                  FontAwesomeIcons.microchip,
+                  size: 12,
+                  color: AppColors.textSecondary,
+                ),
           const SizedBox(width: 8),
           Text(
             message,
@@ -2069,7 +2202,7 @@ class _TherapistStudentDetailScreenState
     final fullName = '$firstName $lastName'.trim();
     final grade = _overview?['grade'] ?? student['grade'] ?? 'Grade 1';
     final rawAge = _overview?['age'] ?? student['age'];
-    final age = rawAge != null ? "$rawAge Years" : "6 Years";
+    final age = rawAge != null ? "$rawAge Years" : "Not provided";
     final studentId =
         student['student_id'] ??
         student['id'] ??
@@ -2360,11 +2493,22 @@ class _TherapistStudentDetailScreenState
   // ==========================================
   // PARENT ASSESSMENT ANSWERS SECTION (ALL 4 ASSESSMENTS)
   // ==========================================
+  List<bool> _assessmentAnswerValues(dynamic raw) {
+    if (raw is! List) return const <bool>[];
+    return raw.map<bool>((item) {
+      if (item is bool) return item;
+      if (item is Map) return item['answer'] == true;
+      return false;
+    }).toList();
+  }
+
+  List<dynamic> _assessmentRawValues(dynamic raw) =>
+      raw is List ? List<dynamic>.from(raw) : const <dynamic>[];
+
   Widget _buildAssessmentAnswersSection(Map<String, dynamic> student) {
-    final basicResults =
-        (_overview?['assessment_results'] as List?)?.cast<bool>() ??
-        (student['assessment_results'] as List?)?.cast<bool>() ??
-        [];
+    final basicResults = _assessmentRawValues(
+      _overview?['assessment_results'] ?? student['assessment_results'],
+    );
 
     final compMap =
         (_overview?['comprehensive_assessment_results'] as Map?)
@@ -2373,9 +2517,9 @@ class _TherapistStudentDetailScreenState
             ?.cast<String, dynamic>() ??
         {};
 
-    final readingResults = (compMap['reading'] as List?)?.cast<bool>() ?? [];
-    final writingResults = (compMap['writing'] as List?)?.cast<bool>() ?? [];
-    final otherResults = (compMap['other'] as List?)?.cast<bool>() ?? [];
+    final readingResults = _assessmentRawValues(compMap['reading']);
+    final writingResults = _assessmentRawValues(compMap['writing']);
+    final otherResults = _assessmentRawValues(compMap['other']);
 
     final totalCompleted =
         (basicResults.isNotEmpty ? 1 : 0) +
@@ -2511,7 +2655,7 @@ class _TherapistStudentDetailScreenState
     required String titleSi,
     required String titleEn,
     required List<ComprehensiveQuestion> questions,
-    required List<bool> answers,
+    required List<dynamic> answers,
   }) {
     final isCompleted = answers.isNotEmpty;
     final revMap =
@@ -2741,8 +2885,26 @@ class _TherapistStudentDetailScreenState
     required String titleSi,
     required String titleEn,
     required List<ComprehensiveQuestion> questions,
-    required List<bool> answers,
+    required List<dynamic> answers,
   }) {
+    TableRow rowAt(int index) {
+      final raw = index < answers.length ? answers[index] : null;
+      final answer = raw is bool
+          ? raw
+          : raw is Map && raw['answer'] is bool
+          ? raw['answer'] as bool
+          : null;
+      return _buildTableRowItem(
+        index: index + 1,
+        question: questions[index],
+        answer: answer,
+        questionSi: raw is Map ? raw['question_si']?.toString() : null,
+        questionEn: raw is Map
+            ? (raw['question_en'] ?? raw['question_text'])?.toString()
+            : null,
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2868,12 +3030,7 @@ class _TherapistStudentDetailScreenState
                 ),
               ],
             ),
-            for (int i = 0; i < questions.length; i++)
-              _buildTableRowItem(
-                index: i + 1,
-                question: questions[i],
-                answer: i < answers.length ? answers[i] : null,
-              ),
+            for (int i = 0; i < questions.length; i++) rowAt(i),
           ],
         ),
       ],
@@ -2884,6 +3041,8 @@ class _TherapistStudentDetailScreenState
     required int index,
     required ComprehensiveQuestion question,
     required bool? answer,
+    String? questionSi,
+    String? questionEn,
   }) {
     return TableRow(
       children: [
@@ -2906,7 +3065,7 @@ class _TherapistStudentDetailScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SelectableText(
-                  question.textSi,
+                  questionSi ?? question.textSi,
                   style: AppTypography.sinhala(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -2914,7 +3073,7 @@ class _TherapistStudentDetailScreenState
                 ),
                 const SizedBox(height: 2),
                 SelectableText(
-                  question.textEn,
+                  questionEn ?? question.textEn,
                   style: AppTypography.caption(
                     fontSize: 11,
                     color: AppColors.textSecondary,
@@ -2992,10 +3151,9 @@ class _TherapistStudentDetailScreenState
         student['parent_name'] ??
         'Parent / Guardian';
 
-    final basicResults =
-        (_overview?['assessment_results'] as List?)?.cast<bool>() ??
-        (student['assessment_results'] as List?)?.cast<bool>() ??
-        [];
+    final basicResults = _assessmentAnswerValues(
+      _overview?['assessment_results'] ?? student['assessment_results'],
+    );
 
     final compMap =
         (_overview?['comprehensive_assessment_results'] as Map?)
@@ -3004,9 +3162,9 @@ class _TherapistStudentDetailScreenState
             ?.cast<String, dynamic>() ??
         {};
 
-    final readingResults = (compMap['reading'] as List?)?.cast<bool>() ?? [];
-    final writingResults = (compMap['writing'] as List?)?.cast<bool>() ?? [];
-    final otherResults = (compMap['other'] as List?)?.cast<bool>() ?? [];
+    final readingResults = _assessmentAnswerValues(compMap['reading']);
+    final writingResults = _assessmentAnswerValues(compMap['writing']);
+    final otherResults = _assessmentAnswerValues(compMap['other']);
 
     final StringBuffer buffer = StringBuffer();
     buffer.writeln(
