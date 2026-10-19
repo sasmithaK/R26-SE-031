@@ -156,6 +156,7 @@ async def _link_confirmation_policy_outcomes(
     )
 
 def get_adaptive_state(student_doc: dict, activity_id: str) -> dict:
+    """Return the persisted per-activity state, including legacy migration."""
     if not student_doc:
         return _get_default_state(activity_id)
         
@@ -171,6 +172,7 @@ def get_adaptive_state(student_doc: dict, activity_id: str) -> dict:
     return state if state else _get_default_state(activity_id)
 
 def _get_default_state(activity_id: str) -> dict:
+    """Create the initial deterministic curriculum state for an activity."""
     if activity_id in {"2.1", "2.2", "2.3", "2.4", "2.5"}:
         activity_number = activity_id.split(".")[1]
         return {
@@ -189,6 +191,7 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def startup_db_client():
+    """Connect MongoDB and load approved observed-data BKT parameters."""
     await connect_to_mongo()
     db = database.get_db()
     models = await db.model_registry.find({
@@ -213,10 +216,12 @@ async def startup_db_client():
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    """Close the shared MongoDB client during application shutdown."""
     await close_mongo_connection()
 
 @app.get("/health")
 def health_check():
+    """Report service health, model versions, and activation safeguards."""
     return {
         "status": "ok",
         "service": "adaptive-tutoring-v1",
@@ -251,6 +256,14 @@ def health_check():
 
 @app.post("/update_interaction", response_model=TutoringResponse)
 async def update_interaction(request: InteractionRequest):
+    """Process one learner response through the complete Component 4 loop.
+
+    The endpoint canonicalizes activity/item identifiers, reconstructs learner
+    state, updates BKT and IRT evidence, asks the action model for a scaffold,
+    applies capability and safety constraints, selects targeted practice when
+    needed, persists the decision/outcome evidence, and returns executable
+    commands to Flutter.
+    """
     # Retrieve Learner DB State
     student_doc = await database.knowledge_states_collection.find_one({"student_id": request.student_id})
     db = database.get_db()

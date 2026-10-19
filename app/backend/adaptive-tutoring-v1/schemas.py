@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Dict, Any, List, Optional
 
 class TelemetryData(BaseModel):
+    """Fine-grained behavioral evidence reported by one Flutter task."""
     first_touch_latency_ms: int = 0
     total_round_latency_ms: int = 0
     hesitation_count: int = 0
@@ -37,6 +38,7 @@ class TelemetryData(BaseModel):
     attempt_history: Optional[List[Dict[str, Any]]] = None
 
 class InteractionRequest(BaseModel):
+    """Validated learner interaction submitted to Component 4."""
     student_id: str
     session_id: str
     event_id: Optional[str] = None
@@ -61,6 +63,7 @@ class InteractionRequest(BaseModel):
     phase: str = Field(default="COMPLETE")
 
 class NextAction(BaseModel):
+    """Policy decision and executable scaffold commands returned to Flutter."""
     model_config = ConfigDict(protected_namespaces=())
 
     next_activity: str
@@ -90,6 +93,7 @@ class NextAction(BaseModel):
     assignment_mechanism: Optional[str] = None
     
 class TutoringResponse(BaseModel):
+    """Complete response containing updated evidence and the next action."""
     student_id: str
     updated_knowledge_state: Dict[str, float]
     previous_knowledge_state: Dict[str, float] = Field(default_factory=dict)

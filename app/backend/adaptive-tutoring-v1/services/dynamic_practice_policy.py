@@ -9,6 +9,8 @@ INDEPENDENT = {"MASTERED", "INDEPENDENT_SUCCESS", "CLEAN_SUCCESS"}
 
 
 class DynamicPracticePolicy:
+    """Route one diagnosed error through bounded remediation and confirmation."""
+
     version = "C4_DYNAMIC_TARGETED_PRACTICE_V3"
     max_remediation_items = 2
     max_confirmation_items = 3
@@ -25,6 +27,7 @@ class DynamicPracticePolicy:
         reasons: list[str],
         selection_intent: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
+        """Build the standard next-action payload and persist its phase state."""
         state["next_phase"] = next_phase
         state["adaptive_policy_version"] = self.version
         return {
@@ -58,6 +61,7 @@ class DynamicPracticePolicy:
         has_reduced_remediation: bool,
         has_floor_remediation: bool,
     ) -> Dict[str, Any]:
+        """Advance the targeted-practice state machine after a completed item."""
         phase = str(state.get("next_phase") or item_role or "CORE").upper()
         # The stored phase is authoritative because a reviewed confirmation
         # item may safely be borrowed as a same-load floor practice item.
@@ -427,6 +431,7 @@ class DynamicPracticePolicy:
         allow_confirmation_as_floor: bool = False,
         generic_authored_fallback: bool = False,
     ) -> Dict[str, Any]:
+        """Create the selector intent for one remediation or confirmation item."""
         profile = dict(state.get("practice_error_profile") or {})
         active_unit = state.get("practice_current_target_unit")
         intent = {
@@ -471,6 +476,7 @@ class DynamicPracticePolicy:
         current_b: float,
         error_profile: Dict[str, Any],
     ) -> None:
+        """Initialize bounded target queues from the latest diagnosed error."""
         state["practice_origin_item_id"] = current_item_id
         state["practice_origin_group_id"] = error_profile.get(
             "equivalent_group_id", current_item_id
@@ -507,6 +513,7 @@ class DynamicPracticePolicy:
 
     @staticmethod
     def _clear_cycle(state: Dict[str, Any], preserve_review: bool = False) -> None:
+        """Remove completed practice-cycle state while optionally keeping review."""
         for key in (
             "practice_origin_item_id", "practice_origin_group_id",
             "practice_origin_difficulty_b", "practice_error_profile",
@@ -531,14 +538,17 @@ class DynamicPracticePolicy:
 
     @staticmethod
     def _queue_key(phase: str) -> str:
+        """Return the state key containing queued units for a practice phase."""
         return f"practice_{phase}_units"
 
     @staticmethod
     def _completed_key(phase: str) -> str:
+        """Return the state key containing completed units for a phase."""
         return f"practice_completed_{phase}_units"
 
     @staticmethod
     def _activate_first_unit(state: Dict[str, Any], phase: str) -> None:
+        """Make the first not-yet-completed target unit active."""
         queue = list(state.get(DynamicPracticePolicy._queue_key(phase), []))
         completed = set(
             state.get(DynamicPracticePolicy._completed_key(phase), [])
@@ -551,6 +561,7 @@ class DynamicPracticePolicy:
     def _mark_current_unit_complete(
         state: Dict[str, Any], phase: str
     ) -> None:
+        """Record the active unit as completed for the current phase."""
         unit = state.get("practice_current_target_unit")
         if not unit:
             return
@@ -562,6 +573,7 @@ class DynamicPracticePolicy:
 
     @staticmethod
     def _advance_unit(state: Dict[str, Any], phase: str) -> bool:
+        """Advance to the next queued target and report whether one remains."""
         DynamicPracticePolicy._activate_first_unit(state, phase)
         return bool(state.get("practice_current_target_unit"))
 

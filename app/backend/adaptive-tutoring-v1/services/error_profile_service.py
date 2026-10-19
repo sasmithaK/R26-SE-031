@@ -8,6 +8,7 @@ from services.practice_metadata import derive_practice_metadata, normalize_targe
 
 
 def _unique(values: Iterable[Any]) -> List[str]:
+    """Normalize an ordered collection while removing blanks and duplicates."""
     seen = set()
     result = []
     for raw in values:
@@ -20,6 +21,8 @@ def _unique(values: Iterable[Any]) -> List[str]:
 
 
 class ErrorProfileService:
+    """Turn a completed response into target-specific diagnostic evidence."""
+
     version = "C4_ERROR_PROFILE_V1"
 
     def build(
@@ -32,6 +35,7 @@ class ErrorProfileService:
         knowledge_component_id: str,
         adaptive_state: Dict[str, Any],
     ) -> Dict[str, Any]:
+        """Build the latest error profile and update micro-skill evidence."""
         metadata = derive_practice_metadata(item)
         target_ids = list(getattr(telemetry, "target_ids", None) or [])
         selected = list(getattr(telemetry, "selected_answers", None) or [])

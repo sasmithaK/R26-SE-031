@@ -22,6 +22,7 @@ _META_KEYS = {
 
 
 def _strings(value: Any) -> List[str]:
+    """Flatten meaningful strings from nested curriculum content."""
     if value is None:
         return []
     if isinstance(value, str):
@@ -43,6 +44,7 @@ def _strings(value: Any) -> List[str]:
 
 
 def _unique(values: Iterable[str]) -> List[str]:
+    """NFC-normalize strings and preserve their first occurrence order."""
     seen = set()
     result = []
     for raw in values:
@@ -55,6 +57,7 @@ def _unique(values: Iterable[str]) -> List[str]:
 
 
 def _basename(value: str) -> str:
+    """Convert an asset path to a human-comparable semantic value."""
     if "/" not in value or "." not in value:
         return value
     return PurePosixPath(value).stem.replace("_", " ")
@@ -67,6 +70,7 @@ def normalize_target_unit(value: Any) -> str:
 
 
 def _sinhala_base_letters(value: str) -> List[str]:
+    """Extract Sinhala base letters while excluding combining marks."""
     # Sinhala combining marks are intentionally excluded.  This produces
     # useful component tags such as `ව` without pretending that a Unicode code
     # point is by itself a pedagogically valid word or question.
@@ -77,6 +81,7 @@ def _sinhala_base_letters(value: str) -> List[str]:
 
 
 def _correct_values(content: Dict[str, Any]) -> List[str]:
+    """Collect reviewed correct targets across supported task templates."""
     values: List[str] = []
     for key in (
         "correctOption", "correct_option", "correct_answer", "correct_word",
@@ -114,6 +119,7 @@ def _correct_values(content: Dict[str, Any]) -> List[str]:
 
 
 def _micro_skill_tags(template: str, content: Dict[str, Any]) -> List[str]:
+    """Derive stable matching tags from template and difficulty metadata."""
     tags: List[str] = []
     mapping = {
         "visual_hidden_search": ("visual_search", "visual_discrimination"),

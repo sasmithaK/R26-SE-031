@@ -17,6 +17,8 @@ MONGODB_URL = os.environ.get("MONGODB_URL")
 DB_NAME = os.environ.get("MONGODB_DB_NAME", "r26_se_031")
 
 class Database:
+    """Mutable holder for the process-wide asynchronous MongoDB client."""
+
     client: AsyncIOMotorClient = None
 
 db_instance = Database()
@@ -25,6 +27,7 @@ knowledge_states_collection = None
 adaptive_decisions_collection = None
 
 async def connect_to_mongo():
+    """Open MongoDB and create indexes needed by the adaptive evidence path."""
     global db, knowledge_states_collection, adaptive_decisions_collection
     if not MONGODB_URL:
         raise ValueError("MONGODB_URL environment variable is not set!")
@@ -52,6 +55,7 @@ async def connect_to_mongo():
     print("Connected to MongoDB Cloud (adaptive-tutoring-v1)")
 
 async def close_mongo_connection():
+    """Close the MongoDB client if startup created one."""
     if db_instance.client:
         db_instance.client.close()
         print("Closed MongoDB connection (adaptive-tutoring-v1)")

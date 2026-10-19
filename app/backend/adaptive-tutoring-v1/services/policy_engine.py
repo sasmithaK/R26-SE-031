@@ -30,6 +30,8 @@ def get_activity_latency_baseline(activity_id: str) -> int:
     return baselines.get(activity_id, 12000)
 
 class PolicyEngine:
+    """Classify responses and enforce executable, bounded support policies."""
+
     def classify_response(
         self,
         is_correct: bool,
@@ -37,6 +39,11 @@ class PolicyEngine:
         activity_id: str,
         personal_latency_factor: float = 1.0,
     ) -> Tuple[str, int, str, float]:
+        """Convert correctness and behavior telemetry into response evidence.
+
+        Returns response quality, struggle score, struggle band, and the
+        learner-personalized latency ratio consumed by later policy stages.
+        """
         if not telemetry:
             return "CLEAN_SUCCESS" if is_correct else "FAILED", 0, "LOW", 1.0
             
@@ -512,6 +519,7 @@ class PolicyEngine:
         adaptive_state: Dict[str, Any],
         round_idx: int
     ) -> Dict[str, Any]:
+        """Apply S2A1's option-count-aware distractor/highlight progression."""
         
         # In S2A1, there are no pair_ids. We track the state per-round.
         # But R6 and R7 have 2 targets. If one target is found, it stays found.
@@ -576,6 +584,7 @@ class PolicyEngine:
         adaptive_state: Dict[str, Any],
         round_idx: int
     ) -> Dict[str, Any]:
+        """Apply bounded retry and visual support for S2A4 word tasks."""
         
         pair_state = adaptive_state.get("current_pair_state", {
             "round": round_idx,
@@ -817,6 +826,7 @@ class PolicyEngine:
         }
 
         def next_unseen_core() -> str:
+            """Find the next S1A1 core item not already administered."""
             administered = set(state.get("administered_item_ids", []))
             administered.add(current_item)
             for round_number in range(1, 6):
@@ -1033,6 +1043,7 @@ class PolicyEngine:
         }
 
     def _s2a1_state_machine(self, response_quality: str, state: Dict[str, Any], current_b: float, policy_reason: list) -> Dict[str, Any]:
+        """Advance S2A1 through core, remediation, and confirmation phases."""
         core_round = state.get("current_core_round", 1)
         phase = state.get("next_phase", "CORE")
         
@@ -1128,6 +1139,7 @@ class PolicyEngine:
         adaptive_state: Dict[str, Any],
         round_idx: int
     ) -> Dict[str, Any]:
+        """Apply option-count-aware distractor/highlight support for S2A3."""
         
         pair_state = adaptive_state.get("current_pair_state", {
             "p1_wrong": 0,
@@ -1175,6 +1187,7 @@ class PolicyEngine:
         }
 
     def _s2a3_state_machine(self, response_quality: str, state: Dict[str, Any], current_b: float, policy_reason: list) -> Dict[str, Any]:
+        """Advance S2A3 while bounding its authored practice sequence."""
         core_round = state.get("current_core_round", 1)
         phase = state.get("next_phase", "CORE")
         
@@ -1184,6 +1197,7 @@ class PolicyEngine:
         is_success = response_quality in ["MASTERED", "CLEAN_SUCCESS", "INDEPENDENT_SUCCESS"]
         
         def advance_core():
+            """Move to the next S2A3 core round or finish the activity."""
             if core_round >= 5:
                 state["next_phase"] = "COMPLETE"
                 state["expected_item_id"] = "COMPLETE"
@@ -1276,6 +1290,7 @@ class PolicyEngine:
         }
 
     def _s2a4_state_machine(self, response_quality: str, state: Dict[str, Any], current_b: float, policy_reason: list) -> Dict[str, Any]:
+        """Advance S2A4 through its authored V1/V2 practice chain."""
         core_round = state.get("current_core_round", 1)
         phase = state.get("next_phase", "CORE")
         origin_core_round = state.get("origin_core_round", core_round)
@@ -1287,6 +1302,7 @@ class PolicyEngine:
         is_success = response_quality in ["MASTERED", "CLEAN_SUCCESS", "INDEPENDENT_SUCCESS"]
         
         def advance_core():
+            """Move to the next S2A4 core round or finish the activity."""
             if core_round >= 5:
                 state["next_phase"] = "COMPLETE"
                 state["expected_item_id"] = "COMPLETE"
@@ -1404,6 +1420,7 @@ class PolicyEngine:
 
 
     def _s2a5_state_machine(self, response_quality: str, state: Dict[str, Any], current_b: float, policy_reason: list) -> Dict[str, Any]:
+        """Advance S2A5 through its bounded word-building practice chain."""
         core_round = state.get("current_core_round", 1)
         phase = state.get("next_phase", "CORE")
         origin_core_round = state.get("origin_core_round", core_round)
@@ -1415,6 +1432,7 @@ class PolicyEngine:
         is_success = response_quality in ["MASTERED", "CLEAN_SUCCESS", "INDEPENDENT_SUCCESS", "STRUGGLED_SUCCESS"]
         
         def advance_core():
+            """Move to the next S2A5 core round or finish the activity."""
             if core_round >= 5:
                 state["next_phase"] = "COMPLETE"
                 state["expected_item_id"] = "COMPLETE"
@@ -1538,6 +1556,7 @@ class PolicyEngine:
         adaptive_state: Dict[str, Any],
         round_idx: int
     ) -> Dict[str, Any]:
+        """Apply bounded retry and scaffold support for S2A5 sequences."""
         
         pair_state = adaptive_state.get("current_pair_state", {
             "round": round_idx,

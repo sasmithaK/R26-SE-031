@@ -8,7 +8,10 @@ import math
 from typing import List
 
 class IRTEngine:
+    """Apply online 1PL/Rasch ability estimation and information calculations."""
+
     def __init__(self, se_threshold: float = 0.30):
+        """Store the measurement-error threshold used by selection evidence."""
         self.se_threshold = se_threshold
 
     def calculate_probability(self, theta: float, b_i: float) -> float:

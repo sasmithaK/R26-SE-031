@@ -31,6 +31,7 @@ FEATURES = (
 
 
 def _jaccard(left: List[str], right: List[str]) -> float:
+    """Measure target overlap as intersection divided by union."""
     a, b = set(map(str, left)), set(map(str, right))
     if not a or not b:
         return 0.0
@@ -38,6 +39,7 @@ def _jaccard(left: List[str], right: List[str]) -> float:
 
 
 def _bounded(value: Any, low: float = 0.0, high: float = 1.0) -> float:
+    """Convert an input to float and clamp it to a valid feature range."""
     try:
         return max(low, min(high, float(value)))
     except (TypeError, ValueError):
@@ -45,7 +47,10 @@ def _bounded(value: Any, low: float = 0.0, high: float = 1.0) -> float:
 
 
 class PracticeSelectorModel:
+    """Rank reviewed remediation or confirmation items for one learner need."""
+
     def __init__(self, path: Path | None = None):
+        """Resolve and load the portable targeted-practice model artifact."""
         self.path = Path(
             os.getenv("C4_PRACTICE_MODEL_PATH", str(path or DEFAULT_MODEL_PATH))
         )
@@ -53,12 +58,14 @@ class PracticeSelectorModel:
         self.reload()
 
     def reload(self) -> None:
+        """Reload the JSON coefficients or expose an empty safe fallback."""
         try:
             self.artifact = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             self.artifact = {}
 
     def _predict(self, features: Dict[str, float]) -> float:
+        """Predict independent success for one reviewed candidate item."""
         model = self.artifact.get("model") or {}
         z = float(model.get("intercept", 0.0))
         weights = model.get("weights") or {}
@@ -84,6 +91,12 @@ class PracticeSelectorModel:
         requested_mode: str | None,
         data_origin: str,
     ) -> Dict[str, Any]:
+        """Feature, score, and rank candidates after hard curriculum filtering.
+
+        Probability is combined with exact-target, difficulty, novelty, and
+        exposure terms so the model does not repeatedly choose an easy but
+        irrelevant task.
+        """
         role = str(selection_intent.get("role") or "REMEDIATION").upper()
         target_units = list(selection_intent.get("target_units") or [])
         component_units = list(selection_intent.get("component_units") or [])
@@ -192,4 +205,3 @@ class PracticeSelectorModel:
 
 
 practice_selector_model = PracticeSelectorModel()
-
