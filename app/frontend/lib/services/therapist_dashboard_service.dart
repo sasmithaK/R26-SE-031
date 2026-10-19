@@ -23,6 +23,8 @@ class TherapistDashboardService {
       _client.get('$_baseUrl/$id/overview');
   Future<Map<String, dynamic>> getC1Behavioral(String id) =>
       _client.get('$_baseUrl/$id/c1-behavioral');
+  Future<Map<String, dynamic>> getActivityPerformance(String id, {int days = 30}) =>
+      _client.get('$_baseUrl/$id/activity-performance?days=$days');
   Future<Map<String, dynamic>> getC2Speech(String id) =>
       _client.get('$_baseUrl/$id/c2-speech');
   Future<Map<String, dynamic>> getC3Profile(String id) =>

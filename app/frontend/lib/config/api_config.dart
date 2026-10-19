@@ -3,6 +3,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiConfig {
+  static String? _configuredUrl(String name) {
+    final value = dotenv.env[name]?.trim() ?? '';
+    return value.isEmpty ? null : value.replaceFirst(RegExp(r'/$'), '');
+  }
   static String get dataOrigin =>
       dotenv.env['DATA_ORIGIN'] == 'synthetic' ? 'synthetic' : 'observed';
 
@@ -62,6 +66,8 @@ class ApiConfig {
   /// Speech Monitoring API (Port 8020 locally, /speech on Azure)
   static String get speechBaseUrl {
     if (isDevelopment) {
+      final configured = _configuredUrl('SPEECH_BASE_URL');
+      if (configured != null) return configured;
       return 'http://$_localHost:8020';
     }
     // Deployed to Azure ML Gateway
@@ -71,6 +77,8 @@ class ApiConfig {
   /// Telemetry Analytics API (Port 8025 locally, /telemetry on Azure)
   static String get telemetryBaseUrl {
     if (isDevelopment) {
+      final configured = _configuredUrl('TELEMETRY_BASE_URL');
+      if (configured != null) return configured;
       return 'http://$_localHost:8025/api/v1/auth';
     }
     // Deployed to Azure ML Gateway
@@ -80,6 +88,8 @@ class ApiConfig {
   /// C1 Behavioral Analytics API (Port 8025 locally, /telemetry/api/v1/c1 on Azure)
   static String get c1BaseUrl {
     if (isDevelopment) {
+      final configured = _configuredUrl('C1_BASE_URL');
+      if (configured != null) return configured;
       return 'http://$_localHost:8025/api/v1/c1';
     }
     // Deployed to Azure ML Gateway
@@ -89,6 +99,8 @@ class ApiConfig {
   /// Unified Learning API Gateway (Port 8015 locally, /learning on Azure)
   static String get learningBaseUrl {
     if (isDevelopment) {
+      final configured = _configuredUrl('LEARNING_BASE_URL');
+      if (configured != null) return configured;
       return 'http://$_localHost:8015/api/v1/learning';
     }
     return 'https://adaptedmind-auth-api.onrender.com/api/v1/learning';
@@ -97,6 +109,8 @@ class ApiConfig {
   /// Parent Dashboard API (Port 8015 — auth service, NOT 8025)
   static String get parentDashboardBaseUrl {
     if (isDevelopment) {
+      final configured = _configuredUrl('PARENT_DASHBOARD_BASE_URL');
+      if (configured != null) return configured;
       return 'http://$_localHost:8015/api/v1/parent/students';
     }
     return 'https://adaptedmind-auth-api.onrender.com/api/v1/parent/students';
@@ -105,6 +119,8 @@ class ApiConfig {
   /// Therapist Dashboard API (Port 8015 — auth service, NOT 8025)
   static String get therapistDashboardBaseUrl {
     if (isDevelopment) {
+      final configured = _configuredUrl('THERAPIST_DASHBOARD_BASE_URL');
+      if (configured != null) return configured;
       return 'http://$_localHost:8015/api/v1/therapist/students';
     }
     return 'https://adaptedmind-auth-api.onrender.com/api/v1/therapist/students';
