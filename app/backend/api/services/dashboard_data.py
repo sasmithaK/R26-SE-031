@@ -1,5 +1,6 @@
 """Dashboard projections: preserve missingness, provenance and current storage contracts."""
 from datetime import datetime, timezone
+import statistics
 import math
 
 KC_NAMES = {
@@ -164,3 +165,109 @@ async def research_evidence(db, student_id):
         doc = {k:v for k,v in docs[0].items() if k != "_id"}
         return {**base(student_id, doc, "Synthetic held-out evaluation"), **doc}
     return {**base(student_id, None), "components": [], "message": "No reproducible evaluation has been imported for this student. No baseline scores are invented."}
+
+
+async def activity_performance(db, student_id, days=30, skill_id=None, limit=100):
+    """Join C1 activity aggregates and C2 recordings on student/skill/activity.
+
+    C1 activity IDs repeat across skills, so all grouping keys include skill_id.
+    Missing C1/C2 values remain null/zero-count rather than being inferred.
+    """
+    from datetime import timedelta
+
+    summaries = await records(db, "session_summaries", student_id, 500)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
+    groups = {}
+    for summary in summaries:
+        stamp_value = timestamp(summary)
+        if cutoff and stamp_value:
+            try:
+                if datetime.fromisoformat(stamp_value.replace("Z", "+00:00")) < cutoff:
+                    continue
+            except ValueError:
+                pass
+        breakdown = summary.get("activity_breakdown_by_skill") or {}
+        # Backward-compatible fallback for old rows, with an explicit unknown skill.
+        if not breakdown:
+            breakdown = {
+                f"unknown::{activity}": {"skill_id": "unknown", "activity_id": activity, **metrics}
+                for activity, metrics in (summary.get("activity_breakdown") or {}).items()
+            }
+        for key, metrics in breakdown.items():
+            sid = str(metrics.get("skill_id") or key.split("::", 1)[0] or "unknown")
+            aid = str(metrics.get("activity_id") or key.split("::", 1)[-1] or "unknown")
+            if skill_id and sid != str(skill_id):
+                continue
+            group = groups.setdefault((sid, aid), {
+                "skill_id": sid, "activity_id": aid, "sessions": 0, "trials": 0, "abandoned_trials": 0,
+                "activity_name": metrics.get("activity_name") or aid,
+                "first_correct": 0, "retry_trials": 0, "latencies": [],
+                "data_origin": summary.get("data_origin", "unspecified"),
+                "last_activity_at": stamp_value,
+            })
+            trials = int(metrics.get("trials") or 0)
+            accuracy = number(metrics.get("accuracy"))
+            group["sessions"] += 1
+            group["trials"] += trials
+            group["abandoned_trials"] += int(metrics.get("abandoned_trials") or 0)
+            if accuracy is not None:
+                group["first_correct"] += round(accuracy * trials)
+            retry_rate = number(metrics.get("retry_rate"))
+            if retry_rate is not None:
+                group["retry_trials"] += round(retry_rate * trials)
+            latency = number(metrics.get("median_response_latency_ms"))
+            if latency is not None:
+                group["latencies"].append(latency)
+            group["last_activity_at"] = group["last_activity_at"] or stamp_value
+
+    speech_rows = await records(db, "speech_features", student_id, 500)
+    for row in speech_rows:
+        sid, aid = str(row.get("skill_id") or "unknown"), str(row.get("activity_id") or "unknown")
+        if skill_id and sid != str(skill_id):
+            continue
+        stamp_value = timestamp(row)
+        if cutoff and stamp_value:
+            try:
+                if datetime.fromisoformat(stamp_value.replace("Z", "+00:00")) < cutoff:
+                    continue
+            except ValueError:
+                pass
+        group = groups.setdefault((sid, aid), {
+            "skill_id": sid, "activity_id": aid, "sessions": 0, "trials": 0, "abandoned_trials": 0,
+            "activity_name": row.get("activity_name") or aid,
+            "first_correct": 0, "retry_trials": 0, "latencies": [],
+            "data_origin": row.get("data_origin", "unspecified"), "last_activity_at": stamp_value,
+        })
+        voice = group.setdefault("voice", {"recordings": 0, "usable_recordings": 0, "quality_counts": {}})
+        voice["recordings"] += 1
+        quality = str(speech(row).get("recording_quality") or "unavailable")
+        voice["quality_counts"][quality] = voice["quality_counts"].get(quality, 0) + 1
+        if row.get("measurement_status") in {"valid", "available", "synthetic_features"}:
+            voice["usable_recordings"] += 1
+        if "latest_voice" not in group or (stamp_value or "") >= (group.get("latest_voice_at") or ""):
+            voice_data = speech(row)
+            group["latest_voice"] = {
+                "recording_quality": voice_data.get("recording_quality"),
+                "measurement_status": voice_data.get("measurement_status"),
+                "word_accuracy": voice_data.get("word_accuracy"),
+                "grapheme_accuracy": voice_data.get("grapheme_accuracy"),
+                "reading_rate_wpm": voice_data.get("reading_rate_wpm"),
+                "pause_ratio": voice_data.get("pause_ratio"),
+            }
+            group["latest_voice_at"] = stamp_value
+
+    output = []
+    for group in groups.values():
+        trials = group.pop("trials")
+        group["trials"] = trials
+        correct = group.pop("first_correct")
+        retries = group.pop("retry_trials")
+        latencies = group.pop("latencies")
+        group["first_attempt_accuracy"] = correct / trials if trials else None
+        group["retry_rate"] = retries / trials if trials else None
+        group["median_response_latency_ms"] = number(statistics.median(latencies)) if latencies else None
+        group.setdefault("voice", {"recordings": 0, "usable_recordings": 0, "quality_counts": {}})
+        group["data_available"] = bool(group["sessions"] or group["voice"]["recordings"])
+        output.append(group)
+    output.sort(key=lambda row: (row.get("skill_id", ""), row.get("activity_id", "")))
+    return {"student_id": student_id, "reporting_days": days, "skill_id": skill_id, "activities": output[:limit]}

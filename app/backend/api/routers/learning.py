@@ -11,6 +11,8 @@ import sys
 from pathlib import Path as PathLib
 sys.path.insert(0, str(PathLib(__file__).parent.parent.parent.parent))
 from shared.database import get_db
+from dependencies import get_current_user
+from bson import ObjectId
 
 router = APIRouter(prefix="/api/v1/learning", tags=["Unified Learning"])
 
@@ -173,7 +175,10 @@ def build_adaptive_submit(
             payload.telemetry.total_round_latency_ms // 1000
         ),
         "fatigue_score": fatigue_score,
-        "learner_profile": learner_profile,
+        # C4 currently receives C1 behavioural evidence only. C2 and C3 remain
+        # observable dashboard evidence until their child-data validation is
+        # complete and an explicit C4 contract is approved.
+        "learner_profile": {},
         "behavioral_context": behavioral_context or {},
         "context_evidence": context_evidence or {},
         # These fields are server-controlled. A mobile client cannot label a
@@ -190,6 +195,9 @@ def build_adaptive_submit(
 
 async def run_background_pipeline(payload: InteractionPayload, c4_result: dict, event_id: str):
     db = get_db()
+    # Speech evidence is owned by C2. Never create a second, less complete
+    # record from the learning gateway's legacy request field.
+    payload.speech = None
     ingestion_key = f"{payload.student_id}:{event_id}"
     
     # 1. Save Telemetry
@@ -346,9 +354,26 @@ async def run_background_pipeline(payload: InteractionPayload, c4_result: dict, 
 
 
 @router.post("/interaction")
-async def process_interaction(payload: InteractionPayload, background_tasks: BackgroundTasks):
+async def process_interaction(
+    payload: InteractionPayload,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
     db = get_db()
     event_id = payload.event_id or str(uuid.uuid4())
+
+    try:
+        student_oid = ObjectId(payload.student_id)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid student_id")
+    student = await db.students.find_one({"_id": student_oid})
+    if not student or str(student.get("parent_id")) != str(current_user.get("_id")):
+        raise HTTPException(status_code=403, detail="This account cannot submit data for this student")
+
+    # Speech is accepted in the legacy request shape but is deliberately not
+    # persisted or forwarded here. The authenticated C2 endpoint is the only
+    # source of speech evidence, preventing duplicate/conflicting records.
+    payload.speech = None
     
     # --- CANONICALIZATION ---
     canonical_activity_id = payload.activity_id
@@ -374,13 +399,8 @@ async def process_interaction(payload: InteractionPayload, background_tasks: Bac
     print(f"canonical activity={canonical_activity_id}")
     print(f"canonical item={canonical_item_id}")
 
-    # Fetch latest fatigue from C1 and learner profile from C3 to inform C4
+    # Fetch C1 summaries only. C4 is intentionally isolated from C2/C3.
     c1 = await db.session_summaries.find_one({"student_id": payload.student_id}, sort=[("_id", -1)])
-    c3 = await db.learner_profiles.find_one({"student_id": payload.student_id}, sort=[("_id", -1)])
-    c3_audit = await db.model_audit_log.find_one(
-        {"student_id": payload.student_id, "model_name": "XGBoost"},
-        sort=[("_id", -1)],
-    )
     current_rows = await db.telemetry_events.find({
         "student_id": payload.student_id,
         "session_id": payload.session_id,
@@ -397,16 +417,10 @@ async def process_interaction(payload: InteractionPayload, background_tasks: Bac
         if behavioral_context.get("observation_count", 0) > 0
         else prior_fatigue
     )
-    learner_profile_dict, profile_status = validated_profile_context(c3)
     context_evidence = {
         "behavior_source": "current_session_rolling",
         "prior_session_available": bool(c1),
-        "c3_profile_status": profile_status,
-        "c3_pipeline_status": (
-            (c3_audit or {}).get("status")
-            or ("profile_available" if c3 else "not_run")
-        ),
-        "c3_missing_inputs": list((c3_audit or {}).get("missing_features") or []),
+        "adaptive_input_scope": "c1_behavior_only",
     }
     
     c4_result = {}
@@ -419,7 +433,7 @@ async def process_interaction(payload: InteractionPayload, background_tasks: Bac
                 canonical_activity_id=canonical_activity_id,
                 canonical_item_id=canonical_item_id,
                 fatigue_score=fatigue_score,
-                learner_profile=learner_profile_dict,
+                learner_profile={},
                 behavioral_context=behavioral_context,
                 context_evidence=context_evidence,
             )

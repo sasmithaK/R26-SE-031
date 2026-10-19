@@ -1,6 +1,7 @@
 import re
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from schemas.dashboards import (TherapistOverviewDTO, TherapistC1BehavioralDTO, TherapistC2SpeechDTO,
                                 TherapistC3ProfileDTO, TherapistC4AdaptiveDTO)
 from shared.database import get_db
@@ -8,7 +9,7 @@ from services.dashboard_access import require_dashboard_access
 from services.dashboard_data import (ACTIVITY_NAMES, KC_NAMES, SKILL_NAMES,
                                      number, timestamp, records, mlbase, speech,
                                      pattern_profile, mastery_status,
-                                     research_evidence)
+                                     research_evidence, activity_performance)
 
 router = APIRouter(prefix="/api/v1/therapist/students", tags=["Therapist Dashboard"],
                    dependencies=[Depends(require_dashboard_access)])
@@ -257,6 +258,17 @@ def _task_preview(row, item):
         },
     }
 
+
+@router.get("/{student_id}/activity-performance")
+async def get_therapist_activity_performance(
+    student_id: str,
+    days: int = Query(30, ge=1, le=365),
+    skill_id: Optional[str] = Query(None, min_length=1, max_length=32),
+    limit: int = Query(100, ge=1, le=300),
+):
+    """Detailed, per-skill activity summary aligned across touch and speech records."""
+    return await activity_performance(get_db(), student_id, days, skill_id, limit)
+
 @router.get("/{student_id}/overview", response_model=TherapistOverviewDTO)
 async def get_therapist_overview(student_id: str):
     db = get_db()
@@ -342,7 +354,7 @@ async def get_therapist_c2_speech(student_id: str):
     def trend(key):
         return [{"session":row.get("session_id"),"value":speech(row)[key]} for row in reversed(history)]
     return TherapistC2SpeechDTO(**mlbase(student_id, latest, "speech analysis", "c2-pipeline-v3"), recording_count=len(history), usable_recording_count=usable, latest=speech(latest),
-        trends=dict(accuracy=[], wer=trend("wer"), latency=trend("acoustic_latency_ms"), silence_ratio=trend("silence_ratio"), peak_delta=trend("peak_delta")))
+        trends=dict(accuracy=trend("word_accuracy"), wer=trend("wer"), latency=trend("acoustic_latency_ms"), silence_ratio=trend("silence_ratio"), peak_delta=trend("peak_delta")))
 
 @router.get("/{student_id}/c3-profile", response_model=TherapistC3ProfileDTO)
 async def get_therapist_c3_profile(student_id: str):
@@ -362,13 +374,13 @@ async def get_therapist_c3_profile(student_id: str):
             explanations.append(dict(feature=f.get("feature_name", ""), contribution=contribution,
                 observed_value=number(f.get("observed_value", f.get("value"))),
                 direction="increases model score" if contribution>0 else "decreases model score" if contribution<0 else "neutral"))
-    pipeline_status = audit.get("status") or ("profile_available" if rows else "not_run")
-    missing_inputs = list(audit.get("missing_features") or [])
+    pipeline_status = doc.get("pipeline_status") or audit.get("status") or ("profile_available" if rows else "not_run")
+    missing_inputs = list(doc.get("missing_inputs") or audit.get("missing_features") or [])
     skip_reason = None
     if not rows and pipeline_status == "skipped_missing_inputs":
-        skip_reason = "C3 fusion was safely skipped because required inputs were unavailable."
+        skip_reason = "Some recent practice information is unavailable, so a learning summary is not ready yet."
     elif not rows:
-        skip_reason = "Insufficient linked multimodal data to generate a learner profile."
+        skip_reason = "More activity observations are needed before a learning summary can be shown."
     metadata = mlbase(student_id, doc or audit, "XGBoost", "c3-fusion-v1")
     metadata["available"] = bool(rows)
     return TherapistC3ProfileDTO(**metadata, primary_pattern=pattern,

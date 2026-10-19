@@ -135,8 +135,10 @@ class TherapistOverviewDTO(MLResponseBase):
     c3_available: bool = False
     c4_available: bool = False
     latest_recommendation: Optional[str] = None
-    assessment_results: List[bool] = Field(default_factory=list)
-    comprehensive_assessment_results: Dict[str, List[bool]] = Field(default_factory=dict)
+    # Preserve question text/IDs and answer values in dashboard responses;
+    # old records containing plain booleans remain valid too.
+    assessment_results: List[Any] = Field(default_factory=list)
+    comprehensive_assessment_results: Dict[str, List[Any]] = Field(default_factory=dict)
     reviewed_assessments: Dict[str, bool] = Field(default_factory=dict)
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -147,6 +149,16 @@ class TherapistOverviewDTO(MLResponseBase):
     parent_name: Optional[str] = None
 
 class KCPerformance(BaseModel):
+    KC_VISUAL_IDENTIFICATION: Optional[float] = None
+    KC_VISUAL_MATCHING: Optional[float] = None
+    KC_VISUAL_CATEGORIZATION: Optional[float] = None
+    KC_VISUAL_PATTERN: Optional[float] = None
+    KC_VISUAL_MEMORY: Optional[float] = None
+    KC_LETTER_IDENTIFICATION: Optional[float] = None
+    KC_LETTER_MATCHING: Optional[float] = None
+    KC_PHONEME_LETTER_MAPPING: Optional[float] = None
+    KC_LETTER_DECODING: Optional[float] = None
+    KC_LETTER_MEMORY: Optional[float] = None
     KC_AKSHARA_IDENTITY: Optional[float] = None
     KC_PHONEME_GRAPHEME: Optional[float] = None
     KC_WORD_RECOGNITION: Optional[float] = None

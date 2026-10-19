@@ -665,7 +665,7 @@ class DashboardTests(unittest.TestCase):
         self.assertFalse(c3.available)
         self.assertEqual(c3.pipeline_status,'skipped_missing_inputs')
         self.assertEqual(c3.missing_inputs,['acoustic_latency_ms','student_age_months'])
-        self.assertIn('safely skipped',c3.skip_reason)
+        self.assertIn('not ready yet',c3.skip_reason)
         c4=self.call(therapist.get_therapist_c4_adaptive,STUDENT)
         self.assertEqual(c4.data_quality['c3_pipeline_status'],'skipped_missing_inputs')
     def test_parent_real_session_count_duration_and_history(self):

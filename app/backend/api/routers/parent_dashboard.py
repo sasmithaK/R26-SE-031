@@ -19,9 +19,19 @@ from pathlib import Path as PathLib
 sys.path.insert(0, str(PathLib(__file__).parent.parent.parent.parent))
 from shared.database import get_db
 from services.dashboard_access import require_dashboard_access
-from services.dashboard_data import KC_NAMES, number, timestamp, records, base, pattern_profile, research_evidence, speech
+from services.dashboard_data import KC_NAMES, number, timestamp, records, base, pattern_profile, research_evidence, speech, activity_performance
 
 router=APIRouter(prefix="/api/v1/parent/students",tags=["Parent Dashboard"],dependencies=[Depends(require_dashboard_access)])
+
+@router.get("/{student_id}/activity-performance")
+async def get_parent_activity_performance(
+    student_id: str,
+    days: int = Query(30, ge=1, le=365),
+    skill_id: Optional[str] = Query(None, min_length=1, max_length=32),
+    limit: int = Query(100, ge=1, le=300),
+):
+    """Parent-safe, skill/activity-aligned C1 and C2 summaries."""
+    return await activity_performance(get_db(), student_id, days, skill_id, limit)
 
 @router.get("/{student_id}/overview",response_model=ParentOverviewDTO)
 async def get_parent_overview(student_id:str):
@@ -34,8 +44,10 @@ async def get_parent_overview(student_id:str):
     except Exception:
         pass
     assessment = (student or {}).get("comprehensive_assessment_results") or {}
+    def answered_yes(item):
+        return item is True or (isinstance(item, dict) and item.get("answer") is True)
     category_counts = {
-        key: sum(1 for item in value if isinstance(item, dict) and item.get("answer") is True)
+        key: sum(1 for item in value if answered_yes(item))
         for key, value in assessment.items() if isinstance(value, list)
     }
     assessment_summary = {
@@ -78,8 +90,10 @@ async def get_parent_assessment_summary(student_id: str):
         raise HTTPException(status_code=404, detail="Student not found")
 
     assessment = student.get("comprehensive_assessment_results") or {}
+    def answered_yes(item):
+        return item is True or (isinstance(item, dict) and item.get("answer") is True)
     category_counts = {
-        key: sum(1 for item in value if isinstance(item, dict) and item.get("answer") is True)
+        key: sum(1 for item in value if answered_yes(item))
         for key, value in assessment.items() if isinstance(value, list)
     }
     
@@ -89,7 +103,14 @@ async def get_parent_assessment_summary(student_id: str):
         "total_categories": 4,
         "reported_observations": sum(category_counts.values()),
         "by_category": category_counts,
-        "raw_responses": assessment
+        "raw_responses": assessment,
+        # The current registration questionnaire's `basic` category is also
+        # mirrored into assessment_results for legacy consumers. Return it in
+        # only one place; retain separate legacy initial submissions when no
+        # comprehensive basic category exists.
+        "initial_responses": [] if assessment.get("basic") else student.get("assessment_results", []),
+        "updated_at": student.get("comprehensive_assessment_updated_at", {}),
+        "initial_updated_at": student.get("assessment_updated_at"),
     }
 
 @router.get("/{student_id}/fluency",response_model=ParentReadingFluencyDTO)
@@ -242,9 +263,15 @@ async def get_parent_component_analytics(student_id: str):
             primary_pattern=pattern,
             confidence=number(profile.get("confidence")),
             probabilities=probabilities,
+            summary_text=latest_profile.get("llm_summary") if latest_profile else "Complete activities and a speaking task to build a combined summary.",
+            recommendations=latest_profile.get("llm_recommendations"),
+            pipeline_status=latest_profile.get("pipeline_status", "not_run"),
+            model_applied=bool(latest_profile.get("model_applied")),
             explanation_status=(
-                "Experimental synthetic-trained model output; not a diagnosis."
-                if latest_profile else "No linked multimodal profile is available."
+                "Activity summary with an experimental model result."
+                if latest_profile.get("model_applied")
+                else "Combined summary of available learning observations."
+                if latest_profile else "No combined learning summary is available."
             ),
         ),
         "c4_adaptive": component(

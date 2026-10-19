@@ -246,7 +246,7 @@ async def test_realtime_attempt_persistence_keeps_canonical_item_evidence(monkey
 
 
 @pytest.mark.asyncio
-async def test_speech_features_are_idempotent_and_keep_observed_provenance(monkeypatch):
+async def test_learning_gateway_does_not_duplicate_c2_speech_evidence(monkeypatch):
     db = AsyncMongoMockClient()["speech_research_contract"]
     monkeypatch.setattr(learning, "get_db", lambda: db)
     payload = research_payload()
@@ -262,9 +262,5 @@ async def test_speech_features_are_idempotent_and_keep_observed_provenance(monke
     await run_background_pipeline(payload, {}, payload.event_id)
     await run_background_pipeline(payload, {}, payload.event_id)
 
-    assert await db.speech_features.count_documents({}) == 1
-    stored = await db.speech_features.find_one({"speech_event_id": payload.event_id})
-    assert stored["data_origin"] == "observed"
-    assert stored["dataset_id"] == "live:student-1:session"
-    assert stored["measurement_status"] == "available"
-    assert stored["local_jitter"] == 0.01
+    assert await db.speech_features.count_documents({}) == 0
+    assert await db.speech_transcriptions.count_documents({}) == 0

@@ -167,9 +167,11 @@ async def submit_assessment(student_id: str, request: AssessmentSubmit, current_
     if not existing_student:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
 
+    submitted_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     await db.students.update_one(
         {"_id": obj_id},
-        {"$set": {"assessment_results": request.assessment_results}}
+        {"$set": {"assessment_results": request.assessment_results,
+                   "assessment_updated_at": submitted_at}}
     )
 
     await db.assessment_submissions.insert_one({
@@ -177,7 +179,8 @@ async def submit_assessment(student_id: str, request: AssessmentSubmit, current_
         "parent_id": str(parent_oid),
         "assessment_type": "initial",
         "results": request.assessment_results,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": submitted_at,
+        "schema_version": "2.0",
     })
 
     return StudentResponse(
@@ -283,8 +286,16 @@ async def submit_comprehensive_assessment(student_id: str, category: str, reques
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
 
     # Update the specific category within comprehensive_assessment_results
+    allowed_categories = {"basic", "reading", "writing", "other"}
+    if category not in allowed_categories:
+        raise HTTPException(status_code=422, detail="Unknown questionnaire category")
+
+    submitted_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    # Keep the latest response embedded for fast student/dashboard reads, and
+    # also retain every submission as an immutable history record below.
     update_field = f"comprehensive_assessment_results.{category}"
-    update_doc = {update_field: request.assessment_results}
+    update_doc = {update_field: request.assessment_results,
+                  f"comprehensive_assessment_updated_at.{category}": submitted_at}
     if category == "basic":
         update_doc["assessment_results"] = request.assessment_results
 
@@ -299,7 +310,8 @@ async def submit_comprehensive_assessment(student_id: str, category: str, reques
         "assessment_type": "comprehensive",
         "category": category,
         "results": request.assessment_results,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": submitted_at,
+        "schema_version": "2.0",
     })
 
     # Fetch updated student to return full response
