@@ -32,6 +32,13 @@ class FusionRequest(BaseModel):
     data_origin: Literal["synthetic", "observed", "unspecified"] = "unspecified"
     dataset_id: Optional[str] = None
 
+
+class SessionFusionRequest(BaseModel):
+    student_id: str
+    session_id: str
+    data_origin: Literal["synthetic", "observed", "unspecified"] = "observed"
+    dataset_id: Optional[str] = None
+
 class LearnerProfileOutput(BaseModel):
     class_probabilities: dict
     primary_pattern: str

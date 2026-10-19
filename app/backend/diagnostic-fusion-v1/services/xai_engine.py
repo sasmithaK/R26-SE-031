@@ -6,10 +6,10 @@ import numpy as np
 
 # Map model predictions to learning patterns
 SUBTYPE_MAP = {
-    0: "Typical",
-    1: "Phonological",
-    2: "Visual-Orthographic",
-    3: "Combined"
+    0: "Typical Learning Pattern",
+    1: "Phonological Learning Pattern",
+    2: "Visual-Orthographic Learning Pattern",
+    3: "Combined Learning Pattern"
 }
 
 class XAIEngine:
