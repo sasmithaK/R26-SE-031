@@ -1,3 +1,10 @@
+"""Provide deterministic response classification and scaffold safety rules.
+
+This policy supplies the auditable baseline decision, activity-specific state
+machines, and safe command translation used around the ML rankers.  It also
+enforces minimum answer pools and bounded remediation/confirmation cycles.
+"""
+
 import re
 from typing import Dict, Any, Optional, Tuple
 

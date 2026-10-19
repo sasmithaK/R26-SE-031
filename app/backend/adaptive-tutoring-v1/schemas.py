@@ -1,3 +1,9 @@
+"""Define validated API contracts for Component 4 interactions and actions.
+
+These Pydantic models are the boundary between Flutter telemetry, the tutoring
+policy, and the structured commands returned to an activity screen.
+"""
+
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Dict, Any, List, Optional
 

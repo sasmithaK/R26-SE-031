@@ -1,3 +1,10 @@
+"""Maintain per-KC mastery with Bayesian Knowledge Tracing.
+
+The engine starts with transparent provisional priors, can accept approved
+calibrated parameters, and updates mastery only from eligible learning
+evidence while avoiding irreversible probabilities of exactly zero or one.
+"""
+
 class BKTEngine:
     # Never persist an absorbing probability of exactly 0 or 1. A 0.99 ceiling
     # still represents very strong mastery, while allowing later independent

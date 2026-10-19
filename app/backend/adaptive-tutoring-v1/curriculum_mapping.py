@@ -1,4 +1,10 @@
-# curriculum_mapping.py
+"""Resolve frontend activity identifiers to canonical Component 4 KCs.
+
+The mobile activities historically used several identifier formats.  This
+module keeps that compatibility logic in one place so mastery is always read
+and updated against the correct knowledge component.
+"""
+
 from typing import Dict, Any, Optional
 
 # The frontend currently sends 'act_1', 'act_2' etc., which is ambiguous across the 4 skills.

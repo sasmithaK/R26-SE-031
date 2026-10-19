@@ -1,3 +1,9 @@
+"""Own the adaptive-tutoring service's MongoDB connection and collections.
+
+The service keeps one asynchronous client and exposes the knowledge-state and
+decision collections used by the real-time tutoring endpoint.
+"""
+
 import os
 from motor.motor_asyncio import AsyncIOMotorClient
 

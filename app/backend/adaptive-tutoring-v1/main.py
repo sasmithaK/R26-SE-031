@@ -1,3 +1,10 @@
+"""Serve the real-time Component 4 adaptive-tutoring workflow.
+
+The main interaction endpoint combines observed telemetry, starter-baseline
+context, BKT mastery, Rasch ability, scaffold ranking, and bounded targeted
+practice.  Every response also persists an auditable decision trace.
+"""
+
 from fastapi import FastAPI
 from datetime import datetime, timezone
 from schemas import InteractionRequest, TutoringResponse, NextAction

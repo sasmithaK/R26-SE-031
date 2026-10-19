@@ -1,3 +1,9 @@
+"""Estimate learner ability and item information with a 1PL Rasch model.
+
+The online update keeps a separate ability estimate for each knowledge
+component and helps the item selector compare learner ability with difficulty.
+"""
+
 import math
 from typing import List
 

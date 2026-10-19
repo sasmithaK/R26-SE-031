@@ -1,3 +1,10 @@
+"""Select safe next items from the reviewed Component 4 item bank.
+
+Hard curriculum and exposure constraints are applied before optional ML
+ranking.  The selector never generates child-facing content; it returns an
+existing authored item plus evidence explaining the choice.
+"""
+
 import math
 from typing import List, Dict, Any, Optional
 
