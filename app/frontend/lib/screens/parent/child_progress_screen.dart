@@ -6,9 +6,11 @@ import '../../services/parent_dashboard_service.dart';
 import '../../services/progress_service.dart';
 import '../../utils/avatar_utils.dart';
 import '../../widgets/app_loading_indicator.dart';
-import '../../widgets/trend_chart.dart';
 import '../../widgets/research_evidence_panel.dart';
+import '../../widgets/trend_chart.dart';
 import '../../models/curriculum_models.dart';
+import '../../models/comprehensive_assessment_questions.dart';
+import '../../models/assessment_question.dart';
 import '../games/game_factory.dart';
 
 class ChildProgressScreen extends StatefulWidget {
@@ -31,8 +33,9 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
   Map<String, dynamic>? _activityHistory;
   Map<String, dynamic>? _adaptiveInsights;
   Map<String, dynamic>? _componentAnalytics;
-  Map<String, dynamic>? _evidence;
-  String _currentFilter = "limit=10";
+  Map<String, dynamic>? _activityPerformance;
+  Map<String, dynamic>? _assessmentSummary;
+  int _activityDays = 30;
 
   @override
   void initState() {
@@ -61,32 +64,29 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
 
     final responses = studentId.isEmpty
         ? List.generate(
-            8,
+            5,
             (_) => <String, dynamic>{'_error': 'Invalid student ID'},
           )
         : await Future.wait([
             capture(_dashboardService.getOverview(studentId)),
-            capture(_dashboardService.getProgress(studentId)),
-            capture(_dashboardService.getSkills(studentId)),
-            capture(_dashboardService.getLearningPattern(studentId)),
-            capture(
-              _dashboardService.getActivityHistory(studentId, _currentFilter),
-            ),
             capture(_dashboardService.getAdaptiveInsights(studentId)),
             capture(_dashboardService.getComponentAnalytics(studentId)),
-            capture(_dashboardService.getResearchEvidence(studentId)),
+            capture(
+              _dashboardService.getActivityPerformance(
+                studentId,
+                days: _activityDays,
+              ),
+            ),
+            capture(_dashboardService.getAssessmentSummary(studentId)),
           ]);
 
     if (!mounted) return;
     setState(() {
       _overview = responses[0];
-      _progress = responses[1];
-      _skills = responses[2];
-      _learningPattern = responses[3];
-      _activityHistory = responses[4];
-      _adaptiveInsights = responses[5];
-      _componentAnalytics = responses[6];
-      _evidence = responses[7];
+      _adaptiveInsights = responses[1];
+      _componentAnalytics = responses[2];
+      _activityPerformance = responses[3];
+      _assessmentSummary = responses[4];
       _isLoading = false;
     });
   }
@@ -101,7 +101,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
     );
 
     return DefaultTabController(
-      length: 7,
+      length: 2,
       child: Scaffold(
         backgroundColor: AppColors.cream,
         appBar: AppBar(
@@ -138,35 +138,24 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
             ),
             const SizedBox(width: 6),
             PopupMenuButton<String>(
-              tooltip: 'Choose activity-history range',
+              tooltip: 'Filter activity details',
               color: AppColors.cardSurface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
               ),
               onSelected: (String newValue) {
-                if (newValue != _currentFilter) {
+                if (newValue != _activityDays.toString()) {
                   setState(() {
-                    _currentFilter = newValue;
+                    _activityDays = int.tryParse(newValue) ?? 30;
                     _isLoading = true;
                   });
                   _loadAllData();
                 }
               },
               itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: 'limit=5',
-                  child: Text('Last 5 activities'),
-                ),
-                PopupMenuItem(
-                  value: 'limit=10',
-                  child: Text('Last 10 activities'),
-                ),
-                PopupMenuItem(
-                  value: 'limit=20',
-                  child: Text('Last 20 activities'),
-                ),
-                PopupMenuItem(value: 'days=7', child: Text('Last 7 days')),
-                PopupMenuItem(value: 'days=30', child: Text('Last 30 days')),
+                PopupMenuItem(value: '7', child: Text('Last 7 days')),
+                PopupMenuItem(value: '30', child: Text('Last 30 days')),
+                PopupMenuItem(value: '90', child: Text('Last 90 days')),
               ],
               child: Container(
                 margin: const EdgeInsets.only(right: 14),
@@ -188,7 +177,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                     ),
                     const SizedBox(width: 7),
                     Text(
-                      _filterLabel(_currentFilter),
+                      'Activities · ${_activityDays}d',
                       style: AppTypography.caption(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -277,43 +266,13 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   Tab(
                     child: _ProgressTab(
                       icon: Icons.dashboard_rounded,
-                      label: 'Summary',
-                    ),
-                  ),
-                  Tab(
-                    child: _ProgressTab(
-                      icon: Icons.touch_app_rounded,
-                      label: 'Behaviour',
-                    ),
-                  ),
-                  Tab(
-                    child: _ProgressTab(
-                      icon: Icons.menu_book_rounded,
-                      label: 'Reading',
-                    ),
-                  ),
-                  Tab(
-                    child: _ProgressTab(
-                      icon: Icons.insights_rounded,
-                      label: 'Patterns',
-                    ),
-                  ),
-                  Tab(
-                    child: _ProgressTab(
-                      icon: Icons.history_rounded,
-                      label: 'History',
+                      label: 'Progress',
                     ),
                   ),
                   Tab(
                     child: _ProgressTab(
                       icon: Icons.favorite_rounded,
                       label: 'Learning support',
-                    ),
-                  ),
-                  Tab(
-                    child: _ProgressTab(
-                      icon: Icons.fact_check_rounded,
-                      label: 'Research',
                     ),
                   ),
                 ],
@@ -326,42 +285,14 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
             : TabBarView(
                 children: [
                   DashboardSection(
-                    data: _overview,
-                    onRetry: _loadAllData,
-                    child: _buildOverviewTab(),
-                  ),
-                  DashboardSection(
                     data: _componentAnalytics,
                     onRetry: _loadAllData,
                     child: _buildComponentAnalyticsTab(),
                   ),
                   DashboardSection(
-                    data: _progress,
-                    onRetry: _loadAllData,
-                    child: _buildReadingProgressTab(),
-                  ),
-                  DashboardSection(
-                    data: _learningPattern,
-                    onRetry: _loadAllData,
-                    child: _buildReadingPatternTab(),
-                  ),
-                  DashboardSection(
-                    data: _activityHistory,
-                    onRetry: _loadAllData,
-                    child: _buildActivityHistoryTab(),
-                  ),
-                  DashboardSection(
                     data: _adaptiveInsights,
                     onRetry: _loadAllData,
                     child: _buildAdaptiveInsightsTab(),
-                  ),
-                  DashboardSection(
-                    data: _evidence,
-                    onRetry: _loadAllData,
-                    child: ResearchEvidencePanel(
-                      data: _evidence ?? const {},
-                      simplified: true,
-                    ),
                   ),
                 ],
               ),
@@ -386,7 +317,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
     final components = <Map<String, dynamic>>[
       {
         'title': 'Touch and learning behaviour',
-        'subtitle': 'C1 telemetry',
+        'subtitle': 'Touch responses, attempts and response time',
         'icon': Icons.touch_app_rounded,
         'color': AppColors.calmBlue,
         'data': data['c1_behavioral'],
@@ -412,20 +343,29 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
       },
       {
         'title': 'Speaking and reading',
-        'subtitle': 'C2 audio telemetry',
+        'subtitle': 'Reading recordings and speech observations',
         'icon': Icons.record_voice_over_rounded,
         'color': AppColors.softCoral,
         'data': data['c2_speech'],
         'metrics': <Map<String, dynamic>>[
           {'label': 'Recordings captured', 'key': 'recording_count'},
-          {'label': 'Sinhala letter match', 'key': 'grapheme_accuracy', 'scale': 100.0, 'suffix': '%'},
-          {'label': 'Words read per minute', 'key': 'reading_rate_wpm', 'suffix': ' wpm'},
+          {
+            'label': 'Sinhala letter match',
+            'key': 'grapheme_accuracy',
+            'scale': 100.0,
+            'suffix': '%',
+          },
+          {
+            'label': 'Words read per minute',
+            'key': 'reading_rate_wpm',
+            'suffix': ' wpm',
+          },
           {'label': 'Audio clarity', 'key': 'recording_quality'},
         ],
       },
       {
         'title': 'Learning-pattern explanation',
-        'subtitle': 'C3 explainability',
+        'subtitle': 'A summary of patterns across available activities',
         'icon': Icons.insights_rounded,
         'color': AppColors.warmAmber,
         'data': data['c3_explainability'],
@@ -439,28 +379,11 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           },
         ],
       },
-      {
-        'title': 'Adaptive learning support',
-        'subtitle': 'C4 adaptation',
-        'icon': Icons.auto_awesome_rounded,
-        'color': AppColors.gentleGreen,
-        'data': data['c4_adaptive'],
-        'metrics': <Map<String, dynamic>>[
-          {
-            'label': 'Average mastery',
-            'key': 'average_mastery',
-            'scale': 100.0,
-            'suffix': '%',
-          },
-          {'label': 'Learning areas', 'key': 'knowledge_components'},
-          {'label': 'Recent decisions', 'key': 'decision_count'},
-        ],
-      },
     ];
 
     return ListView.separated(
       padding: const EdgeInsets.all(20),
-      itemCount: components.length + 1,
+      itemCount: components.length + 4,
       separatorBuilder: (_, _) => const SizedBox(height: 14),
       itemBuilder: (context, index) {
         if (index == 0) {
@@ -472,9 +395,147 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
             ),
           );
         }
-        return _buildComponentCard(components[index - 1]);
+        if (index <= components.length) {
+          return _buildComponentCard(components[index - 1]);
+        }
+        if (index == components.length + 1)
+          return _buildParentOverviewSummary();
+        if (index == components.length + 2) {
+          return _buildParentActivitySummary();
+        }
+        return _buildParentObservations();
       },
     );
+  }
+
+  Widget _buildParentOverviewSummary() {
+    final data = _overview ?? const <String, dynamic>{};
+    final accuracy = data['accuracy'];
+    final items = <(String, String)>[
+      ('Practice sessions', '${data['sessions_completed'] ?? 0}'),
+      (
+        'Practice time',
+        metricText(data['practice_time_minutes'], suffix: ' min', decimals: 0),
+      ),
+      (
+        'Latest first-try accuracy',
+        accuracy is num ? '${accuracy.round()}%' : '—',
+      ),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Overall progress', style: AppTypography.heading(fontSize: 17)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: items
+                .map(
+                  (item) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.slateBg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.$2,
+                          style: AppTypography.heading(fontSize: 16),
+                        ),
+                        Text(
+                          item.$1,
+                          style: AppTypography.caption(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParentActivitySummary() {
+    final activities =
+        _activityPerformance?['activities'] as List<dynamic>? ?? const [];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Activity-by-activity progress',
+            style: AppTypography.heading(fontSize: 17),
+          ),
+          const SizedBox(height: 8),
+          if (activities.isEmpty)
+            const Text(
+              'Activity details will appear after the first completed activity.',
+            )
+          else
+            ...activities.map((raw) {
+              final row = Map<String, dynamic>.from(raw as Map);
+              final accuracy = row['first_attempt_accuracy'];
+              final voice = Map<String, dynamic>.from(
+                row['voice'] as Map? ?? const {},
+              );
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  '${_parentSkillLabel(row['skill_id'])} · ${row['activity_name'] ?? _activityLabel(row['activity_id'])}',
+                ),
+                subtitle: Text(
+                  '${row['trials'] ?? 0} responses · ${row['abandoned_trials'] ?? 0} unfinished · ${voice['usable_recordings'] ?? 0}/${voice['recordings'] ?? 0} recordings clear enough to measure',
+                ),
+                trailing: Text(
+                  accuracy is num ? '${(accuracy * 100).round()}%' : '—',
+                ),
+              );
+            }),
+          const Text(
+            'Percentages describe recorded practice, not a diagnosis.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _parentSkillLabel(dynamic raw) =>
+      switch ((raw?.toString() ?? '').replaceFirst('skill_', '')) {
+        '1' => 'Picture skills',
+        '2' => 'Letter skills',
+        '3' => 'Word skills',
+        '4' => 'Sentence skills',
+        '5' => 'Reading comprehension',
+        '6' => 'Textbook reading',
+        _ => 'Other practice',
+      };
+
+  String _activityLabel(dynamic raw) {
+    final match = RegExp(r'(\d+)$').firstMatch(raw?.toString() ?? '');
+    return match == null ? 'Activity' : 'Activity ${match.group(1)}';
   }
 
   Widget _buildComponentCard(Map<String, dynamic> definition) {
@@ -549,7 +610,10 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Text(
                   component['summary_text'] as String,
-                  style: AppTypography.caption(fontSize: 12, color: AppColors.textSecondary),
+                  style: AppTypography.caption(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             Wrap(
@@ -571,7 +635,9 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                       )
                     : metric['key'] == 'recording_quality'
                     ? qualityLabels[value?.toString()] ?? 'Not available'
-                    : (value?.toString().trim().isNotEmpty == true ? value.toString() : '—');
+                    : (value?.toString().trim().isNotEmpty == true
+                          ? value.toString()
+                          : '—');
                 return Container(
                   constraints: const BoxConstraints(minWidth: 110),
                   padding: const EdgeInsets.symmetric(
@@ -608,7 +674,13 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
             if (component['data_origin'] == 'synthetic')
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text('Demonstration data', style: AppTypography.caption(fontSize: 11, color: AppColors.warmAmber)),
+                child: Text(
+                  'Demonstration data',
+                  style: AppTypography.caption(
+                    fontSize: 11,
+                    color: AppColors.warmAmber,
+                  ),
+                ),
               ),
           ],
         ],
@@ -672,6 +744,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          _buildParentObservations(),
           const SizedBox(height: 24),
           Container(
             width: double.infinity,
@@ -714,6 +788,133 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           const SizedBox(height: 16),
           _buildFluencyCard(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildParentObservations() {
+    final data = _assessmentSummary ?? const <String, dynamic>{};
+    if (data['_error'] != null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Parent observations could not be loaded. Refresh this page to try again.',
+            style: AppTypography.body(color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
+    final raw = Map<String, dynamic>.from(data['raw_responses'] ?? const {});
+    final categories = <String, Map<String, dynamic>>{
+      'basic': {
+        'title': 'Basic questions',
+        'questions': ComprehensiveAssessmentData.basicAssessment,
+      },
+      'reading': {
+        'title': 'Reading and visual skills',
+        'questions': ComprehensiveAssessmentData.readingAssessment,
+      },
+      'writing': {
+        'title': 'Writing',
+        'questions': ComprehensiveAssessmentData.writingAssessment,
+      },
+      'other': {
+        'title': 'Other observations',
+        'questions': ComprehensiveAssessmentData.otherAssessment,
+      },
+    };
+    List<dynamic> responses(String key) =>
+        raw[key] is List ? raw[key] as List : const [];
+
+    Widget renderAnswers(List<dynamic> values, List<dynamic> questions) {
+      if (values.isEmpty) {
+        return const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 14),
+          child: Text('Not completed yet.'),
+        );
+      }
+      return Column(
+        children: List.generate(values.length, (index) {
+          final value = values[index];
+          final answer = value is Map ? value['answer'] : value;
+          final question = index < questions.length ? questions[index] : null;
+          final text = value is Map
+              ? (value['question_si'] ??
+                        value['question_en'] ??
+                        value['question_text'])
+                    ?.toString()
+              : null;
+          final questionText =
+              text ??
+              (question is ComprehensiveQuestion
+                  ? question.text
+                  : question is AssessmentQuestion
+                  ? question.questionText
+                  : 'Question ${index + 1}');
+          return ListTile(
+            dense: true,
+            title: Text(questionText, style: AppTypography.body(fontSize: 13)),
+            trailing: Text(
+              answer == true
+                  ? 'ඔව් / Yes'
+                  : answer == false
+                  ? 'නැත / No'
+                  : 'පිළිතුරු නැත / Not answered',
+              style: AppTypography.caption(fontWeight: FontWeight.w700),
+            ),
+          );
+        }),
+      );
+    }
+
+    final initial = data['initial_responses'] is List
+        ? data['initial_responses'] as List
+        : const <dynamic>[];
+    final completed = categories.keys
+        .where((key) => responses(key).isNotEmpty)
+        .length;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'What you’ve shared',
+              style: AppTypography.heading(fontSize: 18),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$completed of ${categories.length} questionnaire sections completed',
+              style: AppTypography.caption(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Parent-reported observations for discussion, not a diagnosis.',
+              style: AppTypography.caption(color: AppColors.textSecondary),
+            ),
+            if (initial.isNotEmpty)
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: const Text('Initial child observations'),
+                children: [
+                  renderAnswers(initial, AssessmentQuestion.allQuestions),
+                ],
+              ),
+            ...categories.entries.map((entry) {
+              final values = responses(entry.key);
+              final questions = entry.value['questions'] as List<dynamic>;
+              return ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: Text(
+                  '${entry.value['title']} (${values.length}/${questions.length})',
+                ),
+                children: [renderAnswers(values, questions)],
+              );
+            }),
+          ],
+        ),
       ),
     );
   }
