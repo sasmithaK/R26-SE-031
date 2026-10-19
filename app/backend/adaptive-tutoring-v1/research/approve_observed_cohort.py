@@ -9,6 +9,7 @@ from pymongo import MongoClient
 
 
 def main() -> None:
+    """Approve a reviewed observed cohort for later calibration."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset-id", required=True)
     parser.add_argument("--approved-by", required=True)

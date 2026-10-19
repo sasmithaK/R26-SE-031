@@ -18,6 +18,7 @@ from pymongo import MongoClient
 
 
 def _timestamp(value: Any) -> Optional[datetime]:
+    """Normalize stored datetime or ISO text to a timezone-aware value."""
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
     if isinstance(value, str) and value:
@@ -30,6 +31,7 @@ def _timestamp(value: Any) -> Optional[datetime]:
 
 
 def _group_id(row: Dict[str, Any]) -> str:
+    """Resolve a core equivalent-group ID from a policy or evidence row."""
     value = row.get("equivalent_group_id") or row.get("item_id") or row.get("current_item") or ""
     return re.sub(r"V\d+$", "", str(value), flags=re.IGNORECASE)
 
@@ -130,6 +132,7 @@ def build_backfill_updates(
 
 
 def main() -> None:
+    """Plan or apply evidence-backed policy-outcome links in MongoDB."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--student-id")
     parser.add_argument("--session-id")

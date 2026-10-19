@@ -39,6 +39,7 @@ SKILLS_IN_SCOPE = {"skill_1", "skill_2", "skill_3", "skill_4"}
 
 
 def _verify_bank() -> dict[str, Any]:
+    """Assert the reviewed item bank has safe equivalent-task coverage."""
     items = build_items()
     summary = validation_summary(items)
     active = [
@@ -91,6 +92,7 @@ def _verify_bank() -> dict[str, Any]:
 
 
 def _scenario_telemetry(spec: dict[str, Any]) -> SimpleNamespace:
+    """Build deterministic telemetry for one scaffold-family scenario."""
     option_count = spec["options"]
     return SimpleNamespace(
         supported_actions=spec["capabilities"],
@@ -108,6 +110,7 @@ def _scenario_telemetry(spec: dict[str, Any]) -> SimpleNamespace:
 
 
 def _verify_policy() -> dict[str, Any]:
+    """Exercise action ranking and command translation across task families."""
     model = ActionPolicyModel()
     engine = PolicyEngine()
     scenarios = {
@@ -232,6 +235,7 @@ def _practice_intent(
     *,
     role: str,
 ) -> dict[str, Any]:
+    """Build the diagnosed target contract for practice selection tests."""
     metadata = derive_practice_metadata(core)
     target_units = metadata["primary_targets"]
     component_units = metadata["component_units"]
@@ -515,6 +519,7 @@ def _verify_targeted_practice() -> dict[str, Any]:
 
 
 def main() -> None:
+    """Run and print the complete offline Component 4 acceptance report."""
     result = {
         "component": "C4_ADAPTIVE_TUTORING",
         "overall_status": "PASS",

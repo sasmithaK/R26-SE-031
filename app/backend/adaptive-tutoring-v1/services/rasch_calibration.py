@@ -17,6 +17,8 @@ from typing import Dict, Iterable, List, Mapping
 
 @dataclass(frozen=True)
 class RaschCalibrationResult:
+    """Offline item, learner, sample, and convergence estimates."""
+
     item_difficulties: Dict[str, float]
     item_sample_counts: Dict[str, int]
     student_abilities: Dict[str, float]
@@ -27,6 +29,7 @@ class RaschCalibrationResult:
 
 
 def _sigmoid(value: float) -> float:
+    """Evaluate a numerically stable logistic function."""
     if value >= 0:
         inverse = exp(-value)
         return 1.0 / (1.0 + inverse)
@@ -123,6 +126,7 @@ def _log_loss(
     theta: Mapping[str, float],
     difficulty: Mapping[str, float],
 ) -> float:
+    """Calculate average binary cross-entropy for Rasch predictions."""
     total = 0.0
     count = 0
     for student_id, item_id, observed in rows:

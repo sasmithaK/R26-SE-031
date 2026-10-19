@@ -17,6 +17,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
 def main() -> None:
+    """Print a read-only provenance and Component 4 integrity report."""
     uri = os.getenv("MONGODB_URI") or os.getenv("MONGODB_URL")
     if not uri:
         raise RuntimeError("Set MONGODB_URI or MONGODB_URL.")

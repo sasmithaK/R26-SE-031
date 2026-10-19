@@ -9,6 +9,7 @@ ORIGINS = {"observed", "synthetic", "public_external"}
 
 
 def validate_row(row: Dict[str, Any]) -> list[str]:
+    """Return provenance and label errors for one research dataset row."""
     errors = []
     if row.get("data_origin") not in ORIGINS:
         errors.append("INVALID_DATA_ORIGIN")
@@ -28,6 +29,7 @@ def validate_row(row: Dict[str, Any]) -> list[str]:
 def provenance(
     *, data_origin: str, dataset_id: str, validation_status: str
 ) -> Dict[str, Any]:
+    """Build non-calibrating provenance fields for imported/generated data."""
     if data_origin not in ORIGINS:
         raise ValueError(f"Unsupported data origin: {data_origin}")
     return {
