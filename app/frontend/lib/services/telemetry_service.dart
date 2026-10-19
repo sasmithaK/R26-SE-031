@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'telemetry/telemetry_plugin.dart';
 import 'student_service.dart';
+import '../config/api_config.dart';
 
 // ---------------------------------------------------------------------------
 // Rich Touch Point — normalized screen-relative coordinates with timestamp
@@ -67,6 +68,8 @@ Map<String, dynamic> buildTelemetrySessionPayload({
   return <String, dynamic>{
     'student_id': studentId,
     'session_id': sessionId,
+    'data_origin': ApiConfig.dataOrigin,
+    'dataset_id': 'live:$studentId:$sessionId',
     'skill_id': _sessionDimension(events, 'skill_id'),
     'activity_id': _sessionDimension(events, 'activity_id'),
     'started_at': startedAt.toUtc().toIso8601String(),

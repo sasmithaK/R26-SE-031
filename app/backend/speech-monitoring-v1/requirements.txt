@@ -9,6 +9,7 @@ pymongo[srv]>=4.6.1
 dnspython>=2.6.1
 certifi
 python-dotenv>=1.0.1
+PyJWT>=2.8.0
 
 # NLP and Audio Processing
 torch

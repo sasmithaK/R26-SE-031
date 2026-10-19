@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiConfig {
+  static String get dataOrigin =>
+      dotenv.env['DATA_ORIGIN'] == 'synthetic' ? 'synthetic' : 'observed';
+
   /// Check if the environment is set to development
   static bool get isDevelopment {
     return dotenv.env['ENVIRONMENT'] != 'production';
@@ -13,6 +16,13 @@ class ApiConfig {
     const configuredHost = String.fromEnvironment('API_HOST');
     if (configuredHost.isNotEmpty) {
       return configuredHost;
+    }
+    // For a physical device on the same Wi-Fi, set API_HOST in .env to the
+    // computer's LAN IPv4 address (for example, 192.168.1.25).  The dart
+    // define above still takes precedence for CI/emulator builds.
+    final envHost = dotenv.env['API_HOST']?.trim() ?? '';
+    if (envHost.isNotEmpty) {
+      return envHost;
     }
     if (kIsWeb) {
       return 'localhost';
@@ -32,6 +42,8 @@ class ApiConfig {
   /// Auth & Profiles API (Port 8015)
   static String get authBaseUrl {
     if (isDevelopment) {
+      final configured = dotenv.env['AUTH_BASE_URL']?.trim() ?? '';
+      if (configured.isNotEmpty) return configured;
       return 'http://$_localHost:8015/api/v1/auth';
     }
     return 'https://adaptedmind-auth-api.onrender.com/api/v1/auth';
@@ -40,6 +52,8 @@ class ApiConfig {
   /// Specialist API (Port 8015)
   static String get specialistBaseUrl {
     if (isDevelopment) {
+      final configured = dotenv.env['SPECIALIST_BASE_URL']?.trim() ?? '';
+      if (configured.isNotEmpty) return configured;
       return 'http://$_localHost:8015/api/v1/specialists';
     }
     return 'https://adaptedmind-auth-api.onrender.com/api/v1/specialists';

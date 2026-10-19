@@ -417,18 +417,10 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         'color': AppColors.softCoral,
         'data': data['c2_speech'],
         'metrics': <Map<String, dynamic>>[
-          {
-            'label': 'Matched reading sounds',
-            'key': 'grapheme_accuracy',
-            'scale': 100.0,
-            'suffix': '%',
-          },
-          {
-            'label': 'Reading pace',
-            'key': 'reading_rate_wpm',
-            'suffix': ' wpm',
-          },
-          {'label': 'Recording quality', 'key': 'recording_quality'},
+          {'label': 'Recordings captured', 'key': 'recording_count'},
+          {'label': 'Sinhala letter match', 'key': 'grapheme_accuracy', 'scale': 100.0, 'suffix': '%'},
+          {'label': 'Words read per minute', 'key': 'reading_rate_wpm', 'suffix': ' wpm'},
+          {'label': 'Audio clarity', 'key': 'recording_quality'},
         ],
       },
       {
@@ -551,12 +543,25 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 color: AppColors.textSecondary,
               ),
             )
-          else
+          else ...[
+            if (component['summary_text'] is String)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  component['summary_text'] as String,
+                  style: AppTypography.caption(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: metrics.map((metric) {
                 final value = component[metric['key']];
+                const qualityLabels = <String, String>{
+                  'valid': 'Clear enough to measure',
+                  'retry_required': 'Needs a clearer recording',
+                  'uncertain': 'Uncertain',
+                };
                 final text = value is num
                     ? metricText(
                         value,
@@ -564,9 +569,9 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                         decimals: value % 1 == 0 ? 0 : 1,
                         scale: (metric['scale'] as num?)?.toDouble() ?? 1,
                       )
-                    : (value?.toString().trim().isNotEmpty == true
-                          ? value.toString()
-                          : '—');
+                    : metric['key'] == 'recording_quality'
+                    ? qualityLabels[value?.toString()] ?? 'Not available'
+                    : (value?.toString().trim().isNotEmpty == true ? value.toString() : '—');
                 return Container(
                   constraints: const BoxConstraints(minWidth: 110),
                   padding: const EdgeInsets.symmetric(
@@ -600,6 +605,12 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 );
               }).toList(),
             ),
+            if (component['data_origin'] == 'synthetic')
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text('Demonstration data', style: AppTypography.caption(fontSize: 11, color: AppColors.warmAmber)),
+              ),
+          ],
         ],
       ),
     );

@@ -216,6 +216,8 @@ class SpeechTrends(BaseModel):
     peak_delta: List[Dict[str, Any]]
 
 class TherapistC2SpeechDTO(MLResponseBase):
+    recording_count: int = 0
+    usable_recording_count: int = 0
     latest: SpeechLatest
     trends: SpeechTrends
 

@@ -428,7 +428,7 @@ class _TherapistStudentDetailScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildModelInfo(_c1Behavioral ?? {}),
+          _buildModelInfo(_c1Behavioral ?? {}, humanReadable: true),
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -445,7 +445,7 @@ class _TherapistStudentDetailScreenState
                   SizedBox(
                     width: cardWidth,
                     child: _buildStatCard(
-                      "First-Attempt Accuracy",
+                      "Correct on first try",
                       firstAttemptAcc != null
                           ? "${((firstAttemptAcc as num) * 100).toInt()}%"
                           : "Insufficient data",
@@ -456,7 +456,7 @@ class _TherapistStudentDetailScreenState
                   SizedBox(
                     width: cardWidth,
                     child: _buildStatCard(
-                      "Retry Rate",
+                      "Rounds needing another try",
                       retryRate != null
                           ? "${((retryRate as num) * 100).toInt()}%"
                           : "Insufficient data",
@@ -749,8 +749,13 @@ class _TherapistStudentDetailScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildModelInfo(_c2Speech ?? {}),
+          _buildModelInfo(_c2Speech ?? {}, humanReadable: true),
           const SizedBox(height: 16),
+          _buildEvidenceRow(
+            'Recent recordings with usable measures',
+            '${_c2Speech?['usable_recording_count'] ?? 0} of ${_c2Speech?['recording_count'] ?? 0}',
+          ),
+          const SizedBox(height: 12),
 
           // Hero Card: Combined Reading Evidence
           Container(
@@ -788,16 +793,16 @@ class _TherapistStudentDetailScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "STT EVIDENCE",
+                            "READING TRANSCRIPTION",
                             style: AppTypography.caption(
                               fontWeight: FontWeight.bold,
                               color: AppColors.textSecondary,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          _buildEvidenceRow("WER", metricText(latest['wer'])),
+                          _buildEvidenceRow("Word reading difference", metricText(latest['wer'], scale: 100, suffix: '%')),
                           _buildEvidenceRow(
-                            "Confidence",
+                            "Speech recognition confidence",
                             metricText(
                               latest['stt_confidence'],
                               scale: 100,
@@ -818,7 +823,7 @@ class _TherapistStudentDetailScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "ACOUSTIC EVIDENCE",
+                            "SPEECH TIMING MEASURES",
                             style: AppTypography.caption(
                               fontWeight: FontWeight.bold,
                               color: AppColors.textSecondary,
@@ -834,16 +839,16 @@ class _TherapistStudentDetailScreenState
                             ),
                           ),
                           _buildEvidenceRow(
-                            "Silence",
-                            metricText(latest['silence_ratio']),
+                            "Pausing within speech",
+                            metricText(latest['silence_ratio'], scale: 100, suffix: '%'),
                           ),
                           _buildEvidenceRow(
-                            "Peak Δ",
+                            "Syllable beat difference",
                             metricText(latest['peak_delta']),
                           ),
                           _buildEvidenceRow(
                             "Quality",
-                            "${latest['recording_quality'] ?? 'Unknown'}",
+                            _friendlyC2Quality(latest['recording_quality']),
                           ),
                         ],
                       ),
@@ -890,7 +895,7 @@ class _TherapistStudentDetailScreenState
 
           const SizedBox(height: 24),
           _buildEvidenceRow(
-            'Thresholded pauses (200–3000 ms)',
+            'Detected pauses (200–3000 ms)',
             metricText(latest['pause_count'], decimals: 0),
           ),
           _buildEvidenceRow(
@@ -898,11 +903,11 @@ class _TherapistStudentDetailScreenState
             metricText(latest['mean_pause_duration_ms'], suffix: ' ms'),
           ),
           _buildEvidenceRow(
-            'Detected pause ratio',
-            metricText(latest['pause_ratio']),
+            'Time spent pausing',
+            metricText(latest['pause_ratio'], scale: 100, suffix: '%'),
           ),
           _buildEvidenceRow(
-            'Active-span duration',
+            'Speaking time',
             metricText(latest['speech_duration_ms'], suffix: ' ms'),
           ),
           const Text(
@@ -952,7 +957,7 @@ class _TherapistStudentDetailScreenState
             children: [
               Expanded(
                 child: _buildStatCard(
-                  "Current Jitter",
+                  "Voice pitch variation (exploratory)",
                   metricText(latest['jitter']),
                   Icons.multiline_chart,
                   AppColors.calmBlue,
@@ -961,7 +966,7 @@ class _TherapistStudentDetailScreenState
               const SizedBox(width: 12),
               Expanded(
                 child: _buildStatCard(
-                  "Current Shimmer",
+                  "Voice volume variation (exploratory)",
                   metricText(latest['shimmer']),
                   Icons.waves,
                   AppColors.calmBlue,
@@ -973,7 +978,7 @@ class _TherapistStudentDetailScreenState
           const SizedBox(height: 24),
           if (latTrend.isNotEmpty) ...[
             TrendChart(
-              title: "Acoustic Latency (ms)",
+              title: "Time before starting to speak (ms)",
               dataPoints: latTrend,
               lineColor: AppColors.warmAmber,
               minY: 0,
@@ -982,9 +987,12 @@ class _TherapistStudentDetailScreenState
           const SizedBox(height: 24),
           if (trends['wer'] != null) ...[
             TrendChart(
-              title: "Word Error Rate (WER)",
+              title: "Difference between expected and recognized words",
               dataPoints: (trends['wer'] as List)
-                  .map((e) => (e['value'] as num?)?.toDouble())
+                  .map((e) {
+                    final value = (e['value'] as num?)?.toDouble();
+                    return value == null ? null : value * 100;
+                  })
                   .toList(),
               lineColor: AppColors.softCoral,
               minY: 0,
@@ -1998,7 +2006,16 @@ class _TherapistStudentDetailScreenState
     );
   }
 
-  Widget _buildModelInfo(Map<String, dynamic> data) {
+  Widget _buildModelInfo(Map<String, dynamic> data, {bool humanReadable = false}) {
+    final available = data['available'] == true;
+    final origin = data['data_origin']?.toString() ?? 'unspecified';
+    final message = humanReadable
+        ? !available
+            ? 'No observations have been recorded yet.'
+            : origin == 'synthetic'
+                ? 'Demonstration data. These measures show the system pipeline and are not findings about the child.'
+                : 'Practice observations for discussion. These measures are not a diagnosis.'
+        : 'Model: ${data['model_version']} | Features: ${data['feature_version']}';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -2011,14 +2028,16 @@ class _TherapistStudentDetailScreenState
         runSpacing: 6,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          const FaIcon(
-            FontAwesomeIcons.microchip,
-            size: 12,
-            color: AppColors.textSecondary,
-          ),
+          humanReadable
+              ? Icon(
+                  available ? Icons.info_outline_rounded : Icons.hourglass_empty_rounded,
+                  size: 12,
+                  color: AppColors.textSecondary,
+                )
+              : const FaIcon(FontAwesomeIcons.microchip, size: 12, color: AppColors.textSecondary),
           const SizedBox(width: 8),
           Text(
-            "Model: ${data['model_version']} | Features: ${data['feature_version']}",
+            message,
             style: AppTypography.caption(
               fontSize: 12,
               color: AppColors.textSecondary,
@@ -2028,6 +2047,13 @@ class _TherapistStudentDetailScreenState
       ),
     );
   }
+
+  String _friendlyC2Quality(dynamic quality) => switch (quality?.toString()) {
+    'valid' => 'Clear enough to measure',
+    'retry_required' => 'Needs a clearer recording',
+    'uncertain' => 'Measurement uncertain',
+    _ => 'Not available',
+  };
 
   // ==========================================
   // CHILD PROFILE DETAILS CARD

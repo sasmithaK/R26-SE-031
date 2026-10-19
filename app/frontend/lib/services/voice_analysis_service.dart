@@ -153,7 +153,7 @@ class VoiceAnalysisService {
     String? itemId,
     String? roundId,
     String? datasetId,
-    String dataOrigin = 'observed',
+    String? dataOrigin,
     List<String> allowedVariants = const [],
     int expectedSyllables = 0,
     int tStimulus = 0,
@@ -183,8 +183,8 @@ class VoiceAnalysisService {
       if (activityId != null) request.fields['activity_id'] = activityId;
       if (itemId != null) request.fields['item_id'] = itemId;
       if (roundId != null) request.fields['round_id'] = roundId;
-      if (datasetId != null) request.fields['dataset_id'] = datasetId;
-      request.fields['data_origin'] = dataOrigin;
+      request.fields['dataset_id'] = datasetId ?? 'live:$studentId:$sessionId';
+      request.fields['data_origin'] = dataOrigin ?? ApiConfig.dataOrigin;
       request.fields['allowed_variants_json'] = jsonEncode(allowedVariants);
       request.fields['expected_text'] = expectedText;
       request.fields['expected_syllables'] = expectedSyllables.toString();

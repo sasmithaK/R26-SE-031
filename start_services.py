@@ -196,6 +196,16 @@ def run_all():
                 p.kill()
         print("  All services stopped.")
 
+def run_local_c1c2():
+    """Start only C5, C1 and C2 for local student/dashboard testing."""
+    selected = [svc for svc in SERVICES if svc["name"] in {"C5-API", "C1-CBME", "C2-AVLI"}]
+    original = SERVICES[:]
+    try:
+        SERVICES[:] = selected
+        run_all()
+    finally:
+        SERVICES[:] = original
+
 def test_all():
     """Test connections to all services."""
     print("\n" + "=" * 70)
@@ -264,10 +274,12 @@ if __name__ == "__main__":
         arg = sys.argv[1].lower()
         if arg == "--test":
             test_all()
+        elif arg in {"--local-c1c2", "--c1c2"}:
+            run_local_c1c2()
         elif arg.startswith("--c"):
             start_single(arg)
         else:
             print(f"[ERROR] Unknown argument: {arg}")
-            print("Usage: python start_services.py [--test|--c1|--c2|--c3|--c4|--c5]")
+            print("Usage: python start_services.py [--test|--local-c1c2|--c1|--c2|--c3|--c4|--c5]")
     else:
         run_all()

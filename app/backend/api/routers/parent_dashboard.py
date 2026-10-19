@@ -161,7 +161,7 @@ async def get_parent_component_analytics(student_id: str):
     """
     db = get_db()
     summaries = (await records(db, "session_summaries", student_id))[:10]
-    speech_rows = (await records(db, "speech_features", student_id))[:10]
+    speech_rows = (await records(db, "speech_features", student_id))[:50]
     profile_rows = await records(db, "learner_profiles", student_id, 1)
     state_rows = await records(db, "knowledge_states", student_id, 1)
     decisions = (await records(db, "adaptive_decisions", student_id))[:50]
@@ -178,6 +178,11 @@ async def get_parent_component_analytics(student_id: str):
         c1_trend.append({"session": row.get("session_id"), "accuracy": accuracy})
 
     speech_latest = speech(latest_speech)
+    quality_label = {
+        "valid": "Clear enough to measure",
+        "retry_required": "Audio needs a clearer recording",
+        "uncertain": "Measurement is uncertain",
+    }.get(speech_latest.get("recording_quality"), "Not available")
     c2_trend = []
     for row in reversed(speech_rows):
         values = speech(row)
@@ -206,16 +211,24 @@ async def get_parent_component_analytics(student_id: str):
         **base(student_id, latest_summary, "Latest linked component records"),
         "c1_behavioral": component(
             latest_summary,
+            session_count=len(summaries),
+            summary_text=(f"Touch and activity observations from {len(summaries)} recent sessions." if summaries else "Complete an activity to begin collecting touch and activity observations."),
             first_attempt_accuracy=number(overall.get("accuracy")),
             retry_rate=number(overall.get("retry_rate")),
             median_response_latency_ms=number(overall.get("median_response_latency_ms")),
+            correction_rate=number(overall.get("correction_rate")),
+            audio_replay_rate=number(overall.get("audio_replay_rate")),
             fatigue_proxy=number(latest_summary.get("behavioral_fatigue_proxy")),
             trend=c1_trend,
         ),
         "c2_speech": component(
             latest_speech,
+            recording_count=len(speech_rows),
+            summary_text=(f"Reading recording captured. {quality_label}." if latest_speech else "Complete a speaking activity to begin collecting reading observations."),
             wer=speech_latest.get("wer"),
+            word_accuracy=speech_latest.get("word_accuracy"),
             acoustic_latency_ms=speech_latest.get("acoustic_latency_ms"),
+            pause_count=speech_latest.get("pause_count"),
             pause_ratio=speech_latest.get("pause_ratio"),
             grapheme_accuracy=speech_latest.get("grapheme_accuracy"),
             reading_rate_wpm=speech_latest.get("reading_rate_wpm"),

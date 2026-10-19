@@ -67,6 +67,7 @@ async def readiness_check():
 
     stt = get_stt_status()
     database_ready = False
+    auth_configured = bool(os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET"))
     error_type = None
     try:
         await get_db().command("ping")
@@ -74,7 +75,7 @@ async def readiness_check():
     except Exception as exc:
         error_type = type(exc).__name__
 
-    ready = stt["status"] == "ready" and database_ready
+    ready = stt["status"] == "ready" and database_ready and auth_configured
     return JSONResponse(
         status_code=200 if ready else 503,
         content={
@@ -82,6 +83,7 @@ async def readiness_check():
             "service": "speech-monitoring-v1",
             "stt": stt,
             "database": "ready" if database_ready else "unavailable",
+            "authentication": "configured" if auth_configured else "JWT_SECRET_KEY is missing",
             "error_type": error_type,
         },
     )

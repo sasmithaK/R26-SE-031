@@ -239,9 +239,9 @@ async def submit_telemetry(
     session_doc["student_id"] = str(student_oid)
     session_doc["submitted_at"] = datetime.now(timezone.utc).isoformat()
     session_doc["schema_version"] = "2.0"
-    session_doc["data_origin"] = "observed"
-    session_doc["dataset_id"] = f"live:{req.student_id}:{req.session_id}"
-    session_doc["validation_status"] = "operational_observation"
+    session_doc["data_origin"] = req.data_origin
+    session_doc["dataset_id"] = req.dataset_id or f"live:{req.student_id}:{req.session_id}"
+    session_doc["validation_status"] = "synthetic_pipeline_test" if req.data_origin == "synthetic" else "operational_observation"
     session_doc["calibration_eligible"] = False
 
     session_key = {"student_id": req.student_id, "session_id": req.session_id}
@@ -281,9 +281,9 @@ async def submit_telemetry(
         event["schema_version"] = "2.0"
         event["session_id"] = req.session_id
         event["student_id"] = req.student_id
-        event["data_origin"] = "observed"
+        event["data_origin"] = session_doc["data_origin"]
         event["dataset_id"] = session_doc["dataset_id"]
-        event["validation_status"] = "operational_observation"
+        event["validation_status"] = session_doc["validation_status"]
         event["calibration_eligible"] = False
         await _validate_component_four_research_event(db, event)
 
@@ -319,9 +319,9 @@ async def submit_telemetry(
     validated_req = TelemetrySessionSubmit.model_validate(session_doc)
     summary = extract_session_features(validated_req).model_dump()
     summary.update({
-        "data_origin": "observed",
+        "data_origin": session_doc["data_origin"],
         "dataset_id": session_doc["dataset_id"],
-        "validation_status": "operational_observation",
+        "validation_status": session_doc["validation_status"],
         "calibration_eligible": False,
     })
     await db.session_summaries.update_one(
@@ -338,9 +338,9 @@ async def submit_telemetry(
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "feature_version": "kinematics-v2",
             "measurement_status": "available",
-            "data_origin": "observed",
+            "data_origin": session_doc["data_origin"],
             "dataset_id": session_doc["dataset_id"],
-            "validation_status": "operational_observation",
+            "validation_status": session_doc["validation_status"],
             **motion,
             "dwell_time_ms": motion.get("mean_dwell_time_ms", 0.0),
         }

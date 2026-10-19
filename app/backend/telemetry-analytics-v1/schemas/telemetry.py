@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 
 class TouchPoint(BaseModel):
@@ -121,6 +121,8 @@ class TelemetrySessionSubmit(BaseModel):
     """Full session payload submitted after activity completion."""
     student_id: str
     session_id: str = Field(..., description="Unique identifier for the session instance")
+    data_origin: Literal["observed", "synthetic"] = "observed"
+    dataset_id: Optional[str] = None
     skill_id: str = Field(default="unknown", description="Skill ID being practiced")
     activity_id: str = Field(default="unknown", description="Activity ID being practiced")
     started_at: Optional[str] = Field(

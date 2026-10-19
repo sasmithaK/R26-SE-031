@@ -338,9 +338,10 @@ async def get_therapist_c1_behavioral(student_id: str):
 async def get_therapist_c2_speech(student_id: str):
     history = (await records(get_db(), "speech_features", student_id))[:10]
     latest = history[0] if history else {}
+    usable = sum(1 for row in history if row.get("measurement_status") in {"valid", "available", "synthetic_features"})
     def trend(key):
         return [{"session":row.get("session_id"),"value":speech(row)[key]} for row in reversed(history)]
-    return TherapistC2SpeechDTO(**mlbase(student_id, latest, "speech prototype", "speech-v1"), latest=speech(latest),
+    return TherapistC2SpeechDTO(**mlbase(student_id, latest, "speech analysis", "c2-pipeline-v3"), recording_count=len(history), usable_recording_count=usable, latest=speech(latest),
         trends=dict(accuracy=[], wer=trend("wer"), latency=trend("acoustic_latency_ms"), silence_ratio=trend("silence_ratio"), peak_delta=trend("peak_delta")))
 
 @router.get("/{student_id}/c3-profile", response_model=TherapistC3ProfileDTO)
