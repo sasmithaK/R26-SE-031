@@ -1,3 +1,5 @@
+"""Verify scaffold-model ranking, reproducibility, and activation safeguards."""
+
 import json
 from types import SimpleNamespace
 

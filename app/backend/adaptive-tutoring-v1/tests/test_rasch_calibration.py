@@ -1,3 +1,5 @@
+"""Verify observed-data governance and 1PL/Rasch calibration behavior."""
+
 from services.rasch_calibration import fit_rasch
 from calibrate_item_bank import _independent_responses
 

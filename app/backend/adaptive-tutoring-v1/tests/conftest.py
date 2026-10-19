@@ -1,3 +1,5 @@
+"""Share asynchronous test fixtures for the Component 4 FastAPI service."""
+
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient

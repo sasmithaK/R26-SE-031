@@ -1,3 +1,5 @@
+"""Verify historical scaffold decisions link to their observable outcomes."""
+
 from datetime import datetime, timezone
 
 from research.backfill_policy_outcomes import build_backfill_updates

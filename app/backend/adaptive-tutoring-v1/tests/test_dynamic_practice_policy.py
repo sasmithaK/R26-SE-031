@@ -1,3 +1,5 @@
+"""Verify bounded targeted-practice state transitions and fallback cycles."""
+
 from types import SimpleNamespace
 
 from services.dynamic_practice_policy import DynamicPracticePolicy

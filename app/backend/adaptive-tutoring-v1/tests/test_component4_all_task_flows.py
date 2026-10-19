@@ -1,3 +1,5 @@
+"""Exercise core, remediation, and confirmation flows across the curriculum."""
+
 import pytest
 import pytest_asyncio
 
