@@ -1,6 +1,7 @@
 services:
   - type: web
     name: sipsara-auth-api
+    branch: dev
     plan: free
     env: python
     buildCommand: "pip install -r app/backend/api/requirements.txt"
@@ -36,4 +37,3 @@ services:
         value: https://sipsara-ml-backend-v2.azurewebsites.net/tutoring
       - key: ADAPTIVE_API_URL
         value: https://sipsara-ml-backend-v2.azurewebsites.net/tutoring
-
