@@ -8,6 +8,7 @@ import '../models/comprehensive_assessment_questions.dart';
 import '../widgets/gradient_button.dart';
 import '../services/student_service.dart';
 import '../services/localization_service.dart';
+
 class ComprehensiveAssessmentScreen extends StatefulWidget {
   final String studentId;
   final String category;
@@ -19,10 +20,12 @@ class ComprehensiveAssessmentScreen extends StatefulWidget {
   });
 
   @override
-  State<ComprehensiveAssessmentScreen> createState() => _ComprehensiveAssessmentScreenState();
+  State<ComprehensiveAssessmentScreen> createState() =>
+      _ComprehensiveAssessmentScreenState();
 }
 
-class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentScreen> {
+class _ComprehensiveAssessmentScreenState
+    extends State<ComprehensiveAssessmentScreen> {
   late PageController _pageController;
   int _currentIndex = 0;
   bool _isLoading = false;
@@ -34,7 +37,9 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
   void initState() {
     super.initState();
     _pageController = PageController(viewportFraction: 0.88);
-    _questions = ComprehensiveAssessmentData.getQuestionsByCategory(widget.category);
+    _questions = ComprehensiveAssessmentData.getQuestionsByCategory(
+      widget.category,
+    );
     _answers = List.generate(_questions.length, (_) => null);
   }
 
@@ -49,7 +54,7 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
     setState(() {
       _answers[index] = isYes;
     });
-    
+
     if (index < _questions.length - 1) {
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted && _pageController.hasClients) {
@@ -67,18 +72,23 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please answer all questions (${_questions.length})', style: const TextStyle(fontWeight: FontWeight.bold)), 
+          content: Text(
+            'Please answer all questions (${_questions.length})',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           backgroundColor: AppColors.warmAmber,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
-      
+
       final firstUnanswered = _answers.indexOf(null);
       if (firstUnanswered != -1 && _pageController.hasClients) {
         _pageController.animateToPage(
-          firstUnanswered, 
-          duration: const Duration(milliseconds: 800), 
+          firstUnanswered,
+          duration: const Duration(milliseconds: 800),
           curve: Curves.fastLinearToSlowEaseIn,
         );
       }
@@ -89,17 +99,22 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
       _isLoading = true;
     });
 
-    final payload = List.generate(_questions.length, (i) => {
-      'question_id': _questions[i].id,
-      'answer': _answers[i]!,
-    });
+    final payload = List.generate(
+      _questions.length,
+      (i) => {
+        'question_id': _questions[i].id,
+        'question_si': _questions[i].textSi,
+        'question_en': _questions[i].textEn,
+        'answer': _answers[i]!,
+      },
+    );
 
     final error = await StudentService().submitComprehensiveAssessment(
       widget.studentId,
       widget.category,
       payload,
     );
-    
+
     if (!mounted) return;
 
     setState(() {
@@ -109,7 +124,7 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error), 
+          content: Text(error),
           backgroundColor: AppColors.softCoral,
           behavior: SnackBarBehavior.floating,
         ),
@@ -118,7 +133,10 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
       HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Evaluation successfully completed!', style: TextStyle(fontWeight: FontWeight.bold)), 
+          content: Text(
+            'Evaluation successfully completed!',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           backgroundColor: AppColors.gentleGreen,
           behavior: SnackBarBehavior.floating,
         ),
@@ -135,7 +153,9 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
         if (_questions.isEmpty) {
           return Scaffold(
             appBar: AppBar(title: const Text('Error')),
-            body: const Center(child: Text('Questions not found for this category.')),
+            body: const Center(
+              child: Text('Questions not found for this category.'),
+            ),
           );
         }
 
@@ -143,173 +163,208 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
 
         return Scaffold(
           body: Stack(
-        children: [
-          // Map Background
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/images/backgrounds/map_bg.png'),
-                fit: BoxFit.cover,
-                opacity: 0.9,
+            children: [
+              // Map Background
+              Container(
+                width: double.infinity,
+                height: double.infinity,
+                decoration: const BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage('assets/images/backgrounds/map_bg.png'),
+                    fit: BoxFit.cover,
+                    opacity: 0.9,
+                  ),
+                ),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    color: AppColors.cream.withValues(alpha: 0.7),
+                  ),
+                ),
               ),
-            ),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                color: AppColors.cream.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
-          
-          SafeArea(
-            child: _isLoading 
-                ? const Center(child: AppLoadingIndicator())
-                : Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                        child: Row(
-                          children: [
-                            _buildPremiumBackButton(context),
-                            const SizedBox(width: 20),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
+
+              SafeArea(
+                child: _isLoading
+                    ? const Center(child: AppLoadingIndicator())
+                    : Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 20,
+                            ),
+                            child: Row(
+                              children: [
+                                _buildPremiumBackButton(context),
+                                const SizedBox(width: 20),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
-                                      Text(
-                                        LocalizationService.instance.t('question_prefix'),
-                                        style: AppTypography.caption(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${_currentIndex + 1}',
-                                        style: AppTypography.heading(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppColors.calmBlue,
-                                        ),
-                                      ),
-                                      Text(
-                                        ' / ${_questions.length}',
-                                        style: AppTypography.caption(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Stack(
-                                    children: [
-                                      Container(
-                                        height: 10,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.6),
-                                          borderRadius: BorderRadius.circular(10),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.03),
-                                              blurRadius: 4,
-                                              offset: const Offset(0, 2),
-                                            )
-                                          ],
-                                        ),
-                                      ),
-                                      AnimatedContainer(
-                                        duration: const Duration(milliseconds: 600),
-                                        curve: Curves.fastOutSlowIn,
-                                        height: 10,
-                                        width: (MediaQuery.of(context).size.width - 92) * progress,
-                                        decoration: BoxDecoration(
-                                          gradient: AppColors.blueButtonGradient,
-                                          borderRadius: BorderRadius.circular(10),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: AppColors.calmBlue.withValues(alpha: 0.4),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 2),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            LocalizationService.instance.t(
+                                              'question_prefix',
                                             ),
-                                          ],
-                                        ),
+                                            style: AppTypography.caption(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_currentIndex + 1}',
+                                            style: AppTypography.heading(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.calmBlue,
+                                            ),
+                                          ),
+                                          Text(
+                                            ' / ${_questions.length}',
+                                            style: AppTypography.caption(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Stack(
+                                        children: [
+                                          Container(
+                                            height: 10,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.6,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.03),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          AnimatedContainer(
+                                            duration: const Duration(
+                                              milliseconds: 600,
+                                            ),
+                                            curve: Curves.fastOutSlowIn,
+                                            height: 10,
+                                            width:
+                                                (MediaQuery.of(
+                                                      context,
+                                                    ).size.width -
+                                                    92) *
+                                                progress,
+                                            decoration: BoxDecoration(
+                                              gradient:
+                                                  AppColors.blueButtonGradient,
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: AppColors.calmBlue
+                                                      .withValues(alpha: 0.4),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
-                                ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          Expanded(
+                            child: PageView.builder(
+                              controller: _pageController,
+                              physics: const BouncingScrollPhysics(),
+                              onPageChanged: (index) {
+                                HapticFeedback.selectionClick();
+                                setState(() {
+                                  _currentIndex = index;
+                                });
+                              },
+                              itemCount: _questions.length,
+                              itemBuilder: (context, index) {
+                                return _buildPremiumQuestionCard(
+                                  _questions[index],
+                                  index,
+                                );
+                              },
+                            ),
+                          ),
+
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOutCubic,
+                              transform: Matrix4.translationValues(
+                                0,
+                                _answers[_currentIndex] == null ? 20 : 0,
+                                0,
+                              ),
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 300),
+                                opacity: _answers[_currentIndex] == null
+                                    ? 0.0
+                                    : 1.0,
+                                child: GradientButton(
+                                  text: _currentIndex == _questions.length - 1
+                                      ? LocalizationService.instance.t(
+                                          'btn_finish_evaluation',
+                                        )
+                                      : LocalizationService.instance.t(
+                                          'btn_next_question',
+                                        ),
+                                  icon: _currentIndex == _questions.length - 1
+                                      ? Icons.check_circle_rounded
+                                      : Icons.arrow_forward_rounded,
+                                  onPressed: _answers[_currentIndex] == null
+                                      ? () {}
+                                      : () {
+                                          HapticFeedback.lightImpact();
+                                          if (_currentIndex <
+                                              _questions.length - 1) {
+                                            _pageController.nextPage(
+                                              duration: const Duration(
+                                                milliseconds: 800,
+                                              ),
+                                              curve:
+                                                  Curves.fastLinearToSlowEaseIn,
+                                            );
+                                          } else {
+                                            _submitAssessment();
+                                          }
+                                        },
+                                ),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 10),
-
-                      Expanded(
-                        child: PageView.builder(
-                          controller: _pageController,
-                          physics: const BouncingScrollPhysics(),
-                          onPageChanged: (index) {
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _currentIndex = index;
-                            });
-                          },
-                          itemCount: _questions.length,
-                          itemBuilder: (context, index) {
-                            return _buildPremiumQuestionCard(_questions[index], index);
-                          },
-                        ),
-                      ),
-
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutCubic,
-                          transform: Matrix4.translationValues(
-                            0, 
-                            _answers[_currentIndex] == null ? 20 : 0, 
-                            0
                           ),
-                          child: AnimatedOpacity(
-                            duration: const Duration(milliseconds: 300),
-                            opacity: _answers[_currentIndex] == null ? 0.0 : 1.0,
-                            child: GradientButton(
-                              text: _currentIndex == _questions.length - 1 
-                                  ? LocalizationService.instance.t('btn_finish_evaluation') 
-                                  : LocalizationService.instance.t('btn_next_question'),
-                              icon: _currentIndex == _questions.length - 1 ? Icons.check_circle_rounded : Icons.arrow_forward_rounded,
-                              onPressed: _answers[_currentIndex] == null 
-                                  ? () {}
-                                  : () {
-                                      HapticFeedback.lightImpact();
-                                      if (_currentIndex < _questions.length - 1) {
-                                        _pageController.nextPage(
-                                          duration: const Duration(milliseconds: 800),
-                                          curve: Curves.fastLinearToSlowEaseIn,
-                                        );
-                                      } else {
-                                        _submitAssessment();
-                                      }
-                                    },
-                            ),
-                          ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
       },
     );
   }
@@ -332,7 +387,9 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
         border: Border.all(color: Colors.white, width: 2),
         boxShadow: [
           BoxShadow(
-            color: AppColors.calmBlueDark.withValues(alpha: isActive ? 0.12 : 0.05),
+            color: AppColors.calmBlueDark.withValues(
+              alpha: isActive ? 0.12 : 0.05,
+            ),
             blurRadius: isActive ? 32 : 16,
             offset: Offset(0, isActive ? 16 : 8),
           ),
@@ -348,7 +405,10 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.calmBlue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -362,9 +422,9 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 Expanded(
                   child: Center(
                     child: SingleChildScrollView(
@@ -382,9 +442,9 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 Row(
                   children: [
                     Expanded(
@@ -459,15 +519,19 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.2) : Colors.white,
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : Colors.white,
                 shape: BoxShape.circle,
-                boxShadow: isSelected ? [] : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  )
-                ]
+                boxShadow: isSelected
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Icon(
                 icon,
@@ -491,7 +555,9 @@ class _ComprehensiveAssessmentScreenState extends State<ComprehensiveAssessmentS
                 style: AppTypography.caption(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white.withValues(alpha: 0.8) : AppColors.textHint,
+                  color: isSelected
+                      ? Colors.white.withValues(alpha: 0.8)
+                      : AppColors.textHint,
                 ),
               ),
             ],
