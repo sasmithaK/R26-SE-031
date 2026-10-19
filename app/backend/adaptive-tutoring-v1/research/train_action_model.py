@@ -19,6 +19,13 @@ FEATURES = (
 
 
 def main() -> None:
+    """Train, evaluate, and export the per-scaffold outcome models.
+
+    Learners—not individual interaction rows—are split into train and test
+    groups.  Consequently, all rows belonging to one simulated learner remain
+    on one side of the split and cannot leak that learner's pattern into the
+    held-out evaluation.
+    """
     import numpy as np
     from sklearn.dummy import DummyClassifier
     from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
@@ -37,19 +44,28 @@ def main() -> None:
     if not rows or {row.get("data_origin") for row in rows} != {"synthetic"}:
         raise RuntimeError("This training command requires explicitly synthetic rows.")
 
+    # X contains the learner/task context and y is the binary next-response
+    # outcome. ``groups`` is the learner identity used only to protect the
+    # evaluation split; it is never supplied as a predictive feature.
     x = np.asarray([[float(row[name]) for name in FEATURES] for row in rows])
     y = np.asarray([int(row["next_independent_success"]) for row in rows])
     groups = np.asarray([row["student_id"] for row in rows])
     actions = np.asarray([row["action"] for row in rows])
     propensities = np.asarray([float(row["propensity"]) for row in rows])
+    # Hold out 25% of learners (75% train / 25% test). GroupShuffleSplit keeps
+    # every interaction from one student entirely in train or entirely in test.
     splitter = GroupShuffleSplit(n_splits=1, test_size=0.25, random_state=args.seed)
     train_index, test_index = next(splitter.split(x, y, groups))
+    # Fit normalization only on training learners to prevent test statistics
+    # leaking into model fitting. The learned mean/scale then transforms both.
     scaler = StandardScaler().fit(x[train_index])
     x_scaled = scaler.transform(x)
     models = {}
     fitted_by_action = {}
     evaluations = {}
     for action in sorted(set(actions)):
+        # Each scaffold receives its own interpretable binary outcome model.
+        # Fit with training rows for that action; evaluate on held-out learners.
         train = train_index[actions[train_index] == action]
         test = test_index[actions[test_index] == action]
         model = LogisticRegression(max_iter=2000, random_state=args.seed)
@@ -79,6 +95,8 @@ def main() -> None:
         for current in actions
     ])
     comparison_x = np.column_stack([x_scaled, action_one_hot])
+    # Compare the deployable logistic model against a class-prior baseline and
+    # two nonlinear alternatives; these models are evaluation evidence only.
     comparison_models = {
         "class_prior": DummyClassifier(strategy="prior"),
         "logistic_regression": LogisticRegression(max_iter=2000, random_state=args.seed),
@@ -108,6 +126,8 @@ def main() -> None:
             "roc_auc": round(float(roc_auc_score(y[test_index], probability)), 6),
         }
 
+    # Estimate policy value offline. A held-out row contributes only when the
+    # learned recommendation matches the randomly logged synthetic action.
     recommended_actions = []
     for row_index in test_index:
         scores = {

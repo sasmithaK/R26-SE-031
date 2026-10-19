@@ -18,10 +18,12 @@ FEATURES = (
 
 
 def sigmoid(value: float) -> float:
+    """Map a simulated candidate-quality score to success probability."""
     return 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, value))))
 
 
 def rows(seed: int, learners: int, decisions: int):
+    """Yield reproducible candidate-practice outcomes for simulated learners."""
     rng = random.Random(seed)
     dataset_id = f"c4-synthetic-practice-v1-seed-{seed}"
     for learner in range(learners):
@@ -73,6 +75,7 @@ def rows(seed: int, learners: int, decisions: int):
 
 
 def main() -> None:
+    """Generate and save the synthetic targeted-practice training table."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True)
     parser.add_argument("--seed", type=int, default=26031)
@@ -91,4 +94,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
