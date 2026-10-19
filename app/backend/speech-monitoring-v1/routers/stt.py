@@ -1,8 +1,11 @@
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends, BackgroundTasks
 from services.stt_service import get_stt_engine, get_stt_status
 from datetime import datetime, timezone
 from uuid import uuid4
 import hashlib
+import asyncio
+import os
+import httpx
 from database import get_db
 import json
 
@@ -11,6 +14,39 @@ from services.audio_quality_service import AudioQualityService
 from dependencies import get_current_user, require_owned_student
 
 router = APIRouter(prefix="/stt", tags=["Speech-to-Text"])
+_analysis_slots = asyncio.Semaphore(max(1, int(os.getenv("C2_MAX_CONCURRENT_ANALYSES", "1"))))
+
+
+def _validate_curriculum_scope(skill_id: str, activity_id: str, item_id: str) -> None:
+    """Keep C2 evidence attached to the two oral-language curriculum skills."""
+    if skill_id not in {"skill_5", "skill_6"}:
+        raise HTTPException(status_code=422, detail="C2 recordings are supported only for Skills 5 and 6")
+    if not activity_id.startswith("act_"):
+        raise HTTPException(status_code=422, detail="Invalid C2 activity_id")
+    expected_prefix = f"S{skill_id.removeprefix('skill_')}A{activity_id.removeprefix('act_')}"
+    if not item_id.startswith(expected_prefix):
+        raise HTTPException(status_code=422, detail="item_id does not match the submitted skill and activity")
+
+
+async def _process_audio(*args, **kwargs):
+    """Run CPU-heavy speech inference away from the API event loop."""
+    async with _analysis_slots:
+        return await asyncio.to_thread(get_c2_pipeline().process, *args, **kwargs)
+
+
+async def _refresh_c3(student_id: str, session_id: str, data_origin: str, dataset_id: str) -> None:
+    url = os.getenv("FUSION_API_URL", "http://localhost:9016").rstrip("/") + "/diagnose/session"
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            await client.post(url, json={
+                "student_id": student_id,
+                "session_id": session_id,
+                "data_origin": data_origin,
+                "dataset_id": dataset_id,
+            })
+    except Exception:
+        # The saved C2 attempt remains valid and can be reconciled later.
+        return
 
 
 def require_stt_available() -> None:
@@ -31,6 +67,7 @@ def require_stt_available() -> None:
 
 @router.post("/transcribe")
 async def transcribe_audio(
+    background_tasks: BackgroundTasks,
     student_id: str = Form(...),
     session_id: str = Form(...),
     skill_id: str = Form(...),
@@ -48,6 +85,7 @@ async def transcribe_audio(
     if not file:
         raise HTTPException(status_code=400, detail="No file uploaded")
     await require_owned_student(student_id, current_user)
+    _validate_curriculum_scope(skill_id, activity_id, item_id)
     require_stt_available()
         
     try:
@@ -84,6 +122,7 @@ async def transcribe_audio(
                 {"$set": doc}, upsert=True,
             )
             persistence_status = "saved"
+            background_tasks.add_task(_refresh_c3, student_id, session_id, data_origin, resolved_dataset_id)
         except Exception as exc:
             persistence_status = "failed"
             doc["measurement_status"] = "persistence_failed"
@@ -101,6 +140,7 @@ async def transcribe_audio(
 
 @router.post("/analyze-reading")
 async def analyze_reading(
+    background_tasks: BackgroundTasks,
     expected_text: str = Form(...),
     student_id: str = Form(...),
     session_id: str = Form(...),
@@ -120,6 +160,7 @@ async def analyze_reading(
     if not file:
         raise HTTPException(status_code=400, detail="No file uploaded")
     await require_owned_student(student_id, current_user)
+    _validate_curriculum_scope(skill_id, activity_id, item_id)
     require_stt_available()
         
     try:
@@ -129,7 +170,7 @@ async def analyze_reading(
             
         if data_origin not in {"observed", "synthetic"}:
             raise HTTPException(422, "data_origin must be observed or synthetic")
-        result = get_c2_pipeline().process(audio_bytes, expected_text=expected_text)
+        result = await _process_audio(audio_bytes, expected_text=expected_text)
         transcription = result["transcription"].get("text", "")
         alignment = result["alignment"]
         resolved_dataset_id = dataset_id or f"live:{student_id}:{session_id}"
@@ -165,6 +206,7 @@ async def analyze_reading(
             )
             persistence_status = "saved"
             doc["persistence_status"] = persistence_status
+            background_tasks.add_task(_refresh_c3, student_id, session_id, data_origin, resolved_dataset_id)
         except Exception as exc:
             persistence_status = "failed"
             doc["persistence_status"] = persistence_status
@@ -190,6 +232,7 @@ async def analyze_reading(
 
 @router.post("/analyze-acoustics")
 async def analyze_acoustics(
+    background_tasks: BackgroundTasks,
     student_id: str = Form(...),
     session_id: str = Form(...),
     event_id: str = Form(None),
@@ -215,6 +258,7 @@ async def analyze_acoustics(
     if not file:
         raise HTTPException(status_code=400, detail="No file uploaded")
     await require_owned_student(student_id, current_user)
+    _validate_curriculum_scope(skill_id, activity_id, item_id)
     require_stt_available()
         
     try:
@@ -234,7 +278,7 @@ async def analyze_acoustics(
         # Match C1's dataset key so modalities align within one child/session.
         resolved_dataset_id = dataset_id or f"live:{student_id}:{session_id}"
 
-        result = get_c2_pipeline().process(
+        result = await _process_audio(
             wav_bytes=audio_bytes,
             expected_text=expected_text,
             expected_syllables=expected_syllables,
@@ -325,6 +369,13 @@ async def analyze_acoustics(
                 {"student_id": student_id, "attempt_id": resolved_attempt_id},
                 {"$set": doc},
                 upsert=True,
+            )
+            background_tasks.add_task(
+                _refresh_c3,
+                student_id,
+                session_id,
+                data_origin,
+                resolved_dataset_id,
             )
         except Exception as e:
             doc["persistence_status"] = "failed"

@@ -59,11 +59,16 @@ class EvidenceFusionService:
         else:
             status = "valid"
 
-        asr_reliability = asr_confidence if asr_confidence is not None else 0.5
         method_coverage = min(1.0, len(available_methods) / 4.0)
-        combined_confidence = quality_score * (
-            0.45 + 0.30 * asr_reliability + 0.25 * method_coverage
-        )
+        # Do not invent a "neutral" ASR confidence when Whisper cannot supply
+        # one. Confidence is calculated only from methods that actually
+        # produced a measurement.
+        confidence_terms = [(0.45, 1.0), (0.25, method_coverage)]
+        if asr_confidence is not None:
+            confidence_terms.append((0.30, asr_confidence))
+        term_weight = sum(weight for weight, _ in confidence_terms)
+        evidence_confidence = sum(weight * value for weight, value in confidence_terms) / term_weight
+        combined_confidence = quality_score * evidence_confidence
         if disagreement_reasons:
             combined_confidence *= 0.70
         if status == "retry_required":
@@ -88,6 +93,7 @@ class EvidenceFusionService:
                 else None
             ),
             "available_methods": available_methods,
+            "asr_confidence_available": asr_confidence is not None,
             "method_disagreement": bool(disagreement_reasons),
             "disagreement_reasons": disagreement_reasons,
             "decision_policy": "abstain_on_poor_quality_or_method_disagreement",
