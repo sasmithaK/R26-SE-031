@@ -1,0 +1,71 @@
+{
+  "model": "c1_random_forest",
+  "model_version": "2.0.0",
+  "training_data": "synthetic_only",
+  "random_seed": 42,
+  "feature_schema": "c1-features-v1",
+  "feature_count": 19,
+  "features": [
+    "accuracy",
+    "mean_latency_ms",
+    "median_latency_ms",
+    "latency_std_ms",
+    "mean_first_touch_latency_ms",
+    "hesitation_rate",
+    "misclick_rate",
+    "replay_rate",
+    "completion_rate",
+    "latency_drift",
+    "error_drift",
+    "hesitation_drift",
+    "accuracy_slope",
+    "visual_processing_index",
+    "phonological_task_index",
+    "motor_interaction_index",
+    "attention_stability_index",
+    "fatigue_score",
+    "cognitive_load_score"
+  ],
+  "samples": 3000,
+  "test_samples": 600,
+  "accuracy": 0.9983,
+  "classification_report": {
+    "TYPICAL": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 150.0
+    },
+    "VISUAL_ORTHOGRAPHIC_PATTERN": {
+      "precision": 1.0,
+      "recall": 0.9933333333333333,
+      "f1-score": 0.9966555183946488,
+      "support": 150.0
+    },
+    "PHONOLOGICAL_PATTERN": {
+      "precision": 0.9933774834437086,
+      "recall": 1.0,
+      "f1-score": 0.9966777408637874,
+      "support": 150.0
+    },
+    "COMBINED_PATTERN": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 150.0
+    },
+    "accuracy": 0.9983333333333333,
+    "macro avg": {
+      "precision": 0.9983443708609272,
+      "recall": 0.9983333333333333,
+      "f1-score": 0.9983333148146091,
+      "support": 600.0
+    },
+    "weighted avg": {
+      "precision": 0.9983443708609271,
+      "recall": 0.9983333333333333,
+      "f1-score": 0.9983333148146091,
+      "support": 600.0
+    }
+  }
+}

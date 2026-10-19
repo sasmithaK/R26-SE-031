@@ -1,9 +1,13 @@
 {
   "c1_random_forest": {
-    "version": "1.0.0",
+    "version": "2.0.0",
     "feature_schema": "c1-features-v1",
-    "training_dataset": "synthetic-v1",
+    "training_dataset": "synthetic-only-c1-live-schema-v2",
     "algorithm": "RandomForestClassifier",
+    "artifact": "dyslexia_rf_model.pkl",
+    "enabled": true,
+    "provenance": "synthetic_only",
+    "validation_status": "integration_validated_not_clinically_validated",
     "class_names": [
       "TYPICAL",
       "VISUAL_ORTHOGRAPHIC_PATTERN",

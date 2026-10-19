@@ -64,7 +64,7 @@ MOTOR_TEMPLATES = {
 # Feature Extraction
 # ---------------------------------------------------------------------------
 
-def extract_features(events: list[dict[str, Any]]) -> dict[str, float]:
+def extract_features(events: list[dict[str, Any]]) -> dict[str, Any]:
     """
     Compute the 6-dimensional cognitive feature vector from a list of
     raw TelemetryEvent dicts (as stored in MongoDB).
@@ -85,13 +85,21 @@ def extract_features(events: list[dict[str, Any]]) -> dict[str, float]:
     # ---- Visual Processing Speed -------------------------------------------
     visual_events = [e for e in events if e.get("activity_name") in VISUAL_SKILLS_TEMPLATES]
     if visual_events:
-        avg_ftl = statistics.mean(
-            e.get("first_touch_latency_ms", 1500) for e in visual_events
-        )
-        # Logistic curve: Midpoint at 3500ms, smooth degradation
-        visual_processing_speed = 100.0 / (1.0 + math.exp((avg_ftl - 3500) / 800))
+        visual_latencies = [
+            float(e["first_touch_latency_ms"])
+            for e in visual_events
+            if isinstance(e.get("first_touch_latency_ms"), (int, float))
+            and e["first_touch_latency_ms"] > 0
+        ]
+        if visual_latencies:
+            avg_ftl = statistics.mean(visual_latencies)
+            # Research-default curve; the source latency remains available for
+            # later calibration against an observed Sri Lankan cohort.
+            visual_processing_speed = 100.0 / (1.0 + math.exp((avg_ftl - 3500) / 800))
+        else:
+            visual_processing_speed = None
     else:
-        visual_processing_speed = 50.0  # neutral when no data
+        visual_processing_speed = None
 
     # ---- Motor Precision Score ----------------------------------------------
     total_taps = 0
@@ -105,7 +113,7 @@ def extract_features(events: list[dict[str, Any]]) -> dict[str, float]:
     if total_taps > 0:
         motor_precision = max(0.0, (1 - total_misclicks / total_taps) * 100)
     else:
-        motor_precision = 100.0  # default if no touch data
+        motor_precision = None
 
     # ---- Cognitive Hesitation Ratio ----------------------------------------
     hesitation_ratio = statistics.mean(
@@ -126,11 +134,17 @@ def extract_features(events: list[dict[str, Any]]) -> dict[str, float]:
     # ---- Phonological Latency ----------------------------------------------
     phono_events = [e for e in events if e.get("activity_name") in PHONOLOGICAL_TEMPLATES]
     if phono_events:
-        phonological_latency = statistics.mean(
-            e.get("first_touch_latency_ms", 1500) for e in phono_events
+        phonological_latencies = [
+            float(e["first_touch_latency_ms"])
+            for e in phono_events
+            if isinstance(e.get("first_touch_latency_ms"), (int, float))
+            and e["first_touch_latency_ms"] > 0
+        ]
+        phonological_latency = (
+            statistics.mean(phonological_latencies) if phonological_latencies else None
         )
     else:
-        phonological_latency = 1500.0  # neutral baseline
+        phonological_latency = None
 
     # ---- Fatigue Drift (last-3 vs first-3 latency delta) -------------------
     if n >= 4:
@@ -151,11 +165,11 @@ def extract_features(events: list[dict[str, Any]]) -> dict[str, float]:
         hesitation_drift = 0.0
 
     return {
-        "visual_processing_speed": round(visual_processing_speed, 2),
-        "motor_precision": round(motor_precision, 2),
+        "visual_processing_speed": round(visual_processing_speed, 2) if visual_processing_speed is not None else None,
+        "motor_precision": round(motor_precision, 2) if motor_precision is not None else None,
         "hesitation_ratio": round(hesitation_ratio, 3),
         "accuracy_slope": round(accuracy_slope, 3),
-        "phonological_latency": round(phonological_latency, 2),
+        "phonological_latency": round(phonological_latency, 2) if phonological_latency is not None else None,
         "latency_drift": round(latency_drift, 3),
         "error_drift": round(error_drift, 3),
         "hesitation_drift": round(hesitation_drift, 3),
@@ -165,34 +179,39 @@ def extract_features(events: list[dict[str, Any]]) -> dict[str, float]:
 # Cognitive Index Computation (0-100 scores for each domain)
 # ---------------------------------------------------------------------------
 
-def compute_cognitive_indices(features: dict[str, float]) -> dict[str, float]:
+def compute_cognitive_indices(features: dict[str, Any]) -> dict[str, Any]:
     """
     Convert raw feature vector into normalized 0-100 cognitive index scores
     for presentation in the parent analytics dashboard.
     """
-    visual_processing_score = _clamp(features["visual_processing_speed"])
+    visual_speed = features.get("visual_processing_speed")
+    visual_processing_score = _clamp(visual_speed) if isinstance(visual_speed, (int, float)) else None
 
     # Motor precision is already 0-100
-    motor_precision_score = _clamp(features["motor_precision"])
+    motor_precision = features.get("motor_precision")
+    motor_precision_score = _clamp(motor_precision) if isinstance(motor_precision, (int, float)) else None
 
     # Phonological score: Logistic curve with midpoint at 4000ms
-    phonological_latency = features["phonological_latency"]
-    phonological_awareness_score = 100.0 / (1.0 + math.exp((phonological_latency - 4000) / 1000))
+    phonological_latency = features.get("phonological_latency")
+    phonological_awareness_score = (
+        100.0 / (1.0 + math.exp((phonological_latency - 4000) / 1000))
+        if isinstance(phonological_latency, (int, float)) else None
+    )
 
     # Sustained attention: Exponential decay based on hesitation ratio
     sustained_attention_score = _clamp(100.0 * math.exp(-features["hesitation_ratio"] / 2.0))
 
     return {
         # New non-overclaiming behavioral terminology
-        "visual_task_performance": round(visual_processing_score, 1),
-        "phonological_task_performance": round(phonological_awareness_score, 1),
-        "motor_interaction_pattern": round(motor_precision_score, 1),
+        "visual_task_performance": round(visual_processing_score, 1) if visual_processing_score is not None else None,
+        "phonological_task_performance": round(phonological_awareness_score, 1) if phonological_awareness_score is not None else None,
+        "motor_interaction_pattern": round(motor_precision_score, 1) if motor_precision_score is not None else None,
         "attention_interaction_indicator": round(sustained_attention_score, 1),
 
         # Legacy fields preserved temporarily for UI compatibility
-        "visual_processing_index": round(visual_processing_score, 1),
-        "phonological_task_index": round(phonological_awareness_score, 1),
-        "motor_interaction_index": round(motor_precision_score, 1),
+        "visual_processing_index": round(visual_processing_score, 1) if visual_processing_score is not None else None,
+        "phonological_task_index": round(phonological_awareness_score, 1) if phonological_awareness_score is not None else None,
+        "motor_interaction_index": round(motor_precision_score, 1) if motor_precision_score is not None else None,
         "attention_stability_index": round(sustained_attention_score, 1),
     }
 
@@ -208,8 +227,8 @@ import joblib
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "dyslexia_rf_model.pkl")
 
 def classify_risk(
-    features: dict[str, float],
-    indices: dict[str, float],
+    features: dict[str, Any],
+    indices: dict[str, Any],
 ) -> dict[str, str]:
     """
     Classify dyslexia subtype risk levels from feature vector and cognitive indices.
@@ -217,7 +236,9 @@ def classify_risk(
     If a trained Scikit-Learn model exists at MODEL_PATH, it uses the Random Forest
     to predict probabilities. Otherwise, it falls back to the clinical heuristic rules.
     """
-    if os.path.exists(MODEL_PATH):
+    # A model must never receive invented neutral values in place of an
+    # unmeasured domain.
+    if os.path.exists(MODEL_PATH) and all(value is not None for value in features.values()):
         try:
             model = joblib.load(MODEL_PATH)
             # Feature ordering must match training (assuming alphabetical for simplicity in this stub)
@@ -255,30 +276,35 @@ def classify_risk(
     Intended to be replaced / enhanced with a trained sklearn model once
     enough labelled data accumulates.
     """
-    visual_risk = _threshold_risk(
-        score=indices["visual_processing_index"],
+    visual_risk = _threshold_risk_if_measured(
+        score=indices.get("visual_processing_index"),
         high_threshold=40,
         moderate_threshold=65,
     )
-    phonological_risk = _threshold_risk(
-        score=indices["phonological_task_index"],
+    phonological_risk = _threshold_risk_if_measured(
+        score=indices.get("phonological_task_index"),
         high_threshold=40,
         moderate_threshold=65,
     )
-    motor_risk = _threshold_risk(
-        score=indices["motor_interaction_index"],
+    motor_risk = _threshold_risk_if_measured(
+        score=indices.get("motor_interaction_index"),
         high_threshold=50,
         moderate_threshold=72,
     )
-    attention_risk = _threshold_risk(
-        score=indices["attention_stability_index"],
+    attention_risk = _threshold_risk_if_measured(
+        score=indices.get("attention_stability_index"),
         high_threshold=45,
         moderate_threshold=68,
     )
 
     # Overall risk — highest individual component risk determines overall
-    risk_levels = [visual_risk, phonological_risk, motor_risk, attention_risk]
-    if "High" in risk_levels:
+    risk_levels = [
+        level for level in [visual_risk, phonological_risk, motor_risk, attention_risk]
+        if level != "not_measured"
+    ]
+    if not risk_levels:
+        overall = "insufficient_evidence"
+    elif "High" in risk_levels:
         overall = "Needs Attention"
     elif risk_levels.count("Moderate") >= 2:
         overall = "Moderate Risk"
@@ -291,6 +317,7 @@ def classify_risk(
         "phonological_dyslexia_risk": phonological_risk,
         "motor_dysgraphia_risk": motor_risk,
         "attention_risk": attention_risk,
+        "model_used": "heuristic_observed_only",
     }
 
 
@@ -386,7 +413,7 @@ def normalize_features_for_device(features: dict[str, Any], device_metrics: dict
 
 def generate_cognitive_profile(
     telemetry_sessions: list[dict[str, Any]], 
-    assessment_risk_score: float = 0.0
+    assessment_risk_score: Optional[float] = None,
 ) -> dict[str, Any]:
     """
     Full end-to-end ML analytics pipeline.
@@ -419,16 +446,18 @@ def generate_cognitive_profile(
     features = {
         **base_features,
         **advanced_features,
-        "word_error_rate": 0.0,
-        "voice_hesitation_ms": 0.0,
-        "assessment_risk_score": round(assessment_risk_score, 4),
+        # C1 does not measure speech. Do not turn missing C2/screening
+        # evidence into a synthetic zero-error value.
+        "word_error_rate": None,
+        "voice_hesitation_ms": None,
+        "assessment_risk_score": round(assessment_risk_score, 4) if assessment_risk_score is not None else None,
     }
     
     # Calculate deterministic fatigue score (weighted composite, clamped to [0, 1])
     fatigue_score = (
-        (0.5 * base_features.get("latency_drift", 0.0)) +
-        (0.3 * base_features.get("error_drift", 0.0)) +
-        (0.2 * base_features.get("hesitation_drift", 0.0))
+        (0.5 * (base_features.get("latency_drift") or 0.0)) +
+        (0.3 * (base_features.get("error_drift") or 0.0)) +
+        (0.2 * (base_features.get("hesitation_drift") or 0.0))
     )
     fatigue_score = max(0.0, min(1.0, fatigue_score))
 
@@ -527,14 +556,22 @@ def _threshold_risk(score: float, high_threshold: float, moderate_threshold: flo
     return "Low"
 
 
-def _zero_features() -> dict[str, float]:
+def _threshold_risk_if_measured(
+    score: Any, high_threshold: float, moderate_threshold: float
+) -> str:
+    if not isinstance(score, (int, float)):
+        return "not_measured"
+    return _threshold_risk(float(score), high_threshold, moderate_threshold)
+
+
+def _zero_features() -> dict[str, Any]:
     return {
-        "visual_processing_speed": 50.0,
-        "motor_precision": 100.0,
-        "hesitation_ratio": 0.0,
-        "accuracy_slope": 0.0,
-        "phonological_latency": 1500.0,
-        "latency_drift": 0.0,
-        "error_drift": 0.0,
-        "hesitation_drift": 0.0,
+        "visual_processing_speed": None,
+        "motor_precision": None,
+        "hesitation_ratio": None,
+        "accuracy_slope": None,
+        "phonological_latency": None,
+        "latency_drift": None,
+        "error_drift": None,
+        "hesitation_drift": None,
     }
