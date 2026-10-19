@@ -52,6 +52,21 @@ def test_mixed_session_and_kc_aggregation():
     assert akshara["median_response_latency_ms"] == 1500
     assert akshara["error_distribution"]["visual_confusion"] == 1.0
 
+def test_activity_breakdown_keeps_reused_activity_ids_separate_by_skill():
+    first = create_mock_event(is_correct=True, aid="act_1")
+    second = create_mock_event(is_correct=False, aid="act_1")
+    first.skill_id = "1"
+    second.skill_id = "2"
+    session = TelemetrySessionSubmit(
+        student_id="s1", session_id="ses-skills", session_duration_seconds=30,
+        events=[first, second],
+    )
+    summary = extract_session_features(session)
+    grouped = summary.activity_breakdown_by_skill
+    assert grouped["1::act_1"]["accuracy"] == 1.0
+    assert grouped["2::act_1"]["accuracy"] == 0.0
+    assert grouped["1::act_1"]["trials"] == grouped["2::act_1"]["trials"] == 1
+
 def test_zero_valid_events_division_by_zero():
     events = [create_mock_event(is_abandoned=True)]
     session = TelemetrySessionSubmit(student_id="s1", session_id="ses1", session_duration_seconds=60, events=events)

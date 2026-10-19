@@ -26,17 +26,45 @@ _ERROR_CATEGORIES = {
     "categorization_error": "visual_confusion",
     "visual_memory_error": "visual_confusion",
     "phonological_confusion": "phonological_confusion",
+    "sound_letter_error": "phonological_confusion",
+    "word_recognition_error": "phonological_confusion",
+    "oral_reading_error": "phonological_confusion",
     "sequence_error": "sequence_error",
+    "spelling_sequence_error": "sequence_error",
+    "sentence_order_error": "sequence_error",
     "visual_pattern_error": "sequence_error",
     "unknown_error": "unknown_error",
 }
 
 
-def _error_category(error_type: Optional[str]) -> str:
+_KC_ERROR_CATEGORIES = {
+    "KC_VISUAL_IDENTIFICATION": "visual_confusion",
+    "KC_VISUAL_MATCHING": "visual_confusion",
+    "KC_VISUAL_CATEGORIZATION": "visual_confusion",
+    "KC_VISUAL_PATTERN": "sequence_error",
+    "KC_VISUAL_MEMORY": "visual_confusion",
+    "KC_LETTER_IDENTIFICATION": "visual_confusion",
+    "KC_LETTER_MATCHING": "visual_confusion",
+    "KC_LETTER_MEMORY": "visual_confusion",
+    "KC_LETTER_DECODING": "phonological_confusion",
+    "KC_PHONEME_LETTER_MAPPING": "phonological_confusion",
+    "KC_VISUAL_SUPPORT": "visual_confusion",
+    "KC_AKSHARA_IDENTITY": "visual_confusion",
+    "KC_ORTHOGRAPHIC_MEMORY": "visual_confusion",
+    "KC_PHONEME_GRAPHEME": "phonological_confusion",
+    "KC_WORD_RECOGNITION": "phonological_confusion",
+    "KC_ORAL_READING_FLUENCY": "phonological_confusion",
+    "KC_SPELLING_SEQUENCE": "sequence_error",
+    "KC_SENTENCE_LANGUAGE": "sequence_error",
+    "KC_READING_COMPREHENSION": "unknown_error",
+}
+
+
+def _error_category(error_type: Optional[str], knowledge_component_id: Optional[str] = None) -> str:
     normalized = (error_type or "").strip().lower()
-    if normalized in {"", "none"}:
-        return "unknown_error"
-    return _ERROR_CATEGORIES.get(normalized, "unknown_error")
+    if normalized not in {"", "none", "unknown_error"}:
+        return _ERROR_CATEGORIES.get(normalized, "unknown_error")
+    return _KC_ERROR_CATEGORIES.get(knowledge_component_id or "", "unknown_error")
 
 
 def _session_bounds(session: TelemetrySessionSubmit) -> tuple[str, str]:
@@ -97,10 +125,10 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
     eventual_completion_rate = _safe_divide(len([e for e in valid_events if e.final_correct]), valid_trials)
     
     # Error breakdowns
-    visual_confusion_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "visual_confusion"])
-    phonological_confusion_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "phonological_confusion"])
-    sequence_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "sequence_error"])
-    unknown_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "unknown_error"])
+    visual_confusion_errors = len([e for e in incorrect_events if _error_category(e.error_type, e.knowledge_component_id) == "visual_confusion"])
+    phonological_confusion_errors = len([e for e in incorrect_events if _error_category(e.error_type, e.knowledge_component_id) == "phonological_confusion"])
+    sequence_errors = len([e for e in incorrect_events if _error_category(e.error_type, e.knowledge_component_id) == "sequence_error"])
+    unknown_errors = len([e for e in incorrect_events if _error_category(e.error_type, e.knowledge_component_id) == "unknown_error"])
     
     visual_confusion_rate = _safe_divide(visual_confusion_errors, incorrect_trials)
     phonological_confusion_rate = _safe_divide(phonological_confusion_errors, incorrect_trials)
@@ -121,6 +149,7 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
     
     # Aggregations
     activity_breakdown = _aggregate_by_activity(valid_events)
+    activity_breakdown_by_skill = _aggregate_by_skill_activity(events)
     knowledge_components = _aggregate_by_kc(valid_events)
     
     # Fatigue
@@ -162,7 +191,8 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
         behavioral_fatigue_proxy=fatigue_proxy,
         fatigue_components=fatigue_components,
         knowledge_components=knowledge_components,
-        activity_breakdown=activity_breakdown
+        activity_breakdown=activity_breakdown,
+        activity_breakdown_by_skill=activity_breakdown_by_skill,
     )
 
 
@@ -180,13 +210,45 @@ def _aggregate_by_activity(events: List[TelemetryEvent]) -> dict:
         incorrect = len(evs) - correct
         accuracy = _safe_divide(correct, len(evs))
         median_lat = _median_or_none([e.first_touch_latency_ms for e in evs if e.first_touch_latency_ms > 0])
-        visual_errors = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "visual_confusion")
+        visual_errors = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type, e.knowledge_component_id) == "visual_confusion")
         
         result[aid] = {
             "trials": len(evs),
             "accuracy": accuracy,
             "median_response_latency_ms": median_lat,
             "visual_confusion_rate": _safe_divide(visual_errors, incorrect)
+        }
+    return result
+
+
+def _aggregate_by_skill_activity(events: List[TelemetryEvent]) -> dict:
+    """Aggregate separately when identical activity IDs occur in different skills."""
+    grouped: dict[tuple[str, str], list[TelemetryEvent]] = {}
+    for event in events:
+        key = (event.skill_id or "unknown", event.activity_id or "unknown")
+        grouped.setdefault(key, []).append(event)
+    result = {}
+    for (skill_id, activity_id), rows in grouped.items():
+        completed = [event for event in rows if not event.is_abandoned]
+        first_correct = sum(1 for event in completed if _is_first_attempt_correct(event))
+        attempts = sum(max(1, event.attempt_count) for event in completed)
+        result[f"{skill_id}::{activity_id}"] = {
+            "skill_id": skill_id,
+            "activity_id": activity_id,
+            "activity_name": next((event.activity_name for event in rows if event.activity_name), activity_id),
+            "trials": len(completed),
+            "abandoned_trials": sum(1 for event in rows if event.is_abandoned),
+            "accuracy": _safe_divide(first_correct, len(completed)) if completed else None,
+            "retry_rate": _safe_divide(sum(1 for event in completed if event.attempt_count > 1), len(completed)) if completed else None,
+            "mean_attempts_per_round": _safe_divide(attempts, len(completed)) if completed else None,
+            "correction_rate": _safe_divide(sum(1 for event in completed if event.correction_count > 0), len(completed)) if completed else None,
+            "support_rate": _safe_divide(sum(1 for event in completed if event.scaffold_level_used > 0 or event.hint_count > 0), len(completed)) if completed else None,
+            "eventual_completion_rate": _safe_divide(sum(1 for event in completed if event.final_correct), len(completed)) if completed else None,
+            "prompt_modalities": sorted({event.prompt_modality for event in rows if event.prompt_modality}),
+            "response_modalities": sorted({event.response_modality for event in rows if event.response_modality}),
+            "median_response_latency_ms": _median_or_none([
+                event.first_touch_latency_ms for event in completed if event.first_touch_latency_ms > 0
+            ]),
         }
     return result
 
@@ -205,9 +267,9 @@ def _aggregate_by_kc(events: List[TelemetryEvent]) -> dict:
         accuracy = _safe_divide(correct, len(evs))
         median_lat = _median_or_none([e.first_touch_latency_ms for e in evs if e.first_touch_latency_ms > 0])
         
-        visual_confusions = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "visual_confusion")
-        unknown_errors = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "unknown_error")
-        phonological_confusions = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "phonological_confusion")
+        visual_confusions = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type, e.knowledge_component_id) == "visual_confusion")
+        unknown_errors = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type, e.knowledge_component_id) == "unknown_error")
+        phonological_confusions = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type, e.knowledge_component_id) == "phonological_confusion")
         
         err_dist = {}
         if incorrect > 0:

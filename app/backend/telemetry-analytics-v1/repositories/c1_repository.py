@@ -2,6 +2,51 @@ from __future__ import annotations
 from database import get_db
 from datetime import datetime
 
+
+_KC_PRACTICE_LABELS = {
+    "KC_VISUAL_IDENTIFICATION": "Visual identification",
+    "KC_VISUAL_MATCHING": "Visual matching",
+    "KC_VISUAL_CATEGORIZATION": "Visual categorisation",
+    "KC_VISUAL_PATTERN": "Visual patterns",
+    "KC_VISUAL_MEMORY": "Visual memory",
+    "KC_LETTER_IDENTIFICATION": "Letter identification",
+    "KC_LETTER_MATCHING": "Letter matching",
+    "KC_LETTER_MEMORY": "Letter memory",
+    "KC_LETTER_DECODING": "Letter decoding",
+    "KC_PHONEME_LETTER_MAPPING": "Sound and letter matching",
+    "KC_WORD_RECOGNITION": "Word recognition",
+    "KC_ORAL_READING_FLUENCY": "Reading aloud",
+    "KC_READING_COMPREHENSION": "Reading comprehension",
+    "KC_SPELLING_SEQUENCE": "Spelling sequence",
+    "KC_SENTENCE_LANGUAGE": "Sentence building",
+}
+
+
+def _recommendations_from_observed_evidence(state: dict) -> list[str]:
+    """Return guidance only when the stored session measured a weakness."""
+    knowledge_components = state.get("knowledge_components") or {}
+    measured = []
+    for kc, values in knowledge_components.items():
+        accuracy = values.get("accuracy") if isinstance(values, dict) else None
+        trials = values.get("trials", 0) if isinstance(values, dict) else 0
+        if isinstance(accuracy, (int, float)) and trials:
+            measured.append((float(accuracy), kc))
+
+    if not measured:
+        behavior = state.get("behavior") or {}
+        independent_accuracy = behavior.get("independent_accuracy")
+        if isinstance(independent_accuracy, (int, float)):
+            if independent_accuracy < 0.80:
+                return ["Repeat recently completed activities with light support, then try again independently."]
+            return ["Continue practising the completed activities to build confidence."]
+        return ["Complete a few more activities to receive personalised practice guidance."]
+
+    accuracy, weakest_kc = min(measured)
+    label = _KC_PRACTICE_LABELS.get(weakest_kc, "the least secure activity area")
+    if accuracy >= 0.80:
+        return ["Continue practising the completed activities to build confidence."]
+    return [f"Practise {label.lower()} with a short, supported activity."]
+
 async def save_c1_state(state_data: dict) -> None:
     """Upsert the processed C1 result for a specific session."""
     db = get_db()
@@ -75,12 +120,14 @@ async def get_parent_summary(student_id: str) -> dict | None:
     interaction = latest.get("interaction_state", {})
     
     # Calculate simple statuses
-    median_latency = behavior.get("median_latency_ms", 0.0)
-    response_speed = "DEVELOPING"
-    if median_latency < 2000:
-        response_speed = "EXCELLENT"
-    elif median_latency < 4000:
-        response_speed = "GOOD"
+    median_latency = behavior.get("median_latency_ms")
+    response_speed = "NOT_MEASURED"
+    if isinstance(median_latency, (int, float)) and median_latency > 0:
+        response_speed = "DEVELOPING"
+        if median_latency < 2000:
+            response_speed = "EXCELLENT"
+        elif median_latency < 4000:
+            response_speed = "GOOD"
         
     attention = interaction.get("state", "UNKNOWN")
     if attention == "ENGAGED": attention = "GOOD"
@@ -101,12 +148,21 @@ async def get_parent_summary(student_id: str) -> dict | None:
     if not obs:
         obs.append("The learner is practicing steadily.")
         
-    # Recommendations
-    recs = ["Visual letter matching", "Letter recognition"]
+    # Recommendations must be grounded in this child's observed curriculum
+    # evidence. Never show a generic activity as if it were personalised.
+    recs = _recommendations_from_observed_evidence(latest)
+
+    completion_rate = behavior.get("completion_rate")
+    overall_progress = (
+        int(float(completion_rate) * 100)
+        if isinstance(completion_rate, (int, float))
+        else None
+    )
     
     return {
         "student_id": student_id,
-        "overall_progress": int(behavior.get("completion_rate", 0.0) * 100) if behavior.get("completion_rate") else 68,
+        # Missing completion data is missing data, not 68% progress.
+        "overall_progress": overall_progress,
         "accuracy": int(behavior.get("accuracy", 0.0) * 100),
         "response_speed": response_speed,
         "attention": attention,

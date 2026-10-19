@@ -38,7 +38,16 @@ async def process_c1_session(
     await telemetry_repository.save_events(events_data)
     
     c1_partial = process_session(payload.session_id, payload.student_id, events_data)
-    model_metadata = predict_c1_pattern(c1_partial["behavior"])
+    # The classifier contract is the complete live C1 schema.  Keep this
+    # route aligned with /telemetry/log-session so both paths produce the
+    # same 19-field vector.
+    model_features = {
+        **c1_partial["behavior"],
+        **c1_partial["indices"],
+        "fatigue_score": c1_partial["fatigue"]["score"],
+        "cognitive_load_score": c1_partial["interaction_state"]["score"],
+    }
+    model_metadata = predict_c1_pattern(model_features)
     c1_partial["model"] = model_metadata
     
     await c1_repository.save_c1_state(c1_partial)

@@ -134,43 +134,30 @@ async def _validate_component_four_research_event(db, event: dict) -> None:
     event["research_validation_errors"] = errors
 
 async def _trigger_c3_background(student_id: str, session_summary: dict):
-    """Fuse only explicitly linked, complete inputs. C1 accuracy is not path efficiency."""
+    """Ask C3 to reconcile saved evidence after C1 arrives.
+
+    C2 performs the same call after speech is saved, so either arrival order
+    produces one idempotent session summary.
+    """
     db = get_db()
     session_id = session_summary.get("session_id")
-    audit = {"student_id": student_id, "session_id": session_id, "timestamp": datetime.now(timezone.utc),
-             "model_name": "XGBoost", "validation_status": "synthetic_only"}
+    dataset_id = session_summary.get("dataset_id")
     try:
-        speech = await db.speech_features.find_one({"student_id": student_id, "session_id": session_id}, sort=[("created_at", -1)]) or {}
-        motion = await db.kinematic_features.find_one({"student_id": student_id, "session_id": session_id}, sort=[("timestamp", -1)]) or {}
-        student = await db.students.find_one({"_id": ObjectId(student_id)}) or {}
-        audio_names = {"acoustic_latency_ms": "acoustic_latency_ms", "peak_count_delta": "syllabic_event_mismatch",
-                       "intra_word_silence_ratio": "intra_word_silence_ratio", "local_jitter": "local_jitter", "local_shimmer": "local_shimmer"}
-        motion_names = ("time_to_first_touch_ms", "orthographic_confusion_index", "path_efficiency_ratio", "dimensionless_jerk", "dwell_time_ms")
-        audio = {k: speech.get(v) for k,v in audio_names.items()}
-        kinematics = {k: motion.get(k) for k in motion_names}
-        demographics = {"student_age_months": student.get("age_months"), "gender": student.get("gender_code"),
-                        "time_of_day_hour": session_summary.get("time_of_day_hour")}
-        missing = [k for k,v in {**audio, **kinematics, **demographics}.items()
-                   if not isinstance(v, (int,float)) or isinstance(v,bool) or not math.isfinite(v)]
-        origins = {speech.get("data_origin"), motion.get("data_origin")}
-        if origins not in ({"observed"}, {"synthetic"}):
-            missing.append("consistent_explicit_modality_provenance")
-        if speech.get("measurement_status") not in ("available", "valid", "synthetic_features"):
-            missing.append("valid_speech_measurement")
-        if speech.get("dataset_id") != motion.get("dataset_id"):
-            missing.append("matched_dataset_id")
-        if missing:
-            await db.model_audit_log.insert_one({**audit, "status": "skipped_missing_inputs", "missing_features": missing})
-            return
-        payload = {"student_id": student_id, "session_id": session_id, "c1_audio_vector": audio,
-                   "c2_kinematic_vector": kinematics, **demographics,
-                   "data_origin": speech["data_origin"], "dataset_id": speech.get("dataset_id")}
         async with httpx.AsyncClient() as client:
-            response = await client.post(os.getenv("FUSION_API_URL", "http://localhost:9016").rstrip("/") + "/diagnose", json=payload, timeout=15)
+            response = await client.post(
+                os.getenv("FUSION_API_URL", "http://localhost:9016").rstrip("/") + "/diagnose/session",
+                json={"student_id": student_id, "session_id": session_id,
+                      "data_origin": session_summary.get("data_origin", "observed"),
+                      "dataset_id": dataset_id},
+                timeout=15,
+            )
             response.raise_for_status()
-        await db.model_audit_log.insert_one({**audit,"status":"fusion_requested","data_origin":speech["data_origin"]})
-    except Exception:
-        await db.model_audit_log.insert_one({**audit,"status":"fusion_failed"})
+    except Exception as exc:
+        await db.model_audit_log.update_one(
+            {"student_id": student_id, "session_id": session_id, "model_name": "XGBoost"},
+            {"$set": {"timestamp": datetime.now(timezone.utc), "status": "fusion_refresh_failed",
+                      "error_type": type(exc).__name__}}, upsert=True,
+        )
 
 
 def _kinematic_events(events: list[dict]) -> list[dict]:
@@ -188,7 +175,10 @@ def _kinematic_events(events: list[dict]) -> list[dict]:
                 "t": point.get("timestamp_ms", point.get("t", 0)),
                 "type": str(point.get("type") or "").upper(),
             })
-        if len(points) < 2:
+        # Kinematic path metrics are meaningful only when an actual movement
+        # path was captured. A DOWN/UP tap must not be reported as a perfectly
+        # efficient motor trajectory.
+        if len(points) < 3 or not any(point["type"] == "MOVE" for point in points):
             continue
         targets = event.get("targets") or event.get("target_ids") or []
         selected = event.get("selected_answers") or []
@@ -369,7 +359,13 @@ async def submit_telemetry(
             e["student_id"] = req.student_id
             
         c1_partial = process_session(req.session_id, req.student_id, events_data)
-        model_metadata = predict_c1_pattern(c1_partial["behavior"])
+        model_features = {
+            **c1_partial["behavior"],
+            **c1_partial["indices"],
+            "fatigue_score": c1_partial["fatigue"]["score"],
+            "cognitive_load_score": c1_partial["interaction_state"]["score"],
+        }
+        model_metadata = predict_c1_pattern(model_features)
         c1_partial["model"] = model_metadata
         await c1_repository.save_c1_state(c1_partial)
     except Exception as err:
@@ -545,7 +541,9 @@ async def get_cognitive_analytics(
     comp_results = student.get("comprehensive_assessment_results", {})
     total_yes = sum(sum(1 for a in ans if a is True) for ans in comp_results.values() if isinstance(ans, list))
     total_q = sum(len(ans) for ans in comp_results.values() if isinstance(ans, list))
-    assessment_risk_score = total_yes / max(total_q, 1)
+    # No questionnaire responses is missing screening evidence, not a zero-risk
+    # questionnaire result.
+    assessment_risk_score = (total_yes / total_q) if total_q else None
 
     # Run ML pipeline
     profile = generate_cognitive_profile(sessions, assessment_risk_score=assessment_risk_score)

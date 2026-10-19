@@ -48,8 +48,15 @@ def process_session(session_id: str, student_id: str, events: List[dict]) -> dic
     q = quality.calculate_quality(events, f)
     
     # 3. Learner Indices
-    # Assume task type for now based on first event or default to true for phonological
-    is_phono = any("phonetic" in e.get("distractor_matrix", {}) for e in events)
+    # Curriculum metadata, rather than distractor text, determines whether a
+    # response belongs to a sound/language task. This keeps activity mappings
+    # stable across Sinhala content revisions.
+    phonological_kcs = {
+        "KC_PHONEME_GRAPHEME", "KC_PHONEME_LETTER_MAPPING",
+        "KC_LETTER_DECODING", "KC_WORD_RECOGNITION",
+        "KC_READING_COMPREHENSION", "KC_ORAL_READING_FLUENCY",
+    }
+    is_phono = any(e.get("knowledge_component_id") in phonological_kcs for e in events)
     idx = {
         "visual_processing_index": indices.get_visual_processing_index(f["mean_first_touch_latency_ms"]),
         "phonological_task_index": indices.get_phonological_task_index(f["mean_first_touch_latency_ms"], is_phono),
