@@ -10,6 +10,8 @@ import '../../widgets/research_evidence_panel.dart';
 import '../../widgets/trend_chart.dart';
 import '../../models/comprehensive_assessment_questions.dart';
 import 'therapist_adaptive_evidence_view.dart';
+import 'therapist_component_tabs.dart';
+import '../../widgets/dashboard/dashboard_kit.dart';
 
 class TherapistStudentDetailScreen extends StatefulWidget {
   final Map<String, dynamic> student;
@@ -36,6 +38,11 @@ class _TherapistStudentDetailScreenState
   String? _errorMessage;
   String _selectedAssessmentCategory = 'all';
   int _activityDays = 30;
+
+  String? get _studentId =>
+      widget.student['student_id']?.toString() ??
+      widget.student['id']?.toString() ??
+      widget.student['_id']?.toString();
 
   @override
   void initState() {
@@ -66,14 +73,14 @@ class _TherapistStudentDetailScreenState
           )
         : await Future.wait([
             capture(_dashboardService.getOverview(studentId)),
-            capture(_dashboardService.getC1Behavioral(studentId)),
+            capture(_dashboardService.getC1Behavioral(studentId, days: _activityDays)),
             capture(
               _dashboardService.getActivityPerformance(
                 studentId,
                 days: _activityDays,
               ),
             ),
-            capture(_dashboardService.getC2Speech(studentId)),
+            capture(_dashboardService.getC2Speech(studentId, days: _activityDays)),
             capture(_dashboardService.getC3Profile(studentId)),
             capture(_dashboardService.getC4Adaptive(studentId)),
           ]);
@@ -175,7 +182,12 @@ class _TherapistStudentDetailScreenState
               ],
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Center(child: Text('Activities · ${_activityDays}d')),
+                child: Center(
+                  child: Text(
+                    'Last ${_activityDays}d',
+                    style: DashText.body(fontSize: 14, color: AppColors.calmBlueDark),
+                  ),
+                ),
               ),
             ),
             IconButton(
@@ -201,9 +213,9 @@ class _TherapistStudentDetailScreenState
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Therapist Student: $name',
-                  style: AppTypography.heading(
-                    fontSize: 18,
+                  name,
+                  style: DashText.heading(
+                    fontSize: 19,
                     color: AppColors.textPrimary,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -216,13 +228,15 @@ class _TherapistStudentDetailScreenState
             labelColor: AppColors.calmBlue,
             unselectedLabelColor: AppColors.textHint,
             indicatorColor: AppColors.calmBlue,
+            labelStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            unselectedLabelStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
             tabs: [
-              Tab(text: "Overview"),
-              Tab(text: "Activity patterns"),
-              Tab(text: "Reading & speaking"),
-              Tab(text: "Learning profile"),
+              Tab(text: "Summary"),
+              Tab(text: "Activities"),
+              Tab(text: "Reading"),
+              Tab(text: "Combined profile"),
               Tab(text: "Adaptive support"),
-              Tab(text: "Parent observations"),
+              Tab(text: "Parent questionnaire"),
             ],
           ),
         ),
@@ -248,17 +262,26 @@ class _TherapistStudentDetailScreenState
                     DashboardSection(
                       data: _c1Behavioral,
                       onRetry: _loadAllData,
-                      child: _buildC1BehavioralTab(),
+                      child: TherapistActivityTab(
+                        data: _c1Behavioral ?? const {},
+                        activityPerformance: _activityPerformance,
+                        studentId: _studentId ?? '',
+                        onChanged: _loadAllData,
+                      ),
                     ),
                     DashboardSection(
                       data: _c2Speech,
                       onRetry: _loadAllData,
-                      child: _buildC2SpeechTab(),
+                      child: TherapistReadingTab(data: _c2Speech ?? const {}),
                     ),
                     DashboardSection(
                       data: _c3Profile,
                       onRetry: _loadAllData,
-                      child: _buildC3ProfileTab(),
+                      child: TherapistCombinedProfileTab(
+                        data: _c3Profile ?? const {},
+                        studentId: _studentId ?? '',
+                        onChanged: _loadAllData,
+                      ),
                     ),
                     DashboardSection(
                       data: _c4Adaptive,
@@ -284,119 +307,102 @@ class _TherapistStudentDetailScreenState
   // 1. OVERVIEW
   // ==========================================
   Widget _buildOverviewTab() {
-    final accuracy = _overview?['accuracy'];
-    final mastery = _overview?['overall_mastery'];
-    final c1Avail = _overview?['c1_available'] == true;
-    final c2Avail = _overview?['c2_available'] == true;
-    final c3Avail = _overview?['c3_available'] == true;
-    final c4Avail = _overview?['c4_available'] == true;
-    final recommendation =
-        _overview?['latest_recommendation'] ?? "No recommendation available.";
+    final overview = _overview ?? const <String, dynamic>{};
+    final coverage = Map<String, dynamic>.from(overview['coverage'] as Map? ?? const {});
+    final alerts = overview['alerts'] as List<dynamic>? ?? const [];
+    final sectionsDone = DashFormat.number(coverage['questionnaire_sections_done'])?.round() ?? 0;
+    final sectionsTotal = DashFormat.number(coverage['questionnaire_sections_total'])?.round() ?? 4;
+    final recordings = DashFormat.number(coverage['recordings'])?.round() ?? 0;
+    final usable = DashFormat.number(coverage['usable_recordings'])?.round() ?? 0;
+    final sessions = DashFormat.number(coverage['activity_sessions'])?.round() ?? 0;
+    final days = coverage['window_days'] ?? 30;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        _buildChildProfileCard(widget.student),
+        const SizedBox(height: 14),
+        DashCard(
+          title: 'Evidence collected',
+          subtitle: 'Last $days days · last active ${DashFormat.date(coverage['last_active_at'] ?? overview['last_active'])}',
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              _buildModelInfo(_overview ?? {}, humanReadable: true),
-              if (_overview?['last_active'] != null)
-                Text(
-                  "Last Active: ${_overview!['last_active']}",
-                  style: AppTypography.caption(),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // ── Child Details Section ──
-          _buildChildProfileCard(widget.student),
-          const SizedBox(height: 16),
-          // Availability Badges
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildAvailabilityBadge("Behavioral", c1Avail),
-              _buildAvailabilityBadge("Speech", c2Avail),
-              _buildAvailabilityBadge("Learner Profile", c3Avail),
-              _buildAvailabilityBadge("Adaptive", c4Avail),
-            ],
-          ),
-          const SizedBox(height: 16),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.5,
-            children: [
-              _buildStatCard(
-                "First-attempt Accuracy",
-                metricText(accuracy, scale: 100, suffix: '%', decimals: 0),
-                FontAwesomeIcons.bullseye,
-                AppColors.gentleGreen,
+              StatusChip(
+                label: 'Activities: $sessions sessions',
+                tone: sessions > 0 ? DashTone.good : DashTone.neutral,
+                icon: Icons.touch_app_outlined,
               ),
-              _buildStatCard(
-                "Mean BKT Estimate",
-                metricText(mastery, scale: 100, suffix: '%', decimals: 0),
-                FontAwesomeIcons.brain,
-                AppColors.calmBlue,
+              StatusChip(
+                label: 'Reading: $usable of $recordings clear',
+                tone: recordings == 0 ? DashTone.neutral : (usable > 0 ? DashTone.good : DashTone.watch),
+                icon: Icons.mic_none_rounded,
               ),
-              _buildStatCard(
-                "Model Mastery Status",
-                _overview?['reading_fluency_status'] ?? "-",
-                FontAwesomeIcons.chartLine,
-                AppColors.warmAmber,
+              StatusChip(
+                label: 'Questionnaire: $sectionsDone of $sectionsTotal',
+                tone: sectionsDone >= sectionsTotal ? DashTone.good : DashTone.neutral,
+                icon: Icons.assignment_outlined,
               ),
-              _buildStatCard(
-                "Fatigue",
-                _overview?['fatigue_status'] ?? "Low",
-                FontAwesomeIcons.batteryHalf,
-                AppColors.softCoral,
+              StatusChip(
+                label: coverage['combined_profile_ready'] == true ? 'Combined profile ready' : 'Combined profile not ready',
+                tone: coverage['combined_profile_ready'] == true ? DashTone.good : DashTone.neutral,
+                icon: Icons.hub_outlined,
               ),
-              _buildStatCard(
-                "Current Pattern",
-                _overview?['current_pattern'] ?? "Unknown",
-                FontAwesomeIcons.puzzlePiece,
-                AppColors.calmBlue,
-              ),
-              _buildStatCard(
-                "Completed Sessions",
-                "${_overview?['completed_sessions'] ?? 0}",
-                FontAwesomeIcons.calendarCheck,
-                AppColors.gentleGreen,
+              StatusChip(
+                label: coverage['professional_review'] == true ? 'Reviewed by you' : 'Not reviewed yet',
+                tone: coverage['professional_review'] == true ? DashTone.good : DashTone.neutral,
+                icon: Icons.rate_review_outlined,
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          Text(
-            "Latest Recommendation",
-            style: AppTypography.heading(fontSize: 18),
+        ),
+        DashCard(
+          title: 'Needs attention',
+          subtitle: 'Remote-monitoring prompts from recent activity',
+          child: AlertList(alerts: alerts),
+        ),
+        DashCard(
+          title: 'At a glance',
+          subtitle: 'Latest session; details in each tab',
+          child: MetricGrid(
+            children: [
+              MetricTile(
+                label: 'Correct on first try',
+                value: DashFormat.percent(overview['accuracy']),
+                icon: Icons.check_circle_outline_rounded,
+                tone: DashTone.good,
+              ),
+              MetricTile(
+                label: 'Completed sessions',
+                value: DashFormat.count(overview['completed_sessions']),
+                icon: Icons.event_available_outlined,
+              ),
+              MetricTile(
+                label: 'Within-session fatigue',
+                value: (overview['fatigue_status'] ?? DashFormat.missing).toString(),
+                icon: Icons.battery_charging_full_rounded,
+                tone: DashTone.watch,
+              ),
+              MetricTile(
+                label: 'Average mastery estimate',
+                value: DashFormat.percent(overview['overall_mastery']),
+                detail: (overview['reading_fluency_status'] ?? '').toString(),
+                icon: Icons.insights_outlined,
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.calmBlue.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
+        ),
+        if (overview['latest_recommendation'] != null)
+          DashCard(
+            title: 'Latest adaptive decision',
             child: Text(
-              recommendation,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontStyle: FontStyle.italic,
-              ),
+              overview['latest_recommendation'].toString(),
+              style: DashText.body(fontSize: 15),
             ),
           ),
-          const SizedBox(height: 24),
-          // ── Clinical Therapist Report Export Box ──
-          _buildClinicalReportExportCard(),
-          const SizedBox(height: 24),
-        ],
-      ),
+        _buildClinicalReportExportCard(),
+      ],
     );
   }
 
@@ -408,1201 +414,6 @@ class _TherapistStudentDetailScreenState
       padding: const EdgeInsets.all(20),
       child: _buildAssessmentAnswersSection(widget.student),
     );
-  }
-
-  // ==========================================
-  // 2. C1 — BEHAVIORAL ANALYTICS
-  // ==========================================
-  Widget _buildC1BehavioralTab() {
-    final firstAttemptAcc = _c1Behavioral?['first_attempt_accuracy'];
-    final medianLat = _c1Behavioral?['median_response_latency_ms'];
-    final retryRate = _c1Behavioral?['retry_rate'];
-    final meanAttempts = _c1Behavioral?['mean_attempts_per_round'];
-    final medianTimeToCorrect = _c1Behavioral?['median_time_to_correct_ms'];
-    final fatigue = _c1Behavioral?['behavioral_fatigue_proxy'];
-
-    final kcPerformance = _c1Behavioral?['kc_performance'] != null
-        ? Map<String, dynamic>.from(_c1Behavioral!['kc_performance'])
-        : <String, dynamic>{};
-    final errors = _c1Behavioral?['error_distribution'] != null
-        ? Map<String, dynamic>.from(_c1Behavioral!['error_distribution'])
-        : <String, dynamic>{};
-
-    final trends = _c1Behavioral?['trends'] != null
-        ? Map<String, dynamic>.from(_c1Behavioral!['trends'])
-        : <String, dynamic>{};
-    final accTrendRaw = trends['accuracy'] as List<dynamic>? ?? [];
-    final latTrendRaw = trends['latency'] as List<dynamic>? ?? [];
-    final fatTrendRaw = trends['fatigue'] as List<dynamic>? ?? [];
-
-    final accTrend = accTrendRaw
-        .map((e) => (e['value'] as num?)?.toDouble())
-        .toList();
-    final latTrend = latTrendRaw
-        .map(
-          (e) =>
-              e['value'] is num ? (e['value'] as num).toDouble() / 1000 : null,
-        )
-        .toList();
-    final fatTrend = fatTrendRaw
-        .map((e) => (e['value'] as num?)?.toDouble())
-        .toList();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildModelInfo(_c1Behavioral ?? {}, humanReadable: true),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              int cardsPerRow = constraints.maxWidth > 600 ? 3 : 2;
-              double spacing = 12.0;
-              double cardWidth =
-                  (constraints.maxWidth - (spacing * (cardsPerRow - 1))) /
-                  cardsPerRow;
-
-              return Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: [
-                  SizedBox(
-                    width: cardWidth,
-                    child: _buildStatCard(
-                      "Correct on first try",
-                      firstAttemptAcc != null
-                          ? "${((firstAttemptAcc as num) * 100).toInt()}%"
-                          : "Insufficient data",
-                      Icons.check_circle_outline,
-                      AppColors.gentleGreen,
-                    ),
-                  ),
-                  SizedBox(
-                    width: cardWidth,
-                    child: _buildStatCard(
-                      "Rounds needing another try",
-                      retryRate != null
-                          ? "${((retryRate as num) * 100).toInt()}%"
-                          : "Insufficient data",
-                      Icons.replay,
-                      AppColors.warmAmber,
-                    ),
-                  ),
-                  SizedBox(
-                    width: cardWidth,
-                    child: _buildStatCard(
-                      "Mean Attempts",
-                      meanAttempts != null
-                          ? (meanAttempts as num).toStringAsFixed(1)
-                          : "Insufficient data",
-                      Icons.numbers,
-                      AppColors.softCoral,
-                    ),
-                  ),
-                  SizedBox(
-                    width: cardWidth,
-                    child: _buildStatCard(
-                      "Median Response Time",
-                      medianLat != null
-                          ? "${((medianLat as num) / 1000).toStringAsFixed(1)} s"
-                          : "Insufficient data",
-                      Icons.timer,
-                      AppColors.calmBlue,
-                    ),
-                  ),
-                  SizedBox(
-                    width: cardWidth,
-                    child: _buildStatCard(
-                      "Time to Correct",
-                      medianTimeToCorrect != null
-                          ? "${((medianTimeToCorrect as num) / 1000).toStringAsFixed(1)} s"
-                          : "Insufficient data",
-                      Icons.hourglass_bottom,
-                      AppColors.calmBlue,
-                    ),
-                  ),
-                  SizedBox(
-                    width: cardWidth,
-                    child: _buildStatCard(
-                      "Behavioral Fatigue Indicator",
-                      fatigue != null
-                          ? (fatigue as num).toStringAsFixed(2)
-                          : "Insufficient data",
-                      Icons.battery_alert,
-                      AppColors.softCoral,
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-
-          const SizedBox(height: 24),
-          Text("Attempt Behavior", style: AppTypography.heading(fontSize: 18)),
-          const SizedBox(height: 12),
-          _buildAttemptBehaviorBar(firstAttemptAcc, retryRate),
-
-          const SizedBox(height: 24),
-          Text(
-            "Knowledge Component Performance",
-            style: AppTypography.heading(fontSize: 18),
-          ),
-          const SizedBox(height: 12),
-          _buildHorizontalBar(
-            "Akshara Identity",
-            kcPerformance['KC_AKSHARA_IDENTITY'],
-            AppColors.calmBlue,
-          ),
-          _buildHorizontalBar(
-            "Phoneme–Grapheme",
-            kcPerformance['KC_PHONEME_GRAPHEME'],
-            AppColors.gentleGreen,
-          ),
-          _buildHorizontalBar(
-            "Word Recognition",
-            kcPerformance['KC_WORD_RECOGNITION'],
-            AppColors.warmAmber,
-          ),
-          _buildHorizontalBar(
-            "Spelling Sequence",
-            kcPerformance['KC_SPELLING_SEQUENCE'],
-            AppColors.softCoral,
-          ),
-          _buildHorizontalBar(
-            "Sentence Language",
-            kcPerformance['KC_SENTENCE_LANGUAGE'],
-            AppColors.calmBlue,
-          ),
-          _buildHorizontalBar(
-            "Reading Comprehension",
-            kcPerformance['KC_READING_COMPREHENSION'],
-            AppColors.gentleGreen,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "Supportive Measure",
-            style: AppTypography.heading(fontSize: 14),
-          ),
-          const SizedBox(height: 8),
-          _buildHorizontalBar(
-            "Visual Support",
-            kcPerformance['KC_VISUAL_SUPPORT'],
-            AppColors.warmAmber,
-          ),
-          _buildHorizontalBar(
-            "Letter Sequence Memory",
-            kcPerformance['KC_ORTHOGRAPHIC_MEMORY'],
-            AppColors.calmBlue,
-          ),
-          _buildHorizontalBar(
-            "Oral Reading",
-            kcPerformance['KC_ORAL_READING_FLUENCY'],
-            AppColors.calmBlue,
-          ),
-
-          const SizedBox(height: 24),
-          Text(
-            "Observed Error Pattern",
-            style: AppTypography.heading(fontSize: 18),
-          ),
-          const SizedBox(height: 12),
-          _buildErrorPattern(errors),
-
-          const SizedBox(height: 32),
-          Text(
-            "Performance Across Sessions",
-            style: AppTypography.heading(fontSize: 18),
-          ),
-          const SizedBox(height: 12),
-          if (accTrend.length < 2 && latTrend.length < 2 && fatTrend.length < 2)
-            const Text(
-              "Complete more sessions to view this trend.",
-              style: TextStyle(
-                fontStyle: FontStyle.italic,
-                color: AppColors.textSecondary,
-              ),
-            )
-          else ...[
-            if (accTrend.length >= 2) ...[
-              TrendChart(
-                title: "First-Attempt Accuracy",
-                dataPoints: accTrend,
-                labels: accTrendRaw
-                    .map((e) => e['session'].toString())
-                    .toList(),
-                lineColor: AppColors.gentleGreen,
-                minY: 0,
-              ),
-              const SizedBox(height: 24),
-            ],
-            if (latTrend.length >= 2) ...[
-              TrendChart(
-                title: "Median Response Time (s)",
-                dataPoints: latTrend,
-                labels: latTrendRaw
-                    .map((e) => e['session'].toString())
-                    .toList(),
-                lineColor: AppColors.calmBlue,
-                minY: 0,
-              ),
-              const SizedBox(height: 24),
-            ],
-            if (fatTrend.length >= 2) ...[
-              TrendChart(
-                title: "Behavioral Fatigue Indicator",
-                dataPoints: fatTrend,
-                labels: fatTrendRaw
-                    .map((e) => e['session'].toString())
-                    .toList(),
-                lineColor: AppColors.softCoral,
-              ),
-            ],
-          ],
-          const SizedBox(height: 24),
-          Text(
-            "Performance by skill and activity",
-            style: AppTypography.heading(fontSize: 18),
-          ),
-          const SizedBox(height: 10),
-          _buildActivityPerformanceList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActivityPerformanceList() {
-    final activities =
-        _activityPerformance?['activities'] as List<dynamic>? ?? const [];
-    if (activities.isEmpty) {
-      return const Text(
-        'No activity-level observations are available for this period yet.',
-      );
-    }
-    return Column(
-      children: activities.map((raw) {
-        final row = Map<String, dynamic>.from(raw as Map);
-        final voice = Map<String, dynamic>.from(
-          row['voice'] as Map? ?? const {},
-        );
-        final latestVoice = Map<String, dynamic>.from(
-          voice['latest_voice'] as Map? ?? const {},
-        );
-        final accuracy = row['first_attempt_accuracy'];
-        final wordAccuracy = latestVoice['word_accuracy'];
-        final readingRate = latestVoice['reading_rate_wpm'];
-        final voiceDetails = latestVoice.isEmpty
-            ? '${voice['recordings'] ?? 0} reading recordings'
-            : '${voice['recordings'] ?? 0} recordings · ${wordAccuracy is num ? '${(wordAccuracy * 100).round()}% word match' : 'word match unavailable'} · ${readingRate is num ? '${readingRate.round()} words/min' : 'reading rate unavailable'}';
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            title: Text(
-              '${_skillLabel(row['skill_id'])} · ${row['activity_name'] ?? _activityLabel(row['activity_id'])}',
-            ),
-            subtitle: Text(
-              '${row['trials'] ?? 0} responses · ${row['abandoned_trials'] ?? 0} unfinished · $voiceDetails',
-            ),
-            trailing: Text(
-              accuracy is num ? '${(accuracy * 100).round()}%\nfirst try' : '—',
-            ),
-            isThreeLine: true,
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  String _skillLabel(dynamic raw) =>
-      switch ((raw?.toString() ?? '').replaceFirst('skill_', '')) {
-        '1' => 'Picture skills',
-        '2' => 'Letter skills',
-        '3' => 'Word skills',
-        '4' => 'Sentence skills',
-        '5' => 'Reading comprehension',
-        '6' => 'Textbook reading',
-        _ => 'Other practice',
-      };
-
-  String _activityLabel(dynamic raw) {
-    final match = RegExp(r'(\d+)$').firstMatch(raw?.toString() ?? '');
-    return match == null ? 'Activity' : 'Activity ${match.group(1)}';
-  }
-
-  Widget _buildAttemptBehaviorBar(
-    dynamic firstAttemptAcc,
-    dynamic retryRate,
-  ) => Column(
-    children: [
-      _buildHorizontalBar(
-        'First-attempt success',
-        firstAttemptAcc,
-        AppColors.gentleGreen,
-      ),
-      _buildHorizontalBar(
-        'Trials with retries',
-        retryRate,
-        AppColors.warmAmber,
-      ),
-      const Text(
-        'Separate rates with the same trial denominator; they are not normalized into a 100% stacked chart.',
-      ),
-    ],
-  );
-
-  Widget _buildErrorPattern(Map<String, dynamic> errors) {
-    if (errors.isEmpty) {
-      return const Text(
-        "No error-pattern data available yet.",
-        style: TextStyle(
-          fontStyle: FontStyle.italic,
-          color: AppColors.textSecondary,
-        ),
-      );
-    }
-
-    // Check if everything is null
-    bool hasData = false;
-    for (var key in [
-      'visual_confusion',
-      'phonological_confusion',
-      'sequence_error',
-      'unknown_error',
-    ]) {
-      if (errors[key] != null) hasData = true;
-    }
-    if (!hasData) {
-      return const Text(
-        "No error-pattern data available yet.",
-        style: TextStyle(
-          fontStyle: FontStyle.italic,
-          color: AppColors.textSecondary,
-        ),
-      );
-    }
-
-    double visual = (errors['visual_confusion'] as num?)?.toDouble() ?? 0.0;
-    double phono =
-        (errors['phonological_confusion'] as num?)?.toDouble() ?? 0.0;
-    double seq = (errors['sequence_error'] as num?)?.toDouble() ?? 0.0;
-    double unk = (errors['unknown_error'] as num?)?.toDouble() ?? 0.0;
-
-    if (visual == 0 && phono == 0 && seq == 0 && unk == 0) {
-      return const Text(
-        "No first-attempt errors observed in this session.",
-        style: TextStyle(
-          fontStyle: FontStyle.italic,
-          color: AppColors.gentleGreen,
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        _buildHorizontalBar(
-          "Visual Confusion",
-          errors['visual_confusion'],
-          AppColors.calmBlue,
-        ),
-        _buildHorizontalBar(
-          "Phonological Confusion",
-          errors['phonological_confusion'],
-          AppColors.gentleGreen,
-        ),
-        _buildHorizontalBar(
-          "Sequence Error",
-          errors['sequence_error'],
-          AppColors.warmAmber,
-        ),
-        _buildHorizontalBar(
-          "Unknown / Unclassified",
-          errors['unknown_error'],
-          AppColors.softCoral,
-        ),
-      ],
-    );
-  }
-
-  // ==========================================
-  // 3. C2 — SPEECH & SINHALA INTERACTION
-  // ==========================================
-  Widget _buildC2SpeechTab() {
-    final latest = _c2Speech?['latest'] ?? {};
-    final trends = _c2Speech?['trends'] ?? {};
-    final latTrendRaw = trends['latency'] as List<dynamic>? ?? [];
-    final latTrend = latTrendRaw
-        .map((e) => (e['value'] as num?)?.toDouble())
-        .toList();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildModelInfo(_c2Speech ?? {}, humanReadable: true),
-          const SizedBox(height: 16),
-          _buildEvidenceRow(
-            'Recent recordings with usable measures',
-            '${_c2Speech?['usable_recording_count'] ?? 0} of ${_c2Speech?['recording_count'] ?? 0}',
-          ),
-          const SizedBox(height: 12),
-
-          // Hero Card: Combined Reading Evidence
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.calmBlue, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Text(
-                    "READING & SPEECH EVENT",
-                    style: AppTypography.heading(
-                      fontSize: 18,
-                      color: AppColors.calmBlue,
-                    ),
-                  ),
-                ),
-                const Divider(height: 32, thickness: 2),
-
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "READING TRANSCRIPTION",
-                            style: AppTypography.caption(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildEvidenceRow(
-                            "Word reading difference",
-                            metricText(latest['wer'], scale: 100, suffix: '%'),
-                          ),
-                          _buildEvidenceRow(
-                            "Speech recognition confidence",
-                            metricText(
-                              latest['stt_confidence'],
-                              scale: 100,
-                              suffix: '%',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 80,
-                      color: AppColors.borderLight,
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "SPEECH TIMING MEASURES",
-                            style: AppTypography.caption(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildEvidenceRow(
-                            "Latency",
-                            metricText(
-                              latest['acoustic_latency_ms'],
-                              scale: .001,
-                              suffix: ' s',
-                            ),
-                          ),
-                          _buildEvidenceRow(
-                            "Pausing within speech",
-                            metricText(
-                              latest['silence_ratio'],
-                              scale: 100,
-                              suffix: '%',
-                            ),
-                          ),
-                          _buildEvidenceRow(
-                            "Syllable beat difference",
-                            metricText(latest['peak_delta']),
-                          ),
-                          _buildEvidenceRow(
-                            "Quality",
-                            _friendlyC2Quality(latest['recording_quality']),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Center(
-                  child: const Icon(
-                    Icons.arrow_downward,
-                    color: AppColors.textHint,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.gentleGreen.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        "Reading Evidence",
-                        style: AppTypography.caption(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      Text(
-                        latest['measurement_status']?.toString() ??
-                            "Unavailable",
-                        style: AppTypography.heading(
-                          fontSize: 20,
-                          color: AppColors.gentleGreen,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-          _buildEvidenceRow(
-            'Detected pauses (200–3000 ms)',
-            metricText(latest['pause_count'], decimals: 0),
-          ),
-          _buildEvidenceRow(
-            'Mean detected pause',
-            metricText(latest['mean_pause_duration_ms'], suffix: ' ms'),
-          ),
-          _buildEvidenceRow(
-            'Time spent pausing',
-            metricText(latest['pause_ratio'], scale: 100, suffix: '%'),
-          ),
-          _buildEvidenceRow(
-            'Speaking time',
-            metricText(latest['speech_duration_ms'], suffix: ' ms'),
-          ),
-          const Text(
-            'Thresholded acoustic intervals, not validated linguistic pause or syllable annotations.',
-          ),
-          Text(
-            "Expected vs Recognized",
-            style: AppTypography.heading(fontSize: 18),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.cardSurface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.borderLight),
-            ),
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('Expected')),
-                DataColumn(label: Text('Recognized')),
-                DataColumn(label: Text('Result')),
-              ],
-              rows: [
-                DataRow(
-                  cells: [
-                    DataCell(Text(latest['expected_text']?.toString() ?? '-')),
-                    DataCell(Text(latest['transcription']?.toString() ?? '-')),
-                    DataCell(
-                      Text(
-                        (latest['wer'] ?? 1.0) == 0.0 ? '✓' : '⚠',
-                        style: TextStyle(
-                          color: (latest['wer'] ?? 1.0) == 0.0
-                              ? Colors.green
-                              : Colors.orange,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  "Voice pitch variation (exploratory)",
-                  metricText(latest['jitter']),
-                  Icons.multiline_chart,
-                  AppColors.calmBlue,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCard(
-                  "Voice volume variation (exploratory)",
-                  metricText(latest['shimmer']),
-                  Icons.waves,
-                  AppColors.calmBlue,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-          if (latTrend.isNotEmpty) ...[
-            TrendChart(
-              title: "Time before starting to speak (ms)",
-              dataPoints: latTrend,
-              lineColor: AppColors.warmAmber,
-              minY: 0,
-            ),
-          ],
-          const SizedBox(height: 24),
-          if (trends['wer'] != null) ...[
-            TrendChart(
-              title: "Difference between expected and recognized words",
-              dataPoints: (trends['wer'] as List).map((e) {
-                final value = (e['value'] as num?)?.toDouble();
-                return value == null ? null : value * 100;
-              }).toList(),
-              lineColor: AppColors.softCoral,
-              minY: 0,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ==========================================
-  // 4. C3 — LEARNER PROFILE & XAI
-  // ==========================================
-  Widget _buildC3ProfileTab() {
-    final available = _c3Profile?['available'] == true;
-    final classifierAvailable = _c3Profile?['classifier_available'] == true;
-    final primaryPattern =
-        _c3Profile?['primary_pattern']?.toString() ?? 'Activity summary';
-    final confidence = (_c3Profile?['confidence'] as num?)?.toDouble();
-    final modalities =
-        (_c3Profile?['modalities_used'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
-    final rawProbs =
-        (_c3Profile?['probabilities'] as Map<String, dynamic>?) ?? {};
-    final shapExplanations =
-        (_c3Profile?['shap_explanations'] as List<dynamic>?) ?? [];
-    final summary =
-        _c3Profile?['summary_text']?.toString() ??
-        'More activity and reading observations are needed before a combined summary is available.';
-    final recommendation =
-        _c3Profile?['recommendation_text']?.toString() ??
-        'Review activity and reading progress over time.';
-
-    final Map<String, double> probs = {};
-    for (final pattern in [
-      'Typical',
-      'Phonological',
-      'Visual-Orthographic',
-      'Combined',
-    ]) {
-      final value = rawProbs[pattern] ?? rawProbs['$pattern Learning Pattern'];
-      if (classifierAvailable && value is num && value.toDouble().isFinite) {
-        probs[pattern] = value.toDouble().clamp(0.0, 1.0).toDouble();
-      }
-    }
-
-    Color patternColor;
-    IconData patternIcon;
-    final lowerPattern = primaryPattern.toLowerCase();
-    if (lowerPattern.contains('phonological')) {
-      patternColor = Colors.indigo;
-      patternIcon = Icons.record_voice_over_rounded;
-    } else if (lowerPattern.contains('visual') ||
-        lowerPattern.contains('orthographic')) {
-      patternColor = Colors.deepOrange;
-      patternIcon = Icons.visibility_rounded;
-    } else if (lowerPattern.contains('combined')) {
-      patternColor = Colors.purple;
-      patternIcon = Icons.alt_route_rounded;
-    } else if (lowerPattern.contains('typical')) {
-      patternColor = Colors.teal;
-      patternIcon = Icons.check_circle_outline_rounded;
-    } else {
-      patternColor = AppColors.calmBlue;
-      patternIcon = Icons.psychology_alt_rounded;
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. Primary Pattern Profile Header Card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  patternColor.withValues(alpha: 0.16),
-                  AppColors.calmBlue.withValues(alpha: 0.08),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: patternColor.withValues(alpha: 0.28)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: patternColor,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: patternColor.withValues(alpha: 0.35),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Icon(patternIcon, color: Colors.white, size: 28),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Learning pattern estimate',
-                                style: AppTypography.caption(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              const Spacer(),
-                              if (classifierAvailable &&
-                                  confidence != null &&
-                                  confidence > 0)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: patternColor.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: patternColor.withValues(
-                                        alpha: 0.4,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    '${(confidence * 100).toStringAsFixed(1)}% match',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: patternColor,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            classifierAvailable
-                                ? primaryPattern
-                                : available
-                                ? 'Activity summary'
-                                : 'No activity profile yet',
-                            style: AppTypography.heading(fontSize: 19),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                if (modalities.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: modalities
-                        .map(
-                          (m) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.85),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: AppColors.calmBlue.withValues(
-                                  alpha: 0.2,
-                                ),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.hub_outlined,
-                                  size: 12,
-                                  color: AppColors.calmBlue,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  m,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textPrimary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Show only scores actually returned by the classifier.
-          if (probs.isNotEmpty) ...[
-            Text('Pattern scores', style: AppTypography.heading(fontSize: 17)),
-            const SizedBox(height: 4),
-            Text(
-              'Relative scores from the available activity profile.',
-              style: AppTypography.caption(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.black.withValues(alpha: 0.07)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: probs.entries.map((entry) {
-                  final patternLabel = entry.key;
-                  final probVal = entry.value;
-                  Color barColor = Colors.grey.shade400;
-                  if (patternLabel == 'Typical') barColor = Colors.teal;
-                  if (patternLabel == 'Phonological') barColor = Colors.indigo;
-                  if (patternLabel == 'Visual-Orthographic')
-                    barColor = Colors.deepOrange;
-                  if (patternLabel == 'Combined') barColor = Colors.purple;
-
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              patternLabel,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              '${(probVal * 100).toStringAsFixed(1)}%',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: barColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: LinearProgressIndicator(
-                            value: probVal.clamp(0.0, 1.0),
-                            minHeight: 8,
-                            backgroundColor: Colors.grey.shade100,
-                            valueColor: AlwaysStoppedAnimation<Color>(barColor),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 24),
-          ] else ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: Text(
-                'Pattern scores will appear when a combined profile is available.',
-                style: AppTypography.caption(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
-          ],
-
-          // 3. Main contributing observations
-          if (shapExplanations.isNotEmpty) ...[
-            Text(
-              'Main contributing observations',
-              style: AppTypography.heading(fontSize: 17),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Signals that most influenced this pattern estimate.',
-              style: AppTypography.caption(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.black.withValues(alpha: 0.07)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: shapExplanations.map((exp) {
-                  final featName =
-                      exp['feature']?.toString() ??
-                      exp['feature_name']?.toString() ??
-                      '';
-                  final contrib =
-                      (exp['contribution'] as num?)?.toDouble() ?? 0.0;
-                  final obsVal =
-                      (exp['observed_value'] as num?)?.toDouble() ??
-                      (exp['value'] as num?)?.toDouble();
-                  final isToward = contrib >= 0;
-                  final impactColor = isToward
-                      ? Colors.deepOrange.shade600
-                      : Colors.teal.shade600;
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: impactColor.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: impactColor.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Icon(
-                          isToward
-                              ? Icons.trending_up_rounded
-                              : Icons.trending_down_rounded,
-                          color: impactColor,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _friendlyFeatureName(featName),
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              if (obsVal != null)
-                                Text(
-                                  'Observed measurement: ${obsVal.toStringAsFixed(2)}',
-                                  style: AppTypography.caption(
-                                    fontSize: 11,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: impactColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${isToward ? '+' : ''}${contrib.toStringAsFixed(2)} Impact',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: impactColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-
-          // 4. Multimodal Synthesis Narrative
-          Text(
-            'Integrated Multimodal Narrative',
-            style: AppTypography.heading(fontSize: 17),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.calmBlue.withValues(alpha: 0.07),
-              border: Border.all(
-                color: AppColors.calmBlue.withValues(alpha: 0.25),
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(summary, style: AppTypography.body(fontSize: 14)),
-          ),
-          const SizedBox(height: 20),
-
-          // 5. Targeted Pedagogical Recommendations
-          Text(
-            'Targeted Pedagogical Recommendations',
-            style: AppTypography.heading(fontSize: 17),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.gentleGreen.withValues(alpha: 0.07),
-              border: Border.all(
-                color: AppColors.gentleGreen.withValues(alpha: 0.25),
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(
-              recommendation,
-              style: AppTypography.body(fontSize: 14),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'These multimodal observations identify individualized learning patterns to inform instructional differentiation.',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _friendlyFeatureName(String raw) {
-    final name = raw.toLowerCase();
-    if (name.contains('acoustic_latency')) return 'Speech Onset Latency (ms)';
-    if (name.contains('peak_count_delta') || name.contains('syllabic'))
-      return 'Syllabic Event Mismatch';
-    if (name.contains('intra_word_silence') || name.contains('silence_ratio'))
-      return 'Intra-Word Silence Ratio';
-    if (name.contains('jitter')) return 'Vocal Jitter (Pitch Stability)';
-    if (name.contains('shimmer')) return 'Vocal Shimmer (Amplitude Stability)';
-    if (name.contains('time_to_first_touch')) return 'First Touch Latency (ms)';
-    if (name.contains('orthographic_confusion') || name.contains('oci'))
-      return 'Letter Confusion Index (OCI)';
-    if (name.contains('path_efficiency')) return 'Touch Path Directness Ratio';
-    if (name.contains('dimensionless_jerk') || name.contains('jerk'))
-      return 'Movement Smoothness (Jerk)';
-    if (name.contains('dwell_time')) return 'Target Dwell Time (ms)';
-    if (name.contains('age')) return 'Learner Age (Years)';
-    if (name.contains('gender')) return 'Learner Gender Baseline';
-    if (name.contains('time_of_day') || name.contains('hour'))
-      return 'Practice Time of Day';
-    return raw.replaceAll('_', ' ');
-  }
-
-  // ignore: unused_element
-  String _friendlyEvidenceName(String raw) {
-    final name = raw.toLowerCase();
-    if (name.contains('grapheme') || name.contains('letter'))
-      return 'Sinhala letter matching';
-    if (name.contains('word') || name.contains('reading_rate'))
-      return 'Word reading';
-    if (name.contains('pause') || name.contains('silence'))
-      return 'Pauses during reading';
-    if (name.contains('latency') || name.contains('response_time'))
-      return 'Response time';
-    if (name.contains('accuracy') || name.contains('correct'))
-      return 'First-try responses';
-    if (name.contains('retry') || name.contains('attempt'))
-      return 'Responses needing another try';
-    return 'Activity performance';
   }
 
   // ==========================================
@@ -1685,7 +496,7 @@ class _TherapistStudentDetailScreenState
                         children: [
                           Text(
                             'Adaptive support evidence',
-                            style: AppTypography.heading(fontSize: 20),
+                            style: DashText.heading(fontSize: 20),
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -1694,7 +505,7 @@ class _TherapistStudentDetailScreenState
                                 : controlsLive
                                 ? 'Validated model-assisted policy is active'
                                 : 'Safe rule policy is active; ML is monitored in $policyMode mode',
-                            style: AppTypography.caption(
+                            style: DashText.caption(
                               fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
@@ -1776,7 +587,7 @@ class _TherapistStudentDetailScreenState
                                     ? 'Research simulation control enabled'
                                     : 'Validated model control enabled')
                               : 'Research shadow mode — model does not control the child task',
-                          style: AppTypography.heading(fontSize: 15),
+                          style: DashText.heading(fontSize: 15),
                         ),
                       ),
                     ],
@@ -1802,7 +613,7 @@ class _TherapistStudentDetailScreenState
                     const Divider(height: 20),
                     Text(
                       'Latest support decision',
-                      style: AppTypography.heading(fontSize: 14),
+                      style: DashText.heading(fontSize: 14),
                     ),
                     const SizedBox(height: 8),
                     _buildC4LabelValue('Item', latestPolicy['item_id']),
@@ -1821,8 +632,8 @@ class _TherapistStudentDetailScreenState
                     const SizedBox(height: 6),
                     Text(
                       'The ranking margin is the score gap between the best two actions; it is not a clinical confidence score.',
-                      style: AppTypography.caption(
-                        fontSize: 11,
+                      style: DashText.caption(
+                        fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -1836,13 +647,13 @@ class _TherapistStudentDetailScreenState
           if (effectiveness.isNotEmpty) ...[
             Text(
               'Observed support outcomes',
-              style: AppTypography.heading(fontSize: 18),
+              style: DashText.heading(fontSize: 18),
             ),
             const SizedBox(height: 3),
             Text(
               'Descriptive follow-up evidence from this learner; not proof that an action caused the outcome.',
-              style: AppTypography.caption(
-                fontSize: 11,
+              style: DashText.caption(
+                fontSize: 12,
                 color: AppColors.textSecondary,
               ),
             ),
@@ -1875,8 +686,8 @@ class _TherapistStudentDetailScreenState
                           ),
                           Text(
                             '${row['outcomes'] ?? 0} linked checks from ${row['uses'] ?? 0} uses',
-                            style: AppTypography.caption(
-                              fontSize: 11,
+                            style: DashText.caption(
+                              fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -1885,7 +696,7 @@ class _TherapistStudentDetailScreenState
                     ),
                     Text(
                       rate == null ? '—' : '${((rate as num) * 100).round()}%',
-                      style: AppTypography.heading(
+                      style: DashText.heading(
                         fontSize: 16,
                         color: AppColors.gentleGreen,
                       ),
@@ -1901,13 +712,13 @@ class _TherapistStudentDetailScreenState
             const SizedBox(height: 20),
             Text(
               'Persistent learning needs',
-              style: AppTypography.heading(fontSize: 18),
+              style: DashText.heading(fontSize: 18),
             ),
             const SizedBox(height: 3),
             Text(
               'Units that remain unresolved after bounded checks in different task contexts. This is instructional evidence, not a diagnosis.',
-              style: AppTypography.caption(
-                fontSize: 11,
+              style: DashText.caption(
+                fontSize: 12,
                 color: AppColors.textSecondary,
               ),
             ),
@@ -1933,12 +744,12 @@ class _TherapistStudentDetailScreenState
                   children: [
                     Text(
                       'Target: ${row['unit'] ?? '—'}',
-                      style: AppTypography.heading(fontSize: 15),
+                      style: DashText.heading(fontSize: 15),
                     ),
                     const SizedBox(height: 5),
                     Text(
                       '${row['independent_failures'] ?? 0} failed opportunities • ${row['independent_success_contexts'] ?? 0}/2 independent success contexts • $activities',
-                      style: AppTypography.caption(
+                      style: DashText.caption(
                         fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
@@ -1946,7 +757,7 @@ class _TherapistStudentDetailScreenState
                     const SizedBox(height: 7),
                     Text(
                       row['recommendation']?.toString() ?? '',
-                      style: AppTypography.body(
+                      style: DashText.body(
                         fontSize: 12,
                         color: AppColors.textPrimary,
                       ),
@@ -1960,7 +771,7 @@ class _TherapistStudentDetailScreenState
           if (dataQuality.isNotEmpty) ...[
             Text(
               'Evidence links: $linkedOutcomes follow-up checks and $immediateOutcomes immediate responses',
-              style: AppTypography.caption(
+              style: DashText.caption(
                 fontSize: 12,
                 color: AppColors.textSecondary,
               ),
@@ -1968,7 +779,7 @@ class _TherapistStudentDetailScreenState
             const SizedBox(height: 6),
             Text(
               'C3 fusion: ${dataQuality['c3_pipeline_status'] ?? 'not_run'}',
-              style: AppTypography.caption(
+              style: DashText.caption(
                 fontSize: 12,
                 color: AppColors.textSecondary,
               ),
@@ -1979,7 +790,7 @@ class _TherapistStudentDetailScreenState
               const SizedBox(height: 4),
               Text(
                 'C3 unavailable inputs: ${(dataQuality['c3_missing_inputs'] as List<dynamic>).join(', ')}',
-                style: AppTypography.caption(
+                style: DashText.caption(
                   fontSize: 12,
                   color: AppColors.textSecondary,
                 ),
@@ -1988,7 +799,7 @@ class _TherapistStudentDetailScreenState
             const SizedBox(height: 6),
             Text(
               dataQuality['calibration_warning']?.toString() ?? '',
-              style: AppTypography.caption(
+              style: DashText.caption(
                 fontSize: 12,
                 color: AppColors.textSecondary,
               ),
@@ -2011,7 +822,7 @@ class _TherapistStudentDetailScreenState
                   Center(
                     child: Text(
                       "LATEST ADAPTIVE ROUTING DECISION",
-                      style: AppTypography.heading(
+                      style: DashText.heading(
                         fontSize: 16,
                         color: AppColors.calmBlue,
                       ),
@@ -2024,7 +835,7 @@ class _TherapistStudentDetailScreenState
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Difficulty", style: AppTypography.caption()),
+                          Text("Difficulty", style: DashText.caption()),
                           Text(
                             "${metricText(history.last['previous_difficulty'])} → ${metricText(history.last['selected_difficulty'])}",
                             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -2034,7 +845,7 @@ class _TherapistStudentDetailScreenState
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text("Scaffold", style: AppTypography.caption()),
+                          Text("Scaffold", style: DashText.caption()),
                           Text(
                             "Level ${history.last['scaffold_level'] ?? 0}",
                             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -2044,13 +855,13 @@ class _TherapistStudentDetailScreenState
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text("Next Activity", style: AppTypography.caption()),
+                  Text("Next Activity", style: DashText.caption()),
                   Text(
                     "${history.last['next_activity'] ?? 'Unknown'}",
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
-                  Text("Reason", style: AppTypography.caption()),
+                  Text("Reason", style: DashText.caption()),
                   Text(
                     "${history.last['reason'] ?? 'N/A'}",
                     style: const TextStyle(fontStyle: FontStyle.italic),
@@ -2063,7 +874,7 @@ class _TherapistStudentDetailScreenState
 
           Text(
             "Estimated KC Mastery (BKT)",
-            style: AppTypography.heading(fontSize: 18),
+            style: DashText.heading(fontSize: 18),
           ),
           const SizedBox(height: 12),
           ...kcs.map(
@@ -2100,7 +911,7 @@ class _TherapistStudentDetailScreenState
           const SizedBox(height: 32),
           Text(
             "Adaptive Decision Timeline",
-            style: AppTypography.heading(fontSize: 18),
+            style: DashText.heading(fontSize: 18),
           ),
           const SizedBox(height: 16),
 
@@ -2167,7 +978,7 @@ class _TherapistStudentDetailScreenState
                         "Scaffold ON",
                         style: TextStyle(
                           color: AppColors.warmAmber,
-                          fontSize: 10,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -2197,13 +1008,13 @@ class _TherapistStudentDetailScreenState
         children: [
           Icon(icon, size: 18, color: color),
           const SizedBox(height: 4),
-          Text(value, style: AppTypography.heading(fontSize: 17, color: color)),
+          Text(value, style: DashText.heading(fontSize: 17, color: color)),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTypography.caption(
-              fontSize: 10,
+            style: DashText.caption(
+              fontSize: 12,
               color: AppColors.textSecondary,
             ),
           ),
@@ -2223,8 +1034,8 @@ class _TherapistStudentDetailScreenState
             width: 106,
             child: Text(
               label,
-              style: AppTypography.caption(
-                fontSize: 11,
+              style: DashText.caption(
+                fontSize: 12,
                 color: AppColors.textSecondary,
               ),
             ),
@@ -2232,8 +1043,8 @@ class _TherapistStudentDetailScreenState
           Expanded(
             child: Text(
               value == null || value.isEmpty ? 'Unavailable' : value,
-              style: AppTypography.caption(
-                fontSize: 11,
+              style: DashText.caption(
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
@@ -2260,53 +1071,6 @@ class _TherapistStudentDetailScreenState
   // ==========================================
   // SHARED WIDGETS
   // ==========================================
-  Widget _buildAvailabilityBadge(String title, bool isAvailable) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: isAvailable
-            ? AppColors.gentleGreen.withValues(alpha: 0.1)
-            : Colors.grey.withValues(alpha: 0.1),
-        border: Border.all(
-          color: isAvailable ? AppColors.gentleGreen : Colors.grey,
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isAvailable ? Icons.check_circle : Icons.cancel,
-            size: 14,
-            color: isAvailable ? AppColors.gentleGreen : Colors.grey,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            title,
-            style: TextStyle(
-              color: isAvailable ? AppColors.gentleGreen : Colors.grey,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEvidenceRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: AppColors.textDark)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-
   Widget _buildHorizontalBar(
     String label,
     dynamic rawValue,
@@ -2381,15 +1145,15 @@ class _TherapistStudentDetailScreenState
           const SizedBox(height: 4),
           Text(
             value,
-            style: AppTypography.heading(
+            style: DashText.heading(
               fontSize: 16,
               color: AppColors.textPrimary,
             ),
           ),
           Text(
             label,
-            style: AppTypography.caption(
-              fontSize: 10,
+            style: DashText.caption(
+              fontSize: 12,
               color: AppColors.textSecondary,
             ),
             textAlign: TextAlign.center,
@@ -2400,61 +1164,6 @@ class _TherapistStudentDetailScreenState
       ),
     );
   }
-
-  Widget _buildModelInfo(
-    Map<String, dynamic> data, {
-    bool humanReadable = false,
-  }) {
-    final available = data['available'] == true;
-    final message = humanReadable
-        ? !available
-              ? 'No observations have been recorded yet.'
-              : 'Practice observations to guide individualized learning strategies.'
-        : 'Model: ${data['model_version']} | Features: ${data['feature_version']}';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.borderLight,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          humanReadable
-              ? Icon(
-                  available
-                      ? Icons.info_outline_rounded
-                      : Icons.hourglass_empty_rounded,
-                  size: 12,
-                  color: AppColors.textSecondary,
-                )
-              : const FaIcon(
-                  FontAwesomeIcons.microchip,
-                  size: 12,
-                  color: AppColors.textSecondary,
-                ),
-          const SizedBox(width: 8),
-          Text(
-            message,
-            style: AppTypography.caption(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _friendlyC2Quality(dynamic quality) => switch (quality?.toString()) {
-    'valid' => 'Clear enough to measure',
-    'retry_required' => 'Needs a clearer recording',
-    'uncertain' => 'Measurement uncertain',
-    _ => 'Not available',
-  };
 
   // ==========================================
   // CHILD PROFILE DETAILS CARD
@@ -2519,7 +1228,7 @@ class _TherapistStudentDetailScreenState
                   children: [
                     Text(
                       fullName,
-                      style: AppTypography.heading(
+                      style: DashText.heading(
                         fontSize: 20,
                         color: AppColors.textPrimary,
                       ),
@@ -2527,7 +1236,7 @@ class _TherapistStudentDetailScreenState
                     const SizedBox(height: 2),
                     Text(
                       '$grade • Age: $age',
-                      style: AppTypography.body(
+                      style: DashText.body(
                         fontSize: 14,
                         color: AppColors.calmBlue,
                       ),
@@ -2604,7 +1313,7 @@ class _TherapistStudentDetailScreenState
         const SizedBox(width: 6),
         Text(
           '$label: ',
-          style: AppTypography.caption(color: AppColors.textSecondary),
+          style: DashText.caption(color: AppColors.textSecondary),
         ),
         Flexible(
           child: Text(
@@ -2625,87 +1334,23 @@ class _TherapistStudentDetailScreenState
   // CLINICAL REPORT EXPORT CARD (ABOVE PARENT SECTION)
   // ==========================================
   Widget _buildClinicalReportExportCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.calmBlue.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.calmBlue.withValues(alpha: 0.3),
-          width: 1.5,
+    return DashCard(
+      title: 'Professional summary report',
+      subtitle: 'PDF with activity, reading and combined-profile evidence, including model labels and limitations',
+      accent: AppColors.calmBlue,
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: _downloadPdf,
+          icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+          label: Text('Share report (PDF)', style: DashText.button()),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.calmBlue,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.analytics_rounded,
-                color: AppColors.calmBlue,
-                size: 22,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  "Clinical Therapist Summary Report",
-                  style: AppTypography.heading(
-                    fontSize: 16,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: _downloadPdf,
-                icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
-                label: const Text("Share Report (PDF)"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.calmBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppColors.calmBlue.withValues(alpha: 0.2),
-              ),
-            ),
-            child: Row(
-              children: const [
-                Icon(
-                  Icons.info_outline_rounded,
-                  color: AppColors.calmBlue,
-                  size: 16,
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "Note: The Clinical Report includes behavioral analytics, speech interaction metrics, and AI learner profile data. Parent Questionnaire responses below are managed separately and exported as individual medical review PDFs.",
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -2819,7 +1464,7 @@ class _TherapistStudentDetailScreenState
             children: [
               Text(
                 "දෙමාපිය දැනුවත් කිරීමේ ප්‍රශ්නාවලිය",
-                style: AppTypography.sinhala(
+                style: DashText.sinhala(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -2827,7 +1472,7 @@ class _TherapistStudentDetailScreenState
               const SizedBox(height: 2),
               Text(
                 "Parent Awareness Questionnaires ($totalCompleted/4 Completed) — Tap to Expand Details",
-                style: AppTypography.caption(color: AppColors.textSecondary),
+                style: DashText.caption(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -2874,8 +1519,8 @@ class _TherapistStudentDetailScreenState
             _buildCollapsibleAssessmentCard(
               student: student,
               categoryKey: 'basic',
-              titleSi: "1. මූලික ඩිස්ලෙක්සියා පරීක්ෂණය (14)",
-              titleEn: "1. Basic Dyslexia Screening",
+              titleSi: "1. මූලික කියවීමේ අපහසුතා නිරීක්ෂණ (14)",
+              titleEn: "1. Basic reading-difficulty observations",
               questions: ComprehensiveAssessmentData.basicAssessment,
               answers: basicResults,
             ),
@@ -2962,7 +1607,7 @@ class _TherapistStudentDetailScreenState
                   children: [
                     Text(
                       titleSi,
-                      style: AppTypography.sinhala(
+                      style: DashText.sinhala(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
@@ -2970,7 +1615,7 @@ class _TherapistStudentDetailScreenState
                     const SizedBox(height: 2),
                     Text(
                       titleEn,
-                      style: AppTypography.caption(
+                      style: DashText.caption(
                         color: AppColors.textSecondary,
                         fontSize: 12,
                       ),
@@ -2999,7 +1644,7 @@ class _TherapistStudentDetailScreenState
                         ? AppColors.gentleGreen
                         : AppColors.warmAmber,
                     fontWeight: FontWeight.bold,
-                    fontSize: 11,
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -3049,7 +1694,7 @@ class _TherapistStudentDetailScreenState
                           Text(
                             isReviewed ? "Reviewed ✓" : "Mark as Reviewed",
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: isReviewed
                                   ? AppColors.calmBlue
@@ -3064,7 +1709,7 @@ class _TherapistStudentDetailScreenState
                   const Text(
                     "Not Submitted",
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       color: AppColors.textHint,
                       fontStyle: FontStyle.italic,
                     ),
@@ -3098,7 +1743,7 @@ class _TherapistStudentDetailScreenState
                         Text(
                           "Export PDF",
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: AppColors.calmBlue,
                           ),
@@ -3196,7 +1841,7 @@ class _TherapistStudentDetailScreenState
               Expanded(
                 child: SelectableText(
                   "$titleSi ($titleEn)",
-                  style: AppTypography.sinhala(
+                  style: DashText.sinhala(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: AppColors.calmBlueDark,
@@ -3217,7 +1862,7 @@ class _TherapistStudentDetailScreenState
                       : "Not Done",
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -3248,7 +1893,7 @@ class _TherapistStudentDetailScreenState
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 10,
+                        fontSize: 12,
                       ),
                     ),
                   ),
@@ -3261,7 +1906,7 @@ class _TherapistStudentDetailScreenState
                       "ප්‍රශ්නය (Question)",
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 11,
+                        fontSize: 12,
                       ),
                     ),
                   ),
@@ -3275,7 +1920,7 @@ class _TherapistStudentDetailScreenState
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 10,
+                        fontSize: 12,
                         color: AppColors.softCoral,
                       ),
                     ),
@@ -3290,7 +1935,7 @@ class _TherapistStudentDetailScreenState
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 10,
+                        fontSize: 12,
                         color: AppColors.gentleGreen,
                       ),
                     ),
@@ -3334,7 +1979,7 @@ class _TherapistStudentDetailScreenState
               children: [
                 SelectableText(
                   questionSi ?? question.textSi,
-                  style: AppTypography.sinhala(
+                  style: DashText.sinhala(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -3342,8 +1987,8 @@ class _TherapistStudentDetailScreenState
                 const SizedBox(height: 2),
                 SelectableText(
                   questionEn ?? question.textEn,
-                  style: AppTypography.caption(
-                    fontSize: 11,
+                  style: DashText.caption(
+                    fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -3442,7 +2087,7 @@ class _TherapistStudentDetailScreenState
       "                             දෙමාපිය දැනුවත් කිරීමේ ප්‍රශ්නාවලිය",
     );
     buffer.writeln(
-      "   Parent Awareness Questionnaire — Basic Dyslexia Screening (for medical review)",
+      "   Parent Awareness Questionnaire — Basic reading-difficulty observations (for professional review)",
     );
     buffer.writeln(
       "==========================================================================================",
@@ -3503,7 +2148,7 @@ class _TherapistStudentDetailScreenState
 
     if (categoryKey == 'all' || categoryKey == 'basic') {
       formatCategoryTable(
-        "1. මූලික ඩිස්ලෙක්සියා පරීක්ෂණය (Basic Dyslexia Screening — 14 Questions)",
+        "1. මූලික කියවීමේ අපහසුතා නිරීක්ෂණ (Basic reading-difficulty observations — 14 questions)",
         ComprehensiveAssessmentData.basicAssessment,
         basicResults,
       );
