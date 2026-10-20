@@ -147,6 +147,12 @@ class TherapistOverviewDTO(MLResponseBase):
     age: Optional[int] = None
     avatar_url: Optional[str] = None
     parent_name: Optional[str] = None
+    fatigue_state: Optional[str] = None
+    birth_year: Optional[int] = None
+    birth_month: Optional[int] = None
+    gender: Optional[str] = None
+    coverage: Dict[str, Any] = Field(default_factory=dict)
+    alerts: List[Dict[str, Any]] = Field(default_factory=list)
 
 class KCPerformance(BaseModel):
     KC_VISUAL_IDENTIFICATION: Optional[float] = None
@@ -171,6 +177,7 @@ class KCPerformance(BaseModel):
 
 class ErrorDistribution(BaseModel):
     visual_confusion: Optional[float] = None
+    visual_task_error: Optional[float] = None
     phonological_confusion: Optional[float] = None
     sequence_error: Optional[float] = None
     unknown_error: Optional[float] = None
@@ -193,6 +200,16 @@ class TherapistC1BehavioralDTO(MLResponseBase):
     kc_performance: KCPerformance
     error_distribution: ErrorDistribution
     trends: BehavioralTrends
+    # Window-based views (``window_days``) used by the redesigned dashboard.
+    window_days: Optional[int] = None
+    session_count: int = 0
+    total_trials: int = 0
+    fatigue_state: Optional[str] = None
+    kc_breakdown: List[Dict[str, Any]] = Field(default_factory=list)
+    error_breakdown: Dict[str, Any] = Field(default_factory=dict)
+    c1_state: Dict[str, Any] = Field(default_factory=dict)
+    kinematics: Dict[str, Any] = Field(default_factory=dict)
+    index_trend: List[Dict[str, Any]] = Field(default_factory=list)
 
 class SpeechLatest(BaseModel):
     pause_count: Optional[int] = None
@@ -219,6 +236,10 @@ class SpeechLatest(BaseModel):
     method_disagreement: bool = False
     quality_issues: List[str] = Field(default_factory=list)
     recording_quality: str
+    record_start_delay_ms: Optional[float] = None
+    recording_quality_score: Optional[float] = None
+    item_id: Optional[str] = None
+    recorded_at: Optional[str] = None
 
 class SpeechTrends(BaseModel):
     accuracy: List[Dict[str, Any]]
@@ -232,12 +253,18 @@ class TherapistC2SpeechDTO(MLResponseBase):
     usable_recording_count: int = 0
     latest: SpeechLatest
     trends: SpeechTrends
+    window_days: Optional[int] = None
+    usable_recording_rate: Optional[float] = None
+    quality_issue_counts: Dict[str, int] = Field(default_factory=dict)
+    items: List[Dict[str, Any]] = Field(default_factory=list)
+    session_trend: List[Dict[str, Any]] = Field(default_factory=list)
 
 class ShapExplanation(BaseModel):
     feature: str
     contribution: float
     observed_value: Optional[float] = None
     direction: Optional[str] = None
+    plain_text: Optional[str] = None
 
 class TherapistC3ProfileDTO(MLResponseBase):
     classifier_available: bool = False
@@ -252,6 +279,13 @@ class TherapistC3ProfileDTO(MLResponseBase):
     missing_inputs: List[str] = Field(default_factory=list)
     summary_text: str = "More activity observations are needed before a combined summary is available."
     recommendation_text: str = "Continue familiar activities and review progress over time."
+    evidence_window: Dict[str, Any] = Field(default_factory=dict)
+    coverage_checklist: List[Dict[str, Any]] = Field(default_factory=list)
+    measurement_notes: List[str] = Field(default_factory=list)
+    low_agreement: bool = False
+    sources_used: List[str] = Field(default_factory=list)
+    latest_feedback: Optional[Dict[str, Any]] = None
+    marginalized_covariates: List[str] = Field(default_factory=list)
 
 class KnowledgeComponent(BaseModel):
     id: str

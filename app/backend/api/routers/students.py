@@ -47,6 +47,9 @@ async def add_student(request: StudentCreate, current_user: dict = Depends(get_c
         "consent_given": request.consent_given,
         "consent_parent_name": request.consent_parent_name,
         "consent_date": request.consent_date,
+        "birth_year": request.birth_year,
+        "birth_month": request.birth_month,
+        "gender": request.gender,
         "completed_activities": [],
         "activity_scores": {},
         # Only newly-created learners enter the child-friendly cold-start
@@ -69,6 +72,9 @@ async def add_student(request: StudentCreate, current_user: dict = Depends(get_c
         completed_activities=[],
         activity_scores={},
         assessment_completed=len(request.assessment_results) == 14,
+        birth_year=request.birth_year,
+        birth_month=request.birth_month,
+        gender=request.gender,
     )
 
 
@@ -101,6 +107,9 @@ async def list_students(current_user: dict = Depends(get_current_user)):
             completed_activities=s.get("completed_activities", []),
             activity_scores=s.get("activity_scores", {}),
             assessment_completed=len(assessment) == 14,
+            birth_year=s.get("birth_year"),
+            birth_month=s.get("birth_month"),
+            gender=s.get("gender"),
         ))
 
     return result
@@ -131,6 +140,11 @@ async def update_student(student_id: str, request: StudentUpdate, current_user: 
         "daily_limit": request.daily_limit,
         "avatar_url": request.avatar_url,
     }
+    # Only overwrite optional context when the client sends it.
+    for field in ("birth_year", "birth_month", "gender"):
+        value = getattr(request, field)
+        if value is not None:
+            update_doc[field] = value
 
     await db.students.update_one({"_id": obj_id}, {"$set": update_doc})
 
@@ -148,6 +162,9 @@ async def update_student(student_id: str, request: StudentUpdate, current_user: 
         completed_activities=updated.get("completed_activities", []),
         activity_scores=updated.get("activity_scores", {}),
         assessment_completed=len(assessment) == 14,
+        birth_year=updated.get("birth_year"),
+        birth_month=updated.get("birth_month"),
+        gender=updated.get("gender"),
     )
 
 

@@ -5,10 +5,17 @@ Pydantic models for student management endpoints.
 """
 
 from pydantic import BaseModel, Field
-from typing import Any, Optional
+from typing import Any, Literal, Optional
+
+# Optional learner context used by the C3 profile (age) and research
+# reporting. Unknown values stay unknown; they are never defaulted.
+Gender = Literal["female", "male", "not_specified"]
 
 
 class StudentCreate(BaseModel):
+    birth_year: Optional[int] = Field(None, ge=2010, le=2030)
+    birth_month: Optional[int] = Field(None, ge=1, le=12)
+    gender: Optional[Gender] = None
     first_name: str = Field(..., min_length=1, max_length=50)
     last_name: str = Field(..., min_length=1, max_length=50)
     grade: str = "Grade 1"  # Locked to Grade 1 for this app
@@ -24,6 +31,9 @@ class StudentCreate(BaseModel):
 
 
 class StudentUpdate(BaseModel):
+    birth_year: Optional[int] = Field(None, ge=2010, le=2030)
+    birth_month: Optional[int] = Field(None, ge=1, le=12)
+    gender: Optional[Gender] = None
     first_name: str = Field(..., min_length=1, max_length=50)
     last_name: str = Field(..., min_length=1, max_length=50)
     grade: str = "Grade 1"
@@ -52,6 +62,9 @@ class StudentResponse(BaseModel):
     completed_activities: list[str] = []
     activity_scores: dict[str, Any] = {}
     assessment_completed: bool = False
+    birth_year: Optional[int] = None
+    birth_month: Optional[int] = None
+    gender: Optional[str] = None
 
 class ProgressSyncRequest(BaseModel):
     completed_activities: list[str]

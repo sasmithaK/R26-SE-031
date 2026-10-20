@@ -1,97 +1,98 @@
-import os
-from fpdf import FPDF
-from datetime import datetime
+"""Parent-facing learning summary PDF.
 
-class ReportPDF(FPDF):
-    def __init__(self, title):
-        super().__init__()
-        self.report_title = title
-        
+Plain-language observations only: no pattern names, probabilities, indices or
+diagnostic wording. Missing measurements are written as "not recorded yet",
+never as zero or a default value.
+"""
+from datetime import datetime, timezone
+
+from fpdf import FPDF
+
+
+def _safe(text) -> str:
+    """fpdf core fonts are Latin-1; replace characters they cannot draw."""
+    return str(text if text is not None else "").encode("latin-1", "replace").decode("latin-1")
+
+
+def _pct(value) -> str:
+    return "not recorded yet" if value is None else f"{round(value * 100)}%"
+
+
+class _ParentPDF(FPDF):
     def header(self):
-        self.set_font("Helvetica", "B", 15)
-        self.cell(0, 10, self.report_title, border=False, align="C", new_x="LMARGIN", new_y="NEXT")
-        self.set_font("Helvetica", "I", 10)
-        self.cell(0, 10, f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}", border=False, align="C", new_x="LMARGIN", new_y="NEXT")
-        self.ln(10)
+        self.set_font("Helvetica", "B", 16)
+        self.cell(0, 10, "Sipsara - Learning Summary", align="C", new_x="LMARGIN", new_y="NEXT")
+        self.set_font("Helvetica", "", 10)
+        self.cell(0, 6, f"Generated {datetime.now(timezone.utc).strftime('%d %b %Y')}",
+                  align="C", new_x="LMARGIN", new_y="NEXT")
+        self.ln(4)
 
     def footer(self):
-        self.set_y(-15)
+        self.set_y(-18)
         self.set_font("Helvetica", "I", 8)
-        self.cell(0, 10, f"Page {self.page_no()}/{{nb}}", border=False, align="C")
+        self.multi_cell(0, 4, "These are learning observations from app activities. They are not marks, "
+                              "rankings or a diagnosis. Please discuss any questions with your child's teacher "
+                              "or a professional.", align="C")
 
-def generate_parent_report(student_id: str, overview: dict, skills: dict, pattern: dict) -> bytes:
-    pdf = ReportPDF(title="SIPSARA Student Progress Report (Parent)")
-    pdf.add_page()
-    
-    # Overview Section
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "Overview", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 11)
-    
-    accuracy = overview.get("accuracy", 0)
-    practice_time = overview.get("practice_time_minutes", 0)
-    fatigue = overview.get("fatigue_status", "Optimal")
-    
-    pdf.cell(0, 8, f"Accuracy: {accuracy}%", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 8, f"Practice Time: {practice_time} mins", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 8, f"Fatigue Status: {fatigue}", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
-    
-    # Skills Section
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "Skills Mastery", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 11)
-    
-    skills_list = skills.get("skills", [])
-    for skill in skills_list:
-        pdf.cell(0, 8, f"{skill.get('skill_name')}: {skill.get('mastery_percentage')}% - {skill.get('status')}", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
-    
-    # Learning Pattern Section
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "Learning Pattern", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 11)
-    pdf.multi_cell(0, 8, f"Primary Pattern: {pattern.get('primary_learning_pattern')}")
-    pdf.multi_cell(0, 8, f"Confidence: {pattern.get('confidence_level')}")
-    pdf.multi_cell(0, 8, f"Recommended Practice: {pattern.get('recommended_practice')}")
-    
-    return pdf.output()
 
-def generate_therapist_report(student_id: str, overview: dict, behavior: dict, kinematics: dict) -> bytes:
-    pdf = ReportPDF(title="SIPSARA Clinical Progress Report (Therapist)")
+def generate_parent_learning_report(data: dict) -> bytes:
+    pdf = _ParentPDF()
+    pdf.set_auto_page_break(auto=True, margin=22)
     pdf.add_page()
-    
-    # Overview Section
+
+    def heading(text):
+        pdf.ln(3)
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 8, _safe(text), new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 11)
+
+    def line(text):
+        pdf.multi_cell(0, 6, _safe(text), new_x="LMARGIN", new_y="NEXT")
+
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "Clinical Overview", new_x="LMARGIN", new_y="NEXT")
+    line(f"Child: {data.get('child_name') or 'Your child'}   |   {data.get('period', '')}")
     pdf.set_font("Helvetica", "", 11)
-    
-    confidence = overview.get("confidence", 0) * 100
-    fatigue = overview.get("fatigue_score", 0)
-    pattern = overview.get("primary_learning_pattern", "Unknown")
-    
-    pdf.cell(0, 8, f"Pattern Diagnostic Confidence: {confidence:.1f}%", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 8, f"Current Fatigue Score: {fatigue:.2f}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 8, f"Identified Pattern: {pattern}", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
-    
-    # Behavioral Section
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "Behavioral Indices", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 11)
-    
-    indices = behavior.get("learner_indices", {})
-    for key, val in indices.items():
-        pdf.cell(0, 8, f"{key.replace('_', ' ').title()}: {val}", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
-    
-    # Kinematics Section
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "Kinematics Analysis", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 11)
-    
-    comp = kinematics.get("feature_comparison", {})
-    for key, val in comp.items():
-        pdf.cell(0, 8, f"{key.replace('_', ' ').title()}: {val}", new_x="LMARGIN", new_y="NEXT")
-    
-    return pdf.output()
+
+    heading("Practice")
+    line(f"Practice sessions: {data.get('sessions', 0)}")
+    minutes = data.get("minutes")
+    line(f"Practice time: {'not recorded yet' if minutes is None else f'{minutes} minutes'}")
+    line(f"Last activity: {data.get('last_active') or 'not recorded yet'}")
+    line(f"Correct on the first try: {_pct(data.get('first_try_accuracy'))}")
+
+    heading("Activities")
+    activities = data.get("activities") or []
+    if not activities:
+        line("No activities recorded in this period.")
+    else:
+        pdf.set_font("Helvetica", "B", 10)
+        widths = (90, 30, 35, 35)
+        for width, title in zip(widths, ("Activity", "Responses", "First try", "Needed another try")):
+            pdf.cell(width, 7, title, border=1)
+        pdf.ln()
+        pdf.set_font("Helvetica", "", 10)
+        for row in activities:
+            pdf.cell(widths[0], 7, _safe(row.get("name"))[:48], border=1)
+            pdf.cell(widths[1], 7, str(row.get("responses", 0)), border=1)
+            pdf.cell(widths[2], 7, _pct(row.get("first_try")), border=1)
+            pdf.cell(widths[3], 7, _pct(row.get("retry")), border=1)
+            pdf.ln()
+
+    heading("Reading aloud")
+    recordings = data.get("recordings", 0)
+    if not recordings:
+        line("No reading recordings yet. Try the reading activities (Skills 5 and 6) together.")
+    else:
+        line(f"Recordings: {recordings}, clear enough to measure: {data.get('usable_recordings', 0)}")
+        line(f"Letters read as expected (typical recording): {_pct(data.get('reading_letters'))}")
+
+    heading("Shared with your therapist")
+    line(f"Questionnaire sections completed: {data.get('questionnaire_done', 0)} of {data.get('questionnaire_total', 4)}")
+    line("A connected professional has reviewed the combined learning summary."
+         if data.get("reviewed") else "Not yet reviewed by a connected professional.")
+
+    if data.get("practice_tip"):
+        heading("Try together at home")
+        line(data["practice_tip"])
+
+    return bytes(pdf.output())
