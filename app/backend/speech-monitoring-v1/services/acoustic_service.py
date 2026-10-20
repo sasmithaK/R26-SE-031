@@ -9,6 +9,12 @@ import io
 import soundfile as sf
 import math
 
+from services import c2_settings
+
+# Silent-pause bounds (200 ms floor: Campione & Veronis, 2002).
+PAUSE_MIN_MS = c2_settings.get("pauses", "min_ms", 200)
+PAUSE_MAX_MS = c2_settings.get("pauses", "max_ms", 3000)
+
 class AcousticAnalysisService:
     def __init__(self):
         # Removed WebRTC VAD due to C compiler dependencies on Windows
@@ -139,20 +145,22 @@ class AcousticAnalysisService:
             # 2. VAD & Latency
             t_voice_onset = self.find_voice_onset(y, sr)
             
-            # Calculate True Latency
-            # t_record_start is the unix timestamp when mic was pressed
-            # t_stimulus is the unix timestamp when the image was shown
-            # Note: If the user presses record *before* speaking, the latency is from stimulus -> speech.
+            # Reading-initiation latency is measured from the moment recording
+            # starts to the first voiced frame. The time the child took to
+            # press the record button is a separate (interaction) measure:
+            # combining both inflated latency with button-press time.
+            record_start_delay_ms = (
+                t_record_start - t_stimulus
+                if t_stimulus > 0 and t_record_start >= t_stimulus
+                else None
+            )
             if t_voice_onset is None:
                 latency_ms = None
                 latency_reference = "unavailable_no_voice_onset"
-            elif t_stimulus > 0 and t_record_start >= t_stimulus:
-                latency_ms = (t_record_start - t_stimulus) + t_voice_onset
-                latency_reference = "stimulus_to_voice_onset"
             else:
                 latency_ms = t_voice_onset
                 latency_reference = "recording_start_to_voice_onset"
-                
+
             # 3. Syllable Peak Counting
             detected_peaks = self.count_syllable_peaks(y, sr)
             
@@ -193,7 +201,7 @@ class AcousticAnalysisService:
                     for i in range(1, len(intervals)):
                         pause_samples = intervals[i][0] - intervals[i-1][1]
                         pause_ms = (float(pause_samples) / sr) * 1000.0
-                        if 200 <= pause_ms <= 3000:
+                        if PAUSE_MIN_MS <= pause_ms <= PAUSE_MAX_MS:
                             pauses.append(pause_ms)
                     
                     pause_count = len(pauses)
@@ -205,6 +213,7 @@ class AcousticAnalysisService:
             return {
                 "Acoustic_Latency_ms": latency_ms,
                 "Latency_Reference": latency_reference,
+                "Record_Start_Delay_ms": record_start_delay_ms,
                 "Voice_Onset_ms": t_voice_onset,
                 "Detected_Peaks": detected_peaks,
                 "Expected_Syllables": expected_syllables,

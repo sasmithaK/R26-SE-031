@@ -341,6 +341,7 @@ async def analyze_acoustics(
             "error_operations": grapheme_metrics.get("operations", []),
             "acoustic_latency_ms": acoustic.get("Acoustic_Latency_ms"),
             "acoustic_latency_reference": acoustic.get("Latency_Reference"),
+            "record_start_delay_ms": acoustic.get("Record_Start_Delay_ms"),
             "voice_onset_ms": acoustic.get("Voice_Onset_ms"),
             "detected_peaks": acoustic.get("Detected_Peaks"),
             "expected_syllables": acoustic.get("Expected_Syllables"),

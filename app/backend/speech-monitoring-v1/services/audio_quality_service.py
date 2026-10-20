@@ -15,6 +15,8 @@ import librosa
 import numpy as np
 import soundfile as sf
 
+from services import c2_settings
+
 
 QUALITY_VERSION = "c2-audio-quality-v1"
 
@@ -60,15 +62,18 @@ class AudioQualityService:
         active_ratio = float(np.mean(frame_rms >= active_threshold))
 
         issues = []
-        if duration_ms < 350:
+        if duration_ms < c2_settings.get("quality", "min_duration_ms", 350):
             issues.append("too_short")
-        if duration_ms > 30_000:
+        if duration_ms > c2_settings.get("quality", "max_duration_ms", 30_000):
             issues.append("too_long")
-        if peak < 0.008 or active_ratio < 0.04:
+        if (peak < c2_settings.get("quality", "min_peak_amplitude", 0.008)
+                or active_ratio < c2_settings.get("quality", "min_active_frame_ratio", 0.04)):
             issues.append("insufficient_speech")
-        if clipping_ratio > 0.02:
+        if clipping_ratio > c2_settings.get("quality", "max_clipping_ratio", 0.02):
             issues.append("clipping")
-        if snr_db < 7.0 and spectral_flatness > 0.30 and active_ratio >= 0.04:
+        if (snr_db < c2_settings.get("quality", "noisy_snr_db", 7.0)
+                and spectral_flatness > c2_settings.get("quality", "noisy_spectral_flatness", 0.30)
+                and active_ratio >= c2_settings.get("quality", "min_active_frame_ratio", 0.04)):
             issues.append("too_noisy")
 
         severe = {"too_short", "insufficient_speech", "clipping", "too_noisy"}
@@ -80,11 +85,12 @@ class AudioQualityService:
             min(1.0, max(0.0, 1.0 - spectral_flatness)),
         )
         clipping_score = max(0.0, 1.0 - clipping_ratio * 20.0)
+        weights = c2_settings.get("quality", "score_weights", {}) or {}
         quality_score = float(
-            0.20 * duration_score
-            + 0.25 * level_score
-            + 0.35 * clarity_score
-            + 0.20 * clipping_score
+            weights.get("duration", 0.20) * duration_score
+            + weights.get("level", 0.25) * level_score
+            + weights.get("clarity", 0.35) * clarity_score
+            + weights.get("clipping", 0.20) * clipping_score
         )
 
         status = "retry_required" if retry_required else "valid"
