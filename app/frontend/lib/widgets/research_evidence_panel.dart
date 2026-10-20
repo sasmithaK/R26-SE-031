@@ -63,7 +63,7 @@ class ResearchEvidencePanel extends StatelessWidget {
       children: [
         Text(
           'PP2 Research Evidence',
-          style: AppTypography.heading(fontSize: 22),
+          style: DashText.heading(fontSize: 22),
         ),
         const SizedBox(height: 12),
         const Text(
@@ -94,7 +94,7 @@ class ResearchEvidencePanel extends StatelessWidget {
                 children: [
                   Text(
                     '${c['component']} — ${c['objective']}',
-                    style: AppTypography.heading(fontSize: 17),
+                    style: DashText.heading(fontSize: 17),
                   ),
                   const SizedBox(height: 8),
                   Text('Evidence: ${c['evidence_type']}'),
@@ -140,7 +140,7 @@ class ResearchEvidencePanel extends StatelessWidget {
         }),
         const SizedBox(height: 16),
         const Text(
-          'Model evaluation benchmarks reflect standardized neural pattern assessment rubrics for Grade 1 developmental skills.',
+          'Benchmarks come from synthetic held-out evaluations. They test the software pipeline, not performance on Sri Lankan Grade 1 children.',
         ),
       ],
     );

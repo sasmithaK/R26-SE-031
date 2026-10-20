@@ -35,9 +35,9 @@ class TrendChart extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: AppTypography.heading(fontSize: 16)),
+            Text(title, style: DashText.heading(fontSize: 16)),
             const SizedBox(height: 24),
-            const Center(child: Text("Not enough data to display trend.")),
+            Center(child: Text("A trend appears after two or more sessions.", style: DashText.body(fontSize: 14))),
           ],
         ),
       );
@@ -60,7 +60,7 @@ class TrendChart extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppTypography.heading(fontSize: 16)),
+          Text(title, style: DashText.heading(fontSize: 16)),
           const SizedBox(height: 24),
           SizedBox(
             height: 200,
@@ -84,11 +84,20 @@ class TrendChart extends StatelessWidget {
                       reservedSize: 30,
                       interval: 1,
                       getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        // Show at most ~6 labels so they never overlap.
+                        final step = (dataPoints.length / 6).ceil().clamp(1, 1000).toInt();
+                        if (value != index.toDouble() || index % step != 0) {
+                          return const SizedBox.shrink();
+                        }
+                        final text = labels != null && index >= 0 && index < labels!.length
+                            ? labels![index]
+                            : 'S${index + 1}';
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
-                            labels != null && value.toInt() >= 0 && value.toInt() < labels!.length ? labels![value.toInt()] : 'S${value.toInt() + 1}',
-                            style: AppTypography.caption(fontSize: 10, color: AppColors.textHint),
+                            text.length > 8 ? text.substring(0, 8) : text,
+                            style: DashText.caption(fontSize: 12, color: AppColors.textSecondary),
                           ),
                         );
                       },
@@ -97,11 +106,19 @@ class TrendChart extends StatelessWidget {
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 40,
+                      reservedSize: 44,
                       getTitlesWidget: (value, meta) {
+                        // Hide the extra label fl_chart adds at a non-round max.
+                        if (value == meta.max && value != meta.min &&
+                            (value / meta.appliedInterval) % 1 != 0) {
+                          return const SizedBox.shrink();
+                        }
+                        final text = meta.max.abs() >= 10
+                            ? value.round().toString()
+                            : value.toStringAsFixed(value % 1 == 0 ? 0 : 1);
                         return Text(
-                          value.toStringAsFixed(1),
-                          style: AppTypography.caption(fontSize: 10, color: AppColors.textHint),
+                          text,
+                          style: DashText.caption(fontSize: 12, color: AppColors.textSecondary),
                         );
                       },
                     ),
