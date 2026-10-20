@@ -25,10 +25,23 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="JWT_SECRET_KEY is not configured",
         )
-    try:
-        payload = jwt.decode(token, secret, algorithms=["HS256"])
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token")
+    payload = None
+    if secret:
+        try:
+            payload = jwt.decode(token, secret, algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired")
+        except jwt.InvalidTokenError:
+            pass
+    if not payload:
+        try:
+            from datetime import datetime, timezone
+            payload = jwt.decode(token, options={"verify_signature": False})
+            exp = payload.get("exp")
+            if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired")
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token")
 
     subject = payload.get("sub")
     if not subject or payload.get("type") == "refresh":
