@@ -1,7 +1,9 @@
 import pytest
+from bson import ObjectId
+from unittest.mock import AsyncMock
 
 MOCK_FUSION_PAYLOAD = {
-    "student_id": "mock_student_123",
+    "student_id": str(ObjectId()),
     "c1_audio_vector": {
         "acoustic_latency_ms": 500.0,
         "peak_count_delta": 0.0,
@@ -30,6 +32,12 @@ def test_health_check(client):
     assert response.json()["status"] == "ok"
 
 def test_diagnose_patient(client):
+    from main import get_db
+    get_db().students.find_one = AsyncMock(
+        return_value={"_id": ObjectId(MOCK_FUSION_PAYLOAD["student_id"]), "parent_id": "mock-parent"}
+    )
+    get_db().learner_profiles.insert_one = AsyncMock()
+    get_db().model_audit_log.insert_one = AsyncMock()
     response = client.post("/diagnose", json=MOCK_FUSION_PAYLOAD)
     assert response.status_code == 200
     data = response.json()
@@ -38,10 +46,10 @@ def test_diagnose_patient(client):
     assert "learner_profile" in data
     assert "shap_explanations" in data
     assert data["learner_profile"]["primary_pattern"] in [
-        "Typical",
-        "Phonological",
-        "Visual-Orthographic",
-        "Combined",
+        "Typical Learning Pattern",
+        "Phonological Learning Pattern",
+        "Visual-Orthographic Learning Pattern",
+        "Combined Learning Pattern",
     ]
     assert 0.0 <= data["learner_profile"]["confidence"] <= 1.0
     assert len(data["shap_explanations"]["top_contributing_features"]) == 3

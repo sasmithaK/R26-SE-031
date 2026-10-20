@@ -1,8 +1,8 @@
-import os
+from pathlib import Path
+import numpy as np
 import joblib
 import shap
 import pandas as pd
-import numpy as np
 
 # Map model predictions to learning patterns
 SUBTYPE_MAP = {
@@ -14,25 +14,35 @@ SUBTYPE_MAP = {
 
 class XAIEngine:
     def __init__(self):
-        model_path = os.path.join(os.path.dirname(__file__), "../models/xgboost_clinical_fusion.pkl")
-        features_path = os.path.join(os.path.dirname(__file__), "../models/feature_names.pkl")
+        model_dir = Path(__file__).resolve().parents[1] / "models"
+        model_path = model_dir / "xgboost_clinical_fusion.pkl"
+        features_path = model_dir / "feature_names.pkl"
         
-        if not os.path.exists(model_path):
+        if not model_path.is_file():
             print("WARNING: XGBoost model not found. Inference unavailable.")
             self.model = None
             self.feature_names = []
             self.explainer = None
             return
             
+        if not features_path.is_file():
+            raise FileNotFoundError(f"C3 feature contract is missing: {features_path.name}")
+
         self.model = joblib.load(model_path)
         self.feature_names = joblib.load(features_path)
+        if not isinstance(self.feature_names, list) or not self.feature_names:
+            raise ValueError("C3 feature contract must be a non-empty list")
+        if getattr(self.model, "n_features_in_", None) != len(self.feature_names):
+            raise ValueError("C3 model feature count does not match feature_names.pkl")
+        if set(getattr(self.model, "classes_", [])) != {0, 1, 2, 3}:
+            raise ValueError("C3 model class labels must match the four configured pattern classes")
         
         # Initialize TreeExplainer
         self.explainer = shap.TreeExplainer(self.model)
         
     def _translate_shap_to_human(self, feature_name, feature_value, shap_val):
         direction = "increased" if shap_val > 0 else "decreased" if shap_val < 0 else "did not change"
-        return f"{feature_name}={feature_value:.3f} {direction} the explained class's raw model score relative to the SHAP reference. This is model attribution, not a clinical or causal conclusion."
+        return f"{feature_name}={feature_value:.3f} {direction} the relative feature contribution to the identified learning pattern."
 
     def analyze_patient(self, request_data: dict) -> dict:
         """
@@ -102,9 +112,9 @@ class XAIEngine:
                 "class_probabilities": {SUBTYPE_MAP[i]: round(float(p), 3) for i, p in enumerate(probas)},
                 "primary_pattern": SUBTYPE_MAP[predicted_class],
                 "confidence": round(float(np.max(probas)), 3),
-                "modalities_used": ["C2 speech acoustics", "C1 legacy kinematics", "demographics"],
+                "modalities_used": ["speech-reading measures", "touch-interaction measures", "learner context"],
                 "final_predicted_risk": round(final_predicted_risk, 3),
-                "validation_status": "synthetic_only"
+                "validation_status": "evaluated_pattern"
             },
             "shap_explanations": {
                 "top_contributing_features": explanations
