@@ -237,19 +237,43 @@ def get_non_blocking_output(p):
 @app.get("/health")
 def health_check():
     status = {}
+    healthy = len(processes) == len(SERVICES)
     for i, p in enumerate(processes):
         p.poll()
-        logs = get_non_blocking_output(p)
         if p.returncode is not None:
-            status[f"process_{i}"] = f"CRASHED! Exit code: {p.returncode}. Logs: {logs}"
+            status[SERVICES[i]["name"]] = f"crashed:{p.returncode}"
+            healthy = False
         else:
-            status[f"process_{i}"] = f"RUNNING. Logs: {logs}"
+            status[SERVICES[i]["name"]] = "running"
     
     env_vars = {
         "MONGODB_URL": "SET" if os.getenv("MONGODB_URL") else "MISSING",
         "GEMINI_API_KEY": "SET" if os.getenv("GEMINI_API_KEY") else "MISSING"
     }
-    return {"status": "ok", "message": "Azure ML Gateway is running", "details": status, "env": env_vars}
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content={"status": "ok" if healthy else "degraded", "message": "Azure ML Gateway process status",
+                 "details": status, "env": env_vars},
+    )
+
+
+@app.get("/ready")
+async def readiness_check():
+    if len(processes) != len(SERVICES) or any(p.poll() is not None for p in processes):
+        return JSONResponse(status_code=503, content={"ready": False, "services": "process_failure"})
+    checks = {}
+    async with httpx.AsyncClient(timeout=3.0) as health_client:
+        for service in SERVICES:
+            try:
+                endpoint = "health" if service["name"] == "tutoring" else "ready"
+                response = await health_client.get(
+                    f"http://127.0.0.1:{service['port']}/{endpoint}"
+                )
+                checks[service["name"]] = "ready" if response.is_success else f"not_ready:{response.status_code}"
+            except httpx.HTTPError as exc:
+                checks[service["name"]] = f"unreachable:{type(exc).__name__}"
+    ready = all(value == "ready" for value in checks.values())
+    return JSONResponse(status_code=200 if ready else 503, content={"ready": ready, "services": checks})
 
 
 if __name__ == "__main__":

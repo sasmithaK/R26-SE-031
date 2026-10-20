@@ -1,4 +1,11 @@
 .git
+.env
+**/.env
+**/.env*
+*.env
+!*.env.example
+!**/.env.example
+!example.env
 .github
 .gitignore
 venv
@@ -26,3 +33,12 @@ generate_paper_figures.py
 output.wav
 .idea
 .vscode
+
+*.pytest_cache*
+*.pytest_cache/*
+.pytest_cache
+*/.pytest_cache
+*/*/.pytest_cache
+*/*/*/.pytest_cache
+app/backend/api
+app/backend/api/*

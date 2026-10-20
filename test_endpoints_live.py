@@ -362,7 +362,7 @@ def run_tests():
         }
     }
     try:
-        r = make_request("POST", f"{RENDER_BASE}/api/v1/learning/interaction", json=learning_payload)
+        r = make_request("POST", f"{RENDER_BASE}/api/v1/learning/interaction", json=learning_payload, headers=p_headers)
         passed = r.status_code == 200 and "next_action" in r.json()
         record("C5 Learning", "/api/v1/learning/interaction", "POST", r.status_code, 200, passed,
                f"Next activity: {r.json().get('next_action', {}).get('next_activity') if passed else r.text[:60]}")

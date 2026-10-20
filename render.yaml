@@ -9,6 +9,7 @@ services:
     buildFilter:
       paths:
         - app/backend/api/**
+        - shared/**
         - render.yaml
     envVars:
       - key: PORT

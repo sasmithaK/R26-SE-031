@@ -14,6 +14,7 @@ on:
       - 'app/backend/telemetry-analytics-v1/**'
       - 'app/backend/diagnostic-fusion-v1/**'
       - 'app/backend/adaptive-tutoring-v1/**'
+      - 'app/backend/api/requirements.txt'
       - 'Dockerfile.azure'
       - 'requirements-azure.txt'
       - 'azure_gateway.py'
@@ -39,20 +40,15 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Check ACR credentials
-      id: check-creds
+    - name: Validate deployment credentials
       env:
         ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+        PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
       run: |
-        if [ -n "$ACR_PASSWORD" ]; then
-          echo "has_creds=true" >> $GITHUB_OUTPUT
-        else
-          echo "has_creds=false" >> $GITHUB_OUTPUT
-          echo "::notice ::ACR_PASSWORD secret is not configured in GitHub Secrets. Skipping build and push."
-        fi
+        test -n "$ACR_PASSWORD" || (echo "ACR_PASSWORD secret is required" && exit 1)
+        test -n "$PUBLISH_PROFILE" || (echo "AZURE_WEBAPP_PUBLISH_PROFILE secret is required" && exit 1)
 
     - name: Log in to Azure Container Registry
-      if: steps.check-creds.outputs.has_creds == 'true'
       uses: azure/docker-login@v1
       with:
         login-server: ${{ env.ACR_NAME }}.azurecr.io
@@ -60,24 +56,25 @@ jobs:
         password: ${{ secrets.ACR_PASSWORD }}
 
     - name: Build and Push Docker image
-      if: steps.check-creds.outputs.has_creds == 'true'
       run: |
-        LATEST_IMAGE="${ACR_NAME}.azurecr.io/${IMAGE_NAME}:latest"
         TAGGED_IMAGE="${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${{ github.sha }}"
-        docker build -f Dockerfile.azure -t "$LATEST_IMAGE" -t "$TAGGED_IMAGE" .
-        docker push "$LATEST_IMAGE"
+        docker build -f Dockerfile.azure -t "$TAGGED_IMAGE" .
         docker push "$TAGGED_IMAGE"
-        echo "Image successfully pushed to ACR. Webhook will auto-deploy :latest to App Service."
+        echo "IMAGE_REF=$TAGGED_IMAGE" >> "$GITHUB_ENV"
 
-    - name: Verify gateway, C1, and C2 readiness
-      if: steps.check-creds.outputs.has_creds == 'true'
+    - name: Deploy container image to Azure App Service
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        images: '${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}'
+
+    - name: Verify gateway and all component readiness
       run: |
         BASE_URL="https://${WEBAPP_NAME}.azurewebsites.net"
         for attempt in {1..20}; do
-          if curl --fail --silent --show-error "$BASE_URL/health" >/dev/null \
-            && curl --fail --silent --show-error "$BASE_URL/telemetry/docs" >/dev/null \
-            && curl --fail --silent --show-error "$BASE_URL/speech/docs" >/dev/null; then
-            echo "Azure gateway, C1, and C2 are ready."
+          if curl --fail --silent --show-error "$BASE_URL/ready" >/dev/null; then
+            echo "Azure gateway and all ML services are ready."
             exit 0
           fi
           echo "Waiting for Azure services (attempt $attempt/20)..."
