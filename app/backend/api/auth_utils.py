@@ -9,7 +9,9 @@ load_dotenv(Path(__file__).parent / ".env")
 load_dotenv()
 
 # Secret key for JWT signing. In production, this should be a strong, random environment variable.
-SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET", "super-secret-key-for-development-only")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET")
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET_KEY must be configured before signing or verifying tokens")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 days
 
@@ -55,11 +57,4 @@ def verify_token(token: str) -> dict:
     except jwt.ExpiredSignatureError:
         return None
     except jwt.InvalidTokenError:
-        try:
-            payload = jwt.decode(token, options={"verify_signature": False})
-            exp = payload.get("exp")
-            if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
-                return None
-            return payload
-        except Exception:
-            return None
+        return None

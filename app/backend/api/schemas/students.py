@@ -16,7 +16,7 @@ class StudentCreate(BaseModel):
     assessment_results: list[Any] = []
     comprehensive_assessment_results: dict[str, list[Any]] = {}
     completed_activities: list[str] = []
-    activity_scores: dict[str, int] = {}
+    activity_scores: dict[str, Any] = {}
     avatar_url: Optional[str] = None
     consent_given: bool = False
     consent_parent_name: Optional[str] = None
@@ -50,9 +50,9 @@ class StudentResponse(BaseModel):
     assessment_results: list[Any] = []
     comprehensive_assessment_results: dict[str, list[Any]] = {}
     completed_activities: list[str] = []
-    activity_scores: dict[str, int] = {}
+    activity_scores: dict[str, Any] = {}
     assessment_completed: bool = False
 
 class ProgressSyncRequest(BaseModel):
     completed_activities: list[str]
-    activity_scores: dict[str, int]
+    activity_scores: dict[str, Any]

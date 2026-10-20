@@ -12,7 +12,9 @@ load_dotenv(Path(__file__).parent / ".env")
 load_dotenv()
 
 # JWT Configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET", "super-secret-key-for-development-only")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET")
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET_KEY must be configured before the authentication API starts")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7   # 7 days
 REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30  # 30 days

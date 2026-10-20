@@ -240,6 +240,7 @@ class ShapExplanation(BaseModel):
     direction: Optional[str] = None
 
 class TherapistC3ProfileDTO(MLResponseBase):
+    classifier_available: bool = False
     primary_pattern: str
     probabilities: Dict[str, float]
     confidence: Optional[float] = None
@@ -249,6 +250,8 @@ class TherapistC3ProfileDTO(MLResponseBase):
     llm_recommendations: Optional[str] = None
     pipeline_status: str = "not_run"
     missing_inputs: List[str] = Field(default_factory=list)
+    summary_text: str = "More activity observations are needed before a combined summary is available."
+    recommendation_text: str = "Continue familiar activities and review progress over time."
 
 class KnowledgeComponent(BaseModel):
     id: str

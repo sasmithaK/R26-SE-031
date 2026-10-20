@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from schemas.dashboards import (TherapistOverviewDTO, TherapistC1BehavioralDTO, TherapistC2SpeechDTO,
-                                TherapistC3ProfileDTO, TherapistC4AdaptiveDTO)
+                                TherapistC3ProfileDTO, TherapistC4AdaptiveDTO, ShapExplanation)
 from shared.database import get_db
 from services.dashboard_access import require_dashboard_access
 from services.dashboard_data import (ACTIVITY_NAMES, KC_NAMES, SKILL_NAMES,
@@ -367,13 +367,16 @@ async def get_therapist_c3_profile(student_id: str):
     )
     doc = rows[0] if rows else {}
     profile, probs, pattern = pattern_profile(doc)
-    explanations=[]
-    for f in (doc.get("shap_explanations") or {}).get("top_contributing_features", []):
-        contribution=number(f.get("shap_impact"))
-        if contribution is not None:
-            explanations.append(dict(feature=f.get("feature_name", ""), contribution=contribution,
-                observed_value=number(f.get("observed_value", f.get("value"))),
-                direction="increases model score" if contribution>0 else "decreases model score" if contribution<0 else "neutral"))
+    evidence = doc.get("evidence_summary") or {}
+    c1_evidence = evidence.get("c1") or {}
+    c2_evidence = evidence.get("c2") or {}
+    summary_parts = []
+    if number(c1_evidence.get("first_attempt_accuracy")) is not None:
+        summary_parts.append(f"Recent activity responses were correct on {round(number(c1_evidence['first_attempt_accuracy'])*100)}% of first attempts.")
+    if number(c2_evidence.get("word_accuracy")) is not None:
+        summary_parts.append(f"The latest reading sample matched {round(number(c2_evidence['word_accuracy'])*100)}% of expected words and letters.")
+    summary_text = doc.get("llm_summary") or " ".join(summary_parts) or "More activity and reading observations are needed before a combined summary is available."
+    recommendation_text = doc.get("llm_recommendations") or "Review repeated attempts and reading samples across several activities over time."
     pipeline_status = doc.get("pipeline_status") or audit.get("status") or ("profile_available" if rows else "not_run")
     missing_inputs = list(doc.get("missing_inputs") or audit.get("missing_features") or [])
     skip_reason = None
@@ -383,11 +386,48 @@ async def get_therapist_c3_profile(student_id: str):
         skip_reason = "More activity observations are needed before a learning summary can be shown."
     metadata = mlbase(student_id, doc or audit, "XGBoost", "c3-fusion-v1")
     metadata["available"] = bool(rows)
-    return TherapistC3ProfileDTO(**metadata, primary_pattern=pattern,
-        probabilities=probs, confidence=number(profile.get("confidence")), modalities_used=profile.get("modalities_used") or [],
-        shap_explanations=explanations, llm_summary=doc.get("llm_summary"), llm_recommendations=doc.get("llm_recommendations"),
-        pipeline_status=pipeline_status, missing_inputs=missing_inputs,
-        skip_reason=skip_reason)
+
+    shap_list = []
+    raw_shap = doc.get("shap_explanations") or {}
+    top_features = raw_shap.get("top_contributing_features", []) if isinstance(raw_shap, dict) else (raw_shap if isinstance(raw_shap, list) else [])
+    for item in top_features:
+        if isinstance(item, dict):
+            feat = item.get("feature") or item.get("feature_name") or "Unknown"
+            val = number(item.get("value") or item.get("observed_value"))
+            raw_contrib = item.get("contribution") or item.get("shap_val") or item.get("shap_impact")
+            try:
+                contrib = float(str(raw_contrib).replace("+", ""))
+            except Exception:
+                contrib = 0.0
+            direction = item.get("direction") or ("positive" if contrib > 0 else "negative")
+            shap_list.append(ShapExplanation(
+                feature=feat,
+                contribution=contrib,
+                observed_value=val,
+                direction=direction
+            ))
+
+    classifier_available = bool(probs) and pattern != "Unavailable"
+    primary_pattern = pattern if classifier_available else ("Activity summary" if rows else "Unavailable")
+    confidence = number(profile.get("confidence"))
+    modalities_used = profile.get("modalities_used") or (["learning activities"] if rows else [])
+
+    return TherapistC3ProfileDTO(
+        **metadata,
+        classifier_available=classifier_available,
+        primary_pattern=primary_pattern,
+        probabilities=probs,
+        confidence=confidence,
+        modalities_used=modalities_used,
+        shap_explanations=shap_list,
+        llm_summary=doc.get("llm_summary"),
+        llm_recommendations=doc.get("llm_recommendations"),
+        pipeline_status=pipeline_status,
+        missing_inputs=missing_inputs,
+        skip_reason=skip_reason,
+        summary_text=summary_text,
+        recommendation_text=recommendation_text,
+    )
 
 @router.get("/{student_id}/c4-adaptive", response_model=TherapistC4AdaptiveDTO)
 async def get_therapist_c4_adaptive(student_id: str, window: int = 20):

@@ -135,12 +135,25 @@ async def get_parent_skills(student_id:str):
 
 @router.get("/{student_id}/learning-pattern",response_model=ParentLearningPatternDTO)
 async def get_parent_learning_pattern(student_id:str):
-    rows=await records(get_db(),"learner_profiles",student_id,1); doc=rows[0] if rows else {}
-    _,_,pattern=pattern_profile(doc)
-    origin=doc.get("data_origin","unspecified")
-    obs=(f"Synthetic demonstration: the experimental model produced a {pattern} pattern. This is not a finding about your child."
-         if origin=="synthetic" else f"Experimental model output: {pattern}. Input provenance is {origin}; this does not establish a learning difficulty." if doc else "No learning-pattern evidence is available yet.")
-    return ParentLearningPatternDTO(**base(student_id,doc),observation=obs,recommended_practices=[])
+    db=get_db()
+    summary_rows=await records(db,"session_summaries",student_id,1)
+    speech_rows=await records(db,"speech_features",student_id,1)
+    overall=(summary_rows[0].get("overall") or {}) if summary_rows else {}
+    speech_row=speech_rows[0] if speech_rows else {}
+    accuracy=number(overall.get("accuracy"))
+    word_accuracy=number(speech_row.get("word_accuracy"))
+    observations=[]
+    if accuracy is not None:
+        observations.append(f"Recent activity responses were correct on {round(accuracy*100)}% of first attempts.")
+    if word_accuracy is not None:
+        observations.append(f"The latest reading sample matched {round(word_accuracy*100)}% of the expected Sinhala letters and words.")
+    if not observations:
+        observations.append("More completed activities and reading samples are needed to summarize progress.")
+    return ParentLearningPatternDTO(
+        **base(student_id,summary_rows[0] if summary_rows else speech_row),
+        observation=" ".join(observations),
+        recommended_practices=["Continue short, familiar practice activities and review progress over time."],
+    )
 
 @router.get("/{student_id}/activity-history",response_model=ParentActivityHistoryDTO)
 async def get_parent_activity_history(student_id:str,limit:int=Query(10,ge=1,le=50),days:Optional[int]=Query(None,ge=1,le=365)):
@@ -213,7 +226,8 @@ async def get_parent_component_analytics(student_id: str):
             "latency_ms": values.get("acoustic_latency_ms"),
         })
 
-    profile, probabilities, pattern = pattern_profile(latest_profile)
+    profile, pattern_probabilities, primary_pattern = pattern_profile(latest_profile)
+    classifier_available = bool(pattern_probabilities) and primary_pattern != "Unavailable"
     mastery_values = [number(value) for value in (latest_state.get("knowledge_state") or {}).values()]
     mastery_values = [value for value in mastery_values if value is not None]
     assisted = [d for d in decisions if (d.get("scaffold_level_used", d.get("scaffold_level", 0)) or 0) > 0]
@@ -260,18 +274,23 @@ async def get_parent_component_analytics(student_id: str):
         ),
         "c3_explainability": component(
             latest_profile,
-            primary_pattern=pattern,
-            confidence=number(profile.get("confidence")),
-            probabilities=probabilities,
-            summary_text=latest_profile.get("llm_summary") if latest_profile else "Complete activities and a speaking task to build a combined summary.",
-            recommendations=latest_profile.get("llm_recommendations"),
-            pipeline_status=latest_profile.get("pipeline_status", "not_run"),
-            model_applied=bool(latest_profile.get("model_applied")),
-            explanation_status=(
-                "Activity summary with an experimental model result."
-                if latest_profile.get("model_applied")
-                else "Combined summary of available learning observations."
-                if latest_profile else "No combined learning summary is available."
+            classifier_available=classifier_available,
+            primary_pattern=primary_pattern if classifier_available else None,
+            probabilities=pattern_probabilities,
+            confidence=number(profile.get("confidence")) if classifier_available else None,
+            summary_text=(
+                latest_profile.get("llm_summary") or
+                " ".join([
+                    f"Recent activity responses were correct on {round(number(overall.get('accuracy'))*100)}% of first attempts."
+                    if number(overall.get("accuracy")) is not None else "",
+                    f"The latest reading sample matched {round(number(speech_latest.get('word_accuracy'))*100)}% of expected words and letters."
+                    if number(speech_latest.get("word_accuracy")) is not None else "",
+                ]).strip()
+                or "Complete activities and a speaking task to build a progress summary."
+            ),
+            recommendation_text=(
+                latest_profile.get("llm_recommendations") or
+                "Continue familiar practice and compare observations across activities over time."
             ),
         ),
         "c4_adaptive": component(
