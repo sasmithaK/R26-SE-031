@@ -53,3 +53,36 @@ def test_diagnose_patient(client):
     ]
     assert 0.0 <= data["learner_profile"]["confidence"] <= 1.0
     assert len(data["shap_explanations"]["top_contributing_features"]) == 3
+
+
+def test_evidence_chat_context_is_whitelisted_and_includes_parent_answers():
+    from main import _chat_context_from_records
+
+    context = _chat_context_from_records(
+        [{
+            "student_id": "must-not-leak",
+            "overall": {"accuracy": 0.75, "retry_rate": 0.2, "secret": "drop"},
+            "activity_breakdown_by_skill": {
+                "S5::A1": {"skill_id": "S5", "activity_id": "A1", "accuracy": 0.75, "secret": "drop"}
+            },
+        }],
+        [{"student_id": "must-not-leak", "recognized_text": "කමල්", "word_accuracy": 0.8, "audio_bytes": "drop"}],
+        {"first_name": "must-not-leak", "comprehensive_assessment_results": {
+            "reading": [{"question_en": "Does reading feel difficult?", "answer": True}]
+        }},
+    )
+
+    assert context["activity_observations_c1"][0]["overall"] == {"accuracy": 0.75, "retry_rate": 0.2}
+    assert "student_id" not in str(context)
+    assert "first_name" not in str(context)
+    assert "audio_bytes" not in str(context)
+    assert context["reading_observations_c2"][0]["recognized_text"] == "කමල්"
+    assert context["parent_reported_observations"][0]["question"] == "Does reading feel difficult?"
+
+
+def test_evidence_chat_is_not_available_to_parent(client):
+    response = client.post(
+        f"/chat/students/{ObjectId()}",
+        json={"messages": [{"role": "user", "content": "Summarize this child's records."}]},
+    )
+    assert response.status_code == 403
