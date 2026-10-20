@@ -45,9 +45,9 @@ class ApiConfig {
 
   /// Auth & Profiles API (Port 8015)
   static String get authBaseUrl {
+    final configured = _configuredUrl('AUTH_BASE_URL');
+    if (configured != null) return configured;
     if (isDevelopment) {
-      final configured = dotenv.env['AUTH_BASE_URL']?.trim() ?? '';
-      if (configured.isNotEmpty) return configured;
       return 'http://$_localHost:8015/api/v1/auth';
     }
     return 'https://adaptedmind-auth-api.onrender.com/api/v1/auth';
@@ -55,9 +55,9 @@ class ApiConfig {
 
   /// Specialist API (Port 8015)
   static String get specialistBaseUrl {
+    final configured = _configuredUrl('SPECIALIST_BASE_URL');
+    if (configured != null) return configured;
     if (isDevelopment) {
-      final configured = dotenv.env['SPECIALIST_BASE_URL']?.trim() ?? '';
-      if (configured.isNotEmpty) return configured;
       return 'http://$_localHost:8015/api/v1/specialists';
     }
     return 'https://adaptedmind-auth-api.onrender.com/api/v1/specialists';
@@ -65,9 +65,9 @@ class ApiConfig {
 
   /// Speech Monitoring API (Port 8020 locally, /speech on Azure)
   static String get speechBaseUrl {
+    final configured = _configuredUrl('SPEECH_BASE_URL');
+    if (configured != null) return configured;
     if (isDevelopment) {
-      final configured = _configuredUrl('SPEECH_BASE_URL');
-      if (configured != null) return configured;
       return 'http://$_localHost:8020';
     }
     // Deployed to Azure ML Gateway
@@ -76,9 +76,9 @@ class ApiConfig {
 
   /// Telemetry Analytics API (Port 8025 locally, /telemetry on Azure)
   static String get telemetryBaseUrl {
+    final configured = _configuredUrl('TELEMETRY_BASE_URL');
+    if (configured != null) return configured;
     if (isDevelopment) {
-      final configured = _configuredUrl('TELEMETRY_BASE_URL');
-      if (configured != null) return configured;
       return 'http://$_localHost:8025/api/v1/auth';
     }
     // Deployed to Azure ML Gateway
@@ -87,9 +87,9 @@ class ApiConfig {
 
   /// C1 Behavioral Analytics API (Port 8025 locally, /telemetry/api/v1/c1 on Azure)
   static String get c1BaseUrl {
+    final configured = _configuredUrl('C1_BASE_URL');
+    if (configured != null) return configured;
     if (isDevelopment) {
-      final configured = _configuredUrl('C1_BASE_URL');
-      if (configured != null) return configured;
       return 'http://$_localHost:8025/api/v1/c1';
     }
     // Deployed to Azure ML Gateway
@@ -98,9 +98,9 @@ class ApiConfig {
 
   /// Unified Learning API Gateway (Port 8015 locally, /learning on Azure)
   static String get learningBaseUrl {
+    final configured = _configuredUrl('LEARNING_BASE_URL');
+    if (configured != null) return configured;
     if (isDevelopment) {
-      final configured = _configuredUrl('LEARNING_BASE_URL');
-      if (configured != null) return configured;
       return 'http://$_localHost:8015/api/v1/learning';
     }
     return 'https://adaptedmind-auth-api.onrender.com/api/v1/learning';
@@ -108,9 +108,9 @@ class ApiConfig {
 
   /// Parent Dashboard API (Port 8015 — auth service, NOT 8025)
   static String get parentDashboardBaseUrl {
+    final configured = _configuredUrl('PARENT_DASHBOARD_BASE_URL');
+    if (configured != null) return configured;
     if (isDevelopment) {
-      final configured = _configuredUrl('PARENT_DASHBOARD_BASE_URL');
-      if (configured != null) return configured;
       return 'http://$_localHost:8015/api/v1/parent/students';
     }
     return 'https://adaptedmind-auth-api.onrender.com/api/v1/parent/students';
@@ -118,12 +118,20 @@ class ApiConfig {
 
   /// Therapist Dashboard API (Port 8015 — auth service, NOT 8025)
   static String get therapistDashboardBaseUrl {
+    final configured = _configuredUrl('THERAPIST_DASHBOARD_BASE_URL');
+    if (configured != null) return configured;
     if (isDevelopment) {
-      final configured = _configuredUrl('THERAPIST_DASHBOARD_BASE_URL');
-      if (configured != null) return configured;
       return 'http://$_localHost:8015/api/v1/therapist/students';
     }
     return 'https://adaptedmind-auth-api.onrender.com/api/v1/therapist/students';
+  }
+
+  /// Diagnostic/Fusion API (C3; port 9016 locally, /diagnostic on Azure).
+  static String get diagnosticBaseUrl {
+    final configured = _configuredUrl('DIAGNOSTIC_BASE_URL');
+    if (configured != null) return configured;
+    if (isDevelopment) return 'http://$_localHost:9016';
+    return 'https://sipsara-ml-backend-v2.azurewebsites.net/diagnostic';
   }
 
   // --- Helper Methods ---
@@ -133,6 +141,12 @@ class ApiConfig {
     if (profilePicPath.startsWith('http://') ||
         profilePicPath.startsWith('https://')) {
       return profilePicPath;
+    }
+
+    final configured = _configuredUrl('AUTH_BASE_URL');
+    if (configured != null) {
+      final baseHost = configured.replaceFirst(RegExp(r'/api/v1/auth.*$'), '');
+      return '$baseHost$profilePicPath';
     }
 
     // In production or development, the Auth API serves the profile images.

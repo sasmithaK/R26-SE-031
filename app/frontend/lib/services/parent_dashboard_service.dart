@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'auth_service.dart';
 import 'dashboard_client.dart';
 
 class ParentDashboardService {
@@ -33,5 +36,19 @@ class ParentDashboardService {
         ? filter
         : 'limit=10';
     return _client.get('$_baseUrl/$id/activity-history?$query');
+  }
+
+  /// Plain-language learning summary PDF (observations only).
+  Future<Uint8List> downloadLearningSummary(String id, {int days = 30}) async {
+    final token = await AuthService().getAccessToken();
+    if (token == null) throw Exception('Sign in again to download the summary.');
+    final response = await http.get(
+      Uri.parse('$_baseUrl/$id/report?days=$days'),
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/pdf'},
+    ).timeout(const Duration(seconds: 30));
+    if (response.statusCode != 200) {
+      throw Exception('Could not create the summary (HTTP ${response.statusCode}).');
+    }
+    return response.bodyBytes;
   }
 }
