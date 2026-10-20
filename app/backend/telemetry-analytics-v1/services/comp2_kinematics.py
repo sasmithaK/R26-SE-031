@@ -81,9 +81,35 @@ def _process_stream(stream: List[Dict[str, Any]], screen_w: int, screen_h: int) 
     """
     if len(stream) < 2:
         return 0, 0, 0.0, 0.0, 1.0, 0.0
+
+    def _is_down(p):
+        t = str(p.get("type") or p.get("action") or "").upper()
+        return t in {"DOWN", "START"}
+
+    def _is_up(p):
+        t = str(p.get("type") or p.get("action") or "").upper()
+        return t in {"UP", "END"}
+
+    def _get_t(p):
+        for k in ("t", "timestamp_ms", "t_offset_ms", "time"):
+            if k in p and p[k] is not None:
+                return float(p[k])
+        return 0.0
+
+    def _get_x(p):
+        for k in ("x", "x_ratio"):
+            if k in p and p[k] is not None:
+                return float(p[k])
+        return 0.0
+
+    def _get_y(p):
+        for k in ("y", "y_ratio"):
+            if k in p and p[k] is not None:
+                return float(p[k])
+        return 0.0
         
-    down_events = [p for p in stream if p.get("type") == "DOWN"]
-    up_events = [p for p in stream if p.get("type") == "UP"]
+    down_events = [p for p in stream if _is_down(p)]
+    up_events = [p for p in stream if _is_up(p)]
     
     if not down_events or not up_events:
         return 0, 0, 0.0, 0.0, 1.0, 0.0
@@ -91,8 +117,8 @@ def _process_stream(stream: List[Dict[str, Any]], screen_w: int, screen_h: int) 
     first_down = down_events[0]
     last_up = up_events[-1]
     
-    t_start = first_down.get("t", 0)
-    t_end = last_up.get("t", 0)
+    t_start = _get_t(first_down)
+    t_end = _get_t(last_up)
     
     # 1. Time to First Touch (t_FT)
     # If frontend provides t_offset_ms relative to stimulus render, t_FT is just t_start
@@ -102,16 +128,16 @@ def _process_stream(stream: List[Dict[str, Any]], screen_w: int, screen_h: int) 
     t_dwell = float(max(0, t_end - t_start))
     
     # 3. Path Efficiency Ratio
-    x_start, y_start = first_down.get("x", 0) * screen_w, first_down.get("y", 0) * screen_h
-    x_end, y_end = last_up.get("x", 0) * screen_w, last_up.get("y", 0) * screen_h
+    x_start, y_start = _get_x(first_down) * screen_w, _get_y(first_down) * screen_h
+    x_end, y_end = _get_x(last_up) * screen_w, _get_y(last_up) * screen_h
     
     d_euclidean = math.sqrt((x_end - x_start)**2 + (y_end - y_start)**2)
     
     d_actual = 0.0
     for i in range(len(stream) - 1):
         p1, p2 = stream[i], stream[i+1]
-        x1, y1 = p1.get("x", 0) * screen_w, p1.get("y", 0) * screen_h
-        x2, y2 = p2.get("x", 0) * screen_w, p2.get("y", 0) * screen_h
+        x1, y1 = _get_x(p1) * screen_w, _get_y(p1) * screen_h
+        x2, y2 = _get_x(p2) * screen_w, _get_y(p2) * screen_h
         d_actual += math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
         
     path_eff = d_euclidean / d_actual if d_actual > 0 else 1.0

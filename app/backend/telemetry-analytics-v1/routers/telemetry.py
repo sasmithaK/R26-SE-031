@@ -9,7 +9,7 @@ Endpoints:
   GET  /api/v1/auth/telemetry/{sid}/analytics  — ML cognitive profile + risk report
 """
 
-from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
 import io
 import httpx
@@ -133,7 +133,7 @@ async def _validate_component_four_research_event(db, event: dict) -> None:
     event["research_eligible"] = not errors
     event["research_validation_errors"] = errors
 
-async def _trigger_c3_background(student_id: str, session_summary: dict):
+async def _trigger_c3_background(student_id: str, session_summary: dict, authorization: str | None = None):
     """Ask C3 to reconcile saved evidence after C1 arrives.
 
     C2 performs the same call after speech is saved, so either arrival order
@@ -144,12 +144,14 @@ async def _trigger_c3_background(student_id: str, session_summary: dict):
     dataset_id = session_summary.get("dataset_id")
     try:
         async with httpx.AsyncClient() as client:
+            headers = {"Authorization": authorization} if authorization else {}
             response = await client.post(
                 os.getenv("FUSION_API_URL", "http://localhost:9016").rstrip("/") + "/diagnose/session",
                 json={"student_id": student_id, "session_id": session_id,
                       "data_origin": session_summary.get("data_origin", "observed"),
                       "dataset_id": dataset_id},
                 timeout=15,
+                headers=headers,
             )
             response.raise_for_status()
     except Exception as exc:
@@ -198,6 +200,7 @@ def _kinematic_events(events: list[dict]) -> list[dict]:
 async def submit_telemetry(
     req: TelemetrySessionSubmit,
     background_tasks: BackgroundTasks,
+    request: Request,
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -208,6 +211,7 @@ async def submit_telemetry(
     """
     db = get_db()
 
+    c1_processing = {"status": "failed", "model_used": "unavailable"}
     try:
         student_oid = ObjectId(req.student_id)
     except Exception:
@@ -368,15 +372,27 @@ async def submit_telemetry(
         model_metadata = predict_c1_pattern(model_features)
         c1_partial["model"] = model_metadata
         await c1_repository.save_c1_state(c1_partial)
+        c1_processing = {
+            "status": "processed",
+            "model_used": model_metadata.get("model_used"),
+            "unavailable_reason": model_metadata.get("unavailable_reason"),
+            "missing_features": model_metadata.get("missing_features", []),
+        }
     except Exception as err:
-        print(f"C1 processing error in telemetry router: {err}")
+        c1_processing = {"status": "failed", "error_type": type(err).__name__}
 
     # Trigger C3 Background Fusion
-    background_tasks.add_task(_trigger_c3_background, str(student_oid), summary)
+    background_tasks.add_task(
+        _trigger_c3_background,
+        str(student_oid),
+        summary,
+        request.headers.get("Authorization"),
+    )
 
     return {
         "message": "Telemetry session logged successfully.",
-        "cognitive_load": cognitive_load
+        "cognitive_load": cognitive_load,
+        "c1_processing": c1_processing,
     }
 
 

@@ -1,5 +1,6 @@
 import json
 import os
+import math
 from .registry import registry
 
 def get_feature_schema():
@@ -28,26 +29,34 @@ def predict_c1_pattern(features_dict: dict) -> dict:
     version = config.get("version", "unknown")
     schema_version = config.get("feature_schema", "unknown")
     
-    # Build the canonical live vector. Missing index values can be genuinely
-    # non-applicable (for example, a non-phonological task), so use explicit
-    # neutral defaults and return their names to callers rather than silently
-    # treating every missing value as zero.
-    neutral_defaults = {
-        "visual_processing_index": 50.0,
-        "phonological_task_index": 50.0,
-        "motor_interaction_index": 50.0,
-        "attention_stability_index": 50.0,
-        "accuracy": 0.5,
-        "completion_rate": 0.5,
-    }
+    # A classifier prediction is valid only when every canonical measurement
+    # exists. Missingness is returned explicitly; it is never imputed to zero
+    # or a neutral-looking value.
     feature_vector = []
     missing_features = []
     for f_name in FEATURE_SCHEMA.get("features", []):
         val = features_dict.get(f_name)
-        if val is None:
+        if isinstance(val, bool) or not isinstance(val, (int, float)) or not math.isfinite(float(val)):
             missing_features.append(f_name)
-            val = neutral_defaults.get(f_name, 0.0)
-        feature_vector.append(float(val))
+        else:
+            feature_vector.append(float(val))
+
+    if not FEATURE_SCHEMA.get("features"):
+        missing_features = ["feature_schema"]
+
+    if missing_features:
+        return {
+            "model_name": model_name,
+            "model_version": version,
+            "feature_schema_version": schema_version,
+            "predicted_pattern": None,
+            "probabilities": {},
+            "confidence": None,
+            "model_used": "unavailable",
+            "unavailable_reason": "required C1 features are missing or non-finite",
+            "missing_feature_count": len(missing_features),
+            "missing_features": missing_features,
+        }
 
     # Try to load real model
     model = registry.load_model(model_name)
@@ -110,10 +119,10 @@ def predict_c1_pattern(features_dict: dict) -> dict:
             "predicted_pattern": predicted_class,
             "probabilities": probs_dict,
             "confidence": probs_dict.get(predicted_class, 0.0),
-            "model_used": "trained_random_forest_synthetic_only",
+            "model_used": "trained_random_forest_model",
             "model_provenance": config.get("provenance", "unknown"),
-            "missing_feature_count": len(missing_features),
-            "missing_features": missing_features,
+            "missing_feature_count": 0,
+            "missing_features": [],
         }
     return {
         "model_name": model_name,
