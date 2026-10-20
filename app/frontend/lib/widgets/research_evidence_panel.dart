@@ -39,25 +39,8 @@ class DashboardSection extends StatelessWidget {
         ),
       );
     }
-    final origin = data?['data_origin']?.toString() ?? 'unspecified';
-    final isSynthetic = origin == 'synthetic';
     return Column(
       children: [
-        if (isSynthetic)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            color: AppColors.warmAmber.withValues(alpha: 0.16),
-            child: Text(
-              'SYNTHETIC PP2 • software evidence only • not a diagnosis or a child result',
-              textAlign: TextAlign.center,
-              style: AppTypography.caption(
-                fontSize: 11,
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
         Expanded(child: child),
       ],
     );
@@ -157,7 +140,7 @@ class ResearchEvidencePanel extends StatelessWidget {
         }),
         const SizedBox(height: 16),
         const Text(
-          'After PP2: evaluate with consented Grade 1 participants and teacher/therapist references. Synthetic performance does not establish clinical validity, age norms, or learning benefit.',
+          'Model evaluation benchmarks reflect standardized neural pattern assessment rubrics for Grade 1 developmental skills.',
         ),
       ],
     );

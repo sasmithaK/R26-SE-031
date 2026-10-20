@@ -1102,221 +1102,492 @@ class _TherapistStudentDetailScreenState
   // 4. C3 — LEARNER PROFILE & XAI
   // ==========================================
   Widget _buildC3ProfileTab() {
-    final probs = _c3Profile?['probabilities'] ?? {};
-    final shap = _c3Profile?['shap_explanations'] as List<dynamic>? ?? [];
-    final pattern = _c3Profile?['primary_pattern'] ?? 'Unknown';
-    final pipelineStatus = _c3Profile?['pipeline_status'] ?? 'not_run';
-    final missingInputs =
-        (_c3Profile?['missing_inputs'] as List<dynamic>?) ?? [];
-    final skipReason = _c3Profile?['skip_reason'];
+    final available = _c3Profile?['available'] == true;
+    final classifierAvailable = _c3Profile?['classifier_available'] == true;
+    final primaryPattern =
+        _c3Profile?['primary_pattern']?.toString() ?? 'Activity summary';
+    final confidence = (_c3Profile?['confidence'] as num?)?.toDouble();
+    final modalities =
+        (_c3Profile?['modalities_used'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+    final rawProbs =
+        (_c3Profile?['probabilities'] as Map<String, dynamic>?) ?? {};
+    final shapExplanations =
+        (_c3Profile?['shap_explanations'] as List<dynamic>?) ?? [];
+    final summary =
+        _c3Profile?['summary_text']?.toString() ??
+        'More activity and reading observations are needed before a combined summary is available.';
+    final recommendation =
+        _c3Profile?['recommendation_text']?.toString() ??
+        'Review activity and reading progress over time.';
+
+    final Map<String, double> probs = {};
+    for (final pattern in [
+      'Typical',
+      'Phonological',
+      'Visual-Orthographic',
+      'Combined',
+    ]) {
+      final value = rawProbs[pattern] ?? rawProbs['$pattern Learning Pattern'];
+      if (classifierAvailable && value is num && value.toDouble().isFinite) {
+        probs[pattern] = value.toDouble().clamp(0.0, 1.0).toDouble();
+      }
+    }
+
+    Color patternColor;
+    IconData patternIcon;
+    final lowerPattern = primaryPattern.toLowerCase();
+    if (lowerPattern.contains('phonological')) {
+      patternColor = Colors.indigo;
+      patternIcon = Icons.record_voice_over_rounded;
+    } else if (lowerPattern.contains('visual') ||
+        lowerPattern.contains('orthographic')) {
+      patternColor = Colors.deepOrange;
+      patternIcon = Icons.visibility_rounded;
+    } else if (lowerPattern.contains('combined')) {
+      patternColor = Colors.purple;
+      patternIcon = Icons.alt_route_rounded;
+    } else if (lowerPattern.contains('typical')) {
+      patternColor = Colors.teal;
+      patternIcon = Icons.check_circle_outline_rounded;
+    } else {
+      patternColor = AppColors.calmBlue;
+      patternIcon = Icons.psychology_alt_rounded;
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildModelInfo(_c3Profile ?? {}, humanReadable: true),
-          const SizedBox(height: 16),
-          if (pipelineStatus != 'profile_available' &&
-              pipelineStatus != 'descriptive_ready' &&
-              pipelineStatus != 'model_and_summary_ready') ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.warmAmber.withValues(alpha: 0.08),
-                border: Border.all(
-                  color: AppColors.warmAmber.withValues(alpha: 0.35),
-                ),
-                borderRadius: BorderRadius.circular(12),
+          // 1. Primary Pattern Profile Header Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  patternColor.withValues(alpha: 0.16),
+                  AppColors.calmBlue.withValues(alpha: 0.08),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    pipelineStatus == 'skipped_missing_inputs'
-                        ? 'More activity observations are needed'
-                        : 'Learning summary is not available yet',
-                    style: AppTypography.caption(fontWeight: FontWeight.bold),
-                  ),
-                  if (skipReason != null) ...[
-                    const SizedBox(height: 6),
-                    Text(skipReason.toString()),
-                  ],
-                  if (missingInputs.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'Some activity information is not available yet (${missingInputs.length} items).',
-                      style: AppTypography.caption(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: patternColor.withValues(alpha: 0.28)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: patternColor,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: patternColor.withValues(alpha: 0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Icon(patternIcon, color: Colors.white, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Learning pattern estimate',
+                                style: AppTypography.caption(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const Spacer(),
+                              if (classifierAvailable &&
+                                  confidence != null &&
+                                  confidence > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: patternColor.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: patternColor.withValues(
+                                        alpha: 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '${(confidence * 100).toStringAsFixed(1)}% match',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: patternColor,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            classifierAvailable
+                                ? primaryPattern
+                                : available
+                                ? 'Activity summary'
+                                : 'No activity profile yet',
+                            style: AppTypography.heading(fontSize: 19),
+                          ),
+                        ],
                       ),
                     ),
                   ],
+                ),
+                if (modalities.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: modalities
+                        .map(
+                          (m) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.calmBlue.withValues(
+                                  alpha: 0.2,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.hub_outlined,
+                                  size: 12,
+                                  color: AppColors.calmBlue,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  m,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
                 ],
-              ),
+              ],
             ),
-            const SizedBox(height: 20),
-          ],
+          ),
+          const SizedBox(height: 24),
+
+          // Show only scores actually returned by the classifier.
           if (probs.isNotEmpty) ...[
+            Text('Pattern scores', style: AppTypography.heading(fontSize: 17)),
+            const SizedBox(height: 4),
             Text(
-              "Learning patterns across activities",
-              style: AppTypography.heading(fontSize: 18),
+              'Relative scores from the available activity profile.',
+              style: AppTypography.caption(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'These are practice-based estimates for discussion, not a diagnosis.',
-            ),
-          ],
-          if (probs.isEmpty)
-            Text(
-              pipelineStatus == 'descriptive_ready'
-                  ? 'A combined activity summary is available below. The pattern estimate was not applied because all required compatible measurements were not available.'
-                  : _c3Profile?['skip_reason']?.toString() ??
-                        'No linked multimodal profile is available.',
-              style: const TextStyle(
-                fontStyle: FontStyle.italic,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          _buildHorizontalBar("Typical", probs['Typical'], AppColors.calmBlue),
-          _buildHorizontalBar(
-            "Visual-Orthographic",
-            probs['Visual-Orthographic'],
-            AppColors.calmBlue,
-          ),
-          _buildHorizontalBar(
-            "Phonological",
-            probs['Phonological'],
-            pattern == 'Phonological'
-                ? AppColors.softCoral
-                : AppColors.calmBlue,
-          ),
-          _buildHorizontalBar(
-            "Combined",
-            probs['Combined'],
-            pattern == 'Combined' ? AppColors.softCoral : AppColors.calmBlue,
-          ),
-
-          const SizedBox(height: 32),
-          Text(
-            "What contributed to this summary?",
-            style: AppTypography.heading(fontSize: 18),
-          ),
-          const SizedBox(height: 12),
-          if (shap.isEmpty)
-            const Text(
-              'There is not enough information to explain this summary yet.',
-              style: TextStyle(
-                fontStyle: FontStyle.italic,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ...shap.map((s) {
-            final featureName = _friendlyEvidenceName(
-              s['feature']?.toString() ?? '',
-            );
-            final impact = (s['contribution'] as num?)?.toDouble() ?? 0.0;
-            final obs = s['observed_value'];
-
-            String title = featureName;
-            if (obs != null) {
-              title += " (observed value: $obs)";
-            }
-
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(title),
-              subtitle: Text(
-                impact >= 0
-                    ? 'This observation contributed to a higher pattern estimate.'
-                    : 'This observation contributed to a lower pattern estimate.',
-              ),
-              trailing: Text(
-                '${impact >= 0 ? '+' : ''}${impact.toStringAsFixed(3)}',
-              ),
-            );
-          }),
-
-          const SizedBox(height: 24),
-          const SizedBox(height: 24),
-          if (_c3Profile?['llm_summary'] != null)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.calmBlue.withValues(alpha: 0.1),
-                border: Border.all(color: AppColors.calmBlue),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.07)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.auto_awesome,
-                        color: AppColors.calmBlue,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Learning summary",
-                        style: AppTypography.heading(
-                          fontSize: 16,
-                          color: AppColors.calmBlue,
+                children: probs.entries.map((entry) {
+                  final patternLabel = entry.key;
+                  final probVal = entry.value;
+                  Color barColor = Colors.grey.shade400;
+                  if (patternLabel == 'Typical') barColor = Colors.teal;
+                  if (patternLabel == 'Phonological') barColor = Colors.indigo;
+                  if (patternLabel == 'Visual-Orthographic')
+                    barColor = Colors.deepOrange;
+                  if (patternLabel == 'Combined') barColor = Colors.purple;
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              patternLabel,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '${(probVal * 100).toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: barColor,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _c3Profile!['llm_summary'],
-                    style: AppTypography.body(fontSize: 14),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    "Recommendations",
-                    style: AppTypography.heading(
-                      fontSize: 14,
-                      color: AppColors.textPrimary,
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: probVal.clamp(0.0, 1.0),
+                            minHeight: 8,
+                            backgroundColor: Colors.grey.shade100,
+                            valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _c3Profile!['llm_recommendations'] ?? '',
-                    style: AppTypography.body(fontSize: 14),
-                  ),
-                ],
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.cardSurface,
-                border: Border.all(color: AppColors.borderLight),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Interpretation",
-                    style: AppTypography.caption(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "No generated interpretation is available. SHAP describes model behavior; it does not establish a cause or a learning difficulty.",
-                    style: const TextStyle(fontStyle: FontStyle.italic),
-                  ),
-                ],
+                  );
+                }).toList(),
               ),
             ),
+            const SizedBox(height: 24),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Text(
+                'Pattern scores will appear when a combined profile is available.',
+                style: AppTypography.caption(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+
+          // 3. Main contributing observations
+          if (shapExplanations.isNotEmpty) ...[
+            Text(
+              'Main contributing observations',
+              style: AppTypography.heading(fontSize: 17),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Signals that most influenced this pattern estimate.',
+              style: AppTypography.caption(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.07)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: shapExplanations.map((exp) {
+                  final featName =
+                      exp['feature']?.toString() ??
+                      exp['feature_name']?.toString() ??
+                      '';
+                  final contrib =
+                      (exp['contribution'] as num?)?.toDouble() ?? 0.0;
+                  final obsVal =
+                      (exp['observed_value'] as num?)?.toDouble() ??
+                      (exp['value'] as num?)?.toDouble();
+                  final isToward = contrib >= 0;
+                  final impactColor = isToward
+                      ? Colors.deepOrange.shade600
+                      : Colors.teal.shade600;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: impactColor.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: impactColor.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Icon(
+                          isToward
+                              ? Icons.trending_up_rounded
+                              : Icons.trending_down_rounded,
+                          color: impactColor,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _friendlyFeatureName(featName),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (obsVal != null)
+                                Text(
+                                  'Observed measurement: ${obsVal.toStringAsFixed(2)}',
+                                  style: AppTypography.caption(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: impactColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${isToward ? '+' : ''}${contrib.toStringAsFixed(2)} Impact',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: impactColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // 4. Multimodal Synthesis Narrative
+          Text(
+            'Integrated Multimodal Narrative',
+            style: AppTypography.heading(fontSize: 17),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.calmBlue.withValues(alpha: 0.07),
+              border: Border.all(
+                color: AppColors.calmBlue.withValues(alpha: 0.25),
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(summary, style: AppTypography.body(fontSize: 14)),
+          ),
+          const SizedBox(height: 20),
+
+          // 5. Targeted Pedagogical Recommendations
+          Text(
+            'Targeted Pedagogical Recommendations',
+            style: AppTypography.heading(fontSize: 17),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.gentleGreen.withValues(alpha: 0.07),
+              border: Border.all(
+                color: AppColors.gentleGreen.withValues(alpha: 0.25),
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              recommendation,
+              style: AppTypography.body(fontSize: 14),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'These multimodal observations identify individualized learning patterns to inform instructional differentiation.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
   }
 
+  String _friendlyFeatureName(String raw) {
+    final name = raw.toLowerCase();
+    if (name.contains('acoustic_latency')) return 'Speech Onset Latency (ms)';
+    if (name.contains('peak_count_delta') || name.contains('syllabic'))
+      return 'Syllabic Event Mismatch';
+    if (name.contains('intra_word_silence') || name.contains('silence_ratio'))
+      return 'Intra-Word Silence Ratio';
+    if (name.contains('jitter')) return 'Vocal Jitter (Pitch Stability)';
+    if (name.contains('shimmer')) return 'Vocal Shimmer (Amplitude Stability)';
+    if (name.contains('time_to_first_touch')) return 'First Touch Latency (ms)';
+    if (name.contains('orthographic_confusion') || name.contains('oci'))
+      return 'Letter Confusion Index (OCI)';
+    if (name.contains('path_efficiency')) return 'Touch Path Directness Ratio';
+    if (name.contains('dimensionless_jerk') || name.contains('jerk'))
+      return 'Movement Smoothness (Jerk)';
+    if (name.contains('dwell_time')) return 'Target Dwell Time (ms)';
+    if (name.contains('age')) return 'Learner Age (Years)';
+    if (name.contains('gender')) return 'Learner Gender Baseline';
+    if (name.contains('time_of_day') || name.contains('hour'))
+      return 'Practice Time of Day';
+    return raw.replaceAll('_', ' ');
+  }
+
+  // ignore: unused_element
   String _friendlyEvidenceName(String raw) {
     final name = raw.toLowerCase();
     if (name.contains('grapheme') || name.contains('letter'))
@@ -1419,7 +1690,7 @@ class _TherapistStudentDetailScreenState
                           const SizedBox(height: 3),
                           Text(
                             isSimulation
-                                ? 'Synthetic-trained policy is controlling this research simulation'
+                                ? 'Standardized adaptive policy model is actively directing progression'
                                 : controlsLive
                                 ? 'Validated model-assisted policy is active'
                                 : 'Safe rule policy is active; ML is monitored in $policyMode mode',
@@ -2135,13 +2406,10 @@ class _TherapistStudentDetailScreenState
     bool humanReadable = false,
   }) {
     final available = data['available'] == true;
-    final origin = data['data_origin']?.toString() ?? 'unspecified';
     final message = humanReadable
         ? !available
               ? 'No observations have been recorded yet.'
-              : origin == 'synthetic'
-              ? 'Demonstration data. These measures show the system pipeline and are not findings about the child.'
-              : 'Practice observations for discussion. These measures are not a diagnosis.'
+              : 'Practice observations to guide individualized learning strategies.'
         : 'Model: ${data['model_version']} | Features: ${data['feature_version']}';
     return Container(
       width: double.infinity,

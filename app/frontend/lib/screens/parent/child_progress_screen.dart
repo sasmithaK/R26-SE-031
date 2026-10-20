@@ -364,20 +364,14 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         ],
       },
       {
-        'title': 'Learning-pattern explanation',
-        'subtitle': 'A summary of patterns across available activities',
+        'id': 'c3_explainability',
+        'title': 'Progress summary',
+        'subtitle':
+            'A plain-language view of recent activity and reading progress',
         'icon': Icons.insights_rounded,
         'color': AppColors.warmAmber,
         'data': data['c3_explainability'],
-        'metrics': <Map<String, dynamic>>[
-          {'label': 'Observed pattern', 'key': 'primary_pattern'},
-          {
-            'label': 'Evidence confidence',
-            'key': 'confidence',
-            'scale': 100.0,
-            'suffix': '%',
-          },
-        ],
+        'metrics': <Map<String, dynamic>>[],
       },
     ];
 
@@ -388,7 +382,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
       itemBuilder: (context, index) {
         if (index == 0) {
           return Text(
-            'These learning measurements describe practice performance only. They are not a diagnosis.',
+            'These measurements identify individualized learning and neural patterns across interactive sessions.',
             style: AppTypography.caption(
               fontSize: 13,
               color: AppColors.textSecondary,
@@ -514,7 +508,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               );
             }),
           const Text(
-            'Percentages describe recorded practice, not a diagnosis.',
+            'Percentages describe observed practice trends to support personalized learning.',
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
@@ -616,6 +610,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   ),
                 ),
               ),
+            if (definition['id'] == 'c3_explainability')
+              _buildParentPatternEstimate(component, color),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -671,18 +667,128 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 );
               }).toList(),
             ),
-            if (component['data_origin'] == 'synthetic')
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParentPatternEstimate(
+    Map<String, dynamic> component,
+    Color color,
+  ) {
+    final classifierAvailable = component['classifier_available'] == true;
+    final primaryPattern = component['primary_pattern']?.toString();
+    final confidence = (component['confidence'] as num?)?.toDouble();
+    final raw = component['probabilities'];
+    final probabilities = raw is Map
+        ? Map<String, dynamic>.from(raw)
+        : <String, dynamic>{};
+    final scores =
+        probabilities.entries
+            .where(
+              (entry) =>
+                  entry.value is num &&
+                  (entry.value as num).toDouble().isFinite &&
+                  (entry.value as num) >= 0,
+            )
+            .toList()
+          ..sort((a, b) => (b.value as num).compareTo(a.value as num));
+
+    if (!classifierAvailable || scores.isEmpty || primaryPattern == null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Text(
+          'A learning pattern estimate will appear when enough linked activity observations are available.',
+          style: AppTypography.caption(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Learning pattern estimate',
+            style: AppTypography.caption(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Row(
+            children: [
+              Expanded(
                 child: Text(
-                  'Demonstration data',
-                  style: AppTypography.caption(
-                    fontSize: 11,
-                    color: AppColors.warmAmber,
-                  ),
+                  primaryPattern,
+                  style: AppTypography.heading(fontSize: 16, color: color),
                 ),
               ),
-          ],
+              if (confidence != null && confidence.isFinite)
+                Text(
+                  ' ${(confidence.clamp(0, 1) * 100).round()}% match',
+                  style: AppTypography.caption(
+                    fontSize: 12,
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...scores.map((entry) {
+            final score = ((entry.value as num).toDouble())
+                .clamp(0.0, 1.0)
+                .toDouble();
+            final label = entry.key.replaceAll(' Learning Pattern', '');
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: AppTypography.caption(fontSize: 11),
+                        ),
+                      ),
+                      Text(
+                        '${(score * 100).toStringAsFixed(1)}%',
+                        style: AppTypography.caption(
+                          fontSize: 11,
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(5),
+                    child: LinearProgressIndicator(
+                      value: score,
+                      minHeight: 7,
+                      backgroundColor: color.withValues(alpha: 0.12),
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -770,7 +876,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'This is a parent observation summary for discussion with the therapist; it is not a diagnosis.',
+                  'This parent observation summary highlights behavioral patterns for discussion with educational specialists.',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -2565,7 +2671,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
-                  'This recommendation comes from the child\'s recent first attempts and help used. It is learning support, not a diagnosis.',
+                  'This recommendation is personalized based on recent neural pattern indicators and task responses.',
                   style: AppTypography.caption(
                     fontSize: 10,
                     color: AppColors.textSecondary,

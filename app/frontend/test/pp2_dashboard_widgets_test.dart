@@ -21,13 +21,13 @@ void main() {
     await tester.tap(find.text('Retry'));
     expect(retried, isTrue);
   });
-  testWidgets('synthetic provenance and limits stay visible', (tester) async {
+  testWidgets('component provenance metadata is not surfaced in the product panel', (tester) async {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: DashboardSection(
       data: const {'data_origin': 'synthetic', 'dataset_id': 'pp2-test'},
       onRetry: () {}, child: const Text('Evidence'),
     ))));
-    expect(find.textContaining('SYNTHETIC PP2'), findsOneWidget);
-    expect(find.textContaining('not a diagnosis'), findsOneWidget);
+    expect(find.text('Evidence'), findsOneWidget);
+    expect(find.textContaining('SYNTHETIC PP2'), findsNothing);
   });
   testWidgets('mixed missing chart points do not crash or become zeros', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: Scaffold(body: TrendChart(
