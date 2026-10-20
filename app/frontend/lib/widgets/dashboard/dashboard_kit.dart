@@ -184,6 +184,27 @@ class MetricTile extends StatelessWidget {
     this.tone = DashTone.info,
   });
 
+  /// Numbers stay large; word values ("Not enough rounds") use a smaller
+  /// size, and a single long word scales down instead of breaking mid-word.
+  Widget _value() {
+    final isText = RegExp(r'[A-Za-z]{4,}').hasMatch(value);
+    final text = Text(
+      value,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: DashText.heading(
+        fontSize: isText ? 16 : 19,
+        color: AppColors.textPrimary,
+      ),
+    );
+    if (value.contains(' ')) return text;
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: text,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = dashToneColor(tone);
@@ -203,7 +224,7 @@ class MetricTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(value, style: DashText.heading(fontSize: 19, color: AppColors.textPrimary)),
+                _value(),
                 const SizedBox(height: 2),
                 Text(label, style: DashText.body(fontSize: 13, color: AppColors.textSecondary)),
                 if (detail != null) ...[
@@ -288,6 +309,8 @@ class PercentBar extends StatelessWidget {
   final String? detail;
   final Color color;
   final double? marker; // e.g. the child's own earlier value
+  /// Overrides the "NN%" text, e.g. "6 / 100" for a 0-100 index.
+  final String? valueLabel;
 
   const PercentBar({
     super.key,
@@ -296,6 +319,7 @@ class PercentBar extends StatelessWidget {
     this.detail,
     this.color = AppColors.calmBlue,
     this.marker,
+    this.valueLabel,
   });
 
   @override
@@ -310,7 +334,7 @@ class PercentBar extends StatelessWidget {
             children: [
               Expanded(child: Text(label, style: DashText.body(fontSize: 14))),
               Text(
-                v == null ? DashFormat.missing : '${(v * 100).round()}%',
+                v == null ? DashFormat.missing : (valueLabel ?? '${(v * 100).round()}%'),
                 style: DashText.body(fontSize: 14, fontWeight: FontWeight.w700),
               ),
             ],

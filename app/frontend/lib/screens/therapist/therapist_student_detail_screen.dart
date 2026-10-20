@@ -316,6 +316,7 @@ class _TherapistStudentDetailScreenState
     final usable = DashFormat.number(coverage['usable_recordings'])?.round() ?? 0;
     final sessions = DashFormat.number(coverage['activity_sessions'])?.round() ?? 0;
     final days = coverage['window_days'] ?? 30;
+    final c1 = Map<String, dynamic>.from(overview['c1_window'] as Map? ?? const {});
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
@@ -364,30 +365,44 @@ class _TherapistStudentDetailScreenState
         ),
         DashCard(
           title: 'At a glance',
-          subtitle: 'Latest session; details in each tab',
+          subtitle: _glanceSubtitle(c1),
           child: MetricGrid(
             children: [
               MetricTile(
                 label: 'Correct on first try',
-                value: DashFormat.percent(overview['accuracy']),
+                value: DashFormat.percent(c1['first_attempt_accuracy'] ?? overview['accuracy']),
+                detail: c1['completed_rounds'] != null
+                    ? '${c1['first_try_correct'] ?? 0} of ${c1['completed_rounds']} rounds'
+                    : null,
                 icon: Icons.check_circle_outline_rounded,
                 tone: DashTone.good,
               ),
               MetricTile(
-                label: 'Completed sessions',
-                value: DashFormat.count(overview['completed_sessions']),
+                label: 'Activity sessions',
+                value: DashFormat.count(c1['sessions_started'] ?? overview['completed_sessions']),
+                detail: (DashFormat.number(c1['sessions_ended_early']) ?? 0) > 0
+                    ? '${c1['sessions_ended_early']} ended before a round was finished'
+                    : null,
                 icon: Icons.event_available_outlined,
               ),
               MetricTile(
-                label: 'Within-session fatigue',
+                label: 'Within-session fatigue (latest)',
                 value: (overview['fatigue_status'] ?? DashFormat.missing).toString(),
+                detail: overview['fatigue_state'] == 'INSUFFICIENT_DATA' ||
+                        overview['fatigue_state'] == 'UNAVAILABLE'
+                    ? 'Needs 4+ completed rounds in one session'
+                    : null,
                 icon: Icons.battery_charging_full_rounded,
                 tone: DashTone.watch,
               ),
               MetricTile(
                 label: 'Average mastery estimate',
                 value: DashFormat.percent(overview['overall_mastery']),
-                detail: (overview['reading_fluency_status'] ?? '').toString(),
+                detail: (DashFormat.number(overview['mastery_practised_areas']) ?? 0) > 0
+                    ? 'Over ${overview['mastery_practised_areas']} practised '
+                        'area${overview['mastery_practised_areas'] == 1 ? '' : 's'} · '
+                        '${(overview['reading_fluency_status'] ?? '').toString()}'
+                    : 'No practised areas yet',
                 icon: Icons.insights_outlined,
               ),
             ],
@@ -404,6 +419,11 @@ class _TherapistStudentDetailScreenState
         _buildClinicalReportExportCard(),
       ],
     );
+  }
+
+  String _glanceSubtitle(Map<String, dynamic> c1) {
+    final period = (c1['reporting_period'] ?? 'Last 30 days').toString();
+    return '$period · same numbers as the Activities tab and the parent app';
   }
 
   // ==========================================

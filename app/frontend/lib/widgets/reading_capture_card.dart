@@ -110,7 +110,9 @@ class _ReadingCaptureCardState extends State<ReadingCaptureCard> {
       studentId: studentId,
       sessionId: sessionId,
       eventId: '$sessionId:${canonical.itemId}:speech',
-      attemptId: '$sessionId:${canonical.itemId}:speech:$_attempt',
+      // Unique per recording: the record-start time keeps a re-recording
+      // (or a rebuilt widget) from overwriting an earlier attempt.
+      attemptId: '$sessionId:${canonical.itemId}:speech:$_attempt:$_recordingAt',
       skillId: widget.activity.skillId,
       activityId: widget.activity.id,
       itemId: canonical.itemId,
