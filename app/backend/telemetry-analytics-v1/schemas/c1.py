@@ -114,6 +114,7 @@ class SessionSummary(BaseModel):
     overall: dict
     error_profile: dict
     behavioral_fatigue_proxy: Optional[float]
+    fatigue_state: Optional[str] = None
     fatigue_components: dict
     knowledge_components: dict
     activity_breakdown: dict

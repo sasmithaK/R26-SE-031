@@ -17,8 +17,11 @@ ORTHOGRAPHIC_CONFUSION_MAP = {
     "බ": {"ඩ": "Visual", "භ": "Phonetic", "ට": "Neutral"},
     "ප": {"ය": "Visual", "ඵ": "Phonetic", "ර": "Neutral"},
     "ත": {"න": "Visual", "ථ": "Phonetic", "ල": "Neutral"},
-    # Add more as required by the curriculum
 }
+# NOTE: the map currently covers 3 target letters. Errors on other targets
+# cannot be classified, so the index is reported together with
+# ``orthographic_confusion_coverage`` (share of errors the map could classify)
+# and dashboards hide the index when coverage is 0.
 
 def extract_comp2_features(events: List[Dict[str, Any]]) -> Dict[str, float]:
     """
@@ -34,6 +37,7 @@ def extract_comp2_features(events: List[Dict[str, Any]]) -> Dict[str, float]:
     
     total_errors = 0
     visual_errors = 0
+    classifiable_errors = 0
 
     for event in events:
         touch_stream = event.get("touch_stream", [])
@@ -47,6 +51,8 @@ def extract_comp2_features(events: List[Dict[str, Any]]) -> Dict[str, float]:
         if not event.get("is_correct", True) and target and selected:
             total_errors += 1
             mapping = ORTHOGRAPHIC_CONFUSION_MAP.get(target, {})
+            if selected in mapping:
+                classifiable_errors += 1
             if mapping.get(selected) == "Visual":
                 visual_errors += 1
 
@@ -71,7 +77,10 @@ def extract_comp2_features(events: List[Dict[str, Any]]) -> Dict[str, float]:
         "orthographic_confusion_index": round(oci, 3),
         "path_efficiency_ratio": round(sum(path_eff_list) / len(path_eff_list) if path_eff_list else 1.0, 3),
         "dimensionless_jerk": round(sum(jerk_list) / len(jerk_list) if jerk_list else 0, 2),
-        "mean_dwell_time_ms": round(sum(dwell_time_list) / len(dwell_time_list) if dwell_time_list else 0, 2)
+        "mean_dwell_time_ms": round(sum(dwell_time_list) / len(dwell_time_list) if dwell_time_list else 0, 2),
+        "orthographic_confusion_coverage": round(classifiable_errors / total_errors, 3) if total_errors else None,
+        "first_attempt_error_count": total_errors,
+        "movement_event_count": len(path_eff_list),
     }
 
 def _process_stream(stream: List[Dict[str, Any]], screen_w: int, screen_h: int) -> Tuple[int, int, float, float, float, float]:

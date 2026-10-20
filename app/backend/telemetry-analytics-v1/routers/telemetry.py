@@ -23,9 +23,6 @@ from datetime import datetime, timezone
 from database import get_db
 from dependencies import get_current_user
 from schemas.telemetry import TelemetrySessionSubmit
-from services.ml_pipeline import generate_cognitive_profile, generate_comp2_profile
-from services.ml_engine import CognitiveLoadClassifier
-from services.report_generator import generate_pdf_report
 from services.assessment_report_generator import generate_assessment_report
 from services.behavioral_engine import extract_session_features
 from services.comp2_kinematics import extract_comp2_features
@@ -344,9 +341,10 @@ async def submit_telemetry(
             upsert=True,
         )
 
-    # Assess real-time cognitive load
-    events_list = session_doc.get("events", [])
-    cognitive_load = CognitiveLoadClassifier.classify(events_list)
+    # The response reports C1's own interaction state (see services/c1);
+    # the former heuristic CognitiveLoadClassifier duplicated it with
+    # different, undocumented thresholds and has been removed.
+    cognitive_load = None
 
     # Process & Save C1 State for Therapist/Parent dashboards
     from services.c1.processor import process_session
@@ -372,6 +370,7 @@ async def submit_telemetry(
         model_metadata = predict_c1_pattern(model_features)
         c1_partial["model"] = model_metadata
         await c1_repository.save_c1_state(c1_partial)
+        cognitive_load = (c1_partial.get("interaction_state") or {}).get("state")
         c1_processing = {
             "status": "processed",
             "model_used": model_metadata.get("model_used"),
@@ -494,199 +493,11 @@ async def get_c3_ready_features(
 # GET /telemetry/{student_id}/analytics  — ML Cognitive Profile
 # ---------------------------------------------------------------------------
 
-@router.get("/telemetry/{student_id}/analytics")
-async def get_cognitive_analytics(
-    student_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Run the ML Analytics Pipeline over all telemetry sessions for a student
-    and return a structured cognitive profile including:
-      - 4 cognitive index scores (0-100)
-      - Dyslexia subtype risk classification
-      - Personalized intervention recommendations
-
-    Access is granted to: (a) the owning parent, or (b) a connected specialist.
-    """
-    db = get_db()
-
-    try:
-        student_oid = ObjectId(student_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid student ID format.",
-        )
-
-    # Permission check
-    if current_user.get("role") == "specialist":
-        connection = await db.connections.find_one({
-            "student_id": student_id,
-            "specialist_id": str(current_user["_id"]),
-        })
-        if not connection:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not connected to this student.",
-            )
-    else:
-        student = await db.students.find_one(
-            {"_id": student_oid, "parent_id": current_user["_id"]}
-        )
-        if not student:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Student not found.",
-            )
-
-    # Retrieve up to 500 most recent sessions for the pipeline
-    cursor = db.telemetry_events.find(
-        {"student_id": student_id}
-    ).sort("submitted_at", -1).limit(500)
-    sessions = await cursor.to_list(length=500)
-
-    if not sessions:
-        return {
-            "student_id": student_id,
-            "status": "insufficient_data",
-            "message": "Complete at least one activity to generate a cognitive profile.",
-            "data_points": 0,
-        }
-
-    # Fetch assessment_risk_score
-    comp_results = student.get("comprehensive_assessment_results", {})
-    total_yes = sum(sum(1 for a in ans if a is True) for ans in comp_results.values() if isinstance(ans, list))
-    total_q = sum(len(ans) for ans in comp_results.values() if isinstance(ans, list))
-    # No questionnaire responses is missing screening evidence, not a zero-risk
-    # questionnaire result.
-    assessment_risk_score = (total_yes / total_q) if total_q else None
-
-    # Run ML pipeline
-    profile = generate_cognitive_profile(sessions, assessment_risk_score=assessment_risk_score)
-
-    # Persist / upsert the latest cognitive profile for this student
-    await db.cognitive_profiles.update_one(
-        {"student_id": student_id},
-        {
-            "$set": {
-                **profile,
-                "student_id": student_id,
-                "last_updated": datetime.now(timezone.utc).isoformat(),
-            }
-        },
-        upsert=True,
-    )
-
-    return {
-        "student_id": student_id,
-        "status": "ok",
-        **profile,
-    }
-
-# ---------------------------------------------------------------------------
-# GET /telemetry/{student_id}/comp2  — Component 2 Feature Vector (Integration)
-# ---------------------------------------------------------------------------
-
-@router.get("/telemetry/{student_id}/comp2")
-async def get_comp2_analytics(
-    student_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Returns the Component 2 specific visual-orthographic kinematic feature vector.
-    Used for integration with Component 3 (Fusion Engine).
-    """
-    db = get_db()
-    
-    try:
-        student_oid = ObjectId(student_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid student ID format.",
-        )
-        
-    cursor = db.telemetry_events.find(
-        {"student_id": student_id}
-    ).sort("submitted_at", -1).limit(500)
-    sessions = await cursor.to_list(length=500)
-    
-    if not sessions:
-        return {
-            "student_id": student_id,
-            "status": "insufficient_data",
-            "message": "Complete at least one visual orthographic activity."
-        }
-        
-    comp2_profile = generate_comp2_profile(sessions)
-    
-    return comp2_profile
-
-# ---------------------------------------------------------------------------
-# GET /telemetry/{student_id}/report/pdf  — Clinical PDF Report
-# ---------------------------------------------------------------------------
-
-@router.get("/telemetry/{student_id}/report/pdf")
-async def get_clinical_report_pdf(
-    student_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Generate a formatted clinical PDF report of the student's telemetry and cognitive profile.
-    """
-    db = get_db()
-    
-    try:
-        student_oid = ObjectId(student_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid student ID format.",
-        )
-
-    # Permission check
-    if current_user.get("role") == "specialist":
-        connection = await db.connections.find_one({
-            "student_id": student_id,
-            "specialist_id": str(current_user["_id"]),
-        })
-        if not connection:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not connected to this student.",
-            )
-    else:
-        student = await db.students.find_one(
-            {"_id": student_oid, "parent_id": current_user["_id"]}
-        )
-        if not student:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Student not found.",
-            )
-            
-    # Need student name
-    student_name = student.get("first_name", "Unknown") if 'student' in locals() else "Student"
-    if 'student' not in locals():
-        student = await db.students.find_one({"_id": student_oid})
-        student_name = student.get("first_name", "Unknown") if student else "Unknown"
-        
-    # Get profile
-    profile = await db.cognitive_profiles.find_one({"student_id": student_id})
-    if not profile:
-        raise HTTPException(status_code=404, detail="No cognitive profile found for this student. Complete an activity first.")
-        
-    # Get sessions
-    cursor = db.telemetry_events.find({"student_id": student_id}).sort("submitted_at", -1)
-    sessions = await cursor.to_list(length=500)
-    
-    pdf_bytes = generate_pdf_report(student_name, profile, sessions)
-    
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=Clinical_Report_{student_id}.pdf"}
-    )
+# The legacy "cognitive profile", "comp2 risk" and "clinical PDF" endpoints
+# were removed: they produced dyslexia-risk labels with default values and fed
+# the current 19-feature C1 model with a mismatched feature order. Learner
+# state is served by /api/v1/c1/* and the dashboards; reports are generated by
+# the auth/dashboard service (parent and therapist report endpoints).
 
 # ---------------------------------------------------------------------------
 # GET /telemetry/export/csv  — Data Lake ML Export

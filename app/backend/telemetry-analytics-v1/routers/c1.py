@@ -158,16 +158,3 @@ async def get_skills_breakdown(student_id: str, current_user: dict = Depends(get
 @router.get("/students/{student_id}/performance-tree")
 async def get_performance_tree(student_id: str, current_user: dict = Depends(get_current_user)):
     return await get_skills_breakdown(student_id, current_user)
-
-@router.post("/students/{student_id}/c3-ai-summary")
-async def generate_c3_ai_summary(student_id: str, current_user: dict = Depends(get_current_user)):
-    await require_owned_student(student_id, current_user)
-    states = await c1_repository.get_recent_states(student_id, limit=1)
-    pattern = states[0].get("model", {}).get("predicted_pattern", "TYPICAL") if states else "NO_DATA"
-    confidence = states[0].get("model", {}).get("confidence", 0.0) if states else 0.0
-    return {
-        "student_id": student_id,
-        "predicted_pattern": pattern,
-        "confidence": confidence,
-        "summary": f"Child shows {pattern} behavioral profile based on longitudinal telemetry."
-    }
