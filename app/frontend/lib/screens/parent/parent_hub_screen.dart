@@ -33,6 +33,8 @@ class _ParentHubScreenState extends State<ParentHubScreen>
   String _parentName = '';
   String? _profilePictureUrl;
   List<dynamic> _students = [];
+  int? _sessionsThisWeek;
+  int? _connectedTherapists;
   final Map<String, Future<Map<String, dynamic>>> _childInsightFutures = {};
 
   String get _initials {
@@ -73,6 +75,35 @@ class _ParentHubScreenState extends State<ParentHubScreen>
       });
       _fadeController.forward();
     }
+    _loadQuickStats(students);
+  }
+
+  /// Real counts for the quick-stats row (previously hard-coded 24 and 1).
+  Future<void> _loadQuickStats(List<dynamic> students) async {
+    int? sessions = 0;
+    for (final student in students) {
+      final id = (student is Map ? (student['id'] ?? student['_id'] ?? student['student_id']) : null)?.toString();
+      if (id == null) continue;
+      try {
+        final history = await ParentDashboardService().getActivityHistory(id, 'days=7&limit=50');
+        sessions = (sessions ?? 0) + ((history['history'] as List<dynamic>?)?.length ?? 0);
+      } catch (_) {
+        sessions = null;
+        break;
+      }
+    }
+    int? therapists;
+    try {
+      final connections = await AuthService().getConnections();
+      therapists = connections.length;
+    } catch (_) {
+      therapists = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _sessionsThisWeek = sessions;
+      _connectedTherapists = therapists;
+    });
   }
 
   @override
@@ -162,7 +193,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
               children: [
                 Text(
                   LocalizationService.instance.t('parent_hub'),
-                  style: AppTypography.caption(
+                  style: DashText.caption(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.calmBlue,
@@ -171,7 +202,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                 const SizedBox(height: 2),
                 Text(
                   '${LocalizationService.instance.t('hello_parent')}, $_parentName!',
-                  style: AppTypography.heading(
+                  style: DashText.heading(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -217,7 +248,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                   ? Center(
                       child: Text(
                         _initials,
-                        style: AppTypography.heading(
+                        style: DashText.heading(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
@@ -234,10 +265,9 @@ class _ParentHubScreenState extends State<ParentHubScreen>
 
   // ─── Quick Stats Row ───
   Widget _buildQuickStats() {
-    // Mock data for now
     final int totalChildren = _students.length;
-    const int weeklyActivities = 24;
-    const int connectedTherapists = 1;
+    final String weeklyActivities = _sessionsThisWeek?.toString() ?? '—';
+    final String connectedTherapists = _connectedTherapists?.toString() ?? '—';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -252,14 +282,14 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           const SizedBox(width: 12),
           _buildStatCard(
             icon: FontAwesomeIcons.gamepad,
-            value: '$weeklyActivities',
+            value: weeklyActivities,
             label: LocalizationService.instance.t('this_week'),
             color: AppColors.gentleGreen,
           ),
           const SizedBox(width: 12),
           _buildStatCard(
             icon: FontAwesomeIcons.link,
-            value: '$connectedTherapists',
+            value: connectedTherapists,
             label: LocalizationService.instance.t('connected'),
             color: AppColors.warmAmber,
           ),
@@ -303,7 +333,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
             const SizedBox(height: 10),
             Text(
               value,
-              style: AppTypography.heading(
+              style: DashText.heading(
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
@@ -312,7 +342,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
             const SizedBox(height: 2),
             Text(
               label,
-              style: AppTypography.caption(
+              style: DashText.caption(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
@@ -430,7 +460,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                       const SizedBox(height: 10),
                       Text(
                         item['label'] as String,
-                        style: AppTypography.caption(
+                        style: DashText.caption(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: color,
@@ -456,7 +486,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
         children: [
           Text(
             LocalizationService.instance.t('your_children'),
-            style: AppTypography.heading(
+            style: DashText.heading(
               fontSize: 20,
               fontWeight: FontWeight.w700,
               color: AppColors.calmBlue,
@@ -493,7 +523,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           const SizedBox(height: 16),
           Text(
             LocalizationService.instance.t('no_students_yet'),
-            style: AppTypography.heading(
+            style: DashText.heading(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppColors.textSecondary,
@@ -502,7 +532,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           const SizedBox(height: 8),
           Text(
             LocalizationService.instance.t('add_student_settings_hint'),
-            style: AppTypography.caption(
+            style: DashText.caption(
               fontSize: 14,
               color: AppColors.textHint,
             ),
@@ -531,7 +561,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           children: [
             Text(
               LocalizationService.instance.t('select_a_child'),
-              style: AppTypography.heading(
+              style: DashText.heading(
                 fontSize: 20,
                 color: AppColors.calmBlue,
               ),
@@ -561,7 +591,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                 ),
                 title: Text(
                   s['first_name'] ?? 'student',
-                  style: AppTypography.body(fontWeight: FontWeight.w700),
+                  style: DashText.body(fontWeight: FontWeight.w700),
                 ),
                 trailing: const FaIcon(FontAwesomeIcons.chevronRight, size: 16),
                 onTap: () {
@@ -701,7 +731,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                             name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: AppTypography.heading(
+                            style: DashText.heading(
                               fontSize: 19,
                               color: AppColors.textPrimary,
                             ),
@@ -712,7 +742,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                                     'grade_1'
                                 ? LocalizationService.instance.t('grade_1')
                                 : grade,
-                            style: AppTypography.caption(
+                            style: DashText.caption(
                               fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
@@ -744,8 +774,8 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                                 statusText,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: AppTypography.caption(
-                                  fontSize: 10,
+                                style: DashText.caption(
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: statusColor,
                                 ),
@@ -784,7 +814,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                   Text(
                     '$completed completed learning tasks'
                     '${activitiesTried > 0 ? ' across $activitiesTried activities' : ''}.',
-                    style: AppTypography.body(
+                    style: DashText.body(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary,
@@ -878,7 +908,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                       Expanded(
                         child: Text(
                           'View learning summary',
-                          style: AppTypography.body(
+                          style: DashText.body(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: AppColors.calmBlueDark,
@@ -935,15 +965,15 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           const SizedBox(height: 5),
           Text(
             '$value',
-            style: AppTypography.heading(fontSize: 20, color: color),
+            style: DashText.heading(fontSize: 20, color: color),
           ),
           const SizedBox(height: 3),
           Text(
             label,
             textAlign: TextAlign.center,
             maxLines: 2,
-            style: AppTypography.caption(
-              fontSize: 10,
+            style: DashText.caption(
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               color: AppColors.textSecondary,
             ).copyWith(height: 1.2),
@@ -988,8 +1018,8 @@ class _ParentHubScreenState extends State<ParentHubScreen>
               children: [
                 Text(
                   eyebrow,
-                  style: AppTypography.caption(
-                    fontSize: 9,
+                  style: DashText.caption(
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: color,
                   ).copyWith(letterSpacing: 0.8),
@@ -999,7 +1029,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.body(
+                  style: DashText.body(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
@@ -1010,8 +1040,8 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                   detail,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.caption(
-                    fontSize: 11,
+                  style: DashText.caption(
+                    fontSize: 12,
                     color: AppColors.textSecondary,
                   ).copyWith(height: 1.35),
                 ),
@@ -1047,7 +1077,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
               children: [
                 Text(
                   title,
-                  style: AppTypography.body(
+                  style: DashText.body(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -1056,8 +1086,8 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: AppTypography.caption(
-                    fontSize: 11,
+                  style: DashText.caption(
+                    fontSize: 12,
                     color: AppColors.textSecondary,
                   ).copyWith(height: 1.35),
                 ),
