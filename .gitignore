@@ -123,3 +123,6 @@ migrate_working_dir/
 **/generated_plugins.cmake
 
 /test-sample-data
+
+# Local LLM / Claude generator backups
+Claude outputs/
