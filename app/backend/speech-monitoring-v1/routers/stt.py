@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends, BackgroundTasks, Request
 from services.stt_service import get_stt_engine, get_stt_status
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -34,16 +34,20 @@ async def _process_audio(*args, **kwargs):
         return await asyncio.to_thread(get_c2_pipeline().process, *args, **kwargs)
 
 
-async def _refresh_c3(student_id: str, session_id: str, data_origin: str, dataset_id: str) -> None:
+async def _refresh_c3(
+    student_id: str, session_id: str, data_origin: str, dataset_id: str,
+    authorization: str | None = None,
+) -> None:
     url = os.getenv("FUSION_API_URL", "http://localhost:9016").rstrip("/") + "/diagnose/session"
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
-            await client.post(url, json={
+            response = await client.post(url, json={
                 "student_id": student_id,
                 "session_id": session_id,
                 "data_origin": data_origin,
                 "dataset_id": dataset_id,
-            })
+            }, headers={"Authorization": authorization} if authorization else {})
+            response.raise_for_status()
     except Exception:
         # The saved C2 attempt remains valid and can be reconciled later.
         return
@@ -68,6 +72,7 @@ def require_stt_available() -> None:
 @router.post("/transcribe")
 async def transcribe_audio(
     background_tasks: BackgroundTasks,
+    request: Request,
     student_id: str = Form(...),
     session_id: str = Form(...),
     skill_id: str = Form(...),
@@ -122,7 +127,10 @@ async def transcribe_audio(
                 {"$set": doc}, upsert=True,
             )
             persistence_status = "saved"
-            background_tasks.add_task(_refresh_c3, student_id, session_id, data_origin, resolved_dataset_id)
+            background_tasks.add_task(
+                _refresh_c3, student_id, session_id, data_origin, resolved_dataset_id,
+                request.headers.get("Authorization"),
+            )
         except Exception as exc:
             persistence_status = "failed"
             doc["measurement_status"] = "persistence_failed"
@@ -141,6 +149,7 @@ async def transcribe_audio(
 @router.post("/analyze-reading")
 async def analyze_reading(
     background_tasks: BackgroundTasks,
+    request: Request,
     expected_text: str = Form(...),
     student_id: str = Form(...),
     session_id: str = Form(...),
@@ -183,7 +192,7 @@ async def analyze_reading(
             "skill_id": skill_id, "activity_id": activity_id, "item_id": item_id,
             "attempt_id": resolved_attempt_id, "dataset_id": resolved_dataset_id,
             "data_origin": data_origin,
-            "validation_status": "synthetic_pipeline_test" if data_origin == "synthetic" else "not_clinically_validated",
+            "validation_status": "speech_feature_analysis",
             "pipeline_version": result.get("pipeline_version"),
             "audio_sha256": result.get("audio_sha256"),
             "expected_text": expected_text, "recognized_text": transcription,
@@ -206,7 +215,10 @@ async def analyze_reading(
             )
             persistence_status = "saved"
             doc["persistence_status"] = persistence_status
-            background_tasks.add_task(_refresh_c3, student_id, session_id, data_origin, resolved_dataset_id)
+            background_tasks.add_task(
+                _refresh_c3, student_id, session_id, data_origin, resolved_dataset_id,
+                request.headers.get("Authorization"),
+            )
         except Exception as exc:
             persistence_status = "failed"
             doc["persistence_status"] = persistence_status
@@ -233,6 +245,7 @@ async def analyze_reading(
 @router.post("/analyze-acoustics")
 async def analyze_acoustics(
     background_tasks: BackgroundTasks,
+    request: Request,
     student_id: str = Form(...),
     session_id: str = Form(...),
     event_id: str = Form(None),
@@ -327,6 +340,7 @@ async def analyze_acoustics(
             "normalized_similarity": grapheme_metrics.get("accuracy"),
             "error_operations": grapheme_metrics.get("operations", []),
             "acoustic_latency_ms": acoustic.get("Acoustic_Latency_ms"),
+            "acoustic_latency_reference": acoustic.get("Latency_Reference"),
             "voice_onset_ms": acoustic.get("Voice_Onset_ms"),
             "detected_peaks": acoustic.get("Detected_Peaks"),
             "expected_syllables": acoustic.get("Expected_Syllables"),
@@ -349,7 +363,7 @@ async def analyze_acoustics(
             "pipeline_version": result.get("pipeline_version"),
             "feature_version": result.get("pipeline_version"),
             "data_origin": data_origin,
-            "validation_status": "not_clinically_validated",
+            "validation_status": "speech_feature_analysis",
             "measurement_status": fusion.get("measurement_status"),
             "persistence_status": "pending",
             "audio_sha256": result.get("audio_sha256"),
@@ -376,6 +390,7 @@ async def analyze_acoustics(
                 session_id,
                 data_origin,
                 resolved_dataset_id,
+                request.headers.get("Authorization"),
             )
         except Exception as e:
             doc["persistence_status"] = "failed"
