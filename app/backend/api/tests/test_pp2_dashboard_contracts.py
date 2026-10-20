@@ -112,7 +112,10 @@ class DashboardTests(unittest.TestCase):
         self.db.session_summaries.rows=[self.session(i) for i in range(12)]
         dto=self.call(therapist.get_therapist_c1_behavioral,STUDENT)
         self.assertTrue(dto.updated_at.endswith('Z'));self.assertEqual(len(dto.trends.accuracy),10)
-        self.assertEqual(dto.trends.accuracy[0],{'session':'session-2','value':.75})
+        point=dto.trends.accuracy[0]
+        self.assertEqual((point['session'],point['value']),('session-2',.75))
+        # Charts are labelled by session number and date, never by a UUID.
+        self.assertTrue(point['label'].startswith('S1'))
         self.assertEqual(dto.trends.accuracy[-1]['session'],'session-11')
     def test_missing_values_remain_null_not_perfect_speech_or_confidence(self):
         c2=self.call(therapist.get_therapist_c2_speech,STUDENT);c3=self.call(therapist.get_therapist_c3_profile,STUDENT)
@@ -692,12 +695,12 @@ class DashboardTests(unittest.TestCase):
         self.assertTrue(result['c1_behavioral']['available']);self.assertTrue(result['c2_speech']['available'])
         self.assertFalse(result['c3_explainability']['available'])
         self.assertFalse(result['c3_explainability']['classifier_available'])
-        self.assertIsNone(result['c3_explainability']['primary_pattern'])
-        self.assertEqual(result['c3_explainability']['probabilities'], {})
+        self.assertNotIn('primary_pattern', result['c3_explainability'])
+        self.assertFalse(result['c3_explainability']['classifier_available'])
         self.assertEqual(result['c4_adaptive']['average_mastery'],.7)
         self.assertEqual(result['c4_adaptive']['supported_decision_rate'],1.0)
 
-    def test_parent_component_analytics_exposes_stored_classifier_scores(self):
+    def test_parent_component_analytics_hides_classifier_scores(self):
         self.db.learner_profiles.rows=[{
             'student_id':STUDENT,
             'learner_profile':{
@@ -714,10 +717,10 @@ class DashboardTests(unittest.TestCase):
         }]
         result=self.call(parent.get_parent_component_analytics,STUDENT)
         c3=result['c3_explainability']
-        self.assertTrue(c3['classifier_available'])
-        self.assertEqual(c3['primary_pattern'],'Phonological')
-        self.assertEqual(c3['confidence'],.74)
-        self.assertEqual(c3['probabilities']['Phonological'],.74)
+        # Pattern names and probabilities are for professionals only.
+        self.assertFalse(c3['classifier_available'])
+        for key in ('primary_pattern','probabilities','confidence'):
+            self.assertNotIn(key,c3)
         self.assertEqual(c3['data_origin'],'synthetic')
     def test_parent_empty_is_not_a_fabricated_progress_point(self):
         self.assertEqual(self.call(parent.get_parent_progress,STUDENT).accuracy_trend,[])

@@ -9,7 +9,13 @@ from services.dashboard_access import require_dashboard_access
 from services.dashboard_data import (ACTIVITY_NAMES, KC_NAMES, SKILL_NAMES,
                                      number, timestamp, records, mlbase, speech,
                                      pattern_profile, mastery_status,
-                                     research_evidence, activity_performance)
+                                     research_evidence, activity_performance,
+                                     setting, in_window, session_point, weighted_overall,
+                                     kc_breakdown, error_breakdown, fatigue_view,
+                                     shap_phrase, learner_coverage, window_or_latest, learner_alerts,
+                                     public_coverage, activity_label, stamp,
+                                     USABLE_SPEECH_STATUSES)
+from dependencies import get_current_user
 
 router = APIRouter(prefix="/api/v1/therapist/students", tags=["Therapist Dashboard"],
                    dependencies=[Depends(require_dashboard_access)])
@@ -269,20 +275,32 @@ async def get_therapist_activity_performance(
     """Detailed, per-skill activity summary aligned across touch and speech records."""
     return await activity_performance(get_db(), student_id, days, skill_id, limit)
 
+def _window_days(days):
+    # Direct (non-HTTP) calls pass FastAPI's Query default object.
+    return days if isinstance(days, int) else setting("default_window_days", default=30)
+
+
+async def _latest_profile(db, student_id):
+    """Prefer the learner-window C3 profile over legacy per-session rows."""
+    rows = await records(db, "learner_profiles", student_id, 20)
+    window = [row for row in rows if row.get("feature_version") == "c3-learner-window-v1"]
+    return (window or rows or [{}])[0]
+
+
 @router.get("/{student_id}/overview", response_model=TherapistOverviewDTO)
 async def get_therapist_overview(student_id: str):
     db = get_db()
     summaries = await records(db, "session_summaries", student_id)
     speeches = await records(db, "speech_features", student_id, 1)
-    profiles = await records(db, "learner_profiles", student_id, 1)
+    profile_doc = await _latest_profile(db, student_id)
     states = await records(db, "knowledge_states", student_id, 1)
     decisions = await records(db, "adaptive_decisions", student_id, 1)
     latest = summaries[0] if summaries else {}
     values = [number(v) for v in (states[0].get("knowledge_state", {}) if states else {}).values()]
     values = [v for v in values if v is not None]
     mastery = sum(values)/len(values) if values else None
-    profile, _, pattern = pattern_profile(profiles[0] if profiles else {})
-    fatigue = number(latest.get("behavioral_fatigue_proxy"))
+    profile, _, pattern = pattern_profile(profile_doc)
+    fatigue = fatigue_view(latest) if latest else {"score": None, "state": "UNAVAILABLE"}
     from bson import ObjectId
     student_doc = None
     try:
@@ -310,13 +328,18 @@ async def get_therapist_overview(student_id: str):
         except Exception:
             pass
 
+    coverage = await learner_coverage(db, student_id, student_doc or {})
+    alerts = learner_alerts(coverage)
+    fatigue_text = ("Unavailable" if fatigue["score"] is None
+                    else f"{fatigue['state'].replace('_', ' ').title()} ({fatigue['score']:.2f})")
+
     return TherapistOverviewDTO(**mlbase(student_id, latest, "descriptive + BKT/IRT", "c1-v2"),
         accuracy=number((latest.get("overall") or {}).get("accuracy")), attempted_items=latest.get("total_trials", 0),
         completed_sessions=len([x for x in session_ids if x]), reading_fluency_status=mastery_status(mastery),
         overall_mastery=mastery, current_pattern=pattern, pattern_confidence=number(profile.get("confidence")),
-        fatigue_status="Unavailable" if fatigue is None else f"Proxy {fatigue:.2f} (not a diagnosis)",
-        last_active=timestamp(latest), c1_available=bool(summaries), c2_available=bool(speeches),
-        c3_available=bool(profiles), c4_available=bool(states),
+        fatigue_status=fatigue_text, fatigue_state=fatigue["state"],
+        last_active=coverage.get("last_active_at") or timestamp(latest), c1_available=bool(summaries), c2_available=bool(speeches),
+        c3_available=bool(profile_doc.get("model_applied")), c4_available=bool(states),
         latest_recommendation=decisions[0].get("decision_reason") if decisions else None,
         assessment_results=assessment_results,
         comprehensive_assessment_results=comprehensive_assessment_results,
@@ -327,65 +350,219 @@ async def get_therapist_overview(student_id: str):
         grade=grade,
         age=age,
         avatar_url=avatar_url,
-        parent_name=parent_name)
+        parent_name=parent_name,
+        birth_year=(student_doc or {}).get("birth_year"),
+        birth_month=(student_doc or {}).get("birth_month"),
+        gender=(student_doc or {}).get("gender"),
+        coverage=public_coverage(coverage),
+        alerts=alerts)
+
+
+def _c1_state_view(states):
+    """Latest C1 learner state (indices, states, model estimate) + baseline."""
+    if not states:
+        return {}
+    latest, first = states[0], states[-1]
+    model = latest.get("model") or {}
+    def indices(row):
+        return {k: number(v) for k, v in (row.get("indices") or {}).items()}
+    return {
+        "session_id": latest.get("session_id"),
+        "updated_at": timestamp(latest) or stamp(getattr(latest.get("_id"), "generation_time", None)),
+        "indices": indices(latest),
+        "baseline_indices": indices(first) if len(states) > 1 else {},
+        "fatigue": latest.get("fatigue") or {},
+        "interaction_state": latest.get("interaction_state") or {},
+        "quality": latest.get("quality") or {},
+        "pattern_estimate": {
+            "available": model.get("model_used") == "trained_random_forest_model",
+            "predicted_pattern": model.get("predicted_pattern"),
+            "probabilities": model.get("probabilities") or {},
+            "confidence": number(model.get("confidence")),
+            "model_version": model.get("model_version"),
+            "provenance": model.get("model_provenance") or "synthetic_only",
+            "unavailable_reason": model.get("unavailable_reason"),
+            "missing_features": model.get("missing_features") or [],
+            "label": "Model estimate from synthetic training - for professional review, not a diagnosis.",
+        },
+        "sessions_with_state": len(states),
+    }
+
+
+def _kinematics_view(rows):
+    """Median touch-movement features over the window (drag paths only)."""
+    def median(key, *alts):
+        values = []
+        for row in rows:
+            for name in (key, *alts):
+                value = number(row.get(name))
+                if value is not None:
+                    values.append(value)
+                    break
+        if not values:
+            return None
+        values.sort()
+        mid = len(values) // 2
+        return values[mid] if len(values) % 2 else (values[mid - 1] + values[mid]) / 2
+    coverage = [number(r.get("orthographic_confusion_coverage")) for r in rows]
+    coverage = [c for c in coverage if c is not None]
+    return {
+        "sessions": len(rows),
+        "time_to_first_touch_ms": median("time_to_first_touch_ms"),
+        "dwell_time_ms": median("dwell_time_ms", "mean_dwell_time_ms"),
+        "path_efficiency_ratio": median("path_efficiency_ratio"),
+        "dimensionless_jerk": median("dimensionless_jerk"),
+        "orthographic_confusion_index": median("orthographic_confusion_index") if any(c > 0 for c in coverage) else None,
+        "orthographic_confusion_note": (
+            None if any(c > 0 for c in coverage)
+            else "Letter-confusion index not shown: the confusion map did not cover the letters this child got wrong."
+        ),
+    }
+
 
 @router.get("/{student_id}/c1-behavioral", response_model=TherapistC1BehavioralDTO)
-async def get_therapist_c1_behavioral(student_id: str):
-    history = (await records(get_db(), "session_summaries", student_id))[:10]
+async def get_therapist_c1_behavioral(student_id: str, days: Optional[int] = Query(None, ge=1, le=365)):
+    db = get_db()
+    days = _window_days(days)
+    all_rows = await records(db, "session_summaries", student_id)
+    history, period = window_or_latest(all_rows, days)
     latest = history[0] if history else {}
-    overall, errors, kcs = latest.get("overall") or {}, latest.get("error_profile") or {}, latest.get("knowledge_components") or {}
-    def trend(field, fatigue=False):
-        return [{"session": row.get("session_id"), "value": number(row.get("behavioral_fatigue_proxy") if fatigue else (row.get("overall") or {}).get(field))} for row in reversed(history)]
-    has_errors = (number(overall.get("error_rate")) or 0) > 0
-    return TherapistC1BehavioralDTO(**mlbase(student_id, latest, "descriptive", "c1-v2"), session_id=latest.get("session_id"),
-        first_attempt_accuracy=number(overall.get("accuracy")), median_response_latency_ms=number(overall.get("median_response_latency_ms")),
-        retry_rate=number(overall.get("retry_rate")), mean_attempts_per_round=number(overall.get("mean_attempts_per_round")),
-        median_time_to_correct_ms=number(overall.get("median_time_to_correct_ms")), correction_rate=number(overall.get("correction_rate")),
-        behavioral_fatigue_proxy=number(latest.get("behavioral_fatigue_proxy")),
-        kc_performance={kc:number((kcs.get(kc) or {}).get("accuracy")) for kc in KC_NAMES},
-        error_distribution={k:number(errors.get(k+"_rate")) if has_errors else None for k in ("visual_confusion", "phonological_confusion", "sequence_error", "unknown_error")},
-        trends=dict(accuracy=trend("accuracy"), latency=trend("median_response_latency_ms"), fatigue=trend("", True)))
+    trend_rows = list(reversed(history[: setting("limits", "trend_sessions", default=12)]))
+    def trend(field=None, fatigue=False):
+        points = []
+        for index, row in enumerate(trend_rows, start=1):
+            value = fatigue_view(row)["score"] if fatigue else number((row.get("overall") or {}).get(field))
+            points.append(session_point(row, index, value))
+        return points
+    errors = error_breakdown(history)
+    shares = {c["key"]: c["share"] for c in errors["categories"]}
+    kcs = kc_breakdown(history)
+    states = in_window(await records(db, "behavioral_features", student_id, 100), days)
+    states = states or (await records(db, "behavioral_features", student_id, 1))
+    index_trend = []
+    for index, row in enumerate(reversed(states[: setting("limits", "trend_sessions", default=12)]), start=1):
+        point = session_point(row, index, None)
+        point.update({k: number(v) for k, v in (row.get("indices") or {}).items()})
+        index_trend.append(point)
+    motion = in_window(await records(db, "kinematic_features", student_id, 100), days)
+    fatigue = fatigue_view(latest) if latest else {"score": None, "state": "UNAVAILABLE"}
+    return TherapistC1BehavioralDTO(**{**mlbase(student_id, latest, "descriptive", "c1-v2"),
+                                       "reporting_period": period},
+        session_id=latest.get("session_id"),
+        first_attempt_accuracy=weighted_overall(history, "accuracy"),
+        median_response_latency_ms=weighted_overall(history, "median_response_latency_ms"),
+        retry_rate=weighted_overall(history, "retry_rate"),
+        mean_attempts_per_round=weighted_overall(history, "mean_attempts_per_round"),
+        median_time_to_correct_ms=weighted_overall(history, "median_time_to_correct_ms"),
+        correction_rate=weighted_overall(history, "correction_rate"),
+        behavioral_fatigue_proxy=fatigue["score"], fatigue_state=fatigue["state"],
+        kc_performance={row["kc_id"]: row["accuracy"] for row in kcs if row["kc_id"] in KC_NAMES},
+        error_distribution={k: (shares.get(k) if errors["total_errors"] else None)
+                            for k in ("visual_confusion", "visual_task_error", "phonological_confusion", "sequence_error", "unknown_error")},
+        trends=dict(accuracy=trend("accuracy"), latency=trend("median_response_latency_ms"), fatigue=trend(fatigue=True)),
+        window_days=days, session_count=len(history),
+        total_trials=sum(int(r.get("total_trials") or 0) for r in history),
+        kc_breakdown=kcs, error_breakdown=errors,
+        c1_state=_c1_state_view(states), kinematics=_kinematics_view(motion),
+        index_trend=index_trend)
+
+
+def _speech_item(row):
+    values = speech(row)
+    labels = activity_label(row.get("skill_id"), row.get("activity_id"), row.get("activity_name"))
+    alignment = row.get("alignment") or {}
+    operations = (alignment.get("word") or {}).get("operations") or []
+    return {
+        "item_id": row.get("item_id"),
+        "activity": labels["activity_display"],
+        "recorded_at": timestamp(row),
+        "expected_text": values["expected_text"],
+        "recognized_text": values["transcription"],
+        "grapheme_accuracy": values["grapheme_accuracy"],
+        "word_accuracy": values["word_accuracy"],
+        "reading_score": values["reading_performance_score"],
+        "confidence": values["combined_confidence"],
+        "status": values["measurement_status"],
+        "quality_issues": values["quality_issues"],
+        "word_operations": [
+            {"op": op.get("operation"), "expected": op.get("expected"), "observed": op.get("observed")}
+            for op in operations[:40] if isinstance(op, dict)
+        ],
+    }
+
 
 @router.get("/{student_id}/c2-speech", response_model=TherapistC2SpeechDTO)
-async def get_therapist_c2_speech(student_id: str):
-    history = (await records(get_db(), "speech_features", student_id))[:10]
+async def get_therapist_c2_speech(student_id: str, days: Optional[int] = Query(None, ge=1, le=365)):
+    days = _window_days(days)
+    all_rows = await records(get_db(), "speech_features", student_id)
+    history, period = window_or_latest(all_rows, days, fallback=20)
     latest = history[0] if history else {}
-    usable = sum(1 for row in history if row.get("measurement_status") in {"valid", "available", "synthetic_features"})
+    usable_rows = [row for row in history if row.get("measurement_status") in USABLE_SPEECH_STATUSES]
+    issues = {}
+    for row in history:
+        for issue in speech(row)["quality_issues"]:
+            issues[issue] = issues.get(issue, 0) + 1
+    recent = history[:10]
     def trend(key):
-        return [{"session":row.get("session_id"),"value":speech(row)[key]} for row in reversed(history)]
-    return TherapistC2SpeechDTO(**mlbase(student_id, latest, "speech analysis", "c2-pipeline-v3"), recording_count=len(history), usable_recording_count=usable, latest=speech(latest),
-        trends=dict(accuracy=trend("word_accuracy"), wer=trend("wer"), latency=trend("acoustic_latency_ms"), silence_ratio=trend("silence_ratio"), peak_delta=trend("peak_delta")))
+        return [{"session": row.get("session_id"), "value": speech(row)[key], "date": timestamp(row)} for row in reversed(recent)]
+    # Per-session medians make different sentences comparable over time.
+    sessions = {}
+    for row in usable_rows:
+        sessions.setdefault(row.get("session_id") or timestamp(row), []).append(row)
+    def med(values):
+        values = sorted(v for v in values if v is not None)
+        if not values:
+            return None
+        mid = len(values) // 2
+        return values[mid] if len(values) % 2 else (values[mid - 1] + values[mid]) / 2
+    session_trend = []
+    ordered = sorted(sessions.items(), key=lambda kv: min(timestamp(r) or "" for r in kv[1]))
+    for index, (sid, rows) in enumerate(ordered, start=1):
+        point = session_point(rows[-1], index, None)
+        point.update({
+            "items": len(rows),
+            "grapheme_accuracy": med([speech(r)["grapheme_accuracy"] for r in rows]),
+            "word_accuracy": med([speech(r)["word_accuracy"] for r in rows]),
+            "reading_score": med([speech(r)["reading_performance_score"] for r in rows]),
+            "voice_onset_ms": med([speech(r)["voice_onset_ms"] for r in rows]),
+            "pause_ratio": med([speech(r)["pause_ratio"] for r in rows]),
+        })
+        session_trend.append(point)
+    latest_view = speech(latest)
+    latest_view.update({"item_id": latest.get("item_id"), "recorded_at": timestamp(latest)})
+    return TherapistC2SpeechDTO(**{**mlbase(student_id, latest, "speech analysis", "c2-pipeline-v3"),
+                                   "reporting_period": period.replace("sessions", "recordings")},
+        recording_count=len(history), usable_recording_count=len(usable_rows), latest=latest_view,
+        trends=dict(accuracy=trend("word_accuracy"), wer=trend("wer"), latency=trend("voice_onset_ms"),
+                    silence_ratio=trend("silence_ratio"), peak_delta=trend("peak_delta")),
+        window_days=days,
+        usable_recording_rate=(len(usable_rows) / len(history)) if history else None,
+        quality_issue_counts=issues,
+        items=[_speech_item(row) for row in history[: setting("limits", "speech_items", default=20)]],
+        session_trend=session_trend[-setting("limits", "trend_sessions", default=12):])
+
 
 @router.get("/{student_id}/c3-profile", response_model=TherapistC3ProfileDTO)
 async def get_therapist_c3_profile(student_id: str):
     db = get_db()
-    rows = await records(db, "learner_profiles", student_id, 1)
+    doc = await _latest_profile(db, student_id)
+    rows = [doc] if doc else []
     audit_rows = await records(db, "model_audit_log", student_id, 20)
-    audit = next(
-        (row for row in audit_rows if row.get("model_name") == "XGBoost"),
-        {},
-    )
-    doc = rows[0] if rows else {}
+    audit = next((row for row in audit_rows if row.get("model_name") == "XGBoost"), {})
     profile, probs, pattern = pattern_profile(doc)
     evidence = doc.get("evidence_summary") or {}
-    c1_evidence = evidence.get("c1") or {}
-    c2_evidence = evidence.get("c2") or {}
-    summary_parts = []
-    if number(c1_evidence.get("first_attempt_accuracy")) is not None:
-        summary_parts.append(f"Recent activity responses were correct on {round(number(c1_evidence['first_attempt_accuracy'])*100)}% of first attempts.")
-    if number(c2_evidence.get("word_accuracy")) is not None:
-        summary_parts.append(f"The latest reading sample matched {round(number(c2_evidence['word_accuracy'])*100)}% of expected words and letters.")
-    summary_text = doc.get("llm_summary") or " ".join(summary_parts) or "More activity and reading observations are needed before a combined summary is available."
+    window = doc.get("evidence_window") or {}
+    summary_text = doc.get("llm_summary") or "More activity and reading observations are needed before a combined summary is available."
     recommendation_text = doc.get("llm_recommendations") or "Review repeated attempts and reading samples across several activities over time."
-    pipeline_status = doc.get("pipeline_status") or audit.get("status") or ("profile_available" if rows else "not_run")
+    pipeline_status = doc.get("pipeline_status") or audit.get("status") or "not_run"
     missing_inputs = list(doc.get("missing_inputs") or audit.get("missing_features") or [])
     skip_reason = None
-    if not rows and pipeline_status == "skipped_missing_inputs":
-        skip_reason = "Some recent practice information is unavailable, so a learning summary is not ready yet."
-    elif not rows:
-        skip_reason = "More activity observations are needed before a learning summary can be shown."
+    if not doc.get("model_applied"):
+        skip_reason = ("The combined estimate is not ready yet. Still needed: " + "; ".join(missing_inputs) + ".") if missing_inputs \
+            else "The combined estimate is not ready yet: more activity and reading observations are needed."
     metadata = mlbase(student_id, doc or audit, "XGBoost", "c3-fusion-v1")
-    metadata["available"] = bool(rows)
+    metadata["available"] = bool(doc)
+    metadata["validation_status"] = "synthetic_trained_model"
 
     shap_list = []
     raw_shap = doc.get("shap_explanations") or {}
@@ -393,33 +570,60 @@ async def get_therapist_c3_profile(student_id: str):
     for item in top_features:
         if isinstance(item, dict):
             feat = item.get("feature") or item.get("feature_name") or "Unknown"
-            val = number(item.get("value") or item.get("observed_value"))
+            val = number(item.get("value") if item.get("value") is not None else item.get("observed_value"))
             raw_contrib = item.get("contribution") or item.get("shap_val") or item.get("shap_impact")
             try:
                 contrib = float(str(raw_contrib).replace("+", ""))
             except Exception:
                 contrib = 0.0
-            direction = item.get("direction") or ("positive" if contrib > 0 else "negative")
             shap_list.append(ShapExplanation(
-                feature=feat,
-                contribution=contrib,
-                observed_value=val,
-                direction=direction
+                feature=feat, contribution=contrib, observed_value=val,
+                direction=item.get("direction") or ("positive" if contrib > 0 else "negative"),
+                plain_text=shap_phrase(feat, contrib, val),
             ))
 
-    classifier_available = bool(probs) and pattern != "Unavailable"
-    primary_pattern = pattern if classifier_available else ("Activity summary" if rows else "Unavailable")
-    confidence = number(profile.get("confidence"))
-    modalities_used = profile.get("modalities_used") or (["learning activities"] if rows else [])
+    classifier_available = bool(probs) and pattern != "Unavailable" and bool(doc.get("model_applied", True))
+    ranked = sorted(probs.values(), reverse=True)
+    low_agreement = len(ranked) > 1 and (ranked[0] - ranked[1]) < setting("c3", "low_agreement_gap", default=0.15)
+
+    from bson import ObjectId
+    student = {}
+    try:
+        student = await db.students.find_one({"_id": ObjectId(student_id)}) or {}
+    except Exception:
+        pass
+    questionnaire = student.get("comprehensive_assessment_results") or {}
+    sections_done = len([v for v in questionnaire.values() if isinstance(v, list) and v])
+    sections_total = setting("alerts", "questionnaire_sections_total", default=4)
+    checklist = [
+        {"key": "activities", "label": "Touch activities (Skills 1-4)",
+         "done": (window.get("movement_sessions") or 0) >= (window.get("min_movement_sessions") or 1),
+         "detail": f"{window.get('movement_sessions', 0)} sessions with finger-movement data in {window.get('days', '-')} days"},
+        {"key": "reading", "label": "Reading recordings (Skills 5-6)",
+         "done": (window.get("usable_recordings") or 0) >= (window.get("min_usable_recordings") or 1),
+         "detail": f"{window.get('usable_recordings', 0)} clear recordings of {window.get('recordings', 0)}"},
+        {"key": "age", "label": "Child's age recorded", "done": "age" not in missing_inputs and bool(doc),
+         "detail": "Add the birth month and year in the child profile" if "age" in missing_inputs else "Recorded"},
+        {"key": "questionnaire", "label": "Parent questionnaire", "done": sections_done >= sections_total,
+         "detail": f"{sections_done} of {sections_total} sections (shown in the summary, not a model input)"},
+    ]
+    sources = [s for s, ok in (("touch activities", bool(evidence.get("c1", {}).get("first_attempt_accuracy") is not None)),
+                               ("reading recordings", evidence.get("c2", {}).get("word_accuracy") is not None),
+                               ("parent questionnaire", bool(evidence.get("parent_observation_count")))) if ok]
+    feedback = await records(db, "professional_feedback", student_id, 20)
+    latest_feedback = next((f for f in feedback if f.get("component") == "c3"), None)
+    if latest_feedback:
+        latest_feedback = {k: (stamp(v) if k in {"created_at"} else v) for k, v in latest_feedback.items()
+                           if k in {"agreement", "professional_pattern", "note", "created_at", "reviewer_name"}}
 
     return TherapistC3ProfileDTO(
         **metadata,
         classifier_available=classifier_available,
-        primary_pattern=primary_pattern,
-        probabilities=probs,
-        confidence=confidence,
-        modalities_used=modalities_used,
-        shap_explanations=shap_list,
+        primary_pattern=pattern if classifier_available else ("Not enough evidence yet" if doc else "Unavailable"),
+        probabilities=probs if classifier_available else {},
+        confidence=number(profile.get("confidence")) if classifier_available else None,
+        modalities_used=profile.get("modalities_used") or [],
+        shap_explanations=shap_list if classifier_available else [],
         llm_summary=doc.get("llm_summary"),
         llm_recommendations=doc.get("llm_recommendations"),
         pipeline_status=pipeline_status,
@@ -427,7 +631,82 @@ async def get_therapist_c3_profile(student_id: str):
         skip_reason=skip_reason,
         summary_text=summary_text,
         recommendation_text=recommendation_text,
+        evidence_window=window,
+        coverage_checklist=checklist,
+        measurement_notes=list(doc.get("measurement_notes") or []),
+        low_agreement=low_agreement,
+        sources_used=sources,
+        latest_feedback=latest_feedback,
+        marginalized_covariates=list(profile.get("marginalized_covariates") or []),
     )
+
+
+# --- Professional feedback (expert labels for future model training) --------
+from pydantic import BaseModel as _BaseModel, Field as _Field
+from typing import Literal as _Literal
+
+PATTERN_CHOICES = ("TYPICAL", "VISUAL_ORTHOGRAPHIC_PATTERN", "PHONOLOGICAL_PATTERN",
+                   "COMBINED_PATTERN", "NOT_SURE")
+
+
+class ProfessionalFeedbackRequest(_BaseModel):
+    component: _Literal["c1", "c3"]
+    agreement: _Literal["agree", "disagree", "unsure"]
+    professional_pattern: Optional[_Literal[PATTERN_CHOICES]] = None
+    note: Optional[str] = _Field(None, max_length=1000)
+    session_id: Optional[str] = None
+
+
+@router.post("/{student_id}/feedback", status_code=201)
+async def submit_professional_feedback(student_id: str, req: ProfessionalFeedbackRequest,
+                                       current_user: dict = Depends(get_current_user)):
+    """Store a therapist's judgement on a model estimate, with a feature snapshot.
+
+    These rows are the expert-labelled dataset that can later replace the
+    synthetic training data (see telemetry ``/ml/train``).
+    """
+    if current_user.get("role") not in {"specialist", "therapist"}:
+        raise HTTPException(403, "Only connected professionals can review model estimates.")
+    db = get_db()
+    from datetime import datetime, timezone
+    snapshot, estimate, model_version = {}, None, None
+    if req.component == "c1":
+        states = await records(db, "behavioral_features", student_id, 20)
+        state = next((s for s in states if s.get("session_id") == req.session_id), states[0] if states else {})
+        model = state.get("model") or {}
+        estimate, model_version = model.get("predicted_pattern"), model.get("model_version")
+        snapshot = {**(state.get("behavior") or {}), **(state.get("indices") or {}),
+                    "fatigue_score": (state.get("fatigue") or {}).get("score"),
+                    "cognitive_load_score": (state.get("interaction_state") or {}).get("score")}
+        session_id = state.get("session_id")
+    else:
+        doc = await _latest_profile(db, student_id)
+        estimate = (doc.get("learner_profile") or {}).get("primary_pattern")
+        model_version = doc.get("model_version")
+        snapshot = doc.get("model_inputs") or {}
+        session_id = doc.get("session_id")
+    row = {
+        "student_id": student_id, "component": req.component, "session_id": req.session_id or session_id,
+        "agreement": req.agreement, "professional_pattern": req.professional_pattern,
+        "note": (req.note or "").strip() or None, "model_estimate": estimate, "model_version": model_version,
+        "feature_snapshot": {k: v for k, v in snapshot.items() if number(v) is not None},
+        "reviewer_id": str(current_user["_id"]), "reviewer_name": current_user.get("name"),
+        "data_origin": "observed", "calibration_eligible": False,
+        "created_at": datetime.now(timezone.utc),
+    }
+    await db.professional_feedback.insert_one(row)
+    return {"message": "Feedback saved.", "component": req.component, "agreement": req.agreement}
+
+
+@router.get("/{student_id}/feedback")
+async def list_professional_feedback(student_id: str):
+    rows = await records(get_db(), "professional_feedback", student_id, 50)
+    return {"student_id": student_id, "feedback": [
+        {k: (stamp(v) if k == "created_at" else v) for k, v in row.items()
+         if k in {"component", "agreement", "professional_pattern", "note", "model_estimate",
+                  "model_version", "reviewer_name", "created_at", "session_id"}}
+        for row in rows]}
+
 
 @router.get("/{student_id}/c4-adaptive", response_model=TherapistC4AdaptiveDTO)
 async def get_therapist_c4_adaptive(student_id: str, window: int = 20):

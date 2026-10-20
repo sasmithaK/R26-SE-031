@@ -8,7 +8,9 @@ import string
 from dependencies import get_current_user
 from shared.database import get_db
 from schemas.therapist import ConnectionCode, TherapistConnectionResponse, ConnectSpecialistRequest
-from services.dashboard_data import KC_NAMES, number, stamp
+from services.dashboard_data import (
+    KC_NAMES, number, stamp, setting, learner_coverage, learner_alerts, public_coverage,
+)
 
 router = APIRouter(prefix="/api/v1/auth/therapist", tags=["therapist"])
 
@@ -96,6 +98,7 @@ async def get_therapist_dashboard_summary(
                 "independent_rate": None,
             },
             "review_queue": [],
+            "alerts": [],
             "learners": [],
             "recent_activity": [],
             "coverage_note": "No active learner connections are available.",
@@ -173,10 +176,19 @@ async def get_therapist_dashboard_summary(
         total_confirmations += len(confirmation_rows)
 
         state = latest_state_by_student.get(student_id, {})
+        # A KC is only flagged when it has enough observed core responses;
+        # an untouched KC still sits at its prior and is not evidence.
+        kc_observations: Dict[str, int] = {}
+        for row in core_rows:
+            kc_key = str(row.get("kc_id") or row.get("knowledge_component_id") or "")
+            if kc_key:
+                kc_observations[kc_key] = kc_observations.get(kc_key, 0) + 1
+        min_kc_observations = setting("worklist", "min_kc_observations", default=5)
         mastery_pairs = []
         for kc_id, raw_value in (state.get("knowledge_state") or {}).items():
             mastery = number(raw_value)
-            if mastery is not None and 0 <= mastery <= 1:
+            if (mastery is not None and 0 <= mastery <= 1
+                    and kc_observations.get(str(kc_id), 0) >= min_kc_observations):
                 mastery_pairs.append((str(kc_id), mastery))
         weakest = min(mastery_pairs, key=lambda pair: pair[1]) if mastery_pairs else None
         support_ratio = supported / observed if observed else None
@@ -189,18 +201,19 @@ async def get_therapist_dashboard_summary(
                 "No completed Component 4 core tasks are recorded for this learner."
             )
             priority_rank = 2
-        elif support_ratio is not None and support_ratio >= 0.35:
+        elif support_ratio is not None and support_ratio >= setting("worklist", "support_ratio_review", default=0.35):
             review_status = "review_suggested"
             review_title = "Frequent app support observed"
             review_reason = (
                 f"Needed app support on {supported} of {observed} latest task outcomes."
             )
             priority_rank = 3
-        elif weakest and weakest[1] < 0.65:
+        elif weakest and weakest[1] < setting("worklist", "weak_kc_mastery", default=0.65):
             review_status = "review_suggested"
             review_title = f"Review {_friendly_kc_name(weakest[0])}"
             review_reason = (
-                f"Current mastery estimate is {round(weakest[1] * 100)}% from observed app responses."
+                f"Current mastery estimate is {round(weakest[1] * 100)}% from "
+                f"{kc_observations.get(weakest[0], 0)} observed responses in this area."
             )
             priority_rank = 3
         else:
@@ -211,9 +224,13 @@ async def get_therapist_dashboard_summary(
             )
             priority_rank = 1
 
+        coverage = await learner_coverage(db, student_id, student)
+        alerts = learner_alerts(coverage)
         record = {
             "student_id": student_id,
             "student_name": student_name,
+            "coverage": public_coverage(coverage),
+            "alerts": alerts,
             "first_name": first_name,
             "last_name": last_name,
             "grade": student.get("grade") or "Grade 1",
@@ -235,6 +252,7 @@ async def get_therapist_dashboard_summary(
                     "knowledge_component_id": weakest[0],
                     "name": _friendly_kc_name(weakest[0]),
                     "mastery": round(weakest[1], 4),
+                    "observations": kc_observations.get(weakest[0], 0),
                 }
                 if weakest else None
             ),
@@ -297,8 +315,16 @@ async def get_therapist_dashboard_summary(
         if len(recent_activity) >= 8:
             break
 
+    alert_feed = []
+    for record in connected_records:
+        for alert in record.get("alerts", []):
+            if alert.get("severity") == "watch":
+                alert_feed.append({**alert, "student_id": record["student_id"],
+                                   "student_name": record["student_name"]})
+
     return {
         "generated_at": stamp(datetime.now(timezone.utc)),
+        "alerts": alert_feed,
         "summary": {
             "connected_learners": len(valid_connections),
             "learners_with_evidence": learners_with_evidence,
