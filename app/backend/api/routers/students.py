@@ -47,6 +47,9 @@ async def add_student(request: StudentCreate, current_user: dict = Depends(get_c
         "consent_given": request.consent_given,
         "consent_parent_name": request.consent_parent_name,
         "consent_date": request.consent_date,
+        "birth_year": request.birth_year,
+        "birth_month": request.birth_month,
+        "gender": request.gender,
         "completed_activities": [],
         "activity_scores": {},
         # Only newly-created learners enter the child-friendly cold-start
@@ -69,6 +72,9 @@ async def add_student(request: StudentCreate, current_user: dict = Depends(get_c
         completed_activities=[],
         activity_scores={},
         assessment_completed=len(request.assessment_results) == 14,
+        birth_year=request.birth_year,
+        birth_month=request.birth_month,
+        gender=request.gender,
     )
 
 
@@ -101,6 +107,9 @@ async def list_students(current_user: dict = Depends(get_current_user)):
             completed_activities=s.get("completed_activities", []),
             activity_scores=s.get("activity_scores", {}),
             assessment_completed=len(assessment) == 14,
+            birth_year=s.get("birth_year"),
+            birth_month=s.get("birth_month"),
+            gender=s.get("gender"),
         ))
 
     return result
@@ -131,6 +140,11 @@ async def update_student(student_id: str, request: StudentUpdate, current_user: 
         "daily_limit": request.daily_limit,
         "avatar_url": request.avatar_url,
     }
+    # Only overwrite optional context when the client sends it.
+    for field in ("birth_year", "birth_month", "gender"):
+        value = getattr(request, field)
+        if value is not None:
+            update_doc[field] = value
 
     await db.students.update_one({"_id": obj_id}, {"$set": update_doc})
 
@@ -148,6 +162,9 @@ async def update_student(student_id: str, request: StudentUpdate, current_user: 
         completed_activities=updated.get("completed_activities", []),
         activity_scores=updated.get("activity_scores", {}),
         assessment_completed=len(assessment) == 14,
+        birth_year=updated.get("birth_year"),
+        birth_month=updated.get("birth_month"),
+        gender=updated.get("gender"),
     )
 
 
@@ -167,9 +184,11 @@ async def submit_assessment(student_id: str, request: AssessmentSubmit, current_
     if not existing_student:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
 
+    submitted_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     await db.students.update_one(
         {"_id": obj_id},
-        {"$set": {"assessment_results": request.assessment_results}}
+        {"$set": {"assessment_results": request.assessment_results,
+                   "assessment_updated_at": submitted_at}}
     )
 
     await db.assessment_submissions.insert_one({
@@ -177,7 +196,8 @@ async def submit_assessment(student_id: str, request: AssessmentSubmit, current_
         "parent_id": str(parent_oid),
         "assessment_type": "initial",
         "results": request.assessment_results,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": submitted_at,
+        "schema_version": "2.0",
     })
 
     return StudentResponse(
@@ -283,8 +303,16 @@ async def submit_comprehensive_assessment(student_id: str, category: str, reques
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
 
     # Update the specific category within comprehensive_assessment_results
+    allowed_categories = {"basic", "reading", "writing", "other"}
+    if category not in allowed_categories:
+        raise HTTPException(status_code=422, detail="Unknown questionnaire category")
+
+    submitted_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    # Keep the latest response embedded for fast student/dashboard reads, and
+    # also retain every submission as an immutable history record below.
     update_field = f"comprehensive_assessment_results.{category}"
-    update_doc = {update_field: request.assessment_results}
+    update_doc = {update_field: request.assessment_results,
+                  f"comprehensive_assessment_updated_at.{category}": submitted_at}
     if category == "basic":
         update_doc["assessment_results"] = request.assessment_results
 
@@ -299,7 +327,8 @@ async def submit_comprehensive_assessment(student_id: str, category: str, reques
         "assessment_type": "comprehensive",
         "category": category,
         "results": request.assessment_results,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": submitted_at,
+        "schema_version": "2.0",
     })
 
     # Fetch updated student to return full response

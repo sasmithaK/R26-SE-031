@@ -28,6 +28,10 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
 
   String? _selectedGrade = 'Grade 1';
   String? _selectedDailyLimit = 'No Limit';
+  // Optional learner context. Unknown stays unknown (never defaulted).
+  int? _birthYear;
+  int? _birthMonth;
+  String? _gender;
   String _selectedAvatarUrl = 'assets/images/characters/mascots/solo_blue.png';
   bool _isHumanCategory = false;
   
@@ -76,6 +80,11 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
       _selectedGrade = widget.editStudentData!['grade'];
       _selectedDailyLimit =
           widget.editStudentData!['daily_limit'] ?? 'No Limit';
+      final rawYear = widget.editStudentData!['birth_year'];
+      final rawMonth = widget.editStudentData!['birth_month'];
+      _birthYear = rawYear is num ? rawYear.toInt() : int.tryParse('${rawYear ?? ''}');
+      _birthMonth = rawMonth is num ? rawMonth.toInt() : int.tryParse('${rawMonth ?? ''}');
+      _gender = widget.editStudentData!['gender']?.toString();
       _selectedAvatarUrl =
           AvatarUtils.getCorrectedAvatarPath(widget.editStudentData!['avatar_url'] as String?, 'assets/images/characters/mascots/solo_blue.png');
       _isHumanCategory = _humanAvatars.contains(_selectedAvatarUrl);
@@ -137,6 +146,73 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
         _performNudge();
       }
     });
+  }
+
+  /// Optional birth month/year and gender. Age lets the combined learning
+  /// profile run; without it the profile reports "age missing" instead of
+  /// assuming an age. Gender is optional and averaged out when not given.
+  Widget _buildLearnerContextFields() {
+    final now = DateTime.now();
+    final years = [for (var y = now.year - 9; y <= now.year - 4; y++) y];
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Birth month and year (optional)',
+          style: AppTypography.body(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<int>(
+                value: _birthMonth,
+                isExpanded: true,
+                decoration: const InputDecoration(hintText: 'Month'),
+                items: [
+                  for (var m = 1; m <= 12; m++)
+                    DropdownMenuItem(value: m, child: Text(months[m - 1])),
+                ],
+                onChanged: (val) => setState(() => _birthMonth = val),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<int>(
+                value: years.contains(_birthYear) ? _birthYear : null,
+                isExpanded: true,
+                decoration: const InputDecoration(hintText: 'Year'),
+                items: [
+                  for (final y in years) DropdownMenuItem(value: y, child: Text('$y')),
+                ],
+                onChanged: (val) => setState(() => _birthYear = val),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: const ['female', 'male', 'not_specified'].contains(_gender) ? _gender : null,
+          isExpanded: true,
+          decoration: const InputDecoration(hintText: 'Gender (optional)'),
+          items: const [
+            DropdownMenuItem(value: 'female', child: Text('Girl')),
+            DropdownMenuItem(value: 'male', child: Text('Boy')),
+            DropdownMenuItem(value: 'not_specified', child: Text('Prefer not to say')),
+          ],
+          onChanged: (val) => setState(() => _gender = val),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Used only to interpret learning observations. You can leave these blank.',
+          style: AppTypography.caption(fontSize: 14),
+        ),
+      ],
+    );
   }
 
   @override
@@ -415,6 +491,8 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                 setState(() => _selectedDailyLimit = val);
                               },
                             ),
+                            const SizedBox(height: 16),
+                            _buildLearnerContextFields(),
                             const SizedBox(height: 8),
                           ],
                         ),
@@ -439,6 +517,9 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                       'grade': _selectedGrade,
                                       'daily_limit': _selectedDailyLimit,
                                       'avatar_url': _selectedAvatarUrl,
+                                      if (_birthYear != null) 'birth_year': _birthYear,
+                                      if (_birthMonth != null) 'birth_month': _birthMonth,
+                                      if (_gender != null) 'gender': _gender,
                                     };
 
                                       if (widget.editStudentData == null) {

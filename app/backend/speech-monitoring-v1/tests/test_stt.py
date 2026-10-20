@@ -40,8 +40,13 @@ def test_stt_analyze_success(client):
         
         dummy_audio = io.BytesIO(b"dummy audio content")
         files = {"file": ("test.wav", dummy_audio, "audio/wav")}
-        
-        response = client.post("/stt/analyze-acoustics", files=files)
+        data = {
+            "student_id": "507f1f77bcf86cd799439011", "session_id": "session-1",
+            "skill_id": "skill_5", "activity_id": "act_1", "item_id": "S5A1R01",
+            "expected_text": "ගමට", "data_origin": "observed",
+        }
+
+        response = client.post("/stt/analyze-acoustics", files=files, data=data)
         
         assert response.status_code == 200
         data = response.json()

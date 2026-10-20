@@ -4,6 +4,7 @@ import '../../services/auth_service.dart';
 import '../../services/localization_service.dart';
 import '../../services/therapist_dashboard_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/dashboard/dashboard_kit.dart';
 import 'therapist_messages_screen.dart';
 import 'therapist_profile_screen.dart';
 import 'therapist_student_detail_screen.dart';
@@ -176,8 +177,8 @@ class _DashboardNavigation extends StatelessWidget {
                             item.$3,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: AppTypography.caption(
-                              fontSize: 11,
+                            style: DashText.caption(
+                              fontSize: 12,
                               fontWeight: active
                                   ? FontWeight.w700
                                   : FontWeight.w500,
@@ -265,6 +266,19 @@ class _DashboardHome extends StatelessWidget {
               rate: rate,
             ),
             const SizedBox(height: 28),
+            const _SectionTitle(
+              eyebrow: 'REMOTE MONITORING',
+              title: 'Needs attention',
+              subtitle: 'Inactivity, unclear recordings, repeated fatigue.',
+            ),
+            const SizedBox(height: 12),
+            DashCard(
+              child: AlertList(
+                alerts: _list(payload['alerts']),
+                showStudentName: true,
+              ),
+            ),
+            const SizedBox(height: 16),
             _SectionTitle(
               eyebrow: 'PRIORITY WORKLIST',
               title: 'Learners to review',
@@ -347,7 +361,7 @@ class _Header extends StatelessWidget {
             children: [
               Text(
                 greeting,
-                style: AppTypography.body(
+                style: DashText.body(
                   fontSize: 15,
                   color: AppColors.textSecondary,
                 ),
@@ -356,14 +370,14 @@ class _Header extends StatelessWidget {
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppTypography.heading(
+                style: DashText.heading(
                   fontSize: 29,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               Text(
-                'Clinical learning overview',
-                style: AppTypography.caption(fontSize: 13),
+                'Learning overview',
+                style: DashText.caption(fontSize: 13),
               ),
             ],
           ),
@@ -410,7 +424,7 @@ class _Header extends StatelessWidget {
               child: picture == null || picture.isEmpty
                   ? Text(
                       _initials(name),
-                      style: AppTypography.button(fontSize: 16),
+                      style: DashText.button(fontSize: 16),
                     )
                   : null,
             ),
@@ -465,7 +479,7 @@ class _Hero extends StatelessWidget {
             priorities > 0
                 ? '$priorities learner${priorities == 1 ? '' : 's'} ready for review'
                 : 'Learning evidence is up to date',
-            style: AppTypography.heading(
+            style: DashText.heading(
               fontSize: 29,
               fontWeight: FontWeight.w700,
               color: Colors.white,
@@ -477,7 +491,7 @@ class _Hero extends StatelessWidget {
             connected == 0
                 ? 'Connect a learner to begin receiving observed learning evidence.'
                 : '$covered of $connected connected learners have recorded task evidence.',
-            style: AppTypography.body(
+            style: DashText.body(
               fontSize: 14,
               color: Colors.white.withValues(alpha: .91),
               height: 1.5,
@@ -496,7 +510,7 @@ class _Hero extends StatelessWidget {
           const SizedBox(height: 9),
           Text(
             '${(ratio * 100).round()}% evidence coverage',
-            style: AppTypography.caption(
+            style: DashText.caption(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: Colors.white,
@@ -535,7 +549,7 @@ class _HeroPill extends StatelessWidget {
     ),
     child: Text(
       text,
-      style: AppTypography.caption(
+      style: DashText.caption(
         fontSize: 12,
         fontWeight: FontWeight.w700,
         color: Colors.white,
@@ -649,7 +663,7 @@ class _MetricCard extends StatelessWidget {
             const Spacer(),
             Text(
               metric.value,
-              style: AppTypography.heading(
+              style: DashText.heading(
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
                 color: metric.color,
@@ -661,7 +675,7 @@ class _MetricCard extends StatelessWidget {
         Text(
           metric.label,
           maxLines: 2,
-          style: AppTypography.body(
+          style: DashText.body(
             fontSize: 13,
             fontWeight: FontWeight.w700,
             height: 1.35,
@@ -671,7 +685,7 @@ class _MetricCard extends StatelessWidget {
         Text(
           metric.note,
           maxLines: 2,
-          style: AppTypography.caption(fontSize: 11),
+          style: DashText.caption(fontSize: 12),
         ),
       ],
     ),
@@ -697,8 +711,8 @@ class _SectionTitle extends StatelessWidget {
           children: [
             Text(
               eyebrow,
-              style: AppTypography.caption(
-                fontSize: 11,
+              style: DashText.caption(
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: AppColors.calmBlueDark,
               ),
@@ -706,7 +720,7 @@ class _SectionTitle extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               title,
-              style: AppTypography.heading(
+              style: DashText.heading(
                 fontSize: 24,
                 fontWeight: FontWeight.w700,
               ),
@@ -714,7 +728,7 @@ class _SectionTitle extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               subtitle,
-              style: AppTypography.body(fontSize: 13, height: 1.45),
+              style: DashText.body(fontSize: 13, height: 1.45),
             ),
           ],
         ),
@@ -730,7 +744,7 @@ class _SectionTitle extends StatelessWidget {
           ),
           child: Text(
             badge!,
-            style: AppTypography.body(
+            style: DashText.body(
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: AppColors.softCoralDark,
@@ -781,7 +795,7 @@ class _ReviewCard extends StatelessWidget {
                     backgroundColor: tint,
                     child: Text(
                       _initials(name),
-                      style: AppTypography.body(
+                      style: DashText.body(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: accent,
@@ -797,14 +811,14 @@ class _ReviewCard extends StatelessWidget {
                           name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.body(
+                          style: DashText.body(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         Text(
                           learner['grade']?.toString() ?? 'Grade 1',
-                          style: AppTypography.caption(fontSize: 12),
+                          style: DashText.caption(fontSize: 12),
                         ),
                       ],
                     ),
@@ -819,7 +833,7 @@ class _ReviewCard extends StatelessWidget {
               const SizedBox(height: 15),
               Text(
                 learner['review_title']?.toString() ?? 'Learning evidence',
-                style: AppTypography.body(
+                style: DashText.body(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
@@ -827,7 +841,7 @@ class _ReviewCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 learner['review_reason']?.toString() ?? '',
-                style: AppTypography.body(fontSize: 12, height: 1.45),
+                style: DashText.body(fontSize: 12, height: 1.45),
               ),
               if (observed > 0) ...[
                 const SizedBox(height: 14),
@@ -840,19 +854,21 @@ class _ReviewCard extends StatelessWidget {
                     _EvidenceChip('$checks checks', AppColors.gentleGreenDark),
                     if (weakest.isNotEmpty && mastery != null)
                       _EvidenceChip(
-                        '${weakest['name']} ${(mastery * 100).round()}%',
+                        '${weakest['name']}: mastery estimate ${(mastery * 100).round()}% (${_integer(weakest['observations'])} responses)',
                         AppColors.softCoralDark,
                       ),
                   ],
                 ),
               ],
+              const SizedBox(height: 12),
+              _CoverageChips(coverage: _map(learner['coverage'])),
               const SizedBox(height: 14),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Text(
                     'Open learner evidence',
-                    style: AppTypography.body(
+                    style: DashText.body(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: AppColors.calmBlueDark,
@@ -891,8 +907,8 @@ class _StatusPill extends StatelessWidget {
     ),
     child: Text(
       label,
-      style: AppTypography.caption(
-        fontSize: 10,
+      style: DashText.caption(
+        fontSize: 12,
         fontWeight: FontWeight.w700,
         color: color,
       ),
@@ -913,8 +929,8 @@ class _EvidenceChip extends StatelessWidget {
     ),
     child: Text(
       label,
-      style: AppTypography.caption(
-        fontSize: 10,
+      style: DashText.caption(
+        fontSize: 12,
         fontWeight: FontWeight.w700,
         color: color,
       ),
@@ -943,7 +959,7 @@ class _EmptyPriorityCard extends StatelessWidget {
         Expanded(
           child: Text(
             'No connected learner currently crosses the review threshold.',
-            style: AppTypography.body(fontSize: 13, height: 1.45),
+            style: DashText.body(fontSize: 13, height: 1.45),
           ),
         ),
       ],
@@ -1032,18 +1048,18 @@ class _SupportRow extends StatelessWidget {
           children: [
             Text(
               title,
-              style: AppTypography.body(
+              style: DashText.body(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            Text(description, style: AppTypography.caption(fontSize: 11)),
+            Text(description, style: DashText.caption(fontSize: 12)),
           ],
         ),
       ),
       Text(
         '$value',
-        style: AppTypography.heading(
+        style: DashText.heading(
           fontSize: 24,
           fontWeight: FontWeight.w700,
           color: color,
@@ -1088,7 +1104,7 @@ class _RecentCard extends StatelessWidget {
             Expanded(
               child: Text(
                 'No completed learning outcomes are available yet.',
-                style: AppTypography.body(fontSize: 13),
+                style: DashText.body(fontSize: 13),
               ),
             ),
           ],
@@ -1136,7 +1152,7 @@ class _RecentCard extends StatelessWidget {
                         children: [
                           Text(
                             row['student_name']?.toString() ?? 'Learner',
-                            style: AppTypography.body(
+                            style: DashText.body(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1144,13 +1160,13 @@ class _RecentCard extends StatelessWidget {
                           Text(
                             row['description']?.toString() ??
                                 'Completed a learning task.',
-                            style: AppTypography.caption(fontSize: 11),
+                            style: DashText.caption(fontSize: 12),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             _activityMeta(row),
-                            style: AppTypography.caption(
-                              fontSize: 10,
+                            style: DashText.caption(
+                              fontSize: 12,
                               color: AppColors.textHint,
                             ),
                           ),
@@ -1198,7 +1214,7 @@ class _EvidenceNotice extends StatelessWidget {
               if (coverage != null && coverage!.isNotEmpty)
                 Text(
                   coverage!,
-                  style: AppTypography.body(
+                  style: DashText.body(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     height: 1.4,
@@ -1208,7 +1224,7 @@ class _EvidenceNotice extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   limitations.first,
-                  style: AppTypography.caption(fontSize: 10),
+                  style: DashText.caption(fontSize: 12),
                 ),
               ],
             ],
@@ -1250,7 +1266,7 @@ class _LoadingView extends StatelessWidget {
           const SizedBox(height: 22),
           Text(
             'Preparing observed learning evidence…',
-            style: AppTypography.body(fontSize: 14),
+            style: DashText.body(fontSize: 14),
           ),
         ],
       ),
@@ -1282,7 +1298,7 @@ class _ErrorView extends StatelessWidget {
               Text(
                 'Learning evidence is unavailable',
                 textAlign: TextAlign.center,
-                style: AppTypography.heading(
+                style: DashText.heading(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1291,7 +1307,7 @@ class _ErrorView extends StatelessWidget {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: AppTypography.body(fontSize: 12),
+                style: DashText.body(fontSize: 12),
               ),
               const SizedBox(height: 18),
               FilledButton.icon(
@@ -1370,4 +1386,44 @@ String _relativeTime(String? raw) {
   if (gap.inHours < 24) return '${gap.inHours}h ago';
   if (gap.inDays < 7) return '${gap.inDays}d ago';
   return '${parsed.day}/${parsed.month}/${parsed.year}';
+}
+
+
+/// Data-coverage chips for a learner (activities / reading / questionnaire / review).
+class _CoverageChips extends StatelessWidget {
+  const _CoverageChips({required this.coverage});
+  final Map<String, dynamic> coverage;
+
+  @override
+  Widget build(BuildContext context) {
+    if (coverage.isEmpty) return const SizedBox.shrink();
+    final sessions = _integer(coverage['activity_sessions']);
+    final recordings = _integer(coverage['recordings']);
+    final usable = _integer(coverage['usable_recordings']);
+    final done = _integer(coverage['questionnaire_sections_done']);
+    final total = _integer(coverage['questionnaire_sections_total']);
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        StatusChip(
+          label: '$sessions activity sessions',
+          tone: sessions > 0 ? DashTone.good : DashTone.neutral,
+          icon: Icons.touch_app_outlined,
+        ),
+        StatusChip(
+          label: recordings == 0 ? 'No reading yet' : '$usable/$recordings clear recordings',
+          tone: recordings == 0 ? DashTone.neutral : (usable > 0 ? DashTone.good : DashTone.watch),
+          icon: Icons.mic_none_rounded,
+        ),
+        StatusChip(
+          label: 'Questionnaire $done/$total',
+          tone: total > 0 && done >= total ? DashTone.good : DashTone.neutral,
+          icon: Icons.assignment_outlined,
+        ),
+        if (coverage['professional_review'] == true)
+          const StatusChip(label: 'Reviewed', tone: DashTone.good, icon: Icons.rate_review_outlined),
+      ],
+    );
+  }
 }

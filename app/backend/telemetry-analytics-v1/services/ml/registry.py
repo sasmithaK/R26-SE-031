@@ -17,8 +17,11 @@ class ModelRegistry:
     def load_model(self, name: str):
         if name in self.models:
             return self.models[name]
-            
-        model_path = os.path.join(os.path.dirname(__file__), "..", "..", "models", f"{name}.pkl")
+        config = self.get_config(name)
+        if config.get("enabled") is False:
+            return None
+        filename = config.get("artifact", f"{name}.pkl")
+        model_path = os.path.join(os.path.dirname(__file__), "..", "..", "models", filename)
         if os.path.exists(model_path):
             model = joblib.load(model_path)
             self.models[name] = model

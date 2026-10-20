@@ -14,11 +14,17 @@ build/
 dist/
 *.egg-info/
 .pytest_cache/
+**/.pytest_cache/
+**/.pytest_cache/**
+app/backend/api/.pytest_cache
+app/backend/api/.pytest_cache/**
 .claude/
 .coverage
 htmlcov/
 *.joblib
 *.pt
+publish_profile_temp.xml
+*.PublishSettings
 
 # EXCEPT models specifically placed in the final_models directory for the viva
 !final_models/
@@ -117,3 +123,6 @@ migrate_working_dir/
 **/generated_plugins.cmake
 
 /test-sample-data
+
+# Local LLM / Claude generator backups
+Claude outputs/

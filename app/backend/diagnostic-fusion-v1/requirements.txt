@@ -8,3 +8,5 @@ numpy
 pydantic
 joblib
 motor
+python-dotenv
+PyJWT

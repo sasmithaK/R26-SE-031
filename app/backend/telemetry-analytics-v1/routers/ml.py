@@ -1,125 +1,53 @@
 """
 routers/ml.py
 =============
-Endpoints for collecting ground-truth clinician labels and triggering
-the comparative machine learning training pipeline.
+Research endpoint that compares candidate C1 classifiers on *professional
+feedback*: patterns that connected therapists recorded while reviewing the
+dashboard (``professional_feedback`` collection, written by the dashboard API).
+
+Nothing here is used at runtime. Trained artifacts go to a staging folder and
+are never hot-swapped into the live model registry.
 """
 
 from fastapi import APIRouter, HTTPException, status, Depends
-from bson.objectid import ObjectId
-from pydantic import BaseModel, Field
 
 from database import get_db
 from dependencies import get_current_user
-from services.ml_comparative import train_and_compare
+from services.ml_comparative import train_and_compare, PATTERN_LABELS
 
-router = APIRouter(prefix="/api/v1/auth/ml", tags=["Machine Learning"])
+router = APIRouter(prefix="/api/v1/auth/ml", tags=["Machine Learning (research)"])
 
-class ClinicianLabelSubmit(BaseModel):
-    label: str = Field(..., description="Must be 'Low Risk', 'Moderate Risk', or 'Needs Attention'")
-
-@router.post("/label/{student_id}", status_code=status.HTTP_200_OK)
-async def submit_clinician_label(
-    student_id: str,
-    req: ClinicianLabelSubmit,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Submit a ground-truth clinical label for a student.
-    Only specialists connected to the student can perform this action.
-    This label is used to train the supervised ML models.
-    """
-    valid_labels = ["Low Risk", "Moderate Risk", "Needs Attention"]
-    if req.label not in valid_labels:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid label. Must be one of {valid_labels}"
-        )
-
-    db = get_db()
-    
-    # Permission check: must be a specialist
-    if current_user.get("role") != "specialist":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only specialists can submit ground-truth labels."
-        )
-
-    # Verify connection
-    connection = await db.connections.find_one({
-        "student_id": student_id,
-        "specialist_id": str(current_user["_id"]),
-    })
-    if not connection:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not connected to this student."
-        )
-
-    # Upsert the label into the cognitive profile
-    result = await db.cognitive_profiles.update_one(
-        {"student_id": student_id},
-        {"$set": {"clinician_label": req.label}},
-        upsert=True
-    )
-
-    if result.matched_count == 0 and result.upserted_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Student profile not found."
-        )
-
-    return {"message": "Clinician label saved successfully.", "label": req.label}
+MIN_LABELLED_SAMPLES = 15  # needed for stratified 5-fold cross-validation
 
 
 @router.post("/train", status_code=status.HTTP_200_OK)
 async def train_models(current_user: dict = Depends(get_current_user)):
-    """
-    Trigger the comparative ML training pipeline.
-    This fetches all cognitive profiles that have a `clinician_label`,
-    extracts the feature vectors, and trains RF, XGBoost, and Stacking models.
-    
-    Returns the classification report (F1, Accuracy) for each model.
-    """
-    # Restrict to admins/specialists (for prototype, allow specialist)
-    if current_user.get("role") != "specialist":
+    """Compare RF, XGBoost, logistic regression and stacking on expert-labelled C1 sessions."""
+    if current_user.get("role") not in {"specialist", "therapist"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only specialists/admins can trigger model training."
+            detail="Only specialists can trigger research model training.",
         )
 
     db = get_db()
-    
-    # Find all profiles with a clinician label and a valid feature vector
-    cursor = db.cognitive_profiles.find({
-        "clinician_label": {"$exists": True},
-        "feature_vector": {"$exists": True}
-    })
-    profiles = await cursor.to_list(length=5000)
+    rows = await db.professional_feedback.find({
+        "component": "c1",
+        "professional_pattern": {"$in": list(PATTERN_LABELS)},
+        "feature_snapshot": {"$exists": True},
+    }).to_list(length=5000)
 
-    if len(profiles) < 15:
+    if len(rows) < MIN_LABELLED_SAMPLES:
         return {
             "status": "insufficient_data",
-            "message": f"Found only {len(profiles)} labelled samples. Need at least 15 for 5-Fold CV."
+            "labelled_samples": len(rows),
+            "message": f"Need at least {MIN_LABELLED_SAMPLES} professionally labelled sessions for 5-fold CV.",
         }
-
-    features_list = []
-    labels_list = []
-    
-    for p in profiles:
-        features_list.append(p["feature_vector"])
-        labels_list.append(p["clinician_label"])
 
     try:
-        # Run the training pipeline synchronously (can take a few seconds)
-        results = train_and_compare(features_list, labels_list)
-        return {
-            "status": "success",
-            "samples_trained": len(profiles),
-            "results": results
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+        results = train_and_compare(
+            [row["feature_snapshot"] for row in rows],
+            [row["professional_pattern"] for row in rows],
         )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=type(exc).__name__)
+    return {"status": "success", "samples_trained": len(rows), "results": results}

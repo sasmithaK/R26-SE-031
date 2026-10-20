@@ -6,9 +6,13 @@ import '../../services/parent_dashboard_service.dart';
 import '../../services/progress_service.dart';
 import '../../utils/avatar_utils.dart';
 import '../../widgets/app_loading_indicator.dart';
-import '../../widgets/trend_chart.dart';
 import '../../widgets/research_evidence_panel.dart';
+import '../../widgets/trend_chart.dart';
+import '../../widgets/dashboard/dashboard_kit.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../models/curriculum_models.dart';
+import '../../models/comprehensive_assessment_questions.dart';
+import '../../models/assessment_question.dart';
 import '../games/game_factory.dart';
 
 class ChildProgressScreen extends StatefulWidget {
@@ -31,8 +35,9 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
   Map<String, dynamic>? _activityHistory;
   Map<String, dynamic>? _adaptiveInsights;
   Map<String, dynamic>? _componentAnalytics;
-  Map<String, dynamic>? _evidence;
-  String _currentFilter = "limit=10";
+  Map<String, dynamic>? _activityPerformance;
+  Map<String, dynamic>? _assessmentSummary;
+  int _activityDays = 30;
 
   @override
   void initState() {
@@ -61,32 +66,29 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
 
     final responses = studentId.isEmpty
         ? List.generate(
-            8,
+            5,
             (_) => <String, dynamic>{'_error': 'Invalid student ID'},
           )
         : await Future.wait([
             capture(_dashboardService.getOverview(studentId)),
-            capture(_dashboardService.getProgress(studentId)),
-            capture(_dashboardService.getSkills(studentId)),
-            capture(_dashboardService.getLearningPattern(studentId)),
-            capture(
-              _dashboardService.getActivityHistory(studentId, _currentFilter),
-            ),
             capture(_dashboardService.getAdaptiveInsights(studentId)),
             capture(_dashboardService.getComponentAnalytics(studentId)),
-            capture(_dashboardService.getResearchEvidence(studentId)),
+            capture(
+              _dashboardService.getActivityPerformance(
+                studentId,
+                days: _activityDays,
+              ),
+            ),
+            capture(_dashboardService.getAssessmentSummary(studentId)),
           ]);
 
     if (!mounted) return;
     setState(() {
       _overview = responses[0];
-      _progress = responses[1];
-      _skills = responses[2];
-      _learningPattern = responses[3];
-      _activityHistory = responses[4];
-      _adaptiveInsights = responses[5];
-      _componentAnalytics = responses[6];
-      _evidence = responses[7];
+      _adaptiveInsights = responses[1];
+      _componentAnalytics = responses[2];
+      _activityPerformance = responses[3];
+      _assessmentSummary = responses[4];
       _isLoading = false;
     });
   }
@@ -101,7 +103,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
     );
 
     return DefaultTabController(
-      length: 7,
+      length: 2,
       child: Scaffold(
         backgroundColor: AppColors.cream,
         appBar: AppBar(
@@ -138,35 +140,24 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
             ),
             const SizedBox(width: 6),
             PopupMenuButton<String>(
-              tooltip: 'Choose activity-history range',
+              tooltip: 'Filter activity details',
               color: AppColors.cardSurface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
               ),
               onSelected: (String newValue) {
-                if (newValue != _currentFilter) {
+                if (newValue != _activityDays.toString()) {
                   setState(() {
-                    _currentFilter = newValue;
+                    _activityDays = int.tryParse(newValue) ?? 30;
                     _isLoading = true;
                   });
                   _loadAllData();
                 }
               },
               itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: 'limit=5',
-                  child: Text('Last 5 activities'),
-                ),
-                PopupMenuItem(
-                  value: 'limit=10',
-                  child: Text('Last 10 activities'),
-                ),
-                PopupMenuItem(
-                  value: 'limit=20',
-                  child: Text('Last 20 activities'),
-                ),
-                PopupMenuItem(value: 'days=7', child: Text('Last 7 days')),
-                PopupMenuItem(value: 'days=30', child: Text('Last 30 days')),
+                PopupMenuItem(value: '7', child: Text('Last 7 days')),
+                PopupMenuItem(value: '30', child: Text('Last 30 days')),
+                PopupMenuItem(value: '90', child: Text('Last 90 days')),
               ],
               child: Container(
                 margin: const EdgeInsets.only(right: 14),
@@ -188,9 +179,9 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                     ),
                     const SizedBox(width: 7),
                     Text(
-                      _filterLabel(_currentFilter),
-                      style: AppTypography.caption(
-                        fontSize: 11,
+                      'Activities · ${_activityDays}d',
+                      style: DashText.caption(
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
@@ -222,7 +213,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   children: [
                     Text(
                       name.toString(),
-                      style: AppTypography.heading(
+                      style: DashText.heading(
                         fontSize: 19,
                         color: AppColors.textPrimary,
                       ),
@@ -230,8 +221,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                     ),
                     Text(
                       '$grade · Learning progress',
-                      style: AppTypography.caption(
-                        fontSize: 10,
+                      style: DashText.caption(
+                        fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -263,13 +254,13 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 ),
                 labelColor: Colors.white,
                 unselectedLabelColor: AppColors.textSecondary,
-                labelStyle: AppTypography.caption(
-                  fontSize: 11,
+                labelStyle: DashText.caption(
+                  fontSize: 12,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
-                unselectedLabelStyle: AppTypography.caption(
-                  fontSize: 11,
+                unselectedLabelStyle: DashText.caption(
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textSecondary,
                 ),
@@ -277,43 +268,13 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   Tab(
                     child: _ProgressTab(
                       icon: Icons.dashboard_rounded,
-                      label: 'Summary',
-                    ),
-                  ),
-                  Tab(
-                    child: _ProgressTab(
-                      icon: Icons.touch_app_rounded,
-                      label: 'Behaviour',
-                    ),
-                  ),
-                  Tab(
-                    child: _ProgressTab(
-                      icon: Icons.menu_book_rounded,
-                      label: 'Reading',
-                    ),
-                  ),
-                  Tab(
-                    child: _ProgressTab(
-                      icon: Icons.insights_rounded,
-                      label: 'Patterns',
-                    ),
-                  ),
-                  Tab(
-                    child: _ProgressTab(
-                      icon: Icons.history_rounded,
-                      label: 'History',
+                      label: 'Progress',
                     ),
                   ),
                   Tab(
                     child: _ProgressTab(
                       icon: Icons.favorite_rounded,
                       label: 'Learning support',
-                    ),
-                  ),
-                  Tab(
-                    child: _ProgressTab(
-                      icon: Icons.fact_check_rounded,
-                      label: 'Research',
                     ),
                   ),
                 ],
@@ -326,42 +287,14 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
             : TabBarView(
                 children: [
                   DashboardSection(
-                    data: _overview,
-                    onRetry: _loadAllData,
-                    child: _buildOverviewTab(),
-                  ),
-                  DashboardSection(
                     data: _componentAnalytics,
                     onRetry: _loadAllData,
                     child: _buildComponentAnalyticsTab(),
                   ),
                   DashboardSection(
-                    data: _progress,
-                    onRetry: _loadAllData,
-                    child: _buildReadingProgressTab(),
-                  ),
-                  DashboardSection(
-                    data: _learningPattern,
-                    onRetry: _loadAllData,
-                    child: _buildReadingPatternTab(),
-                  ),
-                  DashboardSection(
-                    data: _activityHistory,
-                    onRetry: _loadAllData,
-                    child: _buildActivityHistoryTab(),
-                  ),
-                  DashboardSection(
                     data: _adaptiveInsights,
                     onRetry: _loadAllData,
                     child: _buildAdaptiveInsightsTab(),
-                  ),
-                  DashboardSection(
-                    data: _evidence,
-                    onRetry: _loadAllData,
-                    child: ResearchEvidencePanel(
-                      data: _evidence ?? const {},
-                      simplified: true,
-                    ),
                   ),
                 ],
               ),
@@ -386,95 +319,237 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
     final components = <Map<String, dynamic>>[
       {
         'title': 'Touch and learning behaviour',
-        'subtitle': 'C1 telemetry',
+        'subtitle': 'Touch responses, attempts and response time',
         'icon': Icons.touch_app_rounded,
         'color': AppColors.calmBlue,
         'data': data['c1_behavioral'],
+        'empty': 'Complete an activity to start collecting touch and activity observations.',
         'metrics': <Map<String, dynamic>>[
           {
-            'label': 'First-attempt accuracy',
+            'label': 'Correct on first try (latest session)',
             'key': 'first_attempt_accuracy',
             'scale': 100.0,
             'suffix': '%',
           },
           {
-            'label': 'Retry rate',
+            'label': 'Rounds needing another try',
             'key': 'retry_rate',
             'scale': 100.0,
             'suffix': '%',
           },
           {
-            'label': 'Response time',
+            'label': 'Typical time to answer',
             'key': 'median_response_latency_ms',
-            'suffix': ' ms',
+            'scale': 0.001,
+            'suffix': ' s',
           },
         ],
       },
       {
         'title': 'Speaking and reading',
-        'subtitle': 'C2 audio telemetry',
+        'subtitle': 'Reading recordings and speech observations',
         'icon': Icons.record_voice_over_rounded,
         'color': AppColors.softCoral,
         'data': data['c2_speech'],
+        'empty': 'Try Reading Comprehension (Skill 5) or Textbook Reading (Skill 6) together to start reading observations.',
         'metrics': <Map<String, dynamic>>[
-          {'label': 'Recordings captured', 'key': 'recording_count'},
-          {'label': 'Sinhala letter match', 'key': 'grapheme_accuracy', 'scale': 100.0, 'suffix': '%'},
-          {'label': 'Words read per minute', 'key': 'reading_rate_wpm', 'suffix': ' wpm'},
-          {'label': 'Audio clarity', 'key': 'recording_quality'},
+          {'label': 'Recordings', 'key': 'recording_count'},
+          {'label': 'Clear enough to measure', 'key': 'usable_recording_count'},
+          {
+            'label': 'Letters read as expected (latest)',
+            'key': 'grapheme_accuracy',
+            'scale': 100.0,
+            'suffix': '%',
+          },
         ],
       },
       {
-        'title': 'Learning-pattern explanation',
-        'subtitle': 'C3 explainability',
+        'id': 'c3_explainability',
+        'title': 'Progress summary',
+        'subtitle':
+            'A plain-language view of recent activity and reading progress',
         'icon': Icons.insights_rounded,
         'color': AppColors.warmAmber,
         'data': data['c3_explainability'],
-        'metrics': <Map<String, dynamic>>[
-          {'label': 'Observed pattern', 'key': 'primary_pattern'},
-          {
-            'label': 'Evidence confidence',
-            'key': 'confidence',
-            'scale': 100.0,
-            'suffix': '%',
-          },
-        ],
-      },
-      {
-        'title': 'Adaptive learning support',
-        'subtitle': 'C4 adaptation',
-        'icon': Icons.auto_awesome_rounded,
-        'color': AppColors.gentleGreen,
-        'data': data['c4_adaptive'],
-        'metrics': <Map<String, dynamic>>[
-          {
-            'label': 'Average mastery',
-            'key': 'average_mastery',
-            'scale': 100.0,
-            'suffix': '%',
-          },
-          {'label': 'Learning areas', 'key': 'knowledge_components'},
-          {'label': 'Recent decisions', 'key': 'decision_count'},
-        ],
+        'empty': 'A combined summary appears after activities and reading recordings.',
+        'metrics': <Map<String, dynamic>>[],
       },
     ];
 
     return ListView.separated(
       padding: const EdgeInsets.all(20),
-      itemCount: components.length + 1,
+      itemCount: components.length + 4,
       separatorBuilder: (_, _) => const SizedBox(height: 14),
       itemBuilder: (context, index) {
         if (index == 0) {
-          return Text(
-            'These learning measurements describe practice performance only. They are not a diagnosis.',
-            style: AppTypography.caption(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'These are learning observations from app activities. They are not marks, rankings or a diagnosis.',
+                style: DashText.body(fontSize: 14, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              _buildLearningSummaryDownload(),
+            ],
           );
         }
-        return _buildComponentCard(components[index - 1]);
+        if (index <= components.length) {
+          return _buildComponentCard(components[index - 1]);
+        }
+        if (index == components.length + 1)
+          return _buildParentOverviewSummary();
+        if (index == components.length + 2) {
+          return _buildParentActivitySummary();
+        }
+        return _buildParentObservations();
       },
     );
+  }
+
+  Widget _buildParentOverviewSummary() {
+    final data = _overview ?? const <String, dynamic>{};
+    final accuracy = data['accuracy'];
+    final items = <(String, String)>[
+      ('Practice sessions', '${data['sessions_completed'] ?? 0}'),
+      (
+        'Practice time',
+        metricText(data['practice_time_minutes'], suffix: ' min', decimals: 0),
+      ),
+      (
+        'Correct on first try (latest session)',
+        accuracy is num ? '${accuracy.round()}%' : '—',
+      ),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Overall progress', style: DashText.heading(fontSize: 17)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: items
+                .map(
+                  (item) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.slateBg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.$2,
+                          style: DashText.heading(fontSize: 16),
+                        ),
+                        Text(
+                          item.$1,
+                          style: DashText.caption(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParentActivitySummary() {
+    final activities =
+        _activityPerformance?['activities'] as List<dynamic>? ?? const [];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Activity-by-activity progress',
+            style: DashText.heading(fontSize: 17),
+          ),
+          const SizedBox(height: 8),
+          if (activities.isEmpty)
+            const Text(
+              'Activity details will appear after the first completed activity.',
+            )
+          else
+            ...activities.map((raw) {
+              final row = Map<String, dynamic>.from(raw as Map);
+              final accuracy = row['first_attempt_accuracy'];
+              final voice = Map<String, dynamic>.from(
+                row['voice'] as Map? ?? const {},
+              );
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  (row['activity_display'] ?? row['activity_name'] ?? _activityLabel(row['activity_id'])).toString(),
+                  style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  [
+                    (row['skill_name_en'] ?? _parentSkillLabel(row['skill_id'])).toString(),
+                    '${row['trials'] ?? 0} responses',
+                    if ((voice['recordings'] ?? 0) is num && (voice['recordings'] ?? 0) > 0)
+                      '${voice['usable_recordings'] ?? 0} of ${voice['recordings']} recordings clear',
+                  ].join(' · '),
+                  style: DashText.body(fontSize: 13, color: AppColors.textSecondary),
+                ),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      accuracy is num ? '${(accuracy * 100).round()}%' : '—',
+                      style: DashText.heading(fontSize: 17),
+                    ),
+                    Text('first try', style: DashText.caption(fontSize: 12)),
+                  ],
+                ),
+              );
+            }),
+          Text(
+            'Last 30 days. Percentages describe practice, not test marks.',
+            style: DashText.caption(fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _parentSkillLabel(dynamic raw) =>
+      switch ((raw?.toString() ?? '').replaceFirst('skill_', '')) {
+        '1' => 'Picture skills',
+        '2' => 'Letter skills',
+        '3' => 'Word skills',
+        '4' => 'Sentence skills',
+        '5' => 'Reading comprehension',
+        '6' => 'Textbook reading',
+        _ => 'Other practice',
+      };
+
+  String _activityLabel(dynamic raw) {
+    final match = RegExp(r'(\d+)$').firstMatch(raw?.toString() ?? '');
+    return match == null ? 'Activity' : 'Activity ${match.group(1)}';
   }
 
   Widget _buildComponentCard(Map<String, dynamic> definition) {
@@ -514,12 +589,12 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   children: [
                     Text(
                       definition['title'] as String,
-                      style: AppTypography.heading(fontSize: 16),
+                      style: DashText.heading(fontSize: 16),
                     ),
                     Text(
                       definition['subtitle'] as String,
-                      style: AppTypography.caption(
-                        fontSize: 11,
+                      style: DashText.caption(
+                        fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -537,9 +612,9 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           const SizedBox(height: 14),
           if (!available)
             Text(
-              'No measurements have been captured yet.',
-              style: AppTypography.caption(
-                fontSize: 13,
+              (definition['empty'] ?? 'Nothing recorded yet.').toString(),
+              style: DashText.body(
+                fontSize: 14,
                 color: AppColors.textSecondary,
               ),
             )
@@ -549,7 +624,23 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Text(
                   component['summary_text'] as String,
-                  style: AppTypography.caption(fontSize: 12, color: AppColors.textSecondary),
+                  style: DashText.body(
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            if (definition['id'] == 'c3_explainability')
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: StatusChip(
+                  label: component['combined_estimate_reviewed'] == true
+                      ? 'Reviewed by your therapist'
+                      : 'Not yet reviewed by a therapist',
+                  tone: component['combined_estimate_reviewed'] == true
+                      ? DashTone.good
+                      : DashTone.neutral,
+                  icon: Icons.rate_review_outlined,
                 ),
               ),
             Wrap(
@@ -571,7 +662,9 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                       )
                     : metric['key'] == 'recording_quality'
                     ? qualityLabels[value?.toString()] ?? 'Not available'
-                    : (value?.toString().trim().isNotEmpty == true ? value.toString() : '—');
+                    : (value?.toString().trim().isNotEmpty == true
+                          ? value.toString()
+                          : '—');
                 return Container(
                   constraints: const BoxConstraints(minWidth: 110),
                   padding: const EdgeInsets.symmetric(
@@ -587,7 +680,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                     children: [
                       Text(
                         text,
-                        style: AppTypography.heading(
+                        style: DashText.heading(
                           fontSize: 15,
                           color: color,
                         ),
@@ -595,8 +688,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                       const SizedBox(height: 2),
                       Text(
                         metric['label'] as String,
-                        style: AppTypography.caption(
-                          fontSize: 10,
+                        style: DashText.caption(
+                          fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -605,13 +698,41 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 );
               }).toList(),
             ),
-            if (component['data_origin'] == 'synthetic')
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text('Demonstration data', style: AppTypography.caption(fontSize: 11, color: AppColors.warmAmber)),
-              ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildLearningSummaryDownload() {
+    return DashCard(
+      title: 'Learning summary (PDF)',
+      subtitle: 'Last 30 days, in plain language. Useful to share with a teacher or therapist.',
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          icon: const Icon(Icons.picture_as_pdf_outlined),
+          label: Text('Download and share', style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700)),
+          onPressed: () async {
+            final studentId = widget.studentData['student_id']?.toString() ??
+                widget.studentData['id']?.toString() ??
+                widget.studentData['_id']?.toString();
+            if (studentId == null) return;
+            final messenger = ScaffoldMessenger.of(context);
+            messenger.showSnackBar(const SnackBar(content: Text('Preparing the summary...')));
+            try {
+              final bytes = await _dashboardService.downloadLearningSummary(studentId);
+              await SharePlus.instance.share(
+                ShareParams(
+                  files: [XFile.fromData(bytes, mimeType: 'application/pdf', name: 'Sipsara_Learning_Summary.pdf')],
+                  fileNameOverrides: ['Sipsara_Learning_Summary.pdf'],
+                ),
+              );
+            } catch (e) {
+              messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+            }
+          },
+        ),
       ),
     );
   }
@@ -636,7 +757,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Quick Summary", style: AppTypography.heading(fontSize: 20)),
+          Text("Quick Summary", style: DashText.heading(fontSize: 20)),
           const SizedBox(height: 16),
           GridView.count(
             crossAxisCount: 2,
@@ -672,6 +793,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          _buildParentObservations(),
           const SizedBox(height: 24),
           Container(
             width: double.infinity,
@@ -685,7 +808,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               children: [
                 Text(
                   'Parent Assessment Summary',
-                  style: AppTypography.heading(fontSize: 18),
+                  style: DashText.heading(fontSize: 18),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -696,7 +819,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'This is a parent observation summary for discussion with the therapist; it is not a diagnosis.',
+                  'This parent observation summary highlights behavioral patterns for discussion with educational specialists.',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -709,11 +832,138 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
 
           Text(
             "Interpretation Limits",
-            style: AppTypography.heading(fontSize: 20),
+            style: DashText.heading(fontSize: 20),
           ),
           const SizedBox(height: 16),
           _buildFluencyCard(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildParentObservations() {
+    final data = _assessmentSummary ?? const <String, dynamic>{};
+    if (data['_error'] != null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Parent observations could not be loaded. Refresh this page to try again.',
+            style: DashText.body(color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
+    final raw = Map<String, dynamic>.from(data['raw_responses'] ?? const {});
+    final categories = <String, Map<String, dynamic>>{
+      'basic': {
+        'title': 'Basic questions',
+        'questions': ComprehensiveAssessmentData.basicAssessment,
+      },
+      'reading': {
+        'title': 'Reading and visual skills',
+        'questions': ComprehensiveAssessmentData.readingAssessment,
+      },
+      'writing': {
+        'title': 'Writing',
+        'questions': ComprehensiveAssessmentData.writingAssessment,
+      },
+      'other': {
+        'title': 'Other observations',
+        'questions': ComprehensiveAssessmentData.otherAssessment,
+      },
+    };
+    List<dynamic> responses(String key) =>
+        raw[key] is List ? raw[key] as List : const [];
+
+    Widget renderAnswers(List<dynamic> values, List<dynamic> questions) {
+      if (values.isEmpty) {
+        return const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 14),
+          child: Text('Not completed yet.'),
+        );
+      }
+      return Column(
+        children: List.generate(values.length, (index) {
+          final value = values[index];
+          final answer = value is Map ? value['answer'] : value;
+          final question = index < questions.length ? questions[index] : null;
+          final text = value is Map
+              ? (value['question_si'] ??
+                        value['question_en'] ??
+                        value['question_text'])
+                    ?.toString()
+              : null;
+          final questionText =
+              text ??
+              (question is ComprehensiveQuestion
+                  ? question.text
+                  : question is AssessmentQuestion
+                  ? question.questionText
+                  : 'Question ${index + 1}');
+          return ListTile(
+            dense: true,
+            title: Text(questionText, style: DashText.body(fontSize: 13)),
+            trailing: Text(
+              answer == true
+                  ? 'ඔව් / Yes'
+                  : answer == false
+                  ? 'නැත / No'
+                  : 'පිළිතුරු නැත / Not answered',
+              style: DashText.caption(fontWeight: FontWeight.w700),
+            ),
+          );
+        }),
+      );
+    }
+
+    final initial = data['initial_responses'] is List
+        ? data['initial_responses'] as List
+        : const <dynamic>[];
+    final completed = categories.keys
+        .where((key) => responses(key).isNotEmpty)
+        .length;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'What you’ve shared',
+              style: DashText.heading(fontSize: 18),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$completed of ${categories.length} questionnaire sections completed',
+              style: DashText.caption(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Parent-reported observations for discussion, not a diagnosis.',
+              style: DashText.caption(color: AppColors.textSecondary),
+            ),
+            if (initial.isNotEmpty)
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: const Text('Initial child observations'),
+                children: [
+                  renderAnswers(initial, AssessmentQuestion.allQuestions),
+                ],
+              ),
+            ...categories.entries.map((entry) {
+              final values = responses(entry.key);
+              final questions = entry.value['questions'] as List<dynamic>;
+              return ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: Text(
+                  '${entry.value['title']} (${values.length}/${questions.length})',
+                ),
+                children: [renderAnswers(values, questions)],
+              );
+            }),
+          ],
+        ),
       ),
     );
   }
@@ -738,7 +988,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         children: [
           Text(
             "Accuracy Over Time",
-            style: AppTypography.heading(fontSize: 18),
+            style: DashText.heading(fontSize: 18),
           ),
           const SizedBox(height: 16),
           TrendChart(
@@ -751,7 +1001,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           ),
           Text(
             'Estimated skill mastery',
-            style: AppTypography.heading(fontSize: 18),
+            style: DashText.heading(fontSize: 18),
           ),
           if (_skills?['_error'] != null) Text(_skills!['_error'].toString()),
           ...((_skills?['skills'] as List?) ?? []).map(
@@ -774,7 +1024,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Observation", style: AppTypography.heading(fontSize: 18)),
+          Text("Observation", style: DashText.heading(fontSize: 18)),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(16),
@@ -794,7 +1044,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   child: Text(
                     _learningPattern?['observation'] ??
                         "No learning-pattern evidence is available.",
-                    style: AppTypography.body(fontSize: 16),
+                    style: DashText.body(fontSize: 16),
                   ),
                 ),
               ],
@@ -803,7 +1053,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           const SizedBox(height: 24),
           Text(
             "Recommended Practice",
-            style: AppTypography.heading(fontSize: 18),
+            style: DashText.heading(fontSize: 18),
           ),
           const SizedBox(height: 12),
           ...(_learningPattern?['recommended_practices'] as List<dynamic>? ??
@@ -827,7 +1077,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         children: [
           const Icon(Icons.lightbulb_rounded, color: AppColors.warmAmber),
           const SizedBox(width: 12),
-          Expanded(child: Text(text, style: AppTypography.body())),
+          Expanded(child: Text(text, style: DashText.body())),
         ],
       ),
     );
@@ -841,7 +1091,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         children: [
           Text(
             "Recent Reading Activity",
-            style: AppTypography.heading(fontSize: 18),
+            style: DashText.heading(fontSize: 18),
           ),
           const SizedBox(height: 12),
           Container(
@@ -931,15 +1181,15 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: AppTypography.heading(
+            style: DashText.heading(
               fontSize: 18,
               color: AppColors.textPrimary,
             ),
           ),
           Text(
             label,
-            style: AppTypography.caption(
-              fontSize: 11,
+            style: DashText.caption(
+              fontSize: 12,
               color: AppColors.textSecondary,
             ),
             textAlign: TextAlign.center,
@@ -1106,8 +1356,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   ),
                   child: Text(
                     'LEARNING SUPPORT',
-                    style: AppTypography.caption(
-                      fontSize: 10,
+                    style: DashText.caption(
+                      fontSize: 12,
                       fontWeight: FontWeight.w800,
                       color: AppColors.calmBlueDark,
                     ),
@@ -1118,7 +1368,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   needsPractice.isEmpty
                       ? 'Learning is moving forward'
                       : 'A clear next step for $name',
-                  style: AppTypography.heading(
+                  style: DashText.heading(
                     fontSize: 26,
                     color: AppColors.textPrimary,
                   ),
@@ -1126,7 +1376,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 const SizedBox(height: 7),
                 Text(
                   summaryMessage,
-                  style: AppTypography.body(
+                  style: DashText.body(
                     fontSize: 15,
                     color: AppColors.textSecondary,
                   ),
@@ -1135,7 +1385,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   const SizedBox(height: 7),
                   Text(
                     '$completed recent learning tasks reviewed',
-                    style: AppTypography.caption(
+                    style: DashText.caption(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: AppColors.calmBlueDark,
@@ -1192,7 +1442,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               icon: const Icon(Icons.help_outline_rounded, size: 17),
               label: Text(
                 'What do these mean?',
-                style: AppTypography.button(
+                style: DashText.button(
                   fontSize: 12,
                   color: AppColors.calmBlueDark,
                 ),
@@ -1255,7 +1505,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               icon: const Icon(Icons.history_rounded),
               label: Text(
                 'View recent learning details',
-                style: AppTypography.button(
+                style: DashText.button(
                   fontSize: 14,
                   color: AppColors.calmBlueDark,
                 ),
@@ -1298,13 +1548,13 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               Text(
                 'Learning insights will appear here',
                 textAlign: TextAlign.center,
-                style: AppTypography.heading(fontSize: 20),
+                style: DashText.heading(fontSize: 20),
               ),
               const SizedBox(height: 7),
               Text(
                 'After your child completes an activity, you will see what is going well and one clear area to practise next.',
                 textAlign: TextAlign.center,
-                style: AppTypography.body(
+                style: DashText.body(
                   fontSize: 14,
                   color: AppColors.textSecondary,
                 ),
@@ -1342,15 +1592,15 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               const SizedBox(height: 6),
               Text(
                 '$value',
-                style: AppTypography.heading(fontSize: 24, color: color),
+                style: DashText.heading(fontSize: 24, color: color),
               ),
               const SizedBox(height: 2),
               Text(
                 label,
                 maxLines: 2,
                 textAlign: TextAlign.center,
-                style: AppTypography.caption(
-                  fontSize: 11,
+                style: DashText.caption(
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textSecondary,
                 ),
@@ -1371,8 +1621,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                     children: [
                       Text(
                         'View',
-                        style: AppTypography.caption(
-                          fontSize: 10,
+                        style: DashText.caption(
+                          fontSize: 12,
                           fontWeight: FontWeight.w800,
                           color: color,
                         ),
@@ -1441,13 +1691,13 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                           Expanded(
                             child: Text(
                               title,
-                              style: AppTypography.heading(fontSize: 14),
+                              style: DashText.heading(fontSize: 14),
                             ),
                           ),
                           Text(
                             skill['status']?.toString() ?? '',
-                            style: AppTypography.caption(
-                              fontSize: 10,
+                            style: DashText.caption(
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: progress >= 0.8
                                   ? AppColors.gentleGreenDark
@@ -1473,8 +1723,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                       const SizedBox(height: 5),
                       Text(
                         '$firstTry of $observed first try · $helped helped',
-                        style: AppTypography.caption(
-                          fontSize: 11,
+                        style: DashText.caption(
+                          fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -1496,11 +1746,11 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: AppTypography.heading(fontSize: 21)),
+        Text(title, style: DashText.heading(fontSize: 21)),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: AppTypography.caption(
+          style: DashText.caption(
             fontSize: 13,
             color: AppColors.textSecondary,
           ),
@@ -1539,12 +1789,12 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               children: [
                 Text(
                   homePractice['title']?.toString() ?? 'Short home practice',
-                  style: AppTypography.heading(fontSize: 16),
+                  style: DashText.heading(fontSize: 16),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   homePractice['instruction']?.toString() ?? '',
-                  style: AppTypography.body(
+                  style: DashText.body(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
@@ -1561,8 +1811,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   ),
                   child: Text(
                     '$minutes minutes · no score needed',
-                    style: AppTypography.caption(
-                      fontSize: 10,
+                    style: DashText.caption(
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: AppColors.warmAmber,
                     ),
@@ -1674,12 +1924,12 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                       children: [
                         Text(
                           meaning.$1,
-                          style: AppTypography.heading(fontSize: 22),
+                          style: DashText.heading(fontSize: 22),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           meaning.$2,
-                          style: AppTypography.body(
+                          style: DashText.body(
                             fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
@@ -1694,8 +1944,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 details.isEmpty
                     ? 'No matching tasks in the current activity history.'
                     : '${details.length} ${details.length == 1 ? 'task' : 'tasks'} across ${skillNumbers.length} ${skillNumbers.length == 1 ? 'skill' : 'skills'}',
-                style: AppTypography.caption(
-                  fontSize: 10,
+                style: DashText.caption(
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textSecondary,
                 ),
@@ -1720,8 +1970,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                       Expanded(
                         child: Text(
                           'Showing the matching core tasks from the child\'s saved activity journey.',
-                          style: AppTypography.caption(
-                            fontSize: 11,
+                          style: DashText.caption(
+                            fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -1748,8 +1998,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   ),
                   child: Text(
                     'A checked-again task can also appear under Independent or Helped, depending on how your child completed it.',
-                    style: AppTypography.caption(
-                      fontSize: 11,
+                    style: DashText.caption(
+                      fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -1852,12 +2102,12 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           ),
           title: Text(
             'Skill $skillNumber · $skillTitle',
-            style: AppTypography.heading(fontSize: 14),
+            style: DashText.heading(fontSize: 14),
           ),
           subtitle: Text(
             '${details.length} ${details.length == 1 ? 'task' : 'tasks'}',
-            style: AppTypography.caption(
-              fontSize: 10,
+            style: DashText.caption(
+              fontSize: 12,
               color: AppColors.textSecondary,
             ),
           ),
@@ -1888,7 +2138,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         children: [
           Text(
             rows.first['activity_name']?.toString() ?? 'Learning activity',
-            style: AppTypography.heading(fontSize: 13),
+            style: DashText.heading(fontSize: 13),
           ),
           const SizedBox(height: 8),
           ...rows.map(
@@ -1910,8 +2160,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                     child: Text(
                       row['task_label']?.toString() ?? 'Task',
                       textAlign: TextAlign.center,
-                      style: AppTypography.caption(
-                        fontSize: 10,
+                      style: DashText.caption(
+                        fontSize: 12,
                         fontWeight: FontWeight.w800,
                         color: color,
                       ),
@@ -1924,8 +2174,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                       children: [
                         Text(
                           row['task_kind']?.toString() ?? 'Learning task',
-                          style: AppTypography.caption(
-                            fontSize: 11,
+                          style: DashText.caption(
+                            fontSize: 12,
                             fontWeight: FontWeight.w800,
                             color: AppColors.textPrimary,
                           ),
@@ -1933,8 +2183,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                         const SizedBox(height: 1),
                         Text(
                           row['detail']?.toString() ?? '',
-                          style: AppTypography.caption(
-                            fontSize: 11,
+                          style: DashText.caption(
+                            fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -1985,7 +2235,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               const SizedBox(height: 18),
               Text(
                 'How to read this page',
-                style: AppTypography.heading(fontSize: 22),
+                style: DashText.heading(fontSize: 22),
               ),
               const SizedBox(height: 16),
               _buildGuideRow(
@@ -2009,8 +2259,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               const SizedBox(height: 8),
               Text(
                 'These are learning observations, not marks, rankings, or a diagnosis.',
-                style: AppTypography.caption(
-                  fontSize: 11,
+                style: DashText.caption(
+                  fontSize: 12,
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -2046,11 +2296,11 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppTypography.heading(fontSize: 15)),
+                Text(title, style: DashText.heading(fontSize: 15)),
                 const SizedBox(height: 2),
                 Text(
                   description,
-                  style: AppTypography.body(
+                  style: DashText.body(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
@@ -2109,11 +2359,11 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: AppTypography.heading(fontSize: 17)),
+                    Text(title, style: DashText.heading(fontSize: 17)),
                     const SizedBox(height: 4),
                     Text(
                       evidence,
-                      style: AppTypography.body(
+                      style: DashText.body(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
@@ -2147,8 +2397,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                         : available
                         ? 'Reviewed support task and fresh check are available.'
                         : 'Open the reviewed activity for another calm practice.',
-                    style: AppTypography.caption(
-                      fontSize: 10,
+                    style: DashText.caption(
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textSecondary,
                     ),
@@ -2181,7 +2431,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 canResume
                     ? 'Continue from task ${savedRound + 1}'
                     : 'See practice plan',
-                style: AppTypography.button(fontSize: 14),
+                style: DashText.button(fontSize: 14),
               ),
             ),
           ),
@@ -2232,14 +2482,14 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               children: [
                 Text(
                   area['title']?.toString() ?? 'Learning activity',
-                  style: AppTypography.heading(fontSize: 15),
+                  style: DashText.heading(fontSize: 15),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   area['evidence_text']?.toString() ??
                       'Completed independently.',
-                  style: AppTypography.caption(
-                    fontSize: 10,
+                  style: DashText.caption(
+                    fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -2271,7 +2521,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           Expanded(
             child: Text(
               'Continue with the next normal activity. The app will keep checking learning as your child progresses.',
-              style: AppTypography.body(
+              style: DashText.body(
                 fontSize: 13,
                 color: AppColors.textPrimary,
               ),
@@ -2320,12 +2570,12 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               const SizedBox(height: 18),
               Text(
                 need['title']?.toString() ?? 'Practice plan',
-                style: AppTypography.heading(fontSize: 22),
+                style: DashText.heading(fontSize: 22),
               ),
               const SizedBox(height: 6),
               Text(
                 need['evidence_text']?.toString() ?? '',
-                style: AppTypography.body(
+                style: DashText.body(
                   fontSize: 14,
                   color: AppColors.textSecondary,
                 ),
@@ -2335,8 +2585,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 canResume
                     ? 'Your child stopped before finishing. Continue from task ${savedRound + 1}; completed practice tasks will not repeat.'
                     : 'This opens a fresh version of the full activity. Every round uses a reviewed task of the same difficulty instead of repeating the original core task.',
-                style: AppTypography.caption(
-                  fontSize: 10,
+                style: DashText.caption(
+                  fontSize: 12,
                   color: AppColors.calmBlueDark,
                 ),
               ),
@@ -2364,9 +2614,9 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
-                  'This recommendation comes from the child\'s recent first attempts and help used. It is learning support, not a diagnosis.',
-                  style: AppTypography.caption(
-                    fontSize: 10,
+                  'This suggestion is based on your child\'s recent first tries and the help the app gave.',
+                  style: DashText.caption(
+                    fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -2400,7 +2650,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                     canResume
                         ? 'Continue from task ${savedRound + 1}'
                         : 'Start fresh practice',
-                    style: AppTypography.button(fontSize: 14),
+                    style: DashText.button(fontSize: 14),
                   ),
                 ),
               ),
@@ -2430,7 +2680,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           alignment: Alignment.center,
           child: Text(
             number,
-            style: AppTypography.heading(fontSize: 16, color: color),
+            style: DashText.heading(fontSize: 16, color: color),
           ),
         ),
         const SizedBox(width: 12),
@@ -2438,12 +2688,12 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: AppTypography.heading(fontSize: 15)),
+              Text(title, style: DashText.heading(fontSize: 15)),
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: AppTypography.caption(
-                  fontSize: 10,
+                style: DashText.caption(
+                  fontSize: 12,
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -2547,12 +2797,12 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               const SizedBox(height: 18),
               Text(
                 'Recent learning details',
-                style: AppTypography.heading(fontSize: 22),
+                style: DashText.heading(fontSize: 22),
               ),
               const SizedBox(height: 4),
               Text(
                 'Latest observed attempt for each activity.',
-                style: AppTypography.caption(
+                style: DashText.caption(
                   fontSize: 13,
                   color: AppColors.textSecondary,
                 ),
@@ -2583,7 +2833,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                           ),
                           child: Text(
                             '$skillNumber',
-                            style: AppTypography.heading(
+                            style: DashText.heading(
                               fontSize: 14,
                               color: Colors.white,
                             ),
@@ -2593,12 +2843,12 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                         Expanded(
                           child: Text(
                             'Skill $skillNumber · ${skillNames[skillNumber] ?? 'Learning'}',
-                            style: AppTypography.heading(fontSize: 16),
+                            style: DashText.heading(fontSize: 16),
                           ),
                         ),
                         Text(
                           '${skillActivities.length}',
-                          style: AppTypography.caption(
+                          style: DashText.caption(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
                             color: AppColors.calmBlueDark,
@@ -2652,12 +2902,12 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               children: [
                 Text(
                   activity['activity_name']?.toString() ?? 'Activity',
-                  style: AppTypography.heading(fontSize: 15),
+                  style: DashText.heading(fontSize: 15),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '$correct of $total first try · $guided helped',
-                  style: AppTypography.caption(
+                  style: DashText.caption(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),

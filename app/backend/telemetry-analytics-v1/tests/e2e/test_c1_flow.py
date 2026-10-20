@@ -42,6 +42,12 @@ def test_c1_session_endpoint(monkeypatch):
     async def mock_save(*args, **kwargs):
         pass
         
+    # Ownership is enforced by require_owned_student (tested elsewhere);
+    # this flow test focuses on the C1 pipeline.
+    import routers.c1 as c1_router
+    async def allow(*args, **kwargs):
+        return {}
+    monkeypatch.setattr(c1_router, "require_owned_student", allow)
     monkeypatch.setattr(telemetry_repository, "save_session", mock_save)
     monkeypatch.setattr(telemetry_repository, "save_events", mock_save)
     monkeypatch.setattr(c1_repository, "save_c1_state", mock_save)

@@ -400,50 +400,23 @@ class StudentService {
     }
   }
 
-  /// Fetch the ML-generated cognitive analytics profile for a student.
-  ///
-  /// Returns a Map with cognitive indices, risk assessment, and
-  /// intervention recommendations on success, or an empty Map on failure.
-  ///
-  /// Accessible by: parent (who owns the student) or a connected specialist.
-  Future<Map<String, dynamic>> getCognitiveAnalytics(String studentId) async {
-    try {
-      final token = await _getAccessToken();
-      if (token == null) return {};
-
-      final response = await http.get(
-        Uri.parse('$_telemetryBaseUrl/telemetry/$studentId/analytics'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-      return {};
-    } catch (e) {
-      return {};
-    }
-  }
-
-  /// Download the PDF Clinical Report
+  /// Download the parent learning summary PDF (plain-language observations;
+  /// replaces the removed "clinical risk" report).
   Future<String?> downloadClinicalReport(String studentId) async {
     try {
       final token = await _getAccessToken();
       if (token == null) return 'Not authenticated.';
 
       final response = await http.get(
-        Uri.parse('$_telemetryBaseUrl/telemetry/$studentId/report/pdf'),
+        Uri.parse('${ApiConfig.parentDashboardBaseUrl}/$studentId/report'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
         final tempDir = await getTemporaryDirectory();
-        final file = File('${tempDir.path}/Clinical_Report_$studentId.pdf');
+        final file = File('${tempDir.path}/Sipsara_Learning_Summary_$studentId.pdf');
         await file.writeAsBytes(response.bodyBytes);
-        await Share.shareXFiles([XFile(file.path)], text: 'Clinical Report');
+        await Share.shareXFiles([XFile(file.path)], text: 'Sipsara learning summary');
         return null;
       } else {
         return 'Failed to download report: ${response.statusCode}';
@@ -482,34 +455,6 @@ class StudentService {
     }
   }
 
-  /// Submit a clinical ground-truth label for a student to train ML models.
-  Future<String?> submitClinicianLabel(String studentId, String label) async {
-    try {
-      final token = await _getAccessToken();
-      if (token == null) return 'Not authenticated.';
-
-      final response = await http.post(
-        Uri.parse('$_telemetryBaseUrl/ml/label/$studentId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'label': label}),
-      );
-
-      if (response.statusCode == 200) {
-        return null; // Success
-      } else {
-        final data = jsonDecode(response.body);
-        if (data['detail'] is String) {
-          return data['detail'];
-        }
-        return 'Failed to submit clinical label.';
-      }
-    } catch (e) {
-      return 'Failed to connect to the server.';
-    }
-  }
 
   /// Fetch C1 Behavioral Learner-State history for a student
   Future<List<dynamic>> getC1History(String studentId, {int limit = 5}) async {

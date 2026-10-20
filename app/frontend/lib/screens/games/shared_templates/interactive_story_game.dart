@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import '../../../models/curriculum_models.dart';
 import '../../../theme/app_theme.dart';
@@ -138,37 +136,10 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
         _isAnalyzing = false;
       });
 
-      // Log the acoustic metrics to telemetry
-      final telemetryAfter = TelemetryWrapper.of(context);
-      if (telemetryAfter != null) {
-        debugPrint(
-          'TELEMETRY (Acoustic): Latency=${results['Acoustic_Latency_ms']}, PeakDelta=${results['Peak_Count_Delta']}, Jitter=${results['Local_Jitter']}, Shimmer=${results['Local_Shimmer']}',
-        );
-        // Currently, TelemetryWrapper doesn't have a specific method for these yet, but we log it to console as requested.
-        // If there was a logCustomMetric method we could use it: telemetry.logCustomMetric(results);
-      }
-
       final status = results['measurement_status']?.toString();
-      final scoreValue = (results['reading_performance_score'] as num?)
-          ?.toDouble();
       if (status == 'valid' || status == 'uncertain') {
-        // An uncertain STT result is retained for research but never blocks the
-        // child. Only a recording-quality failure requests a retry.
-        final score = status == 'valid' && scoreValue != null
-            ? (scoreValue * 100).round().clamp(0, 100)
-            : 0;
-        unawaited(
-          telemetryAfter?.completeAdaptiveRound(
-            score,
-            currentRoundIndex: index,
-            itemId: itemId,
-            isCorrect: status == 'valid' && score >= 70,
-            selectedAnswers: <String>['spoken_response'],
-            errorType: status == 'uncertain'
-                ? 'speech_measurement_uncertain'
-                : null,
-          ),
-        );
+        // C2 remains observation-only for C4. Recognition uncertainty is not
+        // converted into a correct/incorrect adaptive-learning event.
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -187,7 +158,7 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
             );
           }
         });
-      } else {
+      } else if (status == 'retry_required') {
         final issues =
             (results['recording_quality_issues'] as List?)
                 ?.map((value) => value.toString())
@@ -203,22 +174,14 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
             backgroundColor: AppColors.warmAmber,
           ),
         );
-        if (telemetryAfter != null) {
-          unawaited(
-            telemetryAfter.requestSemanticScaffold(
-              itemId: itemId,
-              visibleOptionIds: const <String>['spoken_response'],
-              selectedOptionIds: const <String>['spoken_response'],
-              correctOptionIds: const <String>['target_sentence'],
-              supportedActions: const <String>[
-                'REPLAY_INSTRUCTION',
-                'SLOW_AUDIO',
-              ],
-              errorType: 'oral_reading_retry',
-              minimumVisibleOptions: 1,
-            ),
-          );
-        }
+      } else {
+        final message = results['user_message']?.toString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message ?? 'දැනට හඬ විශ්ලේෂණයට සම්බන්ධ විය නොහැක. නැවත උත්සාහ කරන්න.'),
+            backgroundColor: AppColors.warmAmber,
+          ),
+        );
       }
     } else {
       setState(() {

@@ -112,11 +112,15 @@ class DashboardTests(unittest.TestCase):
         self.db.session_summaries.rows=[self.session(i) for i in range(12)]
         dto=self.call(therapist.get_therapist_c1_behavioral,STUDENT)
         self.assertTrue(dto.updated_at.endswith('Z'));self.assertEqual(len(dto.trends.accuracy),10)
-        self.assertEqual(dto.trends.accuracy[0],{'session':'session-2','value':.75})
+        point=dto.trends.accuracy[0]
+        self.assertEqual((point['session'],point['value']),('session-2',.75))
+        # Charts are labelled by session number and date, never by a UUID.
+        self.assertTrue(point['label'].startswith('S1'))
         self.assertEqual(dto.trends.accuracy[-1]['session'],'session-11')
     def test_missing_values_remain_null_not_perfect_speech_or_confidence(self):
         c2=self.call(therapist.get_therapist_c2_speech,STUDENT);c3=self.call(therapist.get_therapist_c3_profile,STUDENT)
         self.assertIsNone(c2.latest.wer);self.assertIsNone(c2.latest.jitter);self.assertIsNone(c3.confidence)
+        self.assertFalse(c3.classifier_available)
         self.assertFalse(c2.available);self.assertEqual(c3.probabilities,{})
         self.assertFalse(c3.available);self.assertEqual(c3.pipeline_status,'not_run')
     def test_flat_nested_speech_contracts_and_no_one_minus_wer(self):
@@ -128,7 +132,11 @@ class DashboardTests(unittest.TestCase):
         self.db.learner_profiles.rows=[{'student_id':STUDENT,'learner_profile':{'primary_pattern':'Phonological Learning Pattern',
             'class_probabilities':{'Phonological Learning Pattern':.6}},'shap_explanations':{'top_contributing_features':[{'feature_name':'f','shap_impact':'-0.25','value':1.2}]}}]
         dto=self.call(therapist.get_therapist_c3_profile,STUDENT)
-        self.assertEqual(dto.probabilities,{'Phonological':.6});self.assertEqual(dto.shap_explanations[0].contribution,-.25)
+        self.assertTrue(dto.classifier_available)
+        self.assertEqual(dto.probabilities,{'Phonological': 0.6})
+        self.assertEqual(len(dto.shap_explanations), 1)
+        self.assertEqual(dto.shap_explanations[0].contribution, -0.25)
+        self.assertEqual(dto.shap_explanations[0].direction, 'negative')
     def test_c4_newest_history_and_unknown_uncertainty(self):
         self.db.knowledge_states.rows=[{'student_id':STUDENT,'knowledge_state':{'KC_ORAL_READING_FLUENCY':.4},'theta_estimate':-.2,'updated_at':datetime(2026,8,31)}]
         self.db.adaptive_decisions.rows=[dict(_id=f'{i:03}',student_id=STUDENT,timestamp=f'2026-08-{i+1:02}T00:00:00Z',selected_activity='act_1',mastery_after=.4) for i in range(25)]
@@ -665,7 +673,7 @@ class DashboardTests(unittest.TestCase):
         self.assertFalse(c3.available)
         self.assertEqual(c3.pipeline_status,'skipped_missing_inputs')
         self.assertEqual(c3.missing_inputs,['acoustic_latency_ms','student_age_months'])
-        self.assertIn('safely skipped',c3.skip_reason)
+        self.assertIn('not ready yet',c3.skip_reason)
         c4=self.call(therapist.get_therapist_c4_adaptive,STUDENT)
         self.assertEqual(c4.data_quality['c3_pipeline_status'],'skipped_missing_inputs')
     def test_parent_real_session_count_duration_and_history(self):
@@ -686,12 +694,38 @@ class DashboardTests(unittest.TestCase):
         result=self.call(parent.get_parent_component_analytics,STUDENT)
         self.assertTrue(result['c1_behavioral']['available']);self.assertTrue(result['c2_speech']['available'])
         self.assertFalse(result['c3_explainability']['available'])
+        self.assertFalse(result['c3_explainability']['classifier_available'])
+        self.assertNotIn('primary_pattern', result['c3_explainability'])
+        self.assertFalse(result['c3_explainability']['classifier_available'])
         self.assertEqual(result['c4_adaptive']['average_mastery'],.7)
         self.assertEqual(result['c4_adaptive']['supported_decision_rate'],1.0)
+
+    def test_parent_component_analytics_hides_classifier_scores(self):
+        self.db.learner_profiles.rows=[{
+            'student_id':STUDENT,
+            'learner_profile':{
+                'primary_pattern':'Phonological Learning Pattern',
+                'confidence':.74,
+                'class_probabilities':{
+                    'Typical Learning Pattern':.12,
+                    'Phonological Learning Pattern':.74,
+                    'Visual-Orthographic Learning Pattern':.09,
+                    'Combined Learning Pattern':.05,
+                },
+            },
+            'data_origin':'synthetic',
+        }]
+        result=self.call(parent.get_parent_component_analytics,STUDENT)
+        c3=result['c3_explainability']
+        # Pattern names and probabilities are for professionals only.
+        self.assertFalse(c3['classifier_available'])
+        for key in ('primary_pattern','probabilities','confidence'):
+            self.assertNotIn(key,c3)
+        self.assertEqual(c3['data_origin'],'synthetic')
     def test_parent_empty_is_not_a_fabricated_progress_point(self):
         self.assertEqual(self.call(parent.get_parent_progress,STUDENT).accuracy_trend,[])
         self.assertIsNone(self.call(parent.get_parent_overview,STUDENT).accuracy)
-        self.assertIn('No learning-pattern',self.call(parent.get_parent_learning_pattern,STUDENT).observation)
+        self.assertIn('More completed activities',self.call(parent.get_parent_learning_pattern,STUDENT).observation)
     def test_http_authorization_and_bson_serialization(self):
         self.db.session_summaries.rows=[self.session(1)]
         app=FastAPI();app.include_router(therapist.router)

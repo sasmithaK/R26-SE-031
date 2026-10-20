@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from services import c2_settings
+
 
 FUSION_VERSION = "c2-evidence-fusion-v1"
 
@@ -43,10 +45,11 @@ class EvidenceFusionService:
 
         disagreement_reasons = []
         if grapheme_accuracy is not None and syllable_consistency is not None:
-            if abs(grapheme_accuracy - syllable_consistency) > 0.45:
+            if abs(grapheme_accuracy - syllable_consistency) > c2_settings.get("fusion", "text_acoustic_disagreement", 0.45):
                 disagreement_reasons.append("text_acoustic_disagreement")
         if asr_confidence is not None and grapheme_accuracy is not None:
-            if asr_confidence < 0.35 and grapheme_accuracy > 0.80:
+            if (asr_confidence < c2_settings.get("fusion", "low_asr_confidence", 0.35)
+                    and grapheme_accuracy > c2_settings.get("fusion", "close_text_grapheme_accuracy", 0.80)):
                 disagreement_reasons.append("low_asr_confidence_despite_close_text")
 
         if quality.get("retry_required"):
@@ -59,23 +62,29 @@ class EvidenceFusionService:
         else:
             status = "valid"
 
-        asr_reliability = asr_confidence if asr_confidence is not None else 0.5
         method_coverage = min(1.0, len(available_methods) / 4.0)
-        combined_confidence = quality_score * (
-            0.45 + 0.30 * asr_reliability + 0.25 * method_coverage
-        )
+        # Do not invent a "neutral" ASR confidence when Whisper cannot supply
+        # one. Confidence is calculated only from methods that actually
+        # produced a measurement.
+        confidence_terms = [(0.45, 1.0), (0.25, method_coverage)]
+        if asr_confidence is not None:
+            confidence_terms.append((0.30, asr_confidence))
+        term_weight = sum(weight for weight, _ in confidence_terms)
+        evidence_confidence = sum(weight * value for weight, value in confidence_terms) / term_weight
+        combined_confidence = quality_score * evidence_confidence
         if disagreement_reasons:
-            combined_confidence *= 0.70
+            combined_confidence *= c2_settings.get("fusion", "disagreement_confidence_penalty", 0.70)
         if status == "retry_required":
             combined_confidence = min(combined_confidence, 0.25)
 
         reading_score = None
         if status != "retry_required" and grapheme_accuracy is not None:
-            components = [(grapheme_accuracy, 0.70)]
+            weights = c2_settings.get("fusion", "reading_score_weights", {}) or {}
+            components = [(grapheme_accuracy, weights.get("grapheme_accuracy", 0.70))]
             if word_accuracy is not None:
-                components.append((word_accuracy, 0.20))
+                components.append((word_accuracy, weights.get("word_accuracy", 0.20)))
             if syllable_consistency is not None:
-                components.append((syllable_consistency, 0.10))
+                components.append((syllable_consistency, weights.get("syllable_consistency", 0.10)))
             total_weight = sum(weight for _, weight in components)
             reading_score = sum(value * weight for value, weight in components) / total_weight
 
@@ -88,6 +97,7 @@ class EvidenceFusionService:
                 else None
             ),
             "available_methods": available_methods,
+            "asr_confidence_available": asr_confidence is not None,
             "method_disagreement": bool(disagreement_reasons),
             "disagreement_reasons": disagreement_reasons,
             "decision_policy": "abstain_on_poor_quality_or_method_disagreement",

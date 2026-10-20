@@ -75,7 +75,7 @@ from datetime import datetime
 
 class ParentC1Summary(BaseModel):
     student_id: str
-    overall_progress: int
+    overall_progress: Optional[int] = None
     accuracy: int
     response_speed: str
     attention: str
@@ -114,9 +114,13 @@ class SessionSummary(BaseModel):
     overall: dict
     error_profile: dict
     behavioral_fatigue_proxy: Optional[float]
+    fatigue_state: Optional[str] = None
     fatigue_components: dict
     knowledge_components: dict
     activity_breakdown: dict
+    # Collision-safe grouping for dashboards; keep the legacy activity-only
+    # map above for existing consumers.
+    activity_breakdown_by_skill: dict = Field(default_factory=dict)
     feature_version: str = "c1-v2"
     schema_version: str = "1.0"
 

@@ -9,7 +9,7 @@ Endpoints:
   GET  /api/v1/auth/telemetry/{sid}/analytics  — ML cognitive profile + risk report
 """
 
-from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
 import io
 import httpx
@@ -23,9 +23,6 @@ from datetime import datetime, timezone
 from database import get_db
 from dependencies import get_current_user
 from schemas.telemetry import TelemetrySessionSubmit
-from services.ml_pipeline import generate_cognitive_profile, generate_comp2_profile
-from services.ml_engine import CognitiveLoadClassifier
-from services.report_generator import generate_pdf_report
 from services.assessment_report_generator import generate_assessment_report
 from services.behavioral_engine import extract_session_features
 from services.comp2_kinematics import extract_comp2_features
@@ -133,44 +130,33 @@ async def _validate_component_four_research_event(db, event: dict) -> None:
     event["research_eligible"] = not errors
     event["research_validation_errors"] = errors
 
-async def _trigger_c3_background(student_id: str, session_summary: dict):
-    """Fuse only explicitly linked, complete inputs. C1 accuracy is not path efficiency."""
+async def _trigger_c3_background(student_id: str, session_summary: dict, authorization: str | None = None):
+    """Ask C3 to reconcile saved evidence after C1 arrives.
+
+    C2 performs the same call after speech is saved, so either arrival order
+    produces one idempotent session summary.
+    """
     db = get_db()
     session_id = session_summary.get("session_id")
-    audit = {"student_id": student_id, "session_id": session_id, "timestamp": datetime.now(timezone.utc),
-             "model_name": "XGBoost", "validation_status": "synthetic_only"}
+    dataset_id = session_summary.get("dataset_id")
     try:
-        speech = await db.speech_features.find_one({"student_id": student_id, "session_id": session_id}, sort=[("created_at", -1)]) or {}
-        motion = await db.kinematic_features.find_one({"student_id": student_id, "session_id": session_id}, sort=[("timestamp", -1)]) or {}
-        student = await db.students.find_one({"_id": ObjectId(student_id)}) or {}
-        audio_names = {"acoustic_latency_ms": "acoustic_latency_ms", "peak_count_delta": "syllabic_event_mismatch",
-                       "intra_word_silence_ratio": "intra_word_silence_ratio", "local_jitter": "local_jitter", "local_shimmer": "local_shimmer"}
-        motion_names = ("time_to_first_touch_ms", "orthographic_confusion_index", "path_efficiency_ratio", "dimensionless_jerk", "dwell_time_ms")
-        audio = {k: speech.get(v) for k,v in audio_names.items()}
-        kinematics = {k: motion.get(k) for k in motion_names}
-        demographics = {"student_age_months": student.get("age_months"), "gender": student.get("gender_code"),
-                        "time_of_day_hour": session_summary.get("time_of_day_hour")}
-        missing = [k for k,v in {**audio, **kinematics, **demographics}.items()
-                   if not isinstance(v, (int,float)) or isinstance(v,bool) or not math.isfinite(v)]
-        origins = {speech.get("data_origin"), motion.get("data_origin")}
-        if origins not in ({"observed"}, {"synthetic"}):
-            missing.append("consistent_explicit_modality_provenance")
-        if speech.get("measurement_status") not in ("available", "valid", "synthetic_features"):
-            missing.append("valid_speech_measurement")
-        if speech.get("dataset_id") != motion.get("dataset_id"):
-            missing.append("matched_dataset_id")
-        if missing:
-            await db.model_audit_log.insert_one({**audit, "status": "skipped_missing_inputs", "missing_features": missing})
-            return
-        payload = {"student_id": student_id, "session_id": session_id, "c1_audio_vector": audio,
-                   "c2_kinematic_vector": kinematics, **demographics,
-                   "data_origin": speech["data_origin"], "dataset_id": speech.get("dataset_id")}
         async with httpx.AsyncClient() as client:
-            response = await client.post(os.getenv("FUSION_API_URL", "http://localhost:9016").rstrip("/") + "/diagnose", json=payload, timeout=15)
+            headers = {"Authorization": authorization} if authorization else {}
+            response = await client.post(
+                os.getenv("FUSION_API_URL", "http://localhost:9016").rstrip("/") + "/diagnose/session",
+                json={"student_id": student_id, "session_id": session_id,
+                      "data_origin": session_summary.get("data_origin", "observed"),
+                      "dataset_id": dataset_id},
+                timeout=15,
+                headers=headers,
+            )
             response.raise_for_status()
-        await db.model_audit_log.insert_one({**audit,"status":"fusion_requested","data_origin":speech["data_origin"]})
-    except Exception:
-        await db.model_audit_log.insert_one({**audit,"status":"fusion_failed"})
+    except Exception as exc:
+        await db.model_audit_log.update_one(
+            {"student_id": student_id, "session_id": session_id, "model_name": "XGBoost"},
+            {"$set": {"timestamp": datetime.now(timezone.utc), "status": "fusion_refresh_failed",
+                      "error_type": type(exc).__name__}}, upsert=True,
+        )
 
 
 def _kinematic_events(events: list[dict]) -> list[dict]:
@@ -188,7 +174,10 @@ def _kinematic_events(events: list[dict]) -> list[dict]:
                 "t": point.get("timestamp_ms", point.get("t", 0)),
                 "type": str(point.get("type") or "").upper(),
             })
-        if len(points) < 2:
+        # Kinematic path metrics are meaningful only when an actual movement
+        # path was captured. A DOWN/UP tap must not be reported as a perfectly
+        # efficient motor trajectory.
+        if len(points) < 3 or not any(point["type"] == "MOVE" for point in points):
             continue
         targets = event.get("targets") or event.get("target_ids") or []
         selected = event.get("selected_answers") or []
@@ -208,6 +197,7 @@ def _kinematic_events(events: list[dict]) -> list[dict]:
 async def submit_telemetry(
     req: TelemetrySessionSubmit,
     background_tasks: BackgroundTasks,
+    request: Request,
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -218,6 +208,7 @@ async def submit_telemetry(
     """
     db = get_db()
 
+    c1_processing = {"status": "failed", "model_used": "unavailable"}
     try:
         student_oid = ObjectId(req.student_id)
     except Exception:
@@ -350,9 +341,10 @@ async def submit_telemetry(
             upsert=True,
         )
 
-    # Assess real-time cognitive load
-    events_list = session_doc.get("events", [])
-    cognitive_load = CognitiveLoadClassifier.classify(events_list)
+    # The response reports C1's own interaction state (see services/c1);
+    # the former heuristic CognitiveLoadClassifier duplicated it with
+    # different, undocumented thresholds and has been removed.
+    cognitive_load = None
 
     # Process & Save C1 State for Therapist/Parent dashboards
     from services.c1.processor import process_session
@@ -369,18 +361,37 @@ async def submit_telemetry(
             e["student_id"] = req.student_id
             
         c1_partial = process_session(req.session_id, req.student_id, events_data)
-        model_metadata = predict_c1_pattern(c1_partial["behavior"])
+        model_features = {
+            **c1_partial["behavior"],
+            **c1_partial["indices"],
+            "fatigue_score": c1_partial["fatigue"]["score"],
+            "cognitive_load_score": c1_partial["interaction_state"]["score"],
+        }
+        model_metadata = predict_c1_pattern(model_features)
         c1_partial["model"] = model_metadata
         await c1_repository.save_c1_state(c1_partial)
+        cognitive_load = (c1_partial.get("interaction_state") or {}).get("state")
+        c1_processing = {
+            "status": "processed",
+            "model_used": model_metadata.get("model_used"),
+            "unavailable_reason": model_metadata.get("unavailable_reason"),
+            "missing_features": model_metadata.get("missing_features", []),
+        }
     except Exception as err:
-        print(f"C1 processing error in telemetry router: {err}")
+        c1_processing = {"status": "failed", "error_type": type(err).__name__}
 
     # Trigger C3 Background Fusion
-    background_tasks.add_task(_trigger_c3_background, str(student_oid), summary)
+    background_tasks.add_task(
+        _trigger_c3_background,
+        str(student_oid),
+        summary,
+        request.headers.get("Authorization"),
+    )
 
     return {
         "message": "Telemetry session logged successfully.",
-        "cognitive_load": cognitive_load
+        "cognitive_load": cognitive_load,
+        "c1_processing": c1_processing,
     }
 
 
@@ -482,197 +493,11 @@ async def get_c3_ready_features(
 # GET /telemetry/{student_id}/analytics  — ML Cognitive Profile
 # ---------------------------------------------------------------------------
 
-@router.get("/telemetry/{student_id}/analytics")
-async def get_cognitive_analytics(
-    student_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Run the ML Analytics Pipeline over all telemetry sessions for a student
-    and return a structured cognitive profile including:
-      - 4 cognitive index scores (0-100)
-      - Dyslexia subtype risk classification
-      - Personalized intervention recommendations
-
-    Access is granted to: (a) the owning parent, or (b) a connected specialist.
-    """
-    db = get_db()
-
-    try:
-        student_oid = ObjectId(student_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid student ID format.",
-        )
-
-    # Permission check
-    if current_user.get("role") == "specialist":
-        connection = await db.connections.find_one({
-            "student_id": student_id,
-            "specialist_id": str(current_user["_id"]),
-        })
-        if not connection:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not connected to this student.",
-            )
-    else:
-        student = await db.students.find_one(
-            {"_id": student_oid, "parent_id": current_user["_id"]}
-        )
-        if not student:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Student not found.",
-            )
-
-    # Retrieve up to 500 most recent sessions for the pipeline
-    cursor = db.telemetry_events.find(
-        {"student_id": student_id}
-    ).sort("submitted_at", -1).limit(500)
-    sessions = await cursor.to_list(length=500)
-
-    if not sessions:
-        return {
-            "student_id": student_id,
-            "status": "insufficient_data",
-            "message": "Complete at least one activity to generate a cognitive profile.",
-            "data_points": 0,
-        }
-
-    # Fetch assessment_risk_score
-    comp_results = student.get("comprehensive_assessment_results", {})
-    total_yes = sum(sum(1 for a in ans if a is True) for ans in comp_results.values() if isinstance(ans, list))
-    total_q = sum(len(ans) for ans in comp_results.values() if isinstance(ans, list))
-    assessment_risk_score = total_yes / max(total_q, 1)
-
-    # Run ML pipeline
-    profile = generate_cognitive_profile(sessions, assessment_risk_score=assessment_risk_score)
-
-    # Persist / upsert the latest cognitive profile for this student
-    await db.cognitive_profiles.update_one(
-        {"student_id": student_id},
-        {
-            "$set": {
-                **profile,
-                "student_id": student_id,
-                "last_updated": datetime.now(timezone.utc).isoformat(),
-            }
-        },
-        upsert=True,
-    )
-
-    return {
-        "student_id": student_id,
-        "status": "ok",
-        **profile,
-    }
-
-# ---------------------------------------------------------------------------
-# GET /telemetry/{student_id}/comp2  — Component 2 Feature Vector (Integration)
-# ---------------------------------------------------------------------------
-
-@router.get("/telemetry/{student_id}/comp2")
-async def get_comp2_analytics(
-    student_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Returns the Component 2 specific visual-orthographic kinematic feature vector.
-    Used for integration with Component 3 (Fusion Engine).
-    """
-    db = get_db()
-    
-    try:
-        student_oid = ObjectId(student_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid student ID format.",
-        )
-        
-    cursor = db.telemetry_events.find(
-        {"student_id": student_id}
-    ).sort("submitted_at", -1).limit(500)
-    sessions = await cursor.to_list(length=500)
-    
-    if not sessions:
-        return {
-            "student_id": student_id,
-            "status": "insufficient_data",
-            "message": "Complete at least one visual orthographic activity."
-        }
-        
-    comp2_profile = generate_comp2_profile(sessions)
-    
-    return comp2_profile
-
-# ---------------------------------------------------------------------------
-# GET /telemetry/{student_id}/report/pdf  — Clinical PDF Report
-# ---------------------------------------------------------------------------
-
-@router.get("/telemetry/{student_id}/report/pdf")
-async def get_clinical_report_pdf(
-    student_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Generate a formatted clinical PDF report of the student's telemetry and cognitive profile.
-    """
-    db = get_db()
-    
-    try:
-        student_oid = ObjectId(student_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid student ID format.",
-        )
-
-    # Permission check
-    if current_user.get("role") == "specialist":
-        connection = await db.connections.find_one({
-            "student_id": student_id,
-            "specialist_id": str(current_user["_id"]),
-        })
-        if not connection:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not connected to this student.",
-            )
-    else:
-        student = await db.students.find_one(
-            {"_id": student_oid, "parent_id": current_user["_id"]}
-        )
-        if not student:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Student not found.",
-            )
-            
-    # Need student name
-    student_name = student.get("first_name", "Unknown") if 'student' in locals() else "Student"
-    if 'student' not in locals():
-        student = await db.students.find_one({"_id": student_oid})
-        student_name = student.get("first_name", "Unknown") if student else "Unknown"
-        
-    # Get profile
-    profile = await db.cognitive_profiles.find_one({"student_id": student_id})
-    if not profile:
-        raise HTTPException(status_code=404, detail="No cognitive profile found for this student. Complete an activity first.")
-        
-    # Get sessions
-    cursor = db.telemetry_events.find({"student_id": student_id}).sort("submitted_at", -1)
-    sessions = await cursor.to_list(length=500)
-    
-    pdf_bytes = generate_pdf_report(student_name, profile, sessions)
-    
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=Clinical_Report_{student_id}.pdf"}
-    )
+# The legacy "cognitive profile", "comp2 risk" and "clinical PDF" endpoints
+# were removed: they produced dyslexia-risk labels with default values and fed
+# the current 19-feature C1 model with a mismatched feature order. Learner
+# state is served by /api/v1/c1/* and the dashboards; reports are generated by
+# the auth/dashboard service (parent and therapist report endpoints).
 
 # ---------------------------------------------------------------------------
 # GET /telemetry/export/csv  — Data Lake ML Export

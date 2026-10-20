@@ -1,0 +1,21 @@
+{
+  "_comment": "C2 thresholds and weights. Recording-quality gate and evidence fusion. Engineering settings to be validated in a consented pilot; cite in the thesis.",
+  "quality": {
+    "min_duration_ms": 350,
+    "max_duration_ms": 30000,
+    "min_peak_amplitude": 0.008,
+    "min_active_frame_ratio": 0.04,
+    "max_clipping_ratio": 0.02,
+    "noisy_snr_db": 7.0,
+    "noisy_spectral_flatness": 0.30,
+    "score_weights": {"duration": 0.20, "level": 0.25, "clarity": 0.35, "clipping": 0.20}
+  },
+  "fusion": {
+    "reading_score_weights": {"grapheme_accuracy": 0.70, "word_accuracy": 0.20, "syllable_consistency": 0.10},
+    "text_acoustic_disagreement": 0.45,
+    "low_asr_confidence": 0.35,
+    "close_text_grapheme_accuracy": 0.80,
+    "disagreement_confidence_penalty": 0.70
+  },
+  "pauses": {"min_ms": 200, "max_ms": 3000}
+}

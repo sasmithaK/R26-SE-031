@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../widgets/app_loading_indicator.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
+import '../../services/therapist_dashboard_service.dart';
+import '../../widgets/dashboard/dashboard_kit.dart';
 import 'therapist_student_detail_screen.dart';
 
 class TherapistStudentsScreen extends StatefulWidget {
@@ -15,6 +17,7 @@ class TherapistStudentsScreen extends StatefulWidget {
 class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
   bool _isLoading = true;
   List<dynamic> _connections = [];
+  Map<String, Map<String, dynamic>> _learnerById = {};
 
   @override
   void initState() {
@@ -24,12 +27,80 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
 
   Future<void> _fetchConnections() async {
     final connections = await AuthService().getConnections();
+    // Coverage and monitoring prompts come from the therapist summary; the
+    // list still renders if that request fails.
+    final learners = <String, Map<String, dynamic>>{};
+    try {
+      final summary = await TherapistDashboardService().getDashboardSummary();
+      for (final raw in (summary['learners'] as List<dynamic>? ?? const [])) {
+        if (raw is Map && raw['student_id'] != null) {
+          learners[raw['student_id'].toString()] = Map<String, dynamic>.from(raw);
+        }
+      }
+    } catch (_) {}
     if (mounted) {
       setState(() {
         _connections = connections;
+        _learnerById = learners;
         _isLoading = false;
       });
     }
+  }
+
+  Widget _coverageFor(dynamic conn) {
+    final learner = _learnerById[(conn is Map ? conn['student_id'] : null)?.toString() ?? ''];
+    if (learner == null) return const SizedBox.shrink();
+    final coverage = Map<String, dynamic>.from(learner['coverage'] as Map? ?? const {});
+    final alerts = (learner['alerts'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .where((a) => a['severity'] == 'watch')
+        .toList();
+    int n(dynamic v) => v is num ? v.toInt() : 0;
+    final recordings = n(coverage['recordings']);
+    final usable = n(coverage['usable_recordings']);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Last active: ${DashFormat.date(coverage['last_active_at'], fallback: 'no activity yet')}',
+            style: DashText.body(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              StatusChip(
+                label: '${n(coverage['activity_sessions'])} activity sessions',
+                tone: n(coverage['activity_sessions']) > 0 ? DashTone.good : DashTone.neutral,
+                icon: Icons.touch_app_outlined,
+              ),
+              StatusChip(
+                label: recordings == 0 ? 'No reading yet' : '$usable/$recordings clear recordings',
+                tone: recordings == 0 ? DashTone.neutral : (usable > 0 ? DashTone.good : DashTone.watch),
+                icon: Icons.mic_none_rounded,
+              ),
+              StatusChip(
+                label: 'Questionnaire ${n(coverage['questionnaire_sections_done'])}/${n(coverage['questionnaire_sections_total'])}',
+                tone: n(coverage['questionnaire_sections_done']) >= n(coverage['questionnaire_sections_total']) &&
+                        n(coverage['questionnaire_sections_total']) > 0
+                    ? DashTone.good
+                    : DashTone.neutral,
+                icon: Icons.assignment_outlined,
+              ),
+              if (alerts.isNotEmpty)
+                StatusChip(
+                  label: '${alerts.length} to watch',
+                  tone: DashTone.watch,
+                  icon: Icons.visibility_outlined,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -46,8 +117,8 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'my students',
-                    style: AppTypography.heading(
+                    'My students',
+                    style: DashText.heading(
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
@@ -87,7 +158,7 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
                                       const SizedBox(height: 16),
                                       Text(
                                         "No students assigned yet.",
-                                        style: AppTypography.heading(
+                                        style: DashText.heading(
                                           fontSize: 20,
                                           color: AppColors.textSecondary,
                                         ),
@@ -149,7 +220,7 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
                                         .withValues(alpha: 0.2),
                                     child: Text(
                                       studentInitials,
-                                      style: AppTypography.heading(
+                                      style: DashText.heading(
                                         fontSize: 24,
                                         color: AppColors.calmBlue,
                                       ),
@@ -163,7 +234,7 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
                                       children: [
                                         Text(
                                           studentName,
-                                          style: AppTypography.heading(
+                                          style: DashText.heading(
                                             fontSize: 18,
                                             fontWeight: FontWeight.w700,
                                           ),
@@ -171,7 +242,7 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
                                         const SizedBox(height: 4),
                                         Text(
                                           'Connected: ${conn['connected_at'] != null ? conn['connected_at'].split('T')[0] : 'Recently'}',
-                                          style: AppTypography.caption(
+                                          style: DashText.caption(
                                             color: AppColors.textSecondary,
                                           ),
                                         ),
@@ -191,7 +262,7 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
                                     ),
                                     child: Text(
                                       conn['status'] ?? 'Active',
-                                      style: AppTypography.caption(
+                                      style: DashText.caption(
                                         color: AppColors.gentleGreen,
                                         fontWeight: FontWeight.w700,
                                       ),
@@ -200,6 +271,7 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
                                 ],
                               ),
 
+                              _coverageFor(conn),
                               const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 12),
                                 child: Divider(
@@ -231,7 +303,7 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
                                       children: [
                                         Text(
                                           'Parent: $parentName',
-                                          style: AppTypography.body(
+                                          style: DashText.body(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600,
                                             color: AppColors.textPrimary,
@@ -239,7 +311,7 @@ class _TherapistStudentsScreenState extends State<TherapistStudentsScreen> {
                                         ),
                                         Text(
                                           parentEmail,
-                                          style: AppTypography.caption(
+                                          style: DashText.caption(
                                             fontSize: 12,
                                             color: AppColors.textSecondary,
                                           ),

@@ -78,7 +78,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
         icon: const Icon(Icons.add_rounded, color: Colors.white),
         label: Text(
           LocalizationService.instance.t('add_therapist'),
-          style: AppTypography.button(fontSize: 14),
+          style: DashText.button(fontSize: 14),
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
@@ -152,7 +152,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
               children: [
                 Text(
                   LocalizationService.instance.t('therapist_connections'),
-                  style: AppTypography.heading(
+                  style: DashText.heading(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -160,7 +160,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
                 ),
                 Text(
                   LocalizationService.instance.t('manage_specialist_access'),
-                  style: AppTypography.caption(
+                  style: DashText.caption(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
@@ -201,7 +201,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
             const SizedBox(height: 24),
             Text(
               LocalizationService.instance.t('no_therapists_connected'),
-              style: AppTypography.heading(
+              style: DashText.heading(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -211,7 +211,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
             Text(
               LocalizationService.instance.t('connect_reading_specialist'),
               textAlign: TextAlign.center,
-              style: AppTypography.body(
+              style: DashText.body(
                 fontSize: 15,
                 color: AppColors.textSecondary,
               ),
@@ -267,7 +267,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
                     children: [
                       Text(
                         therapist['name'] as String,
-                        style: AppTypography.heading(
+                        style: DashText.heading(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
@@ -275,7 +275,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
                       ),
                       Text(
                         therapist['specialization'] as String,
-                        style: AppTypography.caption(
+                        style: DashText.caption(
                           fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
@@ -295,8 +295,8 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
                   ),
                   child: Text(
                     isActive ? LocalizationService.instance.t('active') : LocalizationService.instance.t('pending'),
-                    style: AppTypography.caption(
-                      fontSize: 11,
+                    style: DashText.caption(
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: isActive
                           ? AppColors.gentleGreen
@@ -333,7 +333,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
                         size: 14, color: AppColors.softCoral),
                     label: Text(
                       LocalizationService.instance.t('disconnect'),
-                      style: AppTypography.button(
+                      style: DashText.button(
                           fontSize: 13, color: AppColors.softCoral),
                     ),
                     style: OutlinedButton.styleFrom(
@@ -357,7 +357,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
                         size: 14, color: AppColors.calmBlue),
                     label: Text(
                       LocalizationService.instance.t('message'),
-                      style: AppTypography.button(
+                      style: DashText.button(
                           fontSize: 13, color: AppColors.calmBlue),
                     ),
                     style: OutlinedButton.styleFrom(
@@ -383,7 +383,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
         const SizedBox(width: 10),
         Text(
           '$label: ',
-          style: AppTypography.caption(
+          style: DashText.caption(
             fontSize: 13,
             color: AppColors.textSecondary,
           ),
@@ -391,7 +391,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
         Expanded(
           child: Text(
             value,
-            style: AppTypography.body(
+            style: DashText.body(
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
@@ -410,19 +410,19 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(
           LocalizationService.instance.t('disconnect_therapist'),
-          style: AppTypography.heading(
+          style: DashText.heading(
               fontSize: 20, color: AppColors.textPrimary),
         ),
         content: Text(
           LocalizationService.instance.t('disconnect_desc_full'),
-          style: AppTypography.body(
+          style: DashText.body(
               fontSize: 15, color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(LocalizationService.instance.t('cancel'),
-                style: AppTypography.body(
+                style: DashText.body(
                     fontSize: 14, color: AppColors.textSecondary)),
           ),
           ElevatedButton(
@@ -472,7 +472,7 @@ class _TherapistManagementScreenState extends State<TherapistManagementScreen> {
                   borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(LocalizationService.instance.t('disconnect'),
-                style: AppTypography.button(fontSize: 14)),
+                style: DashText.button(fontSize: 14)),
           ),
         ],
       ),

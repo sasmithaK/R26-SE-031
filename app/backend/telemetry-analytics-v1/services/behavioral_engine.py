@@ -19,23 +19,48 @@ def _is_first_attempt_correct(e: TelemetryEvent) -> bool:
     return e.is_correct
 
 
+# Observed error categories. Only an error type reported by the task itself is
+# categorised; a missing type stays "unknown_error" (shown as "type not
+# recorded"). Errors are never inferred from the knowledge component, because a
+# wrong answer in a picture task is not evidence of letter confusion.
 _ERROR_CATEGORIES = {
+    # Look-alike letter / glyph confusion (orthographic)
     "visual_confusion": "visual_confusion",
-    "visual_search_miss": "visual_confusion",
-    "visual_matching_error": "visual_confusion",
-    "categorization_error": "visual_confusion",
-    "visual_memory_error": "visual_confusion",
+    "orthographic_confusion": "visual_confusion",
+    # Picture-task errors (search, matching, sorting, memory)
+    "visual_search_miss": "visual_task_error",
+    "visual_matching_error": "visual_task_error",
+    "categorization_error": "visual_task_error",
+    "visual_memory_error": "visual_task_error",
+    # Sound / language errors
     "phonological_confusion": "phonological_confusion",
+    "sound_letter_error": "phonological_confusion",
+    "word_recognition_error": "phonological_confusion",
+    "oral_reading_error": "phonological_confusion",
+    # Order errors
     "sequence_error": "sequence_error",
+    "spelling_sequence_error": "sequence_error",
+    "sentence_order_error": "sequence_error",
     "visual_pattern_error": "sequence_error",
     "unknown_error": "unknown_error",
 }
 
+ERROR_CATEGORY_KEYS = (
+    "visual_confusion",
+    "visual_task_error",
+    "phonological_confusion",
+    "sequence_error",
+    "unknown_error",
+)
 
-def _error_category(error_type: Optional[str]) -> str:
+
+def _error_category(error_type: Optional[str], knowledge_component_id: Optional[str] = None) -> str:
+    """Map a task-reported error type to a research category.
+
+    ``knowledge_component_id`` is accepted for backward compatibility but is
+    deliberately not used to invent an error type.
+    """
     normalized = (error_type or "").strip().lower()
-    if normalized in {"", "none"}:
-        return "unknown_error"
     return _ERROR_CATEGORIES.get(normalized, "unknown_error")
 
 
@@ -96,16 +121,14 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
     retry_rate = _safe_divide(len(retry_events), valid_trials)
     eventual_completion_rate = _safe_divide(len([e for e in valid_events if e.final_correct]), valid_trials)
     
-    # Error breakdowns
-    visual_confusion_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "visual_confusion"])
-    phonological_confusion_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "phonological_confusion"])
-    sequence_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "sequence_error"])
-    unknown_errors = len([e for e in incorrect_events if _error_category(e.error_type) == "unknown_error"])
-    
-    visual_confusion_rate = _safe_divide(visual_confusion_errors, incorrect_trials)
-    phonological_confusion_rate = _safe_divide(phonological_confusion_errors, incorrect_trials)
-    sequence_error_rate = _safe_divide(sequence_errors, incorrect_trials)
-    
+    # Error breakdowns (shares of first-attempt errors, by reported type)
+    error_counts = {key: 0 for key in ERROR_CATEGORY_KEYS}
+    for event in incorrect_events:
+        error_counts[_error_category(event.error_type)] += 1
+    visual_confusion_rate = _safe_divide(error_counts["visual_confusion"], incorrect_trials)
+    phonological_confusion_rate = _safe_divide(error_counts["phonological_confusion"], incorrect_trials)
+    sequence_error_rate = _safe_divide(error_counts["sequence_error"], incorrect_trials)
+
     # Audio replay
     audio_prompt_trials = sum(1 for e in valid_events if e.prompt_modality == "audio" or e.audio_replay_count > 0)
     total_audio_replays = sum([e.audio_replay_count for e in valid_events])
@@ -121,6 +144,7 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
     
     # Aggregations
     activity_breakdown = _aggregate_by_activity(valid_events)
+    activity_breakdown_by_skill = _aggregate_by_skill_activity(events)
     knowledge_components = _aggregate_by_kc(valid_events)
     
     # Fatigue
@@ -147,7 +171,9 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
         "visual_confusion_rate": visual_confusion_rate,
         "phonological_confusion_rate": phonological_confusion_rate,
         "sequence_error_rate": sequence_error_rate,
-        "unknown_error_rate": _safe_divide(unknown_errors, incorrect_trials)
+        "visual_task_error_rate": _safe_divide(error_counts["visual_task_error"], incorrect_trials),
+        "unknown_error_rate": _safe_divide(error_counts["unknown_error"], incorrect_trials),
+        "error_count": incorrect_trials,
     }
     
     started_at, completed_at = _session_bounds(session)
@@ -160,9 +186,11 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
         overall=overall,
         error_profile=error_profile,
         behavioral_fatigue_proxy=fatigue_proxy,
+        fatigue_state=fatigue_components.get("state"),
         fatigue_components=fatigue_components,
         knowledge_components=knowledge_components,
-        activity_breakdown=activity_breakdown
+        activity_breakdown=activity_breakdown,
+        activity_breakdown_by_skill=activity_breakdown_by_skill,
     )
 
 
@@ -180,13 +208,45 @@ def _aggregate_by_activity(events: List[TelemetryEvent]) -> dict:
         incorrect = len(evs) - correct
         accuracy = _safe_divide(correct, len(evs))
         median_lat = _median_or_none([e.first_touch_latency_ms for e in evs if e.first_touch_latency_ms > 0])
-        visual_errors = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "visual_confusion")
+        visual_errors = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type, e.knowledge_component_id) == "visual_confusion")
         
         result[aid] = {
             "trials": len(evs),
             "accuracy": accuracy,
             "median_response_latency_ms": median_lat,
             "visual_confusion_rate": _safe_divide(visual_errors, incorrect)
+        }
+    return result
+
+
+def _aggregate_by_skill_activity(events: List[TelemetryEvent]) -> dict:
+    """Aggregate separately when identical activity IDs occur in different skills."""
+    grouped: dict[tuple[str, str], list[TelemetryEvent]] = {}
+    for event in events:
+        key = (event.skill_id or "unknown", event.activity_id or "unknown")
+        grouped.setdefault(key, []).append(event)
+    result = {}
+    for (skill_id, activity_id), rows in grouped.items():
+        completed = [event for event in rows if not event.is_abandoned]
+        first_correct = sum(1 for event in completed if _is_first_attempt_correct(event))
+        attempts = sum(max(1, event.attempt_count) for event in completed)
+        result[f"{skill_id}::{activity_id}"] = {
+            "skill_id": skill_id,
+            "activity_id": activity_id,
+            "activity_name": next((event.activity_name for event in rows if event.activity_name), activity_id),
+            "trials": len(completed),
+            "abandoned_trials": sum(1 for event in rows if event.is_abandoned),
+            "accuracy": _safe_divide(first_correct, len(completed)) if completed else None,
+            "retry_rate": _safe_divide(sum(1 for event in completed if event.attempt_count > 1), len(completed)) if completed else None,
+            "mean_attempts_per_round": _safe_divide(attempts, len(completed)) if completed else None,
+            "correction_rate": _safe_divide(sum(1 for event in completed if event.correction_count > 0), len(completed)) if completed else None,
+            "support_rate": _safe_divide(sum(1 for event in completed if event.scaffold_level_used > 0 or event.hint_count > 0), len(completed)) if completed else None,
+            "eventual_completion_rate": _safe_divide(sum(1 for event in completed if event.final_correct), len(completed)) if completed else None,
+            "prompt_modalities": sorted({event.prompt_modality for event in rows if event.prompt_modality}),
+            "response_modalities": sorted({event.response_modality for event in rows if event.response_modality}),
+            "median_response_latency_ms": _median_or_none([
+                event.first_touch_latency_ms for event in completed if event.first_touch_latency_ms > 0
+            ]),
         }
     return result
 
@@ -205,16 +265,14 @@ def _aggregate_by_kc(events: List[TelemetryEvent]) -> dict:
         accuracy = _safe_divide(correct, len(evs))
         median_lat = _median_or_none([e.first_touch_latency_ms for e in evs if e.first_touch_latency_ms > 0])
         
-        visual_confusions = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "visual_confusion")
-        unknown_errors = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "unknown_error")
-        phonological_confusions = sum(1 for e in evs if not _is_first_attempt_correct(e) and _error_category(e.error_type) == "phonological_confusion")
-        
         err_dist = {}
         if incorrect > 0:
-            err_dist["visual_confusion"] = _safe_divide(visual_confusions, incorrect)
-            err_dist["phonological_confusion"] = _safe_divide(phonological_confusions, incorrect)
-            err_dist["unknown_error"] = _safe_divide(unknown_errors, incorrect)
-            
+            counts = {key: 0 for key in ERROR_CATEGORY_KEYS}
+            for e in evs:
+                if not _is_first_attempt_correct(e):
+                    counts[_error_category(e.error_type)] += 1
+            err_dist = {key: _safe_divide(value, incorrect) for key, value in counts.items()}
+
         result[kc] = {
             "trials": len(evs),
             "accuracy": accuracy,
@@ -223,32 +281,46 @@ def _aggregate_by_kc(events: List[TelemetryEvent]) -> dict:
         }
     return result
 
+FATIGUE_MIN_TRIALS = 6
+FATIGUE_WINDOW = 3
+
+
 def _calculate_fatigue(events: List[TelemetryEvent]) -> tuple[Optional[float], dict]:
+    """Within-session fatigue proxy shared with C1 (``services/c1/fatigue.py``).
+
+    Compares the first and last three completed rounds. Only slowing down,
+    more errors and more hesitation count towards fatigue (negative drifts are
+    clipped to zero), so the score is always 0-1 and maps to the same
+    LOW / MODERATE / HIGH / VERY_HIGH bands used by C1.
+    """
+    from services.c1.fatigue import calculate_fatigue_score, get_fatigue_state
+
     n = len(events)
-    if n < 4:
-        return None, {}
-        
-    early = events[:2]
-    late = events[-2:]
-    
+    if n < FATIGUE_MIN_TRIALS:
+        return None, {"reason": f"needs at least {FATIGUE_MIN_TRIALS} completed rounds", "trials": n}
+
+    early = events[:FATIGUE_WINDOW]
+    late = events[-FATIGUE_WINDOW:]
+
     early_lat = statistics.mean(e.total_round_latency_ms for e in early)
     late_lat = statistics.mean(e.total_round_latency_ms for e in late)
     latency_drift = ((late_lat / early_lat) - 1.0) if early_lat > 0 else 0.0
-    
-    early_err = statistics.mean(1.0 if not _is_first_attempt_correct(e) else 0.0 for e in early)
-    late_err = statistics.mean(1.0 if not _is_first_attempt_correct(e) else 0.0 for e in late)
+
+    early_err = statistics.mean(0.0 if _is_first_attempt_correct(e) else 1.0 for e in early)
+    late_err = statistics.mean(0.0 if _is_first_attempt_correct(e) else 1.0 for e in late)
     error_drift = late_err - early_err
-    
+
     early_hes = statistics.mean(e.hesitation_count for e in early)
     late_hes = statistics.mean(e.hesitation_count for e in late)
     hesitation_drift = late_hes - early_hes
-    
-    fatigue_proxy = (0.50 * latency_drift) + (0.30 * error_drift) + (0.20 * hesitation_drift)
-    
+
+    score = calculate_fatigue_score(latency_drift, error_drift, hesitation_drift)
     components = {
         "latency_drift": latency_drift,
         "error_drift": error_drift,
-        "hesitation_drift": hesitation_drift
+        "hesitation_drift": hesitation_drift,
+        "state": get_fatigue_state(score),
+        "window_rounds": FATIGUE_WINDOW,
+        "trials": n,
     }
-    
-    return fatigue_proxy, components
+    return round(score, 4), components

@@ -19,9 +19,19 @@ from pathlib import Path as PathLib
 sys.path.insert(0, str(PathLib(__file__).parent.parent.parent.parent))
 from shared.database import get_db
 from services.dashboard_access import require_dashboard_access
-from services.dashboard_data import KC_NAMES, number, timestamp, records, base, pattern_profile, research_evidence, speech
+from services.dashboard_data import KC_NAMES, number, timestamp, records, base, pattern_profile, research_evidence, speech, activity_performance
 
 router=APIRouter(prefix="/api/v1/parent/students",tags=["Parent Dashboard"],dependencies=[Depends(require_dashboard_access)])
+
+@router.get("/{student_id}/activity-performance")
+async def get_parent_activity_performance(
+    student_id: str,
+    days: int = Query(30, ge=1, le=365),
+    skill_id: Optional[str] = Query(None, min_length=1, max_length=32),
+    limit: int = Query(100, ge=1, le=300),
+):
+    """Parent-safe, skill/activity-aligned C1 and C2 summaries."""
+    return await activity_performance(get_db(), student_id, days, skill_id, limit)
 
 @router.get("/{student_id}/overview",response_model=ParentOverviewDTO)
 async def get_parent_overview(student_id:str):
@@ -34,8 +44,10 @@ async def get_parent_overview(student_id:str):
     except Exception:
         pass
     assessment = (student or {}).get("comprehensive_assessment_results") or {}
+    def answered_yes(item):
+        return item is True or (isinstance(item, dict) and item.get("answer") is True)
     category_counts = {
-        key: sum(1 for item in value if isinstance(item, dict) and item.get("answer") is True)
+        key: sum(1 for item in value if answered_yes(item))
         for key, value in assessment.items() if isinstance(value, list)
     }
     assessment_summary = {
@@ -78,8 +90,10 @@ async def get_parent_assessment_summary(student_id: str):
         raise HTTPException(status_code=404, detail="Student not found")
 
     assessment = student.get("comprehensive_assessment_results") or {}
+    def answered_yes(item):
+        return item is True or (isinstance(item, dict) and item.get("answer") is True)
     category_counts = {
-        key: sum(1 for item in value if isinstance(item, dict) and item.get("answer") is True)
+        key: sum(1 for item in value if answered_yes(item))
         for key, value in assessment.items() if isinstance(value, list)
     }
     
@@ -89,7 +103,14 @@ async def get_parent_assessment_summary(student_id: str):
         "total_categories": 4,
         "reported_observations": sum(category_counts.values()),
         "by_category": category_counts,
-        "raw_responses": assessment
+        "raw_responses": assessment,
+        # The current registration questionnaire's `basic` category is also
+        # mirrored into assessment_results for legacy consumers. Return it in
+        # only one place; retain separate legacy initial submissions when no
+        # comprehensive basic category exists.
+        "initial_responses": [] if assessment.get("basic") else student.get("assessment_results", []),
+        "updated_at": student.get("comprehensive_assessment_updated_at", {}),
+        "initial_updated_at": student.get("assessment_updated_at"),
     }
 
 @router.get("/{student_id}/fluency",response_model=ParentReadingFluencyDTO)
@@ -114,12 +135,25 @@ async def get_parent_skills(student_id:str):
 
 @router.get("/{student_id}/learning-pattern",response_model=ParentLearningPatternDTO)
 async def get_parent_learning_pattern(student_id:str):
-    rows=await records(get_db(),"learner_profiles",student_id,1); doc=rows[0] if rows else {}
-    _,_,pattern=pattern_profile(doc)
-    origin=doc.get("data_origin","unspecified")
-    obs=(f"Synthetic demonstration: the experimental model produced a {pattern} pattern. This is not a finding about your child."
-         if origin=="synthetic" else f"Experimental model output: {pattern}. Input provenance is {origin}; this does not establish a learning difficulty." if doc else "No learning-pattern evidence is available yet.")
-    return ParentLearningPatternDTO(**base(student_id,doc),observation=obs,recommended_practices=[])
+    db=get_db()
+    summary_rows=await records(db,"session_summaries",student_id,1)
+    speech_rows=await records(db,"speech_features",student_id,1)
+    overall=(summary_rows[0].get("overall") or {}) if summary_rows else {}
+    speech_row=speech_rows[0] if speech_rows else {}
+    accuracy=number(overall.get("accuracy"))
+    word_accuracy=number(speech_row.get("word_accuracy"))
+    observations=[]
+    if accuracy is not None:
+        observations.append(f"Recent activity responses were correct on {round(accuracy*100)}% of first attempts.")
+    if word_accuracy is not None:
+        observations.append(f"The latest reading sample matched {round(word_accuracy*100)}% of the expected Sinhala letters and words.")
+    if not observations:
+        observations.append("More completed activities and reading samples are needed to summarize progress.")
+    return ParentLearningPatternDTO(
+        **base(student_id,summary_rows[0] if summary_rows else speech_row),
+        observation=" ".join(observations),
+        recommended_practices=["Continue short, familiar practice activities and review progress over time."],
+    )
 
 @router.get("/{student_id}/activity-history",response_model=ParentActivityHistoryDTO)
 async def get_parent_activity_history(student_id:str,limit:int=Query(10,ge=1,le=50),days:Optional[int]=Query(None,ge=1,le=365)):
@@ -165,6 +199,8 @@ async def get_parent_component_analytics(student_id: str):
     profile_rows = await records(db, "learner_profiles", student_id, 1)
     state_rows = await records(db, "knowledge_states", student_id, 1)
     decisions = (await records(db, "adaptive_decisions", student_id))[:50]
+    professional_feedback = await records(db, "professional_feedback", student_id, 1)
+    usable_speech = [row for row in speech_rows if row.get("measurement_status") in {"valid", "available"}]
 
     latest_summary = summaries[0] if summaries else {}
     latest_speech = speech_rows[0] if speech_rows else {}
@@ -192,7 +228,8 @@ async def get_parent_component_analytics(student_id: str):
             "latency_ms": values.get("acoustic_latency_ms"),
         })
 
-    profile, probabilities, pattern = pattern_profile(latest_profile)
+    profile, pattern_probabilities, primary_pattern = pattern_profile(latest_profile)
+    classifier_available = bool(pattern_probabilities) and primary_pattern != "Unavailable"
     mastery_values = [number(value) for value in (latest_state.get("knowledge_state") or {}).values()]
     mastery_values = [value for value in mastery_values if value is not None]
     assisted = [d for d in decisions if (d.get("scaffold_level_used", d.get("scaffold_level", 0)) or 0) > 0]
@@ -224,6 +261,7 @@ async def get_parent_component_analytics(student_id: str):
         "c2_speech": component(
             latest_speech,
             recording_count=len(speech_rows),
+            usable_recording_count=len(usable_speech),
             summary_text=(f"Reading recording captured. {quality_label}." if latest_speech else "Complete a speaking activity to begin collecting reading observations."),
             wer=speech_latest.get("wer"),
             word_accuracy=speech_latest.get("word_accuracy"),
@@ -237,14 +275,27 @@ async def get_parent_component_analytics(student_id: str):
             measurement_status=speech_latest.get("measurement_status"),
             trend=c2_trend,
         ),
+        # Parents receive the plain-language summary only. Pattern names and
+        # model probabilities are professional-review material and are not
+        # sent to the parent app.
         "c3_explainability": component(
             latest_profile,
-            primary_pattern=pattern,
-            confidence=number(profile.get("confidence")),
-            probabilities=probabilities,
-            explanation_status=(
-                "Experimental synthetic-trained model output; not a diagnosis."
-                if latest_profile else "No linked multimodal profile is available."
+            classifier_available=False,
+            combined_estimate_reviewed=bool(professional_feedback),
+            reviewed_by=(professional_feedback[0].get("reviewer_name") if professional_feedback else None),
+            summary_text=(
+                latest_profile.get("llm_summary") or
+                " ".join([
+                    f"Recent activity responses were correct on {round(number(overall.get('accuracy'))*100)}% of first attempts."
+                    if number(overall.get("accuracy")) is not None else "",
+                    f"The latest reading sample matched {round(number(speech_latest.get('word_accuracy'))*100)}% of expected words and letters."
+                    if number(speech_latest.get("word_accuracy")) is not None else "",
+                ]).strip()
+                or "Complete activities and a speaking task to build a progress summary."
+            ),
+            recommendation_text=(
+                latest_profile.get("llm_recommendations") or
+                "Continue familiar practice and compare observations across activities over time."
             ),
         ),
         "c4_adaptive": component(
@@ -1217,5 +1268,52 @@ async def get_adaptive_insights(student_id: str = Path(...)):
     )
 
 @router.get("/{student_id}/report")
-async def download_parent_report(student_id:str):
-    raise HTTPException(501,"Parent PDF export is not implemented; no placeholder PDF is returned.")
+async def download_parent_report(student_id: str, days: int = Query(30, ge=1, le=365)):
+    """Plain-language PDF for parents (observations only, no model outputs)."""
+    from fastapi.responses import Response
+    from bson import ObjectId
+    from utils.pdf_generator import generate_parent_learning_report
+    from services.dashboard_data import (window_or_latest, weighted_overall, activity_performance,
+                                         learner_coverage, speech as speech_view)
+    db = get_db()
+    student = await db.students.find_one({"_id": ObjectId(student_id)}) or {}
+    summaries = await records(db, "session_summaries", student_id)
+    window, period = window_or_latest(summaries, days)
+    coverage = await learner_coverage(db, student_id, student, days)
+    perf = await activity_performance(db, student_id, days)
+    activities = [
+        {"name": row.get("activity_display"), "responses": row.get("trials", 0),
+         "first_try": row.get("first_attempt_accuracy"), "retry": row.get("retry_rate")}
+        for row in perf["activities"] if row.get("trials")
+    ]
+    speech_rows, _ = window_or_latest(await records(db, "speech_features", student_id), days)
+    usable = [speech_view(r)["grapheme_accuracy"] for r in speech_rows
+              if r.get("measurement_status") in {"valid", "available"}]
+    usable = sorted(v for v in usable if v is not None)
+    minutes = None
+    durations = [r.get("session_duration_seconds") for r in await db.telemetry_sessions.find(
+        {"student_id": student_id}).to_list(length=500) if isinstance(r.get("session_duration_seconds"), (int, float))]
+    if durations:
+        minutes = round(sum(durations) / 60)
+    weakest = min((a for a in activities if a["first_try"] is not None and a["responses"] >= 3),
+                  key=lambda a: a["first_try"], default=None)
+    data = {
+        "child_name": " ".join(filter(None, [student.get("first_name"), student.get("last_name")])),
+        "period": period,
+        "sessions": len(window),
+        "minutes": minutes,
+        "last_active": (coverage.get("last_active_at") or "")[:10] or None,
+        "first_try_accuracy": weighted_overall(window, "accuracy"),
+        "activities": activities,
+        "recordings": len(speech_rows),
+        "usable_recordings": len(usable),
+        "reading_letters": usable[len(usable) // 2] if usable else None,
+        "questionnaire_done": coverage.get("questionnaire_sections_done", 0),
+        "questionnaire_total": coverage.get("questionnaire_sections_total", 4),
+        "reviewed": coverage.get("professional_review", False),
+        "practice_tip": (f"Practise '{weakest['name']}' for 5 minutes, calmly and with no score."
+                         if weakest and weakest["first_try"] < 0.8 else None),
+    }
+    content = generate_parent_learning_report(data)
+    return Response(content=content, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="Sipsara_Learning_Summary_{student_id}.pdf"'})

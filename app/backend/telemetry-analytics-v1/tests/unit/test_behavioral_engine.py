@@ -52,6 +52,21 @@ def test_mixed_session_and_kc_aggregation():
     assert akshara["median_response_latency_ms"] == 1500
     assert akshara["error_distribution"]["visual_confusion"] == 1.0
 
+def test_activity_breakdown_keeps_reused_activity_ids_separate_by_skill():
+    first = create_mock_event(is_correct=True, aid="act_1")
+    second = create_mock_event(is_correct=False, aid="act_1")
+    first.skill_id = "1"
+    second.skill_id = "2"
+    session = TelemetrySessionSubmit(
+        student_id="s1", session_id="ses-skills", session_duration_seconds=30,
+        events=[first, second],
+    )
+    summary = extract_session_features(session)
+    grouped = summary.activity_breakdown_by_skill
+    assert grouped["1::act_1"]["accuracy"] == 1.0
+    assert grouped["2::act_1"]["accuracy"] == 0.0
+    assert grouped["1::act_1"]["trials"] == grouped["2::act_1"]["trials"] == 1
+
 def test_zero_valid_events_division_by_zero():
     events = [create_mock_event(is_abandoned=True)]
     session = TelemetrySessionSubmit(student_id="s1", session_id="ses1", session_duration_seconds=60, events=events)
@@ -64,16 +79,28 @@ def test_fatigue_with_sufficient_trials():
     events = [
         create_mock_event(is_correct=True, latency=1000, hes=0),
         create_mock_event(is_correct=True, latency=1000, hes=0),
+        create_mock_event(is_correct=True, latency=1000, hes=0),
         create_mock_event(is_correct=True, latency=2000, hes=1),
-        create_mock_event(is_correct=False, latency=3000, hes=2)
+        create_mock_event(is_correct=False, latency=3000, hes=2),
+        create_mock_event(is_correct=False, latency=3000, hes=2),
     ]
     session = TelemetrySessionSubmit(student_id="s1", session_id="ses1", session_duration_seconds=60, events=events)
     summary = extract_session_features(session)
-    assert summary.behavioral_fatigue_proxy is not None
+    assert 0.0 <= summary.behavioral_fatigue_proxy <= 1.0
     assert "latency_drift" in summary.fatigue_components
+    assert summary.fatigue_state in {"LOW", "MODERATE", "HIGH", "VERY_HIGH"}
+
+
+def test_fatigue_never_negative_when_child_speeds_up():
+    events = [create_mock_event(is_correct=True, latency=4000 - i * 500, hes=0) for i in range(6)]
+    session = TelemetrySessionSubmit(student_id="s1", session_id="ses1", session_duration_seconds=60, events=events)
+    summary = extract_session_features(session)
+    assert summary.behavioral_fatigue_proxy == 0.0
+    assert summary.fatigue_state == "LOW"
+
 
 def test_fatigue_with_insufficient_trials():
-    events = [create_mock_event() for _ in range(3)]
+    events = [create_mock_event() for _ in range(5)]
     session = TelemetrySessionSubmit(student_id="s1", session_id="ses1", session_duration_seconds=60, events=events)
     summary = extract_session_features(session)
     assert summary.behavioral_fatigue_proxy is None
@@ -96,9 +123,19 @@ def test_skill1_error_types_map_to_research_categories():
 
     summary = extract_session_features(session)
 
-    assert summary.error_profile["visual_confusion_rate"] == pytest.approx(0.8)
+    # Picture-task mistakes are not letter (orthographic) confusion.
+    assert summary.error_profile["visual_confusion_rate"] == 0.0
+    assert summary.error_profile["visual_task_error_rate"] == pytest.approx(0.8)
     assert summary.error_profile["sequence_error_rate"] == pytest.approx(0.2)
     assert summary.error_profile["unknown_error_rate"] == 0.0
+
+
+def test_missing_error_type_is_not_inferred_from_kc():
+    events = [create_mock_event(is_correct=False, kc="KC_VISUAL_CATEGORIZATION", error_type="unknown_error") for _ in range(3)]
+    session = TelemetrySessionSubmit(student_id="s1", session_id="kc-fallback", session_duration_seconds=60, events=events)
+    summary = extract_session_features(session)
+    assert summary.error_profile["visual_confusion_rate"] == 0.0
+    assert summary.error_profile["unknown_error_rate"] == 1.0
 
 
 def test_summary_uses_client_session_time_boundaries():

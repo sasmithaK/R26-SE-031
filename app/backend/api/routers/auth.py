@@ -4,6 +4,7 @@ routers/auth.py
 Authentication endpoints: signup, login, refresh, me, change-password, verify-password.
 """
 
+import secrets
 from fastapi import UploadFile, File
 from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
@@ -145,10 +146,9 @@ async def verify_email(request: Request, req: VerifyEmailRequest, background_tas
             user_doc["clinic_name"] = pending["clinic_name"]
         
         if pending.get("role") == "specialist":
-            import random
             import string
             # Generate a professional 6-character alphanumeric clinic code
-            user_doc["clinic_code"] = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            user_doc["clinic_code"] = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
         
         # Upsert just in case they were somehow inserted but unverified before we changed architecture
         await db.users.update_one(
@@ -367,9 +367,8 @@ async def google_login(request: Request, login_req: GoogleLoginRequest, backgrou
             user_doc["clinic_name"] = login_req.clinic_name
             
         if user_doc["role"] == "specialist":
-            import random
             import string
-            user_doc["clinic_code"] = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            user_doc["clinic_code"] = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
             
         result = await db.users.insert_one(user_doc)
         user_id = str(result.inserted_id)
@@ -445,9 +444,8 @@ async def microsoft_login(request: Request, login_req: MicrosoftLoginRequest, ba
             user_doc["clinic_name"] = login_req.clinic_name
             
         if user_doc["role"] == "specialist":
-            import random
             import string
-            user_doc["clinic_code"] = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            user_doc["clinic_code"] = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
             
         result = await db.users.insert_one(user_doc)
         user_id = str(result.inserted_id)
@@ -664,7 +662,7 @@ async def forgot_password(request: Request, req: ForgotPasswordRequest):
         )
     # Check if this is an OAuth account
     hashed_pwd = user.get("hashed_password", "")
-    if verify_password("google-oauth-placeholder-password", hashed_pwd) or "google-oauth" in hashed_pwd:
+    if user.get("auth_provider", "local") != "local" or not hashed_pwd:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You signed up using a social account (Google/Microsoft). Please log in using that button.",
