@@ -19,7 +19,9 @@ from pathlib import Path as PathLib
 sys.path.insert(0, str(PathLib(__file__).parent.parent.parent.parent))
 from shared.database import get_db
 from services.dashboard_access import require_dashboard_access
-from services.dashboard_data import KC_NAMES, number, timestamp, records, base, pattern_profile, research_evidence, speech, activity_performance
+from services.dashboard_data import (KC_NAMES, number, timestamp, records, base, pattern_profile, research_evidence,
+                                     speech, activity_performance, c1_window_metrics, practised_kcs,
+                                     USABLE_SPEECH_STATUSES, usable_speech, has_completed_rounds)
 
 router=APIRouter(prefix="/api/v1/parent/students",tags=["Parent Dashboard"],dependencies=[Depends(require_dashboard_access)])
 
@@ -53,29 +55,24 @@ async def get_parent_overview(student_id:str):
     assessment_summary = {
         "completed_categories": len([v for v in assessment.values() if isinstance(v, list) and v]),
         "total_categories": 4,
+        "answered_questions": sum(len(v) for v in assessment.values() if isinstance(v, list)),
+        # Number of questions answered "yes" (a reported observation).
         "reported_observations": sum(category_counts.values()),
         "by_category": category_counts,
         "reviewed": (student or {}).get("reviewed_assessments") or {},
     }
-    sessions=await db.session_summaries.distinct("session_id",{"student_id":student_id})
-    pipeline=[{"$match":{"student_id":student_id,"schema_version":"2.0"}},
-              {"$group":{"_id":"$session_id","seconds":{"$max":"$session_duration_seconds"}}},
-              {"$group":{"_id":None,"seconds":{"$sum":"$seconds"}}}]
-    durations=await db.telemetry_sessions.aggregate(pipeline).to_list(length=1)
-    if not durations:
-        # Read-only compatibility for pre-v2 stores where the complete session
-        # document lived in telemetry_events. New writes still use
-        # telemetry_sessions, so this does not duplicate current data.
-        legacy_pipeline=[{"$match":{"student_id":student_id}},
-                         {"$group":{"_id":"$session_id","seconds":{"$max":"$session_duration_seconds"}}},
-                         {"$group":{"_id":None,"seconds":{"$sum":"$seconds"}}}]
-        durations=await db.telemetry_events.aggregate(legacy_pipeline).to_list(length=1)
-    accuracy=number((latest.get("overall") or {}).get("accuracy"))
-    return ParentOverviewDTO(**base(student_id,latest,"Latest accuracy; all completed sessions and measured session duration"),
+    c1=await c1_window_metrics(db,student_id)
+    accuracy=c1["first_attempt_accuracy"]
+    return ParentOverviewDTO(**base(student_id,latest,c1["reporting_period"]),
         accuracy=round(accuracy*100) if accuracy is not None else None,
-        practice_time_minutes=round(durations[0]["seconds"]/60) if durations else None,
-        sessions_completed=len([x for x in sessions if x]), reading_progress="Practice recorded" if summaries else "No observations yet",
-        assessment_summary=assessment_summary)
+        practice_time_minutes=round(c1["practice_minutes"]) if c1["practice_minutes"] is not None else None,
+        sessions_completed=c1["sessions_started"],
+        reading_progress="Practice recorded" if summaries else "No observations yet",
+        assessment_summary=assessment_summary,
+        window_days=c1["window_days"],
+        completed_rounds=c1["completed_rounds"],
+        sessions_ended_early=c1["sessions_ended_early"],
+        median_response_latency_ms=c1["median_response_latency_ms"])
 
 @router.get("/{student_id}/assessment-summary")
 async def get_parent_assessment_summary(student_id: str):
@@ -122,35 +119,38 @@ async def get_parent_progress(student_id:str):
     rows=(await records(get_db(),"session_summaries",student_id))[:10]
     trend=[]
     for r in reversed(rows):
+        if not has_completed_rounds(r):
+            continue  # session left before any round was finished: no accuracy
         value=number((r.get("overall") or {}).get("accuracy"))
         trend.append({"session":r.get("session_id"),"accuracy":round(value*100) if value is not None else None})
     return ParentReadingProgressDTO(**base(student_id,rows[0] if rows else {},"Latest 10 sessions, chronological"),accuracy_trend=trend)
 
 @router.get("/{student_id}/skills")
 async def get_parent_skills(student_id:str):
-    rows=await records(get_db(),"knowledge_states",student_id,1); doc=rows[0] if rows else {}
+    db=get_db(); rows=await records(db,"knowledge_states",student_id,1); doc=rows[0] if rows else {}
+    practised=await practised_kcs(db,student_id)
+    # Areas the child has not practised hold a starting value, not a measurement.
     skills=[{"skill_name":KC_NAMES.get(k,k),"mastery_percentage":round(v*100),"status":"Model estimate, not a test grade"}
-            for k,x in (doc.get("knowledge_state") or {}).items() if (v:=number(x)) is not None]
+            for k,x in (doc.get("knowledge_state") or {}).items() if (v:=number(x)) is not None and k in practised]
     return {**base(student_id,doc),"skills":skills}
 
 @router.get("/{student_id}/learning-pattern",response_model=ParentLearningPatternDTO)
 async def get_parent_learning_pattern(student_id:str):
     db=get_db()
     summary_rows=await records(db,"session_summaries",student_id,1)
-    speech_rows=await records(db,"speech_features",student_id,1)
-    overall=(summary_rows[0].get("overall") or {}) if summary_rows else {}
-    speech_row=speech_rows[0] if speech_rows else {}
-    accuracy=number(overall.get("accuracy"))
-    word_accuracy=number(speech_row.get("word_accuracy"))
+    c1=await c1_window_metrics(db,student_id)
+    speech_row=usable_speech(await records(db,"speech_features",student_id,50))
+    accuracy=c1["first_attempt_accuracy"]
+    word_accuracy=speech(speech_row)["word_accuracy"] if speech_row else None
     observations=[]
     if accuracy is not None:
-        observations.append(f"Recent activity responses were correct on {round(accuracy*100)}% of first attempts.")
+        observations.append(f"In the {c1['reporting_period'].lower()}, {c1['first_try_correct']} of {c1['completed_rounds']} completed activity rounds were correct on the first try.")
     if word_accuracy is not None:
-        observations.append(f"The latest reading sample matched {round(word_accuracy*100)}% of the expected Sinhala letters and words.")
+        observations.append(f"The latest clear reading recording matched {round(word_accuracy*100)}% of the expected Sinhala words.")
     if not observations:
         observations.append("More completed activities and reading samples are needed to summarize progress.")
     return ParentLearningPatternDTO(
-        **base(student_id,summary_rows[0] if summary_rows else speech_row),
+        **base(student_id,summary_rows[0] if summary_rows else (speech_row or {})),
         observation=" ".join(observations),
         recommended_practices=["Continue short, familiar practice activities and review progress over time."],
     )
@@ -200,20 +200,26 @@ async def get_parent_component_analytics(student_id: str):
     state_rows = await records(db, "knowledge_states", student_id, 1)
     decisions = (await records(db, "adaptive_decisions", student_id))[:50]
     professional_feedback = await records(db, "professional_feedback", student_id, 1)
-    usable_speech = [row for row in speech_rows if row.get("measurement_status") in {"valid", "available"}]
+    usable_rows = [row for row in speech_rows if row.get("measurement_status") in USABLE_SPEECH_STATUSES]
+    c1 = await c1_window_metrics(db, student_id)
 
     latest_summary = summaries[0] if summaries else {}
     latest_speech = speech_rows[0] if speech_rows else {}
+    latest_usable_speech = usable_rows[0] if usable_rows else {}
     latest_profile = profile_rows[0] if profile_rows else {}
     latest_state = state_rows[0] if state_rows else {}
     overall = latest_summary.get("overall") or {}
 
     c1_trend = []
     for row in reversed(summaries):
+        if not has_completed_rounds(row):
+            continue
         accuracy = number((row.get("overall") or {}).get("accuracy"))
         c1_trend.append({"session": row.get("session_id"), "accuracy": accuracy})
 
     speech_latest = speech(latest_speech)
+    # Reading numbers come from the latest recording that could be measured.
+    speech_measured_latest = speech(latest_usable_speech) if latest_usable_speech else speech({})
     quality_label = {
         "valid": "Clear enough to measure",
         "retry_required": "Audio needs a clearer recording",
@@ -222,6 +228,8 @@ async def get_parent_component_analytics(student_id: str):
     c2_trend = []
     for row in reversed(speech_rows):
         values = speech(row)
+        if not values["measured"]:
+            continue
         c2_trend.append({
             "session": row.get("session_id"),
             "wer": values.get("wer"),
@@ -230,7 +238,8 @@ async def get_parent_component_analytics(student_id: str):
 
     profile, pattern_probabilities, primary_pattern = pattern_profile(latest_profile)
     classifier_available = bool(pattern_probabilities) and primary_pattern != "Unavailable"
-    mastery_values = [number(value) for value in (latest_state.get("knowledge_state") or {}).values()]
+    practised = await practised_kcs(db, student_id)
+    mastery_values = [number(value) for kc, value in (latest_state.get("knowledge_state") or {}).items() if kc in practised]
     mastery_values = [value for value in mastery_values if value is not None]
     assisted = [d for d in decisions if (d.get("scaffold_level_used", d.get("scaffold_level", 0)) or 0) > 0]
 
@@ -248,12 +257,20 @@ async def get_parent_component_analytics(student_id: str):
         **base(student_id, latest_summary, "Latest linked component records"),
         "c1_behavioral": component(
             latest_summary,
-            session_count=len(summaries),
-            summary_text=(f"Touch and activity observations from {len(summaries)} recent sessions." if summaries else "Complete an activity to begin collecting touch and activity observations."),
-            first_attempt_accuracy=number(overall.get("accuracy")),
-            retry_rate=number(overall.get("retry_rate")),
-            median_response_latency_ms=number(overall.get("median_response_latency_ms")),
-            correction_rate=number(overall.get("correction_rate")),
+            session_count=c1["sessions_started"],
+            completed_rounds=c1["completed_rounds"],
+            sessions_ended_early=c1["sessions_ended_early"],
+            reporting_period=c1["reporting_period"],
+            summary_text=(
+                f"{c1['completed_rounds']} completed rounds in {c1['sessions_started']} activity sessions "
+                f"({c1['reporting_period'].lower()})."
+                + (f" {c1['sessions_ended_early']} session(s) ended before a round was finished."
+                   if c1["sessions_ended_early"] else "")
+                if c1["sessions_started"] else "Complete an activity to begin collecting touch and activity observations."),
+            first_attempt_accuracy=c1["first_attempt_accuracy"],
+            retry_rate=c1["retry_rate"],
+            median_response_latency_ms=c1["median_response_latency_ms"],
+            correction_rate=c1["correction_rate"],
             audio_replay_rate=number(overall.get("audio_replay_rate")),
             fatigue_proxy=number(latest_summary.get("behavioral_fatigue_proxy")),
             trend=c1_trend,
@@ -261,16 +278,16 @@ async def get_parent_component_analytics(student_id: str):
         "c2_speech": component(
             latest_speech,
             recording_count=len(speech_rows),
-            usable_recording_count=len(usable_speech),
+            usable_recording_count=len(usable_rows),
             summary_text=(f"Reading recording captured. {quality_label}." if latest_speech else "Complete a speaking activity to begin collecting reading observations."),
-            wer=speech_latest.get("wer"),
-            word_accuracy=speech_latest.get("word_accuracy"),
-            acoustic_latency_ms=speech_latest.get("acoustic_latency_ms"),
-            pause_count=speech_latest.get("pause_count"),
-            pause_ratio=speech_latest.get("pause_ratio"),
-            grapheme_accuracy=speech_latest.get("grapheme_accuracy"),
-            reading_rate_wpm=speech_latest.get("reading_rate_wpm"),
-            combined_confidence=speech_latest.get("combined_confidence"),
+            wer=speech_measured_latest.get("wer"),
+            word_accuracy=speech_measured_latest.get("word_accuracy"),
+            acoustic_latency_ms=speech_measured_latest.get("acoustic_latency_ms"),
+            pause_count=speech_measured_latest.get("pause_count"),
+            pause_ratio=speech_measured_latest.get("pause_ratio"),
+            grapheme_accuracy=speech_measured_latest.get("grapheme_accuracy"),
+            reading_rate_wpm=speech_measured_latest.get("reading_rate_wpm"),
+            combined_confidence=speech_measured_latest.get("combined_confidence"),
             recording_quality=speech_latest.get("recording_quality"),
             measurement_status=speech_latest.get("measurement_status"),
             trend=c2_trend,
@@ -286,10 +303,10 @@ async def get_parent_component_analytics(student_id: str):
             summary_text=(
                 latest_profile.get("llm_summary") or
                 " ".join([
-                    f"Recent activity responses were correct on {round(number(overall.get('accuracy'))*100)}% of first attempts."
-                    if number(overall.get("accuracy")) is not None else "",
-                    f"The latest reading sample matched {round(number(speech_latest.get('word_accuracy'))*100)}% of expected words and letters."
-                    if number(speech_latest.get("word_accuracy")) is not None else "",
+                    f"{c1['first_try_correct']} of {c1['completed_rounds']} completed activity rounds were correct on the first try."
+                    if c1["completed_rounds"] else "",
+                    f"The latest clear reading recording matched {round(speech_measured_latest['word_accuracy']*100)}% of the expected words."
+                    if speech_measured_latest.get("word_accuracy") is not None else "",
                 ]).strip()
                 or "Complete activities and a speaking task to build a progress summary."
             ),
@@ -1277,8 +1294,8 @@ async def download_parent_report(student_id: str, days: int = Query(30, ge=1, le
                                          learner_coverage, speech as speech_view)
     db = get_db()
     student = await db.students.find_one({"_id": ObjectId(student_id)}) or {}
-    summaries = await records(db, "session_summaries", student_id)
-    window, period = window_or_latest(summaries, days)
+    c1 = await c1_window_metrics(db, student_id, days)
+    period = c1["reporting_period"]
     coverage = await learner_coverage(db, student_id, student, days)
     perf = await activity_performance(db, student_id, days)
     activities = [
@@ -1288,22 +1305,21 @@ async def download_parent_report(student_id: str, days: int = Query(30, ge=1, le
     ]
     speech_rows, _ = window_or_latest(await records(db, "speech_features", student_id), days)
     usable = [speech_view(r)["grapheme_accuracy"] for r in speech_rows
-              if r.get("measurement_status") in {"valid", "available"}]
+              if r.get("measurement_status") in USABLE_SPEECH_STATUSES]
     usable = sorted(v for v in usable if v is not None)
-    minutes = None
-    durations = [r.get("session_duration_seconds") for r in await db.telemetry_sessions.find(
-        {"student_id": student_id}).to_list(length=500) if isinstance(r.get("session_duration_seconds"), (int, float))]
-    if durations:
-        minutes = round(sum(durations) / 60)
+    minutes = round(c1["practice_minutes"]) if c1["practice_minutes"] is not None else None
     weakest = min((a for a in activities if a["first_try"] is not None and a["responses"] >= 3),
                   key=lambda a: a["first_try"], default=None)
     data = {
         "child_name": " ".join(filter(None, [student.get("first_name"), student.get("last_name")])),
         "period": period,
-        "sessions": len(window),
+        "sessions": c1["sessions_started"],
+        "completed_rounds": c1["completed_rounds"],
+        "sessions_ended_early": c1["sessions_ended_early"],
+        "typical_answer_seconds": (c1["median_response_latency_ms"] / 1000) if c1["median_response_latency_ms"] else None,
         "minutes": minutes,
         "last_active": (coverage.get("last_active_at") or "")[:10] or None,
-        "first_try_accuracy": weighted_overall(window, "accuracy"),
+        "first_try_accuracy": c1["first_attempt_accuracy"],
         "activities": activities,
         "recordings": len(speech_rows),
         "usable_recordings": len(usable),

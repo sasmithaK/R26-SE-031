@@ -34,7 +34,7 @@ class Cursor:
 
 class Collection:
     def __init__(self,rows=None):self.rows=rows or []
-    def find(self,query):return Cursor([r for r in self.rows if matches(r,query)])
+    def find(self,query,*args,**kwargs):return Cursor([r for r in self.rows if matches(r,query)])
     async def find_one(self,query,**kwargs):return next((copy.deepcopy(r) for r in self.rows if matches(r,query)),None)
     async def distinct(self,key,query):return list({r.get(key) for r in self.rows if matches(r,query)})
     def aggregate(self,pipeline):
@@ -689,7 +689,9 @@ class DashboardTests(unittest.TestCase):
         self.db.session_summaries.rows=[self.session(1,behavioral_fatigue_proxy=.2)]
         self.db.speech_features.rows=[dict(student_id=STUDENT,session_id='session-1',created_at='2026-08-02T00:00:00Z',
             word_error_rate=.25,acoustic_latency_ms=900,recording_quality='good')]
-        self.db.knowledge_states.rows=[dict(student_id=STUDENT,knowledge_state={'KC_AKSHARA_IDENTITY':.7})]
+        # Average mastery covers practised areas only; KC_LETTER_MEMORY was never answered.
+        self.db.knowledge_states.rows=[dict(student_id=STUDENT,knowledge_state={'KC_AKSHARA_IDENTITY':.7,'KC_LETTER_MEMORY':.2})]
+        self.db.telemetry_events.rows=[dict(student_id=STUDENT,knowledge_component_id='KC_AKSHARA_IDENTITY',is_abandoned=False)]
         self.db.adaptive_decisions.rows=[dict(student_id=STUDENT,decision='CONTINUE',scaffold_level_used=1)]
         result=self.call(parent.get_parent_component_analytics,STUDENT)
         self.assertTrue(result['c1_behavioral']['available']);self.assertTrue(result['c2_speech']['available'])

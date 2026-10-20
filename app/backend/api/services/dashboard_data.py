@@ -114,6 +114,10 @@ TEMPLATE_TO_ACTIVITY = {
     "skill4_act4_jumbled_sentence": "4.4",
     "skill5_act1_mcq": "5.1", "skill5_act2_mcq": "5.2", "skill5_act3_mcq": "5.3", "skill5_act4_mcq": "5.4",
 }
+# Recording statuses that count as "clear enough to measure" everywhere
+# (therapist, parent, coverage, alerts and C3 use the same set).
+USABLE_SPEECH_STATUSES = {"valid", "available", "synthetic_features"}
+
 PATTERNS = {name: name.removesuffix(" Learning Pattern") for name in (
     "Typical Learning Pattern", "Phonological Learning Pattern",
     "Visual-Orthographic Learning Pattern", "Combined Learning Pattern")}
@@ -175,7 +179,7 @@ def speech(doc):
     # A historical 1-WER value is not a recognition confidence estimate.
     confidence = field("stt_confidence") if field("stt_confidence_method") not in (None, "one_minus_wer") else None
     fusion = doc.get("fusion") or {}
-    return dict(pause_count=number(field("pause_count", "Pause_Count")),
+    result = dict(pause_count=number(field("pause_count", "Pause_Count")),
                 mean_pause_duration_ms=number(field("mean_pause_duration_ms", "Mean_Pause_Duration_ms")),
                 pause_ratio=number(field("pause_ratio", "Pause_Ratio")), speech_duration_ms=number(field("speech_duration_ms", "Speech_Duration_ms")),
                 expected_text=field("expected_text") or "", transcription=field("recognized_text", "transcription") or "",
@@ -195,7 +199,42 @@ def speech(doc):
                 method_disagreement=bool(fusion.get("method_disagreement", False)),
                 quality_issues=field("recording_quality_issues") or [],
                 recording_quality=field("recording_quality") or "Unknown",
-                measurement_status=field("measurement_status") or ("unverified" if doc else "unavailable"))
+                measurement_status=field("measurement_status") or ("unverified" if doc else "unavailable"),
+                record_start_delay_ms=number(field("record_start_delay_ms", "Record_Start_Delay_ms")),
+                recording_quality_score=number(field("recording_quality_score")),
+                pipeline_version=field("pipeline_version"),
+                asr_model=field("asr_model"),
+                disagreement_reasons=list(fusion.get("disagreement_reasons") or []))
+    result["measured"] = speech_measured(doc, result)
+    if not result["measured"]:
+        # A recording that failed the quality check, or where nothing was
+        # recognised, has no reading accuracy. The pipeline stores 0 / WER 1
+        # for these; showing that as "0% read correctly" is wrong.
+        for key in ("word_accuracy", "grapheme_accuracy", "wer", "reading_performance_score",
+                    "reading_rate_wpm", "combined_confidence"):
+            result[key] = None
+    return result
+
+
+def speech_measured(doc, values=None):
+    """True when a recording produced a reading measurement."""
+    if not doc:
+        return False
+    values = values if values is not None else {}
+    status = doc.get("measurement_status")
+    if status in USABLE_SPEECH_STATUSES:
+        return True
+    quality = values.get("recording_quality", doc.get("recording_quality"))
+    if status is None:
+        # Older rows without a status: trust them unless the quality gate failed.
+        return quality != "retry_required"
+    transcript = values.get("transcription", doc.get("recognized_text") or doc.get("transcription") or "")
+    return status == "uncertain" and quality != "retry_required" and bool(str(transcript).strip())
+
+
+def usable_speech(rows):
+    """Latest recording that was clear enough to measure, or None."""
+    return next((row for row in rows if row.get("measurement_status") in USABLE_SPEECH_STATUSES), None)
 
 def pattern_profile(doc):
     profile = (doc or {}).get("learner_profile") or {}
@@ -227,9 +266,35 @@ async def activity_performance(db, student_id, days=30, skill_id=None, limit=100
     """
     from datetime import timedelta
 
-    summaries = await records(db, "session_summaries", student_id, 500)
     cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
     groups = {}
+    raw_rows, _ = await window_sessions(db, student_id, days, skill_id, fallback=False)
+    if raw_rows:
+        # Pool the captured rounds per activity (same rules as c1_window_metrics).
+        per_activity = {}
+        for doc, events in raw_rows:
+            stamp_value = timestamp(doc)
+            for event in events:
+                sid = _skill_digits(event.get("skill_id"))
+                aid = str(event.get("activity_id") or "unknown")
+                bucket = per_activity.setdefault((sid, aid), {"events": [], "sessions": set(), "last": None,
+                                                              "name": event.get("activity_name"),
+                                                              "origin": doc.get("data_origin", "unspecified")})
+                bucket["events"].append(event)
+                bucket["sessions"].add(doc.get("session_id"))
+                bucket["last"] = max(filter(None, [bucket["last"], stamp_value]), default=None)
+        for (sid, aid), bucket in per_activity.items():
+            pooled = pooled_round_metrics(bucket["events"])
+            groups[(sid, aid)] = {
+                "skill_id": sid, "activity_id": aid, "sessions": len(bucket["sessions"]),
+                "trials": pooled["completed_rounds"], "abandoned_trials": pooled["abandoned_rounds"],
+                "activity_name": bucket["name"] or aid,
+                "first_correct": pooled["first_try_correct"],
+                "retry_trials": round((pooled["retry_rate"] or 0) * pooled["completed_rounds"]),
+                "latencies": [], "median_latency": pooled["median_response_latency_ms"],
+                "data_origin": bucket["origin"], "last_activity_at": bucket["last"],
+            }
+    summaries = [] if raw_rows else await records(db, "session_summaries", student_id, 500)
     for summary in summaries:
         stamp_value = timestamp(summary)
         if cutoff and stamp_value:
@@ -246,9 +311,9 @@ async def activity_performance(db, student_id, days=30, skill_id=None, limit=100
                 for activity, metrics in (summary.get("activity_breakdown") or {}).items()
             }
         for key, metrics in breakdown.items():
-            sid = str(metrics.get("skill_id") or key.split("::", 1)[0] or "unknown")
+            sid = _skill_digits(metrics.get("skill_id") or key.split("::", 1)[0])
             aid = str(metrics.get("activity_id") or key.split("::", 1)[-1] or "unknown")
-            if skill_id and sid != str(skill_id):
+            if skill_id and sid != _skill_digits(skill_id):
                 continue
             group = groups.setdefault((sid, aid), {
                 "skill_id": sid, "activity_id": aid, "sessions": 0, "trials": 0, "abandoned_trials": 0,
@@ -274,8 +339,8 @@ async def activity_performance(db, student_id, days=30, skill_id=None, limit=100
 
     speech_rows = await records(db, "speech_features", student_id, 500)
     for row in speech_rows:
-        sid, aid = str(row.get("skill_id") or "unknown"), str(row.get("activity_id") or "unknown")
-        if skill_id and sid != str(skill_id):
+        sid, aid = _skill_digits(row.get("skill_id")), str(row.get("activity_id") or "unknown")
+        if skill_id and sid != _skill_digits(skill_id):
             continue
         stamp_value = timestamp(row)
         if cutoff and stamp_value:
@@ -294,7 +359,7 @@ async def activity_performance(db, student_id, days=30, skill_id=None, limit=100
         voice["recordings"] += 1
         quality = str(speech(row).get("recording_quality") or "unavailable")
         voice["quality_counts"][quality] = voice["quality_counts"].get(quality, 0) + 1
-        if row.get("measurement_status") in {"valid", "available", "synthetic_features"}:
+        if row.get("measurement_status") in USABLE_SPEECH_STATUSES:
             voice["usable_recordings"] += 1
         if "latest_voice" not in group or (stamp_value or "") >= (group.get("latest_voice_at") or ""):
             voice_data = speech(row)
@@ -317,7 +382,9 @@ async def activity_performance(db, student_id, days=30, skill_id=None, limit=100
         latencies = group.pop("latencies")
         group["first_attempt_accuracy"] = correct / trials if trials else None
         group["retry_rate"] = retries / trials if trials else None
-        group["median_response_latency_ms"] = number(statistics.median(latencies)) if latencies else None
+        pooled_latency = group.pop("median_latency", None)
+        group["median_response_latency_ms"] = (pooled_latency if pooled_latency is not None
+                                               else number(statistics.median(latencies)) if latencies else None)
         group.setdefault("voice", {"recordings": 0, "usable_recordings": 0, "quality_counts": {}})
         group.update(activity_label(group.get("skill_id"), group.get("activity_id"), group.get("activity_name")))
         group["data_available"] = bool(group["sessions"] or group["voice"]["recordings"])
@@ -434,13 +501,37 @@ def session_point(row, index, value):
     }
 
 
+def completed_trials(row):
+    """Completed (non-abandoned) rounds in a stored session summary.
+
+    Returns None when an old summary does not record trial counts.
+    """
+    if row.get("valid_trials") is not None:
+        return int(row.get("valid_trials") or 0)
+    if row.get("total_trials") is None:
+        return None
+    total = int(row.get("total_trials") or 0)
+    abandoned = number((row.get("overall") or {}).get("abandonment_rate")) or 0.0
+    return max(0, total - round(abandoned * total))
+
+
+def has_completed_rounds(row):
+    """False only when a summary is known to contain no completed round."""
+    return completed_trials(row) != 0
+
+
 def weighted_overall(summaries, field):
-    """Trial-weighted mean of an ``overall`` metric across sessions."""
+    """Mean of an ``overall`` metric weighted by completed rounds.
+
+    Sessions with no completed round are skipped: older summaries stored 0
+    for their accuracy/attempts, which is not a measurement.
+    """
     total, weight = 0.0, 0
     for row in summaries:
         value = number((row.get("overall") or {}).get(field))
-        trials = int(row.get("total_trials") or 0) or 1
-        if value is not None:
+        trials = completed_trials(row)
+        trials = 1 if trials is None else trials
+        if value is not None and trials > 0:
             total += value * trials
             weight += trials
     return total / weight if weight else None
@@ -536,6 +627,11 @@ SHAP_FEATURE_NAMES = {
     "dimensionless_jerk": ("Finger-movement smoothness (jerk)", ""),
     "dwell_time_ms": ("Touch hold time", "ms"),
     "age": ("Age", "years"),
+    "age_years": ("Age", "years"),
+    "c1_first_try_accuracy": ("Activities correct on first try", "%"),
+    "c1_visual_task_index": ("Visual task speed index", ""),
+    "c1_sound_task_index": ("Sound task speed index", ""),
+    "c1_long_pauses_per_round": ("Long pauses per activity round", ""),
     "time_of_day_hour": ("Time of day", "h"),
 }
 
@@ -559,7 +655,6 @@ def shap_phrase(feature, contribution, value=None):
     return f"{name} ({_format_value(value, unit)}) {verb} the model estimate."
 
 
-USABLE_SPEECH_STATUSES = {"valid", "available", "synthetic_features"}
 
 
 async def learner_coverage(db, student_id, student_doc=None, days=None):
@@ -571,7 +666,8 @@ async def learner_coverage(db, student_id, student_doc=None, days=None):
     window_speech = in_window(speech_rows, days)
     usable = [r for r in window_speech if r.get("measurement_status") in USABLE_SPEECH_STATUSES]
     profiles = await records(db, "learner_profiles", student_id, 5)
-    profile = next((p for p in profiles if p.get("feature_version") == "c3-learner-window-v1"), profiles[0] if profiles else {})
+    profile = next((p for p in profiles if str(p.get("feature_version") or "").startswith("c3-learner-window")),
+                   profiles[0] if profiles else {})
     feedback = await records(db, "professional_feedback", student_id, 1)
     student_doc = student_doc or {}
     questionnaire = student_doc.get("comprehensive_assessment_results") or {}
@@ -626,3 +722,180 @@ def learner_alerts(coverage):
 
 def public_coverage(coverage):
     return {k: v for k, v in coverage.items() if not k.startswith("_")}
+
+
+# ---------------------------------------------------------------------------
+# One pooled C1 view shared by every dashboard (therapist, parent, PDF)
+# ---------------------------------------------------------------------------
+
+def _median(values):
+    values = sorted(v for v in values if v is not None)
+    if not values:
+        return None
+    mid = len(values) // 2
+    return float(values[mid]) if len(values) % 2 else (values[mid - 1] + values[mid]) / 2
+
+
+def _first_try(event):
+    value = event.get("first_attempt_correct")
+    return value if isinstance(value, bool) else bool(event.get("is_correct"))
+
+
+def _dedupe_events(events):
+    """Drop repeated copies of the same round (offline replays reuse event_id)."""
+    seen, kept = set(), []
+    for event in reversed(events or []):
+        if not isinstance(event, dict):
+            continue
+        key = event.get("event_id")
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        kept.append(event)
+    return list(reversed(kept))
+
+
+def pooled_round_metrics(events):
+    """Metrics over completed rounds, pooled (every round counts once).
+
+    Abandoned rounds are counted separately and never enter a rate, so a
+    session the child left early cannot pull accuracy or attempts down.
+    """
+    done = [e for e in events if not e.get("is_abandoned")]
+    left = len(events) - len(done)
+    n = len(done)
+
+    def share(predicate):
+        return (sum(1 for e in done if predicate(e)) / n) if n else None
+
+    attempts = [max(1, int(number(e.get("attempt_count")) or 1)) for e in done]
+    return {
+        "completed_rounds": n,
+        "abandoned_rounds": left,
+        "first_try_correct": sum(1 for e in done if _first_try(e)),
+        "first_attempt_accuracy": share(_first_try),
+        "retry_rate": share(lambda e: (number(e.get("attempt_count")) or 1) > 1),
+        "mean_attempts_per_round": (sum(attempts) / n) if n else None,
+        "eventual_completion_rate": share(lambda e: bool(e.get("final_correct", e.get("is_correct")))),
+        "correction_rate": share(lambda e: (number(e.get("correction_count")) or 0) > 0),
+        "support_rate": share(lambda e: (number(e.get("scaffold_level_used")) or 0) > 0
+                              or (number(e.get("hint_count")) or 0) > 0),
+        # Time to first answer (first touch for app versions before Oct 2026).
+        "median_response_latency_ms": _median(
+            [number(e.get("time_to_first_response_ms")) or number(e.get("first_touch_latency_ms")) for e in done
+             if (number(e.get("time_to_first_response_ms")) or number(e.get("first_touch_latency_ms")) or 0) > 0]),
+        "stray_drops_per_drag_round": (
+            sum(number(e.get("stray_drop_count")) or 0 for e in drags) / len(drags) if (drags := [
+                e for e in done if e.get("response_modality") == "drag"]) else None),
+        "median_time_to_correct_ms": _median(
+            [number(e.get("time_to_correct_ms")) for e in done
+             if (number(e.get("time_to_correct_ms")) or 0) > 0]),
+        "median_round_time_ms": _median(
+            [number(e.get("total_round_latency_ms")) for e in done
+             if (number(e.get("total_round_latency_ms")) or 0) > 0]),
+    }
+
+
+def _skill_digits(value):
+    """'skill_1', '1' and 1 all mean Skill 1."""
+    digits = re.sub(r"\D", "", str(value or ""))
+    return digits or "unknown"
+
+
+def _skill_matches(event, skill_id):
+    return _skill_digits(event.get("skill_id")) == _skill_digits(skill_id)
+
+
+async def window_sessions(db, student_id, days, skill_id=None, fallback=True):
+    """Stored telemetry sessions in the window, with de-duplicated rounds."""
+    limit = setting("limits", "records", default=200)
+    # Touch paths are large and not needed for these numbers.
+    projection = {"events.touch_path": 0, "events.touch_stream": 0, "events.attempt_history": 0,
+                  "events.scaffold_applications": 0, "device_metrics": 0}
+    docs = await db.telemetry_sessions.find({"student_id": student_id}, projection).sort("_id", -1).limit(limit).to_list(length=limit)
+    docs = sorted(docs, key=lambda d: timestamp(d) or "", reverse=True)
+    if fallback:
+        sessions, period = window_or_latest(docs, days)
+    else:
+        sessions, period = in_window(docs, days), f"Last {days} days"
+    rows = []
+    for doc in sessions:
+        events = _dedupe_events(doc.get("events"))
+        if skill_id:
+            events = [e for e in events if _skill_matches(e, skill_id)]
+            if not events:
+                continue
+        rows.append((doc, events))
+    return rows, period
+
+
+async def c1_window_metrics(db, student_id, days=None, skill_id=None):
+    """The single source for C1 numbers on every dashboard.
+
+    Reads the stored telemetry sessions (the raw rounds the app captured),
+    keeps those in the window, removes duplicate rounds and pools completed
+    rounds. Falls back to the latest sessions (labelled) when none are in the
+    window. ``latest_session`` is reported separately and labelled as such.
+    """
+    days = days if isinstance(days, int) else setting("default_window_days", default=30)
+    rows, period = await window_sessions(db, student_id, days, skill_id)
+    all_events = [e for _, events in rows for e in events]
+    pooled = pooled_round_metrics(all_events)
+    with_rounds = [(doc, ev) for doc, ev in rows if any(not e.get("is_abandoned") for e in ev)]
+    latest = None
+    if with_rounds:
+        doc, events = with_rounds[0]
+        latest = {"session_id": doc.get("session_id"), "completed_at": timestamp(doc),
+                  **pooled_round_metrics(events)}
+    seconds = [number(doc.get("session_duration_seconds")) for doc, _ in rows]
+    seconds = [s for s in seconds if s is not None]
+    activities = {}
+    for e in all_events:
+        if e.get("is_abandoned"):
+            continue
+        key = activity_key(e.get("skill_id"), e.get("activity_id"), e.get("activity_name"))
+        if key:
+            activities[key] = activities.get(key, 0) + 1
+    return {
+        "window_days": days,
+        "reporting_period": period.replace("sessions", "activity sessions"),
+        "sessions_started": len(rows),
+        "sessions_with_completed_rounds": len(with_rounds),
+        "sessions_ended_early": len(rows) - len(with_rounds),
+        "practice_minutes": round(sum(seconds) / 60, 1) if seconds else None,
+        "activities_practised": activities,
+        **pooled,
+        "latest_session": latest,
+        "data_source": "telemetry_sessions (completed rounds, de-duplicated)",
+    }
+
+
+async def practised_kcs(db, student_id):
+    """Knowledge components the learner has actually answered (completed rounds)."""
+    kcs = await db.telemetry_events.distinct(
+        "knowledge_component_id",
+        {"student_id": student_id, "is_abandoned": {"$ne": True}},
+    )
+    return {kc for kc in kcs if kc and kc not in {"KC_UNKNOWN", "None"}}
+
+
+async def practised_mastery(db, student_id, state_doc=None):
+    """Average C4 mastery estimate over practised areas only.
+
+    The knowledge state holds a starting value for every area, including areas
+    the child has never seen. Averaging those priors made "average mastery"
+    look like a measured result.
+    """
+    if state_doc is None:
+        rows = await records(db, "knowledge_states", student_id, 1)
+        state_doc = rows[0] if rows else {}
+    state = (state_doc or {}).get("knowledge_state") or {}
+    practised = await practised_kcs(db, student_id)
+    values = {kc: number(v) for kc, v in state.items() if kc in practised and number(v) is not None}
+    return {
+        "average": (sum(values.values()) / len(values)) if values else None,
+        "practised_areas": len(values),
+        "total_areas": len([v for v in state.values() if number(v) is not None]),
+        "by_area": values,
+    }

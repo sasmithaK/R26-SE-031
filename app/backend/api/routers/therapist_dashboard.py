@@ -14,7 +14,8 @@ from services.dashboard_data import (ACTIVITY_NAMES, KC_NAMES, SKILL_NAMES,
                                      kc_breakdown, error_breakdown, fatigue_view,
                                      shap_phrase, learner_coverage, window_or_latest, learner_alerts,
                                      public_coverage, activity_label, stamp,
-                                     USABLE_SPEECH_STATUSES)
+                                     USABLE_SPEECH_STATUSES, c1_window_metrics, completed_trials, has_completed_rounds,
+                                     practised_mastery)
 from dependencies import get_current_user
 
 router = APIRouter(prefix="/api/v1/therapist/students", tags=["Therapist Dashboard"],
@@ -283,7 +284,7 @@ def _window_days(days):
 async def _latest_profile(db, student_id):
     """Prefer the learner-window C3 profile over legacy per-session rows."""
     rows = await records(db, "learner_profiles", student_id, 20)
-    window = [row for row in rows if row.get("feature_version") == "c3-learner-window-v1"]
+    window = [row for row in rows if str(row.get("feature_version") or "").startswith("c3-learner-window")]
     return (window or rows or [{}])[0]
 
 
@@ -296,9 +297,9 @@ async def get_therapist_overview(student_id: str):
     states = await records(db, "knowledge_states", student_id, 1)
     decisions = await records(db, "adaptive_decisions", student_id, 1)
     latest = summaries[0] if summaries else {}
-    values = [number(v) for v in (states[0].get("knowledge_state", {}) if states else {}).values()]
-    values = [v for v in values if v is not None]
-    mastery = sum(values)/len(values) if values else None
+    c1 = await c1_window_metrics(db, student_id)
+    mastery_view = await practised_mastery(db, student_id, states[0] if states else {})
+    mastery = mastery_view["average"]
     profile, _, pattern = pattern_profile(profile_doc)
     fatigue = fatigue_view(latest) if latest else {"score": None, "state": "UNAVAILABLE"}
     from bson import ObjectId
@@ -330,11 +331,11 @@ async def get_therapist_overview(student_id: str):
 
     coverage = await learner_coverage(db, student_id, student_doc or {})
     alerts = learner_alerts(coverage)
-    fatigue_text = ("Unavailable" if fatigue["score"] is None
+    fatigue_text = ("Not enough rounds" if fatigue["score"] is None
                     else f"{fatigue['state'].replace('_', ' ').title()} ({fatigue['score']:.2f})")
 
     return TherapistOverviewDTO(**mlbase(student_id, latest, "descriptive + BKT/IRT", "c1-v2"),
-        accuracy=number((latest.get("overall") or {}).get("accuracy")), attempted_items=latest.get("total_trials", 0),
+        accuracy=c1["first_attempt_accuracy"], attempted_items=c1["completed_rounds"],
         completed_sessions=len([x for x in session_ids if x]), reading_fluency_status=mastery_status(mastery),
         overall_mastery=mastery, current_pattern=pattern, pattern_confidence=number(profile.get("confidence")),
         fatigue_status=fatigue_text, fatigue_state=fatigue["state"],
@@ -355,7 +356,10 @@ async def get_therapist_overview(student_id: str):
         birth_month=(student_doc or {}).get("birth_month"),
         gender=(student_doc or {}).get("gender"),
         coverage=public_coverage(coverage),
-        alerts=alerts)
+        alerts=alerts,
+        c1_window=c1,
+        mastery_practised_areas=mastery_view["practised_areas"],
+        mastery_total_areas=mastery_view["total_areas"])
 
 
 def _c1_state_view(states):
@@ -386,6 +390,54 @@ def _c1_state_view(states):
             "label": "Model estimate from synthetic training - for professional review, not a diagnosis.",
         },
         "sessions_with_state": len(states),
+    }
+
+
+C1_FEATURE_LABELS = {
+    "accuracy": "Correct on first try", "mean_latency_ms": "Average round time",
+    "median_latency_ms": "Median round time", "latency_std_ms": "Round-time spread",
+    "mean_first_touch_latency_ms": "Time to first touch", "hesitation_rate": "Long pauses per round",
+    "misclick_rate": "Wrong taps per round", "replay_rate": "Audio replays per round",
+    "completion_rate": "Rounds finished", "latency_drift": "Slowing within sessions",
+    "error_drift": "More mistakes late in sessions", "hesitation_drift": "More pauses late in sessions",
+    "accuracy_slope": "Accuracy trend", "visual_processing_index": "Visual task speed index",
+    "phonological_task_index": "Sound task speed index", "motor_interaction_index": "Motor interaction index",
+    "attention_stability_index": "Attention stability index", "fatigue_score": "Fatigue score",
+    "cognitive_load_score": "Effort score",
+}
+
+_ESTIMATE_REASONS = {
+    "insufficient_evidence": "Not enough evidence yet for a learner-level estimate.",
+    "outside_training_range": "This learner's measurements are outside what the model was trained on, so no estimate is shown.",
+    "model_unavailable": "The learner-level model is not installed on the server.",
+    None: "No learner-level estimate has been computed yet. It updates after each activity.",
+}
+
+
+def _learner_estimate_view(doc):
+    """Learner-level C1 estimate (14-day window) for the therapist dashboard."""
+    doc = doc or {}
+    status = doc.get("status")
+    return {
+        "available": status == "estimated",
+        "status": status or "not_computed",
+        "predicted_pattern": doc.get("predicted_pattern"),
+        "probabilities": doc.get("probabilities") or {},
+        "confidence": number(doc.get("confidence")),
+        "model_version": doc.get("model_version"),
+        "model_name": doc.get("model_name", "c1_learner_model"),
+        "provenance": doc.get("provenance") or "synthetic_only",
+        "computed_at": doc.get("computed_at"),
+        "window_days": doc.get("window_days"),
+        "evidence": doc.get("evidence") or {},
+        "missing_evidence": list(doc.get("missing_evidence") or []),
+        "outside_range": [
+            {**row, "label": C1_FEATURE_LABELS.get(row.get("feature"), row.get("feature"))}
+            for row in (doc.get("outside_range") or [])
+        ],
+        "notes": list(doc.get("notes") or []),
+        "unavailable_reason": None if status == "estimated" else _ESTIMATE_REASONS.get(status, _ESTIMATE_REASONS[None]),
+        "label": "Learner-level model estimate from simulated training data - for professional review, not a diagnosis.",
     }
 
 
@@ -427,7 +479,8 @@ async def get_therapist_c1_behavioral(student_id: str, days: Optional[int] = Que
     all_rows = await records(db, "session_summaries", student_id)
     history, period = window_or_latest(all_rows, days)
     latest = history[0] if history else {}
-    trend_rows = list(reversed(history[: setting("limits", "trend_sessions", default=12)]))
+    # Sessions left before any round was finished have no accuracy/latency.
+    trend_rows = list(reversed([r for r in history if has_completed_rounds(r)][: setting("limits", "trend_sessions", default=12)]))
     def trend(field=None, fatigue=False):
         points = []
         for index, row in enumerate(trend_rows, start=1):
@@ -446,33 +499,60 @@ async def get_therapist_c1_behavioral(student_id: str, days: Optional[int] = Que
         index_trend.append(point)
     motion = in_window(await records(db, "kinematic_features", student_id, 100), days)
     fatigue = fatigue_view(latest) if latest else {"score": None, "state": "UNAVAILABLE"}
+    learner_doc = await db.c1_learner_estimates.find_one({"student_id": student_id})
+    c1_state = _c1_state_view(states)
+    c1_state["pattern_estimate"] = _learner_estimate_view(learner_doc)
+    # Key numbers are pooled over the completed rounds in the window — the
+    # same source the summary tab, parent dashboard and PDF use. Session
+    # summaries remain the source for per-session trends.
+    pooled = await c1_window_metrics(db, student_id, days)
+    def key_number(field):
+        if pooled["sessions_started"]:
+            return pooled[field]
+        return weighted_overall(history, {"first_attempt_accuracy": "accuracy"}.get(field, field))
     return TherapistC1BehavioralDTO(**{**mlbase(student_id, latest, "descriptive", "c1-v2"),
                                        "reporting_period": period},
         session_id=latest.get("session_id"),
-        first_attempt_accuracy=weighted_overall(history, "accuracy"),
-        median_response_latency_ms=weighted_overall(history, "median_response_latency_ms"),
-        retry_rate=weighted_overall(history, "retry_rate"),
-        mean_attempts_per_round=weighted_overall(history, "mean_attempts_per_round"),
-        median_time_to_correct_ms=weighted_overall(history, "median_time_to_correct_ms"),
-        correction_rate=weighted_overall(history, "correction_rate"),
+        window=pooled,
+        first_attempt_accuracy=key_number("first_attempt_accuracy"),
+        median_response_latency_ms=key_number("median_response_latency_ms"),
+        retry_rate=key_number("retry_rate"),
+        mean_attempts_per_round=key_number("mean_attempts_per_round"),
+        median_time_to_correct_ms=key_number("median_time_to_correct_ms"),
+        correction_rate=key_number("correction_rate"),
         behavioral_fatigue_proxy=fatigue["score"], fatigue_state=fatigue["state"],
         kc_performance={row["kc_id"]: row["accuracy"] for row in kcs if row["kc_id"] in KC_NAMES},
         error_distribution={k: (shares.get(k) if errors["total_errors"] else None)
                             for k in ("visual_confusion", "visual_task_error", "phonological_confusion", "sequence_error", "unknown_error")},
         trends=dict(accuracy=trend("accuracy"), latency=trend("median_response_latency_ms"), fatigue=trend(fatigue=True)),
         window_days=days, session_count=len(history),
-        total_trials=sum(int(r.get("total_trials") or 0) for r in history),
+        total_trials=pooled["completed_rounds"] if pooled["sessions_started"] else sum(completed_trials(r) or 0 for r in history),
         kc_breakdown=kcs, error_breakdown=errors,
-        c1_state=_c1_state_view(states), kinematics=_kinematics_view(motion),
+        c1_state=c1_state, kinematics=_kinematics_view(motion),
         index_trend=index_trend)
 
 
-def _speech_item(row):
+def _letter_changes(row, limit=12):
+    """Letter (grapheme) substitutions and omissions, e.g. expected "ප" read as "බ"."""
+    alignment = row.get("alignment") or {}
+    ops = (alignment.get("grapheme") or {}).get("operations") or row.get("error_operations") or []
+    changes = []
+    for op in ops:
+        if not isinstance(op, dict) or op.get("operation") not in {"substitution", "deletion"}:
+            continue
+        changes.append({"op": op.get("operation"), "expected": op.get("expected"), "observed": op.get("observed")})
+    return changes[:limit]
+
+
+def _speech_item(row, attempts=1):
     values = speech(row)
     labels = activity_label(row.get("skill_id"), row.get("activity_id"), row.get("activity_name"))
     alignment = row.get("alignment") or {}
     operations = (alignment.get("word") or {}).get("operations") or []
     return {
+        "attempts_for_item": attempts,
+        "letter_changes": _letter_changes(row) if values["measured"] else [],
+        "disagreement_reasons": values["disagreement_reasons"],
         "item_id": row.get("item_id"),
         "activity": labels["activity_display"],
         "recorded_at": timestamp(row),
@@ -526,8 +606,22 @@ async def get_therapist_c2_speech(student_id: str, days: Optional[int] = Query(N
             "reading_score": med([speech(r)["reading_performance_score"] for r in rows]),
             "voice_onset_ms": med([speech(r)["voice_onset_ms"] for r in rows]),
             "pause_ratio": med([speech(r)["pause_ratio"] for r in rows]),
+            "reading_rate_wpm": med([speech(r)["reading_rate_wpm"] for r in rows]),
         })
         session_trend.append(point)
+    # Re-recordings of the same sentence in a session, and the most frequent
+    # letter changes over clear recordings.
+    attempts = {}
+    for row in history:
+        key = (row.get("session_id"), row.get("item_id"))
+        attempts[key] = attempts.get(key, 0) + 1
+    letter_counts = {}
+    for row in usable_rows:
+        for change in _letter_changes(row, limit=100):
+            if change["op"] == "substitution" and change["expected"] and change["observed"]:
+                label = f'{change["expected"]} → {change["observed"]}'
+                letter_counts[label] = letter_counts.get(label, 0) + 1
+    letter_counts = dict(sorted(letter_counts.items(), key=lambda kv: -kv[1])[:10])
     latest_view = speech(latest)
     latest_view.update({"item_id": latest.get("item_id"), "recorded_at": timestamp(latest)})
     return TherapistC2SpeechDTO(**{**mlbase(student_id, latest, "speech analysis", "c2-pipeline-v3"),
@@ -538,7 +632,9 @@ async def get_therapist_c2_speech(student_id: str, days: Optional[int] = Query(N
         window_days=days,
         usable_recording_rate=(len(usable_rows) / len(history)) if history else None,
         quality_issue_counts=issues,
-        items=[_speech_item(row) for row in history[: setting("limits", "speech_items", default=20)]],
+        items=[_speech_item(row, attempts.get((row.get("session_id"), row.get("item_id")), 1))
+               for row in history[: setting("limits", "speech_items", default=20)]],
+        letter_change_counts=letter_counts,
         session_trend=session_trend[-setting("limits", "trend_sessions", default=12):])
 
 
@@ -557,7 +653,12 @@ async def get_therapist_c3_profile(student_id: str):
     pipeline_status = doc.get("pipeline_status") or audit.get("status") or "not_run"
     missing_inputs = list(doc.get("missing_inputs") or audit.get("missing_features") or [])
     skip_reason = None
-    if not doc.get("model_applied"):
+    outside = list(doc.get("outside_range") or [])
+    if not doc.get("model_applied") and outside:
+        skip_reason = ("No combined estimate: these measurements are outside what the model was trained on - "
+                       + "; ".join(f"{o.get('label', o.get('feature'))} {o.get('value')} (trained {o.get('training_range')})"
+                                   for o in outside) + ".")
+    elif not doc.get("model_applied"):
         skip_reason = ("The combined estimate is not ready yet. Still needed: " + "; ".join(missing_inputs) + ".") if missing_inputs \
             else "The combined estimate is not ready yet: more activity and reading observations are needed."
     metadata = mlbase(student_id, doc or audit, "XGBoost", "c3-fusion-v1")
@@ -638,6 +739,9 @@ async def get_therapist_c3_profile(student_id: str):
         sources_used=sources,
         latest_feedback=latest_feedback,
         marginalized_covariates=list(profile.get("marginalized_covariates") or []),
+        outside_range=outside,
+        not_measured_inputs=list(doc.get("not_measured_inputs") or []),
+        c1_evidence_used=bool(doc.get("c1_evidence_used")),
     )
 
 
@@ -671,14 +775,12 @@ async def submit_professional_feedback(student_id: str, req: ProfessionalFeedbac
     from datetime import datetime, timezone
     snapshot, estimate, model_version = {}, None, None
     if req.component == "c1":
-        states = await records(db, "behavioral_features", student_id, 20)
-        state = next((s for s in states if s.get("session_id") == req.session_id), states[0] if states else {})
-        model = state.get("model") or {}
-        estimate, model_version = model.get("predicted_pattern"), model.get("model_version")
-        snapshot = {**(state.get("behavior") or {}), **(state.get("indices") or {}),
-                    "fatigue_score": (state.get("fatigue") or {}).get("score"),
-                    "cognitive_load_score": (state.get("interaction_state") or {}).get("score")}
-        session_id = state.get("session_id")
+        # The C1 estimate is learner-level; the snapshot is the exact 19-feature
+        # vector the model saw, so reviews can later train/calibrate it.
+        learner = await db.c1_learner_estimates.find_one({"student_id": student_id}) or {}
+        estimate, model_version = learner.get("predicted_pattern"), learner.get("model_version")
+        snapshot = dict(learner.get("features") or {})
+        session_id = req.session_id or (learner.get("session_ids") or [None])[-1]
     else:
         doc = await _latest_profile(db, student_id)
         estimate = (doc.get("learner_profile") or {}).get("primary_pattern")
