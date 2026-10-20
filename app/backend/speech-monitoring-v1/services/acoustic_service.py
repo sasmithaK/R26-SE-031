@@ -21,38 +21,26 @@ class AcousticAnalysisService:
         pass
 
     def estimate_sinhala_syllables(self, text: str) -> int:
-        """
-        Estimates the number of syllables in a Sinhala word/phrase.
-        Sinhala is an abugida, so each consonant is a syllable unless modified by a hal-kirima (්) \u0dca
-        which removes the inherent vowel. 
+        """Count Sinhala syllables (aksharas with a vowel) in the expected text.
+
+        A syllable is an independent vowel (U+0D85-U+0D96) or a consonant
+        (U+0D9A-U+0DC6) that is not followed by the hal kirima (U+0DCA). A
+        consonant with hal kirima has no vowel of its own: at the end of a word
+        it closes the previous syllable, and before a ZWJ (yansaya/rakaransaya)
+        it joins the next consonant, so it is not counted. Vowel signs,
+        anusvara and visarga modify a syllable and are not counted.
         """
         if not text:
             return 1
-            
-        # Remove spaces and punctuation
-        cleaned = ''.join(c for c in text if c.isalnum() or c == '\u0dca')
-        
-        # Count all characters
-        total_chars = len(cleaned)
-        
-        # In Unicode Sinhala, vowels marks are separate characters, 
-        # but they combine with the consonant. 
-        # A basic heuristic:
-        # 1. Count total characters.
-        # 2. Subtract the number of vowel marks (since they don't add a new syllable, they modify existing one).
-        # Vowel marks block: \u0dcf to \u0ddf
-        # 3. Hal kirima (\u0dca) removes the inherent vowel, so it merges with the previous consonant 
-        #    creating a consonant cluster, effectively reducing syllable count by 1.
-        
-        vowel_marks = sum(1 for c in cleaned if '\u0dcf' <= c <= '\u0ddf')
-        hal_kirima = sum(1 for c in cleaned if c == '\u0dca')
-        
-        # The true syllable count is roughly the number of base consonants/vowels 
-        # minus the ones that are killed by hal_kirima.
-        base_chars = total_chars - vowel_marks - hal_kirima
-        
-        estimated = base_chars - hal_kirima
-        return max(1, estimated)
+        count = 0
+        for index, char in enumerate(text):
+            if "\u0d85" <= char <= "\u0d96":
+                count += 1
+            elif "\u0d9a" <= char <= "\u0dc6":
+                following = text[index + 1] if index + 1 < len(text) else ""
+                if following != "\u0dca":
+                    count += 1
+        return max(1, count)
 
     def find_voice_onset(self, y: np.ndarray, sr: int, top_db: int = 30) -> int | None:
         """
@@ -75,7 +63,14 @@ class AcousticAnalysisService:
         onset_env = librosa.onset.onset_strength(y=y, sr=sr)
         
         # Detect peaks in the onset strength envelope
-        peaks = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr, wait=30, pre_max=20, post_max=20, pre_avg=100, post_avg=100, delta=0.2)
+        # Window sizes are in onset frames (hop 512 at 16 kHz = 32 ms). The
+        # former wait=30 (~0.96 s) allowed at most ~1 beat per second, while
+        # children read 2-4 syllables per second. Settings in c2_settings.json
+        # ("syllable_peaks"); tune them on labelled recordings.
+        cfg = {"wait": 4, "pre_max": 3, "post_max": 3, "pre_avg": 10, "post_avg": 10, "delta": 0.2}
+        for key in cfg:
+            cfg[key] = c2_settings.get("syllable_peaks", key, cfg[key])
+        peaks = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr, **cfg)
         
         return len(peaks)
 
