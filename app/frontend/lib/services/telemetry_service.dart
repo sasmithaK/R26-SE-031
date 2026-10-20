@@ -150,6 +150,9 @@ class TelemetryEvent {
   final List<Map<String, dynamic>> scaffoldApplications;
   final List<Map<String, dynamic>> attemptHistory;
 
+  /// Drags released outside every target (movement precision).
+  final int strayDropCount;
+
   const TelemetryEvent({
     this.eventId,
     required this.activityName,
@@ -193,6 +196,7 @@ class TelemetryEvent {
     this.scaffoldLevelUsed = 0,
     this.scaffoldApplications = const <Map<String, dynamic>>[],
     this.attemptHistory = const <Map<String, dynamic>>[],
+    this.strayDropCount = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -239,6 +243,7 @@ class TelemetryEvent {
     'scaffold_level_used': scaffoldLevelUsed,
     'scaffold_applications': scaffoldApplications,
     'attempt_history': attemptHistory,
+    'stray_drop_count': strayDropCount,
   };
 }
 

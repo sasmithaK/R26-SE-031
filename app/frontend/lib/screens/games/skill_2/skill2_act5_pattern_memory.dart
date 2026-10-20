@@ -293,6 +293,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
     int totalRounds,
   ) async {
     if (_isCorrect || _isMemorizing || _wrongTappedOption != null) return;
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
 
     final currentIndex = _userSequence.length;
     if (item != targetPattern[currentIndex]) {

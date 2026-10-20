@@ -362,6 +362,9 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   }
 
   void _onRoundComplete() {
+    // Response time ends at the final correct drop, not after the 1.5 s
+    // celebration below.
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markResponseComplete();
     setState(() {
       _roundComplete = true;
     });
@@ -975,7 +978,15 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
                       _isDragging = true;
                     });
                   },
-                  onDragEnd: (_) {
+                  onDragEnd: (details) {
+                    // A drop on a target is an answer; a drop elsewhere is a
+                    // movement miss (not a wrong answer).
+                    final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+                    if (details.wasAccepted) {
+                      wrapper?.markAnswer();
+                    } else {
+                      wrapper?.recordStrayDrop();
+                    }
                     setState(() {
                       _isDragging = false;
                     });

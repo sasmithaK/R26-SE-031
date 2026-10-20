@@ -233,6 +233,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
         _foundIndices.contains(index) ||
         _choiceController.removedIds.contains(_optionId(index)))
       return;
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
 
     final item = _shuffledItems[index];
     final targetLetter = _activeRoundData['target_letter']?.toString();

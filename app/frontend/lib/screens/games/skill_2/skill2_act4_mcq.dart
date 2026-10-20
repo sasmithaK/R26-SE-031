@@ -248,6 +248,7 @@ class _Skill2Act4McqState extends State<Skill2Act4Mcq> {
         _isCorrect ||
         _choiceController.removedIds.contains(_optionId(index)))
       return;
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
 
     final bool wasSelected = _selectedIndices.contains(index);
     setState(() {

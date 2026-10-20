@@ -367,6 +367,11 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats>
     setState(() {
       _currentPhase = MemoryPhase.recall;
     });
+    // Response timing starts when the child can answer, not during the
+    // memorise/hide phases (which are not response time).
+    context
+        .findAncestorStateOfType<TelemetryWrapperState>()
+        ?.resetRoundTimers(clearPreResponseEvidence: true);
 
     _playInstruction('මේ පින්තූරය තිබූ තැන තෝරන්න');
   }
@@ -411,6 +416,8 @@ class _VisualAct5MemoryAdventureState extends State<VisualAct5MemoryHats>
       _currentEncouragement =
           _encourageMessages[rng.nextInt(_encourageMessages.length)];
 
+      // Response time ends at the correct card, not after the celebration.
+      context.findAncestorStateOfType<TelemetryWrapperState>()?.markResponseComplete();
       setState(() {
         _currentPhase = MemoryPhase.success;
       });

@@ -167,6 +167,7 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
 
   void _onPoolLetterTapped(int poolIndex) async {
     if (_isChecking || _poolLetters[poolIndex] == null) return;
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
 
     // Find first empty slot
     int emptySlotIndex = _filledSlots.indexWhere((s) => s == null);
