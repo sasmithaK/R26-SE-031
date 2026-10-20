@@ -95,6 +95,7 @@ ASSET_NAMES = {
 
 
 def canonical(value: str) -> str:
+    """Normalize curriculum item IDs to the canonical Component 4 format."""
     compact = value.replace("_", "").replace("-", "")
     match = re.fullmatch(r"S(\d+)A(\d+)R(\d+)(V\d+)?", compact, re.I)
     if not match:
@@ -233,6 +234,7 @@ def _targeted_pattern_content(
     *,
     seed: int,
 ) -> Dict[str, Any]:
+    """Create a pattern task that preserves one diagnosed visual target."""
     content = copy.deepcopy(base)
     sequence = list(content.get("sequence") or [])
     old_correct = str(content.get("correct_answer") or "")
@@ -412,6 +414,7 @@ def targeted_skill1_variant_contents(
 
 
 def skill2_activity1_prompt(targets: List[str]) -> str:
+    """Create the Sinhala prompt for one or more target letters."""
     if len(targets) <= 1:
         return f"'{targets[0]}' අකුර සොයන්න."
     if len(set(targets)) == 1:
@@ -422,6 +425,7 @@ def skill2_activity1_prompt(targets: List[str]) -> str:
 
 
 def metadata(round_number: int, difficulty: float, *, anchor: bool = False) -> Dict[str, Any]:
+    """Return shared research metadata for one authored core round."""
     return {
         "item_version": 2,
         "difficulty_label": "easy" if difficulty < -0.25 else "hard" if difficulty > 0.75 else "medium",
@@ -432,6 +436,7 @@ def metadata(round_number: int, difficulty: float, *, anchor: bool = False) -> D
 
 
 def skill1_rounds() -> Dict[str, List[Dict[str, Any]]]:
+    """Build the reviewed Skill 1 core-round content definitions."""
     shadow_counts = [2, 3, 4, 5, 6]
     shadows = []
     for index, count in enumerate(shadow_counts):
@@ -748,6 +753,7 @@ SKILL2_ACTIVITY5_TARGETED_VARIANTS = {
 
 
 def skill2_activity5_content(spec) -> Dict[str, Any]:
+    """Expand an S2A5 reviewed word-pattern specification."""
     word, pattern, pilla_count, options, show_seconds = spec
     return {
         "target_word": word,
@@ -759,6 +765,7 @@ def skill2_activity5_content(spec) -> Dict[str, Any]:
 
 
 def skill2_activity4_content(spec) -> Dict[str, Any]:
+    """Expand an S2A4 reviewed first/last-letter specification."""
     word, units, pilla_count, target_position, options = spec
     content = {
         "target_word": word,
@@ -793,10 +800,12 @@ SKILL2_SIMPLE_PILLA_UNITS = [
 
 
 def _has_pillam(value: str) -> bool:
+    """Return whether Sinhala text contains a combining vowel mark."""
     return any(unicodedata.category(char).startswith("M") for char in value)
 
 
 def _sinhala_letter_bases(value: str) -> set[str]:
+    """Extract base Sinhala letters while excluding combining marks."""
     return {
         char
         for char in value
@@ -949,6 +958,7 @@ PICTURE_WORDS = [
 
 
 def skill3_image_word(image: str, target: str, options: List[str]) -> Dict[str, Any]:
+    """Build a Skill 3 image-to-word choice task."""
     return {
         "prompt": "පින්තූරයට ගැලපෙන වචනය තෝරන්න",
         "image_url": image,
@@ -961,6 +971,7 @@ def skill3_image_word(image: str, target: str, options: List[str]) -> Dict[str, 
 def skill3_word_formation(
     parts: List[str], target: str, options: List[str]
 ) -> Dict[str, Any]:
+    """Build a Skill 3 word-formation choice task."""
     joined = " + ".join(f"'{part}'" for part in parts)
     return {
         "prompt": f"{joined} එකතු වූ විට හැදෙන වචනය කුමක්ද?",
@@ -971,6 +982,7 @@ def skill3_word_formation(
 
 
 def skill3_audio_word(target: str, options: List[str]) -> Dict[str, Any]:
+    """Build a Skill 3 audio-to-word choice task."""
     return {
         "prompt": "ශබ්දයට සවන් දී නිවැරදි වචනය තෝරන්න",
         "audio_text": target,
@@ -987,6 +999,7 @@ def skill3_fill_blank(
     options: List[str],
     target: str,
 ) -> Dict[str, Any]:
+    """Build a Skill 3 missing-letter task with matching image."""
     return {
         "prompt": f"'{word}' වචනයේ අඩු අකුර තෝරන්න",
         "image_url": image,
@@ -1000,6 +1013,7 @@ def skill3_fill_blank(
 def skill3_jumbled_word(
     image: str, word: str, parts: List[str]
 ) -> Dict[str, Any]:
+    """Build a Skill 3 ordered-word construction task."""
     return {
         "prompt": "පින්තූරයට අදාළ වචනය සාදන්න",
         "image_url": image,
@@ -1122,6 +1136,7 @@ SKILL3_VARIANTS = {
 def skill3_difficulty_features(
     activity: int, content: Dict[str, Any]
 ) -> Dict[str, Any]:
+    """Measure response load and orthographic complexity for Skill 3."""
     if activity == 4:
         match = re.search(r"'([^']+)'", str(content.get("prompt", "")))
         target_word = match.group(1) if match else "".join(
@@ -1193,6 +1208,7 @@ def skill4_sentence_choice(
 def skill4_activity1_difficulty_features(
     content: Dict[str, Any],
 ) -> Dict[str, Any]:
+    """Measure sentence-choice difficulty features for S4A1."""
     return {
         "sentence_word_count": len(
             str(content.get("correctOption", "")).rstrip(".?!").split()
@@ -1317,6 +1333,7 @@ def skill4_fill_blank(
 def skill4_activity2_difficulty_features(
     content: Dict[str, Any],
 ) -> Dict[str, Any]:
+    """Measure fill-the-blank sentence difficulty features for S4A2."""
     sequence = list(content.get("sequence") or [])
     return {
         "sentence_word_count": len(sequence),
@@ -1431,6 +1448,7 @@ def skill4_audio_sentence(
 
 
 def _sinhala_base_letter_count(word: str) -> int:
+    """Count base Sinhala letters without punctuation or vowel marks."""
     return sum(
         1
         for char in word.rstrip(".?!")
@@ -1442,6 +1460,7 @@ def _sinhala_base_letter_count(word: str) -> int:
 def skill4_activity3_difficulty_features(
     content: Dict[str, Any],
 ) -> Dict[str, Any]:
+    """Measure sentence recognition and pilla complexity for S4A3."""
     words = str(content.get("correctOption", "")).rstrip(".?!").split()
     return {
         "sentence_word_count": len(words),
@@ -1554,6 +1573,7 @@ def skill4_jumbled_sentence(
 def skill4_activity4_difficulty_features(
     content: Dict[str, Any],
 ) -> Dict[str, Any]:
+    """Measure sentence-ordering difficulty features for S4A4."""
     return {
         "sentence_word_count": len(
             str(content.get("correct_sentence", "")).rstrip(".?!").split()
@@ -1613,6 +1633,7 @@ SKILL4_ACTIVITY4_VARIANTS = {
 
 
 def rotate(values: List[Any], start: int, count: int) -> List[Any]:
+    """Select a deterministic wrapped slice while deep-copying content."""
     return [copy.deepcopy(values[(start + offset) % len(values)]) for offset in range(count)]
 
 
@@ -1626,10 +1647,12 @@ def unique_values(values: List[Any]) -> List[Any]:
 
 
 def difficulty_label(difficulty: float) -> str:
+    """Map a provisional difficulty logit to a readable band."""
     return "easy" if difficulty < -0.25 else "hard" if difficulty > 0.75 else "medium"
 
 
 def _reduce_choice_options(content: Dict[str, Any]) -> bool:
+    """Remove one distractor while retaining targets and a valid choice."""
     options = list(content.get("options") or [])
     if len(options) <= 2:
         return False
@@ -1803,6 +1826,7 @@ def reduce_remediation_load(
 
 
 def variant_content(skill: int, activity: int, round_index: int, variant: int, core: Dict[str, Any]) -> Dict[str, Any]:
+    """Return reviewed V1/V2 content for a core curriculum round."""
     slot = (round_index - 1) * 2 + (variant - 1)
     option_count = len((core.get("content") or core).get("options") or [])
 
@@ -1981,6 +2005,7 @@ def variant_content(skill: int, activity: int, round_index: int, variant: int, c
 
 
 def build() -> None:
+    """Regenerate all Component 4 curriculum JSON with research metadata."""
     skill1 = skill1_rounds()
     for skill in range(1, 5):
         path = CURRICULUM / f"skill_{skill}.json"

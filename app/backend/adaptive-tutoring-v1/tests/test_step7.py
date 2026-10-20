@@ -1,3 +1,5 @@
+"""Run end-to-end acceptance checks for the research-ready C4 pipeline."""
+
 import pytest
 import pytest_asyncio
 from tests.conftest import mock_db

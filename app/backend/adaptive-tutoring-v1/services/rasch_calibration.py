@@ -17,6 +17,8 @@ from typing import Dict, Iterable, List, Mapping
 
 @dataclass(frozen=True)
 class RaschCalibrationResult:
+    """Offline item, learner, sample, and convergence estimates."""
+
     item_difficulties: Dict[str, float]
     item_sample_counts: Dict[str, int]
     student_abilities: Dict[str, float]
@@ -27,6 +29,7 @@ class RaschCalibrationResult:
 
 
 def _sigmoid(value: float) -> float:
+    """Evaluate a numerically stable logistic function."""
     if value >= 0:
         inverse = exp(-value)
         return 1.0 / (1.0 + inverse)
@@ -49,7 +52,7 @@ def fit_rasch(
     Items below ``min_item_responses`` are excluded rather than assigned a
     misleading estimate. Returned logits are clamped to [-3, 3].
     """
-
+#validate responses and remove items with fewer than 30 responses#
     rows: List[tuple[str, str, float]] = []
     for response in responses:
         student_id = str(response.get("student_id", "")).strip()
@@ -65,7 +68,7 @@ def fit_rasch(
     rows = [row for row in rows if row[1] in eligible]
     if not rows:
         return RaschCalibrationResult({}, {}, {}, 0, 0.0, False, 0)
-
+#Initialize ability and difficulty#
     theta = {student_id: 0.0 for student_id, _, _ in rows}
     difficulty = {item_id: 0.0 for _, item_id, _ in rows}
     rng = Random(seed)
@@ -123,6 +126,7 @@ def _log_loss(
     theta: Mapping[str, float],
     difficulty: Mapping[str, float],
 ) -> float:
+    """Calculate average binary cross-entropy for Rasch predictions."""
     total = 0.0
     count = 0
     for student_id, item_id, observed in rows:

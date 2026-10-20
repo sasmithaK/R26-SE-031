@@ -32,10 +32,16 @@ FEATURES = (
 
 
 def sigmoid(value: float) -> float:
+    """Map a simulated scaffold-effect score to a binary-success probability."""
     return 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, value))))
 
 
 def generate_rows(seed: int, learners: int, interactions: int):
+    """Yield reproducible labelled scaffold outcomes for simulated learners.
+
+    Actions are assigned uniformly, so their logged propensity is known and
+    later supports inverse-propensity policy evaluation.
+    """
     rng = random.Random(seed)
     dataset_id = f"c4-synthetic-policy-v1-seed-{seed}"
     for learner in range(learners):
@@ -110,6 +116,7 @@ def generate_rows(seed: int, learners: int, interactions: int):
 
 
 def main() -> None:
+    """Generate the requested synthetic cohort and write it as a CSV dataset."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True)
     parser.add_argument("--seed", type=int, default=26031)

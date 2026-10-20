@@ -42,6 +42,7 @@ def _is_canonical_completion(event: dict) -> bool:
 
 
 def _canonical_completion_events(db, projection: dict):
+    """Yield one eligible completion observation per learner/session/item."""
     projection = {
         **projection,
         "item_id": 1,
@@ -115,6 +116,7 @@ def _canonical_component4_item_bank(db) -> dict[str, dict]:
 
 
 def _is_research_eligible(event: dict, canonical_bank: dict[str, dict]) -> bool:
+    """Enforce observed, approved, version-matched calibration evidence."""
     if event.get("research_eligible") is False:
         return False
     item_id = str(event.get("item_id") or "")
@@ -163,6 +165,7 @@ def _is_research_eligible(event: dict, canonical_bank: dict[str, dict]) -> bool:
 
 
 def _independent_responses(db) -> list[dict]:
+    """Extract first-attempt item responses eligible for Rasch fitting."""
     projection = {
         "student_id": 1,
         "event_id": 1,
@@ -189,6 +192,7 @@ def _independent_responses(db) -> list[dict]:
 
 
 def _independent_bkt_responses(db) -> list[dict]:
+    """Extract ordered first-attempt KC responses eligible for BKT fitting."""
     projection = {
         "student_id": 1,
         "event_id": 1,
@@ -217,6 +221,7 @@ def _independent_bkt_responses(db) -> list[dict]:
 
 
 def main() -> None:
+    """Run dry-run calibration, optionally persisting approved estimates."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true",
                         help="Persist estimates. Default is a safe dry run.")

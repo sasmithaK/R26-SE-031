@@ -1,3 +1,5 @@
+"""Validate generated item metadata, variants, targets, and difficulty rules."""
+
 import json
 import unicodedata
 

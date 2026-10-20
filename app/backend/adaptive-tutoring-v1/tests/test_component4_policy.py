@@ -1,3 +1,5 @@
+"""Verify deterministic scaffold classifications and activity safety rules."""
+
 from types import SimpleNamespace
 
 from services.policy_engine import PolicyEngine

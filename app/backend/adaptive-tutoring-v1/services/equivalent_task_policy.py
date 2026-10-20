@@ -21,6 +21,8 @@ ITEM_RE = re.compile(r"^(S\d+A\d+R\d{2})(?:V(\d+))?$", re.IGNORECASE)
 
 
 class EquivalentTaskPolicy:
+    """Route a struggled core item through unseen V1/V2 equivalent tasks."""
+
     version = "C4_EQUIVALENT_TASK_V2"
     remediation_step = 0.5
 
@@ -38,6 +40,7 @@ class EquivalentTaskPolicy:
         target_b: Optional[float] = None,
         difficulty_direction: str = "MAINTAIN",
     ) -> Dict[str, Any]:
+        """Build a consistent next-action result and persist phase state."""
         state["next_phase"] = next_phase
         if next_item:
             state["expected_item_id"] = next_item

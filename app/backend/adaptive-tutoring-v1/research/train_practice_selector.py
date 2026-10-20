@@ -21,10 +21,12 @@ FEATURES = (
 
 
 def sigmoid(value: float) -> float:
+    """Convert a bounded logistic score into an independent-success probability."""
     return 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, value))))
 
 
 def auc(labels, probabilities):
+    """Compute rank-based ROC-AUC without adding a runtime ML dependency."""
     pairs = sorted(zip(probabilities, labels))
     positives = sum(labels)
     negatives = len(labels) - positives
@@ -35,6 +37,12 @@ def auc(labels, probabilities):
 
 
 def main() -> None:
+    """Train, test, and export the targeted-practice logistic ranker.
+
+    The split is performed on learner IDs before rows are collected. This
+    guarantees that one simulated learner cannot occur in both training and
+    testing, even though each learner has multiple candidate decisions.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
@@ -46,6 +54,8 @@ def main() -> None:
     if not rows or {row.get("data_origin") for row in rows} != {"synthetic"}:
         raise RuntimeError("Practice-selector training accepts synthetic rows only.")
 
+    # Create a deterministic 75% learner-training / 25% learner-testing split.
+    # Unlike a random row split, this preserves learner independence.
     learners = sorted({row["student_id"] for row in rows})
     rng = random.Random(args.seed)
     rng.shuffle(learners)
@@ -53,6 +63,7 @@ def main() -> None:
     train_ids = set(learners[:split])
     train = [row for row in rows if row["student_id"] in train_ids]
     test = [row for row in rows if row["student_id"] not in train_ids]
+    # Learn standardization statistics from training learners only.
     means = {
         name: sum(float(row[name]) for row in train) / len(train)
         for name in FEATURES
@@ -62,6 +73,10 @@ def main() -> None:
         variance = sum((float(row[name]) - means[name]) ** 2 for row in train) / len(train)
         scales[name] = math.sqrt(variance) or 1.0
 
+    # MODEL 2: L2-regularized binary logistic regression predicts success for
+    # each eligible remediation/confirmation task.
+    # Fit L2-regularized logistic regression with batch gradient descent. The
+    # resulting coefficients are exported as portable JSON for inference.
     weights = {name: 0.0 for name in FEATURES}
     intercept = 0.0
     learning_rate = 0.08
@@ -82,6 +97,7 @@ def main() -> None:
                 grad_w[name] / len(train) + regularization * weights[name]
             )
 
+    # The held-out rows are used only after training to calculate final metrics.
     probabilities = []
     labels = []
     for row in test:
@@ -90,7 +106,7 @@ def main() -> None:
         labels.append(int(row["independent_success"]))
     accuracy = sum((p >= 0.5) == bool(y) for p, y in zip(probabilities, labels)) / len(labels)
     brier = sum((p - y) ** 2 for p, y in zip(probabilities, labels)) / len(labels)
-
+#Export model coefficients#
     artifact = {
         "model_type": "reviewed_item_independent_success_logistic_model",
         "model_version": "c4-practice-selector-synthetic-v1",

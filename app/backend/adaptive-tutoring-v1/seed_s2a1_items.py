@@ -1,3 +1,9 @@
+"""Legacy utility for seeding the original Skill 2 Activity 1 item variants.
+
+The current full item bank is normally built by ``seed_item_bank.py``.  This
+small script remains useful only for isolated S2A1 development databases.
+"""
+
 import os
 from pymongo import MongoClient
 

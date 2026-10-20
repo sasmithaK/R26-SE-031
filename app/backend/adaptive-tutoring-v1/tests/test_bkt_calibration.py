@@ -1,3 +1,5 @@
+"""Verify BKT fitting, calibrated-parameter loading, and mastery recovery."""
+
 from services.bkt_calibration import fit_bkt_by_kc
 from services.bkt_engine import BKTEngine
 

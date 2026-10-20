@@ -44,6 +44,7 @@ ACTION_COSTS = {
 
 
 def _bounded(value: Any, low: float = 0.0, high: float = 1.0) -> float:
+    """Convert an input to float and clamp it to its valid model range."""
     try:
         return max(low, min(high, float(value)))
     except (TypeError, ValueError):
@@ -51,6 +52,7 @@ def _bounded(value: Any, low: float = 0.0, high: float = 1.0) -> float:
 
 
 def candidate_actions(telemetry: Any) -> List[str]:
+    """Return only scaffold actions the current activity can safely render."""
     capabilities = set(getattr(telemetry, "supported_actions", None) or [])
     options = int(getattr(telemetry, "original_options_count", 0) or 0)
     minimum = max(2, int(getattr(telemetry, "minimum_visible_options", 2) or 2))
@@ -92,6 +94,7 @@ def context_features(
     learner_profile: Dict[str, float] | None,
     personal_latency_factor: float = 1.0,
 ) -> Dict[str, float]:
+    """Convert live learner, task, baseline, and telemetry evidence to features."""
     behavior = behavioral_context or {}
     profile = learner_profile or {}
     latency = float(getattr(telemetry, "total_round_latency_ms", 0) or 0)
@@ -125,18 +128,23 @@ def context_features(
 
 
 class ActionPolicyModel:
+    """Load portable coefficients and rank safe scaffold actions in real time."""
+
     def __init__(self, path: Path | None = None):
+        """Resolve the configured artifact path and load it once at startup."""
         self.path = Path(os.getenv("C4_ACTION_MODEL_PATH", str(path or DEFAULT_MODEL_PATH)))
         self.artifact: Dict[str, Any] = {}
         self.reload()
 
     def reload(self) -> None:
+        """Reload the JSON artifact, leaving an empty model on invalid input."""
         try:
             self.artifact = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             self.artifact = {}
-
+    #Predict next-independent-success probability for one scaffold.#
     def _score(self, action: str, features: Dict[str, float]) -> float:
+
         model_action = MODEL_ACTION_ALIASES.get(action, action)
         model = (self.artifact.get("models_by_action") or {}).get(model_action)
         if not model:
@@ -162,6 +170,13 @@ class ActionPolicyModel:
         data_origin: str,
         assignment_key: str | None = None,
     ) -> Dict[str, Any]:
+        """Rank eligible actions and apply the policy-mode safety gate.
+
+        ``simulation_model`` applies the synthetic model for the labelled
+        research demonstration. Ordinary ``model`` mode requires an approved
+        observed-data artifact; otherwise the deterministic baseline remains
+        applied while the recommendation is retained for auditing.
+        """
         requested_policy_mode = str(
             requested_mode or os.getenv("C4_POLICY_MODE", "shadow")
         ).lower()
@@ -189,10 +204,14 @@ class ActionPolicyModel:
         candidates = candidate_actions(telemetry)
         if baseline_action not in candidates:
             candidates.append(baseline_action)
+        # Score every scaffold supported by the current activity. Each value is
+        # P(next response is independently successful | context, scaffold).
         predictions = {
             action: round(self._score(action, features), 6)
             for action in candidates
         }
+        # Prefer effective but less intrusive help:
+        # utility = predicted success probability - instructional cost.
         utilities = {
             action: round(
                 probability - ACTION_COSTS.get(action, 0.05),
@@ -200,6 +219,7 @@ class ActionPolicyModel:
             )
             for action, probability in predictions.items()
         }
+        # The ML recommendation is the supported scaffold with highest utility.
         recommendation = max(utilities, key=utilities.get) if utilities else baseline_action
         ordered = sorted(utilities.values(), reverse=True)
         confidence = ordered[0] - ordered[1] if len(ordered) > 1 else 0.0

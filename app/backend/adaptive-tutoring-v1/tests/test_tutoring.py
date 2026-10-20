@@ -1,3 +1,5 @@
+"""Verify the tutoring API integrates state updates, models, and persistence."""
+
 import pytest
 import database
 from main import _link_confirmation_policy_outcomes

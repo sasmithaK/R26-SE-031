@@ -22,6 +22,7 @@ RUNTIME_GENERATED_ROUNDS = 5
 
 
 def normalize_item_id(value: str) -> str:
+    """Convert supported item-ID spellings to canonical SXAYRZZ[Vn]."""
     compact = value.replace("_", "").replace("-", "")
     match = re.fullmatch(r"S(\d+)A(\d+)R(\d+)(V\d+)?", compact, re.IGNORECASE)
     if not match:
@@ -33,22 +34,26 @@ def normalize_item_id(value: str) -> str:
 
 
 def _activity_id(skill_id: str, activity_id: str) -> str:
+    """Convert curriculum skill/activity identifiers to the runtime X.Y form."""
     skill = re.search(r"\d+", skill_id)
     activity = re.search(r"\d+", activity_id)
     return f"{skill.group() if skill else '0'}.{activity.group() if activity else '0'}"
 
 
 def _number(value: str) -> str:
+    """Extract the first numeric identifier component."""
     match = re.search(r"\d+", value)
     return match.group() if match else "0"
 
 
 def _content_hash(content: Dict[str, Any]) -> str:
+    """Create a stable short hash used to detect duplicate variants."""
     encoded = json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
 
 
 def _capabilities(template: str) -> List[str]:
+    """Declare scaffold commands that a task template can safely render."""
     if "jumbled" in template or "pattern" in template or "memory" in template:
         return ["HIGHLIGHT_OPTION", "REVEAL_FIRST_TOKEN", "REPLAY_INSTRUCTION"]
     if "sorting" in template:
@@ -61,12 +66,14 @@ def _capabilities(template: str) -> List[str]:
 
 
 def _difficulty(round_number: int, total: int) -> float:
+    """Assign a provisional evenly spaced difficulty before calibration."""
     if total <= 1:
         return 0.0
     return round(-1.0 + (2.0 * (round_number - 1) / (total - 1)), 2)
 
 
 def _option_records(item_id: str, content: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Normalize heterogeneous curriculum options into auditable records."""
     sequence_key = next(
         (key for key in ("pattern", "scrambled_letters", "scrambled_words") if content.get(key)),
         None,
@@ -143,6 +150,7 @@ def _item_document(
     source: str,
     base_hash: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """Build one canonical core or practice item-bank document."""
     research = activity.get("research_metadata") or {}
     canonical_activity_id = _activity_id(skill_id, activity.get("id", "act_0"))
     difficulty_b = float(round_data.get("difficulty_b", _difficulty(round_number, total_rounds)))
@@ -224,6 +232,7 @@ def _item_document(
 
 
 def build_items(curriculum_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
+    """Load all four skills and construct their validated item documents."""
     curriculum_dir = Path(curriculum_dir or DEFAULT_CURRICULUM_DIR)
     documents: List[Dict[str, Any]] = []
     for path in sorted(curriculum_dir.glob("skill_*.json")):
@@ -306,6 +315,7 @@ def build_items(curriculum_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
 
 
 def validation_summary(items: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    """Summarize item-bank completeness and validation warnings."""
     items = list(items)
     return {
         "total_items": len(items),

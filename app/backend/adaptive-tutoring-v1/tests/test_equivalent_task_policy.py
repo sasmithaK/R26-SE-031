@@ -1,3 +1,5 @@
+"""Verify equivalent-task targeting and difficulty constraints."""
+
 import pytest
 
 from services.equivalent_task_policy import EquivalentTaskPolicy

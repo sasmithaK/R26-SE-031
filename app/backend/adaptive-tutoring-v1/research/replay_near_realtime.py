@@ -11,6 +11,7 @@ import httpx
 
 
 async def main_async(args) -> None:
+    """Replay labelled synthetic trigger events through the live API."""
     with open(args.input, encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
     async with httpx.AsyncClient(timeout=15.0) as client:
@@ -53,6 +54,7 @@ async def main_async(args) -> None:
 
 
 def main() -> None:
+    """Parse replay controls and run the asynchronous sender."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--url", default="http://127.0.0.1:9017")

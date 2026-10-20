@@ -17,10 +17,12 @@ ALIASES = {
 
 
 def value(row, names):
+    """Return the first populated value among supported public aliases."""
     return next((row[name] for name in names if row.get(name) not in (None, "")), "")
 
 
 def main() -> None:
+    """Normalize a public KT CSV as external, non-calibrating evidence."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)

@@ -1,3 +1,10 @@
+"""Select safe next items from the reviewed Component 4 item bank.
+
+Hard curriculum and exposure constraints are applied before optional ML
+ranking.  The selector never generates child-facing content; it returns an
+existing authored item plus evidence explaining the choice.
+"""
+
 import math
 from typing import List, Dict, Any, Optional
 
@@ -5,6 +12,8 @@ from services.practice_metadata import derive_practice_metadata, normalize_targe
 from services.practice_selector_model import practice_selector_model
 
 class ItemSelector:
+    """Choose reviewed curriculum items under instructional constraints."""
+
     def select_targeted_practice_item(
         self,
         *,
@@ -66,6 +75,7 @@ class ItemSelector:
         }
 
         def has_exact_target(candidate: Dict[str, Any]) -> bool:
+            """Check whether a candidate covers the diagnosed target unit."""
             if not diagnosed_targets:
                 return False
             metadata = derive_practice_metadata(candidate)
@@ -310,6 +320,7 @@ class ItemSelector:
             }
 
         def get_bucket(diff: float) -> str:
+            """Map continuous item difficulty to a confirmation band."""
             if diff <= -1.0: return "VERY_EASY"
             elif diff <= -0.25: return "EASY"
             elif diff <= 0.25: return "MEDIUM"
@@ -356,6 +367,7 @@ class ItemSelector:
         exposure_counts = exposure_counts or {}
 
         def candidate_evidence(c: Dict[str, Any]) -> Dict[str, Any]:
+            """Build auditable IRT-distance and prior-exposure evidence."""
             difficulty = float(c.get("difficulty_b", 0.0) or 0.0)
             distance = abs(difficulty - target_difficulty)
             # At the target ability, a Rasch item is most informative near
@@ -377,6 +389,7 @@ class ItemSelector:
         scored = [(candidate_evidence(candidate), candidate) for candidate in valid_candidates]
 
         def sort_key(pair):
+            """Rank safe candidates deterministically after hard filtering."""
             evidence, _ = pair
             return (
                 evidence["difficulty_distance"],

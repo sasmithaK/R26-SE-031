@@ -644,6 +644,7 @@ def item_upsert_update(item: dict) -> dict:
 
 
 def seed(db) -> dict:
+    """Upsert the canonical bank and quarantine superseded evidence."""
     items = build_items()
     for item in items:
         db.item_bank.update_one(

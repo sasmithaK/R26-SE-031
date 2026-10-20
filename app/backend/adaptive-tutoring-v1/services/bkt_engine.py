@@ -1,4 +1,13 @@
+"""Maintain per-KC mastery with Bayesian Knowledge Tracing.
+
+The engine starts with transparent provisional priors, can accept approved
+calibrated parameters, and updates mastery only from eligible learning
+evidence while avoiding irreversible probabilities of exactly zero or one.
+"""
+
 class BKTEngine:
+    """Track the probability that a learner has mastered each curriculum KC."""
+
     # Never persist an absorbing probability of exactly 0 or 1. A 0.99 ceiling
     # still represents very strong mastery, while allowing later independent
     # evidence to correct an over-confident (including legacy 1.0) state.
@@ -6,6 +15,7 @@ class BKTEngine:
     MASTERY_CEILING = 0.99
 
     def __init__(self):
+        """Initialize transparent theory-informed priors for every supported KC."""
         # Baseline priors for Sinhala Abugida script KCs
         # Format: "target_kc": (P(L0), P(T), P(G), P(S))
         # P(L0) = Initial probability of knowing the skill
@@ -75,6 +85,7 @@ class BKTEngine:
         return True
 
     def get_model_evidence(self, kc: str) -> dict:
+        """Return parameters and calibration provenance for dashboard auditing."""
         metadata = self.model_metadata.get(kc, {})
         parameters = self.priors.get(kc, self.priors["default"])
         return {
@@ -98,6 +109,8 @@ class BKTEngine:
         Updates the probability that the student has mastered the knowledge component
         using the standard Bayesian Knowledge Tracing (BKT) equations.
         """
+        # MODEL 3: BKT updates P(mastery) from correct/incorrect evidence while
+        # accounting for learning, guessing, and slipping.
         priors = self.priors.get(target_kc, self.priors["default"])
         p_l_0, p_t, p_g, p_s = priors
         
