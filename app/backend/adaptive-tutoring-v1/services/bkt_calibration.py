@@ -66,7 +66,7 @@ def fit_bkt_by_kc(
     min_students: int = 30,
 ) -> BKTCalibrationResult:
     """Fit P(L0), P(T), P(G), P(S) per KC with learner-level holdout."""
-
+#group correct/incorrect responses by learner and KC#
     grouped: dict[str, dict[str, list[tuple[str, bool]]]] = defaultdict(
         lambda: defaultdict(list)
     )
@@ -83,7 +83,7 @@ def fit_bkt_by_kc(
     observation_counts: Dict[str, int] = {}
     student_counts: Dict[str, int] = {}
     validation_losses: Dict[str, float] = {}
-
+    #Create parameter grid#
     candidates = (
         (initial, transition, guess, slip)
         for initial in (0.1, 0.2, 0.3, 0.4, 0.5, 0.6)
@@ -93,7 +93,7 @@ def fit_bkt_by_kc(
         if guess + slip < 0.5
     )
     candidate_grid = tuple(candidates)
-
+#Learner-level training/validation split#
     for kc, by_student in grouped.items():
         ordered_students = sorted(by_student)
         observation_count = sum(len(sequence) for sequence in by_student.values())

@@ -142,9 +142,9 @@ class ActionPolicyModel:
             self.artifact = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             self.artifact = {}
-
+    #Predict next-independent-success probability for one scaffold.#
     def _score(self, action: str, features: Dict[str, float]) -> float:
-        """Predict next-independent-success probability for one scaffold."""
+
         model_action = MODEL_ACTION_ALIASES.get(action, action)
         model = (self.artifact.get("models_by_action") or {}).get(model_action)
         if not model:
@@ -204,10 +204,14 @@ class ActionPolicyModel:
         candidates = candidate_actions(telemetry)
         if baseline_action not in candidates:
             candidates.append(baseline_action)
+        # Score every scaffold supported by the current activity. Each value is
+        # P(next response is independently successful | context, scaffold).
         predictions = {
             action: round(self._score(action, features), 6)
             for action in candidates
         }
+        # Prefer effective but less intrusive help:
+        # utility = predicted success probability - instructional cost.
         utilities = {
             action: round(
                 probability - ACTION_COSTS.get(action, 0.05),
@@ -215,6 +219,7 @@ class ActionPolicyModel:
             )
             for action, probability in predictions.items()
         }
+        # The ML recommendation is the supported scaffold with highest utility.
         recommendation = max(utilities, key=utilities.get) if utilities else baseline_action
         ordered = sorted(utilities.values(), reverse=True)
         confidence = ordered[0] - ordered[1] if len(ordered) > 1 else 0.0

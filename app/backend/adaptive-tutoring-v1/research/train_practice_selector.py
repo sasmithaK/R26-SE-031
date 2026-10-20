@@ -73,6 +73,8 @@ def main() -> None:
         variance = sum((float(row[name]) - means[name]) ** 2 for row in train) / len(train)
         scales[name] = math.sqrt(variance) or 1.0
 
+    # MODEL 2: L2-regularized binary logistic regression predicts success for
+    # each eligible remediation/confirmation task.
     # Fit L2-regularized logistic regression with batch gradient descent. The
     # resulting coefficients are exported as portable JSON for inference.
     weights = {name: 0.0 for name in FEATURES}
@@ -104,7 +106,7 @@ def main() -> None:
         labels.append(int(row["independent_success"]))
     accuracy = sum((p >= 0.5) == bool(y) for p, y in zip(probabilities, labels)) / len(labels)
     brier = sum((p - y) ** 2 for p, y in zip(probabilities, labels)) / len(labels)
-
+#Export model coefficients#
     artifact = {
         "model_type": "reviewed_item_independent_success_logistic_model",
         "model_version": "c4-practice-selector-synthetic-v1",

@@ -64,8 +64,9 @@ class PracticeSelectorModel:
         except (OSError, json.JSONDecodeError):
             self.artifact = {}
 
+#Predict independent success for one reviewed candidate item.#
     def _predict(self, features: Dict[str, float]) -> float:
-        """Predict independent success for one reviewed candidate item."""
+
         model = self.artifact.get("model") or {}
         z = float(model.get("intercept", 0.0))
         weights = model.get("weights") or {}
@@ -112,7 +113,7 @@ class PracticeSelectorModel:
         ]
         micro_mastery = min(target_masteries) if target_masteries else 0.30
         support_dependency = 1.0 - micro_mastery
-
+#Build candidate features & Predict independent success
         scored = []
         for candidate in candidates:
             metadata = derive_practice_metadata(candidate)

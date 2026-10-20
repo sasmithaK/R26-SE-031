@@ -64,6 +64,8 @@ def main() -> None:
     fitted_by_action = {}
     evaluations = {}
     for action in sorted(set(actions)):
+        # MODEL 1: binary logistic regression predicts independent success
+        # separately for each scaffold action.
         # Each scaffold receives its own interpretable binary outcome model.
         # Fit with training rows for that action; evaluate on held-out learners.
         train = train_index[actions[train_index] == action]

@@ -52,7 +52,7 @@ def fit_rasch(
     Items below ``min_item_responses`` are excluded rather than assigned a
     misleading estimate. Returned logits are clamped to [-3, 3].
     """
-
+#validate responses and remove items with fewer than 30 responses#
     rows: List[tuple[str, str, float]] = []
     for response in responses:
         student_id = str(response.get("student_id", "")).strip()
@@ -68,7 +68,7 @@ def fit_rasch(
     rows = [row for row in rows if row[1] in eligible]
     if not rows:
         return RaschCalibrationResult({}, {}, {}, 0, 0.0, False, 0)
-
+#Initialize ability and difficulty#
     theta = {student_id: 0.0 for student_id, _, _ in rows}
     difficulty = {item_id: 0.0 for _, item_id, _ in rows}
     rng = Random(seed)

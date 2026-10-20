@@ -109,6 +109,8 @@ class BKTEngine:
         Updates the probability that the student has mastered the knowledge component
         using the standard Bayesian Knowledge Tracing (BKT) equations.
         """
+        # MODEL 3: BKT updates P(mastery) from correct/incorrect evidence while
+        # accounting for learning, guessing, and slipping.
         priors = self.priors.get(target_kc, self.priors["default"])
         p_l_0, p_t, p_g, p_s = priors
         

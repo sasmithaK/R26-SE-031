@@ -24,6 +24,7 @@ class IRTEngine:
         except OverflowError:
             return 0.0 if (theta - b_i) < 0 else 1.0
 
+#Test-information and standard-error calculation: lines#
     def calculate_standard_error(self, theta: float, item_difficulties: List[float]) -> float:
         """
         Calculates Standard Error of the ability estimate θ.
@@ -44,6 +45,8 @@ class IRTEngine:
         """
         Online update of ability estimate θ using Stochastic Gradient Descent step.
         """
+        # MODEL 4: the 1PL Rasch/IRT model updates learner ability theta by
+        # comparing the observed answer with its predicted correctness.
         p_i = self.calculate_probability(theta_old, b_i)
         response = 1.0 if is_correct else 0.0
         
