@@ -6,11 +6,12 @@ import logging
 from datetime import datetime, timedelta, timezone
 import os
 import math
+import json
 from bson import ObjectId
 
-from schemas import FusionRequest, FusionResponse, SessionFusionRequest, EvidenceChatRequest
+from schemas import FusionRequest, FusionResponse, SessionFusionRequest
 from services.xai_engine import get_xai_engine, XAIEngine
-from services.llm_explainer import generate_diagnostic_summary, answer_evidence_question
+from services.llm_explainer import generate_diagnostic_summary
 from database import connect_to_mongo, close_mongo_connection, get_db
 from auth import get_current_user, require_student_access
 
@@ -89,129 +90,6 @@ def _number(value):
     return value if math.isfinite(value) else None
 
 
-def _chat_observation_rows(student: dict) -> list:
-    """Return a small, text-only view of the current parent questionnaire answers."""
-    groups = student.get("comprehensive_assessment_results") or {}
-    rows = []
-    if isinstance(groups, dict):
-        for category, answers in groups.items():
-            if not isinstance(answers, list):
-                continue
-            for item in answers:
-                if isinstance(item, dict):
-                    question = (item.get("question_en") or item.get("question") or
-                                item.get("question_text") or item.get("text"))
-                    answer = item.get("answer", item.get("value"))
-                else:
-                    question, answer = None, item
-                rows.append({
-                    "category": str(category)[:40],
-                    "question": str(question)[:240] if question is not None else None,
-                    "answer": answer if isinstance(answer, (bool, int, float, str)) else str(answer)[:120],
-                })
-    if not rows and isinstance(student.get("assessment_results"), list):
-        for item in student["assessment_results"]:
-            if isinstance(item, dict):
-                rows.append({
-                    "category": "basic",
-                    "question": str(item.get("question_en") or item.get("question") or
-                                     item.get("question_text") or "")[:240],
-                    "answer": item.get("answer", item.get("value")),
-                })
-            else:
-                rows.append({"category": "basic", "question": None, "answer": item})
-    return rows[:80]
-
-
-def _chat_context_from_records(sessions: list, speech_rows: list, student: dict) -> dict:
-    """Whitelist observed fields; never pass identifiers, profiles, or raw audio to the LLM."""
-    c1_fields = ("accuracy", "retry_rate", "correction_rate", "median_response_latency_ms",
-                 "mean_attempts_per_round", "median_time_to_correct_ms", "error_rate", "trials")
-    activity_fields = ("skill_id", "activity_id", "activity_name", "trials", "accuracy",
-                       "retry_rate", "abandoned_trials", "median_response_latency_ms")
-    c1 = []
-    for row in sessions:
-        overall = row.get("overall") or {}
-        activities = row.get("activity_breakdown_by_skill") or row.get("activity_breakdown") or {}
-        compact_activities = []
-        if isinstance(activities, dict):
-            for metrics in list(activities.values())[:12]:
-                if isinstance(metrics, dict):
-                    compact_activities.append({key: metrics[key] for key in activity_fields if key in metrics})
-        c1.append({
-            "session_date": str(row.get("completed_at") or row.get("timestamp") or "")[:40],
-            "skill_id": row.get("skill_id"),
-            "overall": {key: overall[key] for key in c1_fields if key in overall},
-            "activities": compact_activities,
-        })
-
-    c2_fields = ("skill_id", "activity_id", "expected_text", "recognized_text", "exact_match",
-                 "word_accuracy", "word_error_rate", "grapheme_accuracy", "grapheme_error_rate",
-                 "acoustic_latency_ms", "syllabic_event_mismatch", "intra_word_silence_ratio",
-                 "pause_ratio", "reading_rate_wpm", "recording_quality", "measurement_status")
-    c2 = []
-    for row in speech_rows:
-        compact = {key: row[key] for key in c2_fields if key in row}
-        compact["recorded_at"] = str(row.get("created_at") or row.get("timestamp") or "")[:40]
-        # Keep transcript strings bounded; never transfer the uploaded recording itself.
-        for key in ("expected_text", "recognized_text"):
-            if isinstance(compact.get(key), str):
-                compact[key] = compact[key][:240]
-        c2.append(compact)
-
-    return {
-        "activity_observations_c1": c1,
-        "reading_observations_c2": c2,
-        "parent_reported_observations": _chat_observation_rows(student),
-    }
-
-
-@app.post("/chat/students/{student_id}")
-async def chat_about_student_evidence(
-    student_id: str,
-    request: EvidenceChatRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Therapist-only, read-only chat grounded in this student's C1/C2/questionnaire records."""
-    if current_user.get("role") not in {"therapist", "specialist"}:
-        raise HTTPException(status_code=403, detail="This assistant is available to connected therapists only")
-    await require_student_access(student_id, current_user)
-    if not 1 <= len(request.messages) <= 8 or request.messages[-1].role != "user":
-        raise HTTPException(status_code=422, detail="Provide 1–8 recent messages ending with a question")
-
-    db = get_db()
-    try:
-        student = await db.students.find_one({"_id": ObjectId(student_id)}) or {}
-    except Exception:
-        raise HTTPException(status_code=422, detail="Invalid student_id")
-
-    session_cursor = db.session_summaries.find({"student_id": student_id}).sort(
-        [("completed_at", -1), ("timestamp", -1), ("_id", -1)]
-    ).limit(12)
-    speech_cursor = db.speech_features.find({"student_id": student_id}).sort(
-        [("created_at", -1), ("timestamp", -1), ("_id", -1)]
-    ).limit(12)
-    sessions, speech_rows = await session_cursor.to_list(length=12), await speech_cursor.to_list(length=12)
-    evidence = _chat_context_from_records(sessions, speech_rows, student)
-    try:
-        answer = await answer_evidence_question(
-            evidence,
-            [{"role": item.role, "content": item.content} for item in request.messages],
-        )
-    except RuntimeError as exc:
-        status_code = 503 if "not configured" in str(exc).lower() else 502
-        raise HTTPException(status_code=status_code, detail=str(exc))
-    return {
-        "answer": answer,
-        "evidence_counts": {
-            "activity_sessions": len(sessions),
-            "reading_samples": len(speech_rows),
-            "parent_observations": len(evidence["parent_reported_observations"]),
-        },
-        "stored": False,
-    }
-
-
 def _questionnaire_yes_count(student: dict) -> int:
     """Count unique current parent observations without double-counting basic."""
     comprehensive = student.get("comprehensive_assessment_results") or {}
@@ -234,10 +112,41 @@ def _questionnaire_yes_count(student: dict) -> int:
     return total
 
 
-def _build_observed_summary(summary: dict, speech: dict, student: dict):
-    overall = summary.get("overall") or {}
-    accuracy = _number(overall.get("accuracy"))
-    retry_rate = _number(overall.get("retry_rate"))
+def _completed_rounds(row: dict):
+    if row.get("valid_trials") is not None:
+        return int(row.get("valid_trials") or 0)
+    total = int(row.get("total_trials") or 0)
+    abandoned = _number((row.get("overall") or {}).get("abandonment_rate")) or 0.0
+    return max(0, total - round(abandoned * total))
+
+
+def _pooled_overall(summaries: list) -> dict:
+    """Pool session rates over completed rounds (abandoned-only sessions skipped)."""
+    pooled, rounds = {}, sum(_completed_rounds(r) for r in summaries)
+    for field in ("accuracy", "retry_rate", "correction_rate"):
+        total = weight = 0.0
+        for row in summaries:
+            value, n = _number((row.get("overall") or {}).get(field)), _completed_rounds(row)
+            if value is not None and n > 0:
+                total += value * n
+                weight += n
+        pooled[field] = (total / weight) if weight else None
+    latencies = sorted(v for v in (_number((r.get("overall") or {}).get("median_response_latency_ms"))
+                                   for r in summaries if _completed_rounds(r) > 0) if v is not None)
+    pooled["median_response_latency_ms"] = latencies[len(latencies) // 2] if latencies else None
+    pooled["completed_rounds"] = rounds
+    return pooled
+
+
+def _build_observed_summary(summaries, speech: dict, student: dict, recordings: int = 0):
+    """Descriptive summary over the C3 window. ``speech`` is the latest
+    recording that was clear enough to measure (or {} when there is none)."""
+    if isinstance(summaries, dict):  # backward compatible single-session call
+        summaries = [summaries] if summaries else []
+    overall = _pooled_overall(summaries)
+    accuracy = overall.get("accuracy")
+    retry_rate = overall.get("retry_rate")
+    rounds = overall.get("completed_rounds") or 0
     word_accuracy = _number(speech.get("word_accuracy"))
     grapheme_accuracy = _number(speech.get("grapheme_accuracy"))
     speech_status = speech.get("measurement_status") or "unavailable"
@@ -245,15 +154,16 @@ def _build_observed_summary(summary: dict, speech: dict, student: dict):
 
     statements = []
     if accuracy is not None:
-        statements.append(f"First-attempt activity accuracy was {round(accuracy * 100)}%.")
+        statements.append(f"Across {rounds} completed activity rounds in the last {C3_WINDOW_DAYS} days, "
+                          f"{round(accuracy * 100)}% were correct on the first try.")
     if retry_rate is not None:
         statements.append(f"Extra attempts were used in {round(retry_rate * 100)}% of completed rounds.")
-    if word_accuracy is not None:
-        statements.append(f"Recorded-word agreement was {round(word_accuracy * 100)}% in the latest reading practice sample.")
-    elif speech:
-        statements.append("The latest oral reading practice audio was recorded.")
+    if word_accuracy is not None and speech_status in USABLE_SPEECH_STATUSES:
+        statements.append(f"Recorded-word agreement was {round(word_accuracy * 100)}% in the latest clear reading recording.")
+    elif recordings:
+        statements.append("Reading recordings were made, but none was clear enough to measure yet.")
     if questionnaire_count:
-        statements.append(f"The parent reported {questionnaire_count} learning observations in the questionnaires.")
+        statements.append(f"In the parent questionnaire, {questionnaire_count} items were marked as observed at home.")
     if not statements:
         statements.append("More completed activity observations are needed for a combined learning summary.")
 
@@ -261,7 +171,7 @@ def _build_observed_summary(summary: dict, speech: dict, student: dict):
     if retry_rate is not None and retry_rate >= float(os.getenv("C3_SUMMARY_RETRY_RATE", "0.35")):
         priorities.append("Use short practice sets and observe whether support reduces repeated attempts.")
     if (word_accuracy is not None and word_accuracy < float(os.getenv("C3_SUMMARY_WORD_ACCURACY", "0.70"))
-            and speech_status in {"valid", "available"}):
+            and speech_status in USABLE_SPEECH_STATUSES):
         priorities.append("Repeat familiar oral-reading items and compare several clear recordings over time.")
     if questionnaire_count:
         priorities.append("Compare parent observations with patterns repeated across several activities.")
@@ -272,8 +182,9 @@ def _build_observed_summary(summary: dict, speech: dict, student: dict):
         "c1": {
             "first_attempt_accuracy": accuracy,
             "retry_rate": retry_rate,
-            "correction_rate": _number(overall.get("correction_rate")),
-            "median_response_latency_ms": _number(overall.get("median_response_latency_ms")),
+            "correction_rate": overall.get("correction_rate"),
+            "median_response_latency_ms": overall.get("median_response_latency_ms"),
+            "completed_rounds": rounds,
         },
         "c2": {
             "measurement_status": speech_status,
@@ -295,24 +206,24 @@ def _build_observed_summary(summary: dict, speech: dict, student: dict):
 C3_WINDOW_DAYS = int(os.getenv("C3_WINDOW_DAYS", "14"))
 C3_MIN_USABLE_RECORDINGS = int(os.getenv("C3_MIN_USABLE_RECORDINGS", "2"))
 C3_MIN_MOVEMENT_SESSIONS = int(os.getenv("C3_MIN_MOVEMENT_SESSIONS", "2"))
-C3_MODEL_VERSION = "C3-v1.2"
-C3_FEATURE_VERSION = "c3-learner-window-v1"
+C3_MODEL_VERSION = "C3-v2.0"
+# Inputs, aggregation and the evidence rule live in services/c3_features.py and
+# are shared with scripts/train_c3_model.py (training uses the same code).
+from services.c3_features import (FEATURE_VERSION as C3_FEATURE_VERSION, FEATURE_LABELS,
+                                  USABLE_SPEECH_STATUSES, age_years as _c3_age_years,
+                                  build_c3_inputs, evidence_gaps as _c3_evidence_gaps,
+                                  outside_training_range as _c3_outside_range,
+                                  median_feature as _median_feature)
 
-SPEECH_FEATURE_SOURCES = {
-    "acoustic_latency_ms": ("acoustic_latency_ms",),
-    "peak_count_delta": ("syllabic_event_mismatch", "peak_count_delta"),
-    "intra_word_silence_ratio": ("intra_word_silence_ratio",),
-    "local_jitter": ("local_jitter",),
-    "local_shimmer": ("local_shimmer",),
-}
-MOTION_FEATURE_SOURCES = {
-    "time_to_first_touch_ms": ("time_to_first_touch_ms",),
-    "orthographic_confusion_index": ("orthographic_confusion_index",),
-    "path_efficiency_ratio": ("path_efficiency_ratio",),
-    "dimensionless_jerk": ("dimensionless_jerk",),
-    "dwell_time_ms": ("dwell_time_ms", "mean_dwell_time_ms"),
-}
-USABLE_SPEECH_STATUSES = {"valid", "available"}
+
+def _c3_ranges() -> dict:
+    path = os.path.join(os.path.dirname(__file__), "models", "c3_feature_ranges.json")
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        return data.get("ranges", {}) if data.get("feature_version") == C3_FEATURE_VERSION else {}
+    except (OSError, ValueError):
+        return {}
 
 
 def _row_time(row: dict):
@@ -333,22 +244,6 @@ def _row_time(row: dict):
 async def _recent(db, collection: str, student_id: str, since: datetime, limit: int = 300):
     rows = await db[collection].find({"student_id": student_id}).sort("_id", -1).to_list(length=limit)
     return [row for row in rows if (_row_time(row) or since) >= since]
-
-
-def _median_feature(rows: list, sources: tuple):
-    values = []
-    for row in rows:
-        for key in sources:
-            value = _number(row.get(key))
-            if value is not None:
-                values.append(value)
-                break
-    if not values:
-        return None, 0
-    values.sort()
-    mid = len(values) // 2
-    median = values[mid] if len(values) % 2 else (values[mid - 1] + values[mid]) / 2
-    return median, len(values)
 
 
 def _student_age_years(student: dict):
@@ -396,48 +291,30 @@ async def diagnose_saved_session(
 
     # Narrative uses the most recent observed records (descriptive only).
     narrative, recommendation, evidence = _build_observed_summary(
-        summaries[0] if summaries else {}, usable_speech[0] if usable_speech else (speech_rows[0] if speech_rows else {}), student,
+        summaries, usable_speech[0] if usable_speech else {}, student, recordings=len(speech_rows),
     )
 
-    model_inputs, feature_counts, missing = {}, {}, []
-    if len(usable_speech) < C3_MIN_USABLE_RECORDINGS:
-        missing.append(f"usable_reading_recordings ({len(usable_speech)} of {C3_MIN_USABLE_RECORDINGS})")
-    if len(motion_rows) < C3_MIN_MOVEMENT_SESSIONS:
-        missing.append(f"touch_movement_sessions ({len(motion_rows)} of {C3_MIN_MOVEMENT_SESSIONS})")
-    for name, sources in SPEECH_FEATURE_SOURCES.items():
-        value, count = _median_feature(usable_speech, sources)
-        feature_counts[name] = count
-        if value is None:
-            missing.append(name)
-        else:
-            model_inputs[name] = value
-    for name, sources in MOTION_FEATURE_SOURCES.items():
-        value, count = _median_feature(motion_rows, sources)
-        feature_counts[name] = count
-        if value is None:
-            missing.append(name)
-        else:
-            model_inputs[name] = value
-
-    age_years = _student_age_years(student)
-    if age_years is None:
-        missing.append("age")
-    else:
-        model_inputs["age"] = float(age_years)
-    gender = _student_gender_code(student)
+    # Activity-behaviour inputs come from the learner-level C1 estimate, used
+    # only when C1 itself had enough evidence.
+    c1_doc = await db.c1_learner_estimates.find_one({"student_id": request.student_id}) or {}
+    c1_features = c1_doc.get("features") if c1_doc.get("status") in {"estimated", "outside_training_range"} else None
+    age = _c3_age_years(student, now)
+    values, feature_counts = build_c3_inputs(usable_speech, motion_rows, c1_features, age)
+    missing = _c3_evidence_gaps(len(usable_speech), len(motion_rows), age,
+                                C3_MIN_USABLE_RECORDINGS, C3_MIN_MOVEMENT_SESSIONS)
+    model_inputs = {k: v for k, v in values.items() if v is not None}
+    not_measured = [k for k, v in values.items() if v is None]
+    outside = _c3_outside_range(values, _c3_ranges()) if not missing else []
     marginalize = {}
-    if gender is None:
-        marginalize["gender"] = [0.0, 1.0]  # averaged out, not invented
-    else:
-        model_inputs["gender"] = float(gender)
-    latest_time = max((t for t in (_row_time(r) for r in usable_speech + motion_rows) if t), default=now)
-    model_inputs["time_of_day_hour"] = float(latest_time.hour)
 
     measurement_notes = []
     if any((row.get("orthographic_confusion_coverage") == 0) for row in motion_rows):
         measurement_notes.append("Letter-confusion index covers only the letter pairs in the confusion map.")
-    if marginalize:
-        measurement_notes.append("Gender not recorded: estimate averaged over both values.")
+    if not_measured and not missing:
+        measurement_notes.append("Not measured yet (the model handles these as missing, nothing is filled in): "
+                                 + ", ".join(FEATURE_LABELS.get(k, k) for k in not_measured) + ".")
+    if outside:
+        measurement_notes.append("Some measurements are outside the range the model was trained on, so no estimate is shown.")
 
     modalities = []
     if summaries or motion_rows:
@@ -454,12 +331,14 @@ async def diagnose_saved_session(
     }
     shap_explanations = {"top_contributing_features": []}
     model_applied = False
-    if not missing:
+    if not missing and not outside:
         result = engine.analyze_patient(model_inputs, marginalize=marginalize)
         learner_profile = {**result["learner_profile"], "modalities_used": modalities}
         shap_explanations = result["shap_explanations"]
         model_applied = True
         pipeline_status = "model_and_summary_ready"
+    elif outside:
+        pipeline_status = "outside_training_range"
     else:
         pipeline_status = "insufficient_evidence" if (summaries or speech_rows or motion_rows) else "no_evidence"
 
@@ -471,7 +350,8 @@ async def diagnose_saved_session(
         "validation_status": "synthetic_trained_model",
         "model_provenance": "multimodal_pattern_model_trained_on_synthetic_data",
         "pipeline_status": pipeline_status, "model_applied": model_applied,
-        "missing_inputs": missing, "learner_profile": learner_profile,
+        "missing_inputs": missing, "not_measured_inputs": not_measured, "outside_range": outside,
+        "learner_profile": learner_profile,
         "shap_explanations": shap_explanations, "llm_summary": narrative,
         "llm_recommendations": recommendation, "evidence_summary": evidence,
         "evidence_window": {
@@ -483,6 +363,7 @@ async def diagnose_saved_session(
             "feature_counts": feature_counts,
         },
         "model_inputs": model_inputs if model_applied else {},
+        "c1_evidence_used": c1_features is not None,
         "measurement_notes": measurement_notes,
         "model_version": C3_MODEL_VERSION, "feature_version": C3_FEATURE_VERSION,
         "updated_at": now,
@@ -503,7 +384,7 @@ async def diagnose_saved_session(
     })
     return {"student_id": request.student_id, "session_id": request.session_id,
             "pipeline_status": pipeline_status, "model_applied": model_applied,
-            "missing_inputs": missing, "summary": narrative,
+            "missing_inputs": missing, "outside_range": outside, "summary": narrative,
             "recommendations": recommendation}
 
 @app.post("/diagnose")
@@ -529,9 +410,9 @@ async def diagnose_patient(
         flat_features.update(request.c1_audio_vector.dict())
         flat_features.update(request.c2_kinematic_vector.dict())
         # Convert age from months to years to match training data scale (range 5-7 years)
-        flat_features["age"] = request.student_age_months // 12
-        flat_features["gender"] = request.gender
-        flat_features["time_of_day_hour"] = request.time_of_day_hour
+        # v2 model: age in decimal years; gender/time of day are no longer
+        # inputs; C1 activity inputs are not part of this legacy request (NaN).
+        flat_features["age_years"] = round(request.student_age_months / 12, 2)
         
         # Analyze
         analysis_result = engine.analyze_patient(flat_features)
@@ -575,7 +456,7 @@ async def diagnose_patient(
             "student_id": request.student_id,
             "timestamp": datetime.utcnow(),
             "model_name": "XGBoost",
-            "model_version": "C3-v1.0",
+            "model_version": C3_MODEL_VERSION,
             "validation_status": "synthetic_only",
             "input_features": flat_features,
             "output_probabilities": analysis_result["learner_profile"]["class_probabilities"],
