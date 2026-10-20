@@ -259,6 +259,14 @@ def run_tests():
     # 5. C3 DIAGNOSTIC FUSION & XAI ENGINE (Azure)
     # -----------------------------------------------------------------
     print("\n--- 5. C3 Diagnostic Fusion (Azure) ---")
+    azure_auth = jwt.encode({
+        "sub": "test_verifier_parent@sipsara.org",
+        "role": "parent",
+        "id": parent_user_id or "6ad48611b981b30e3a9cc286",
+        "exp": datetime.now(timezone.utc) + timedelta(days=7)
+    }, AZURE_JWT_SECRET, algorithm="HS256")
+    azure_headers = {"Authorization": f"Bearer {azure_auth}"}
+
     diagnostic_payload = {
         "student_id": student_id or "STU_VERIFY",
         "c1_audio_vector": {
@@ -281,7 +289,7 @@ def run_tests():
         "data_origin": "observed"
     }
     try:
-        r = make_request("POST", f"{AZURE_BASE}/diagnostic/diagnose", json=diagnostic_payload)
+        r = make_request("POST", f"{AZURE_BASE}/diagnostic/diagnose", json=diagnostic_payload, headers=azure_headers)
         passed = r.status_code == 200 and "learner_profile" in r.json()
         data = r.json() if passed else {}
         record("C3 Diagnostic", "/diagnostic/diagnose", "POST", r.status_code, 200, passed,
@@ -293,13 +301,6 @@ def run_tests():
     # 6. C1 BEHAVIORAL TELEMETRY ANALYTICS (Azure)
     # -----------------------------------------------------------------
     print("\n--- 6. C1 Behavioral Telemetry Analytics (Azure) ---")
-    azure_auth = jwt.encode({
-        "sub": "test_verifier_parent@sipsara.org",
-        "role": "parent",
-        "id": parent_user_id or "6ad48611b981b30e3a9cc286",
-        "exp": datetime.now(timezone.utc) + timedelta(days=7)
-    }, AZURE_JWT_SECRET, algorithm="HS256")
-    azure_headers = {"Authorization": f"Bearer {azure_auth}"}
 
     c1_session = {
         "session_id": str(uuid.uuid4()),
