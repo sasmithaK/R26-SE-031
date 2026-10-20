@@ -57,8 +57,20 @@ def calculate_latency_std(events: List[dict]) -> Optional[float]:
     lats = [e.get("total_round_latency_ms") for e in events if e.get("total_round_latency_ms") is not None]
     return statistics.stdev(lats) if len(lats) > 1 else (0.0 if lats else None)
 
+def response_latency(event: dict) -> Optional[float]:
+    """Time to the first answer; falls back to first touch for older data.
+
+    0 means "not recorded", not an instant response.
+    """
+    for key in ("time_to_first_response_ms", "first_touch_latency_ms"):
+        value = event.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+            return float(value)
+    return None
+
+
 def calculate_mean_first_touch_latency(events: List[dict]) -> Optional[float]:
-    lats = [e.get("first_touch_latency_ms") for e in events if e.get("first_touch_latency_ms") is not None]
+    lats = [v for v in (response_latency(e) for e in events) if v is not None]
     return statistics.mean(lats) if lats else None
 
 def calculate_rate(events: List[dict], field: str) -> Optional[float]:
@@ -74,33 +86,18 @@ def calculate_completion_rate(events: List[dict]) -> Optional[float]:
     completed = sum(1 for e in events if not e.get("is_abandoned", False))
     return completed / len(events)
 
-def _drift(events: List[dict], field: str, invert: bool = False) -> Optional[float]:
-    vals = [e.get(field) for e in events if e.get(field) is not None]
-    if len(vals) < 6:
-        return None
-    early = statistics.mean(vals[:3])
-    late = statistics.mean(vals[-3:])
-    if early <= 0:
-        return None
-    drift_val = (late / early) - 1.0
-    return -drift_val if invert else drift_val
+def _shared_drift(events: List[dict], key: str) -> Optional[float]:
+    from .fatigue import compute_drifts
+    return (compute_drifts(events) or {}).get(key)
 
 def calculate_latency_drift(events: List[dict]) -> Optional[float]:
-    return _drift(events, "total_round_latency_ms")
+    return _shared_drift(events, "latency_drift")
 
 def calculate_error_drift(events: List[dict]) -> Optional[float]:
-    # Invert is_correct to treat 1.0 as error and 0.0 as correct
-    error_vals = [0.0 if e.get("is_correct") else 1.0 for e in events if "is_correct" in e]
-    if len(error_vals) < 6:
-        return None
-    early = statistics.mean(error_vals[:3])
-    late = statistics.mean(error_vals[-3:])
-    if early <= 0:
-        return None
-    return (late / early) - 1.0
+    return _shared_drift(events, "error_drift")
 
 def calculate_hesitation_drift(events: List[dict]) -> Optional[float]:
-    return _drift(events, "hesitation_count")
+    return _shared_drift(events, "hesitation_drift")
 
 def calculate_accuracy_slope(events: List[dict]) -> Optional[float]:
     valid = [e for e in events if "is_correct" in e]

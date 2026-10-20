@@ -1,5 +1,6 @@
 {
-  "schema_version": "c1-features-v1",
+  "schema_version": "c1-learner-v2",
+  "unit": "learner over a 14-day window (services/c1/learner_window.py)",
   "features": [
     "accuracy",
     "mean_latency_ms",

@@ -8,7 +8,6 @@ from schemas.c1 import (
     C1TrendPoint, C1SessionSummary
 )
 from services.c1.processor import process_session
-from services.ml.inference import predict_c1_pattern
 from repositories import telemetry_repository, c1_repository
 
 router = APIRouter(prefix="/api/v1/c1", tags=["C1 Analytics"])
@@ -39,17 +38,17 @@ async def process_c1_session(
     await telemetry_repository.save_events(events_data)
     
     c1_partial = process_session(payload.session_id, payload.student_id, events_data)
-    # The classifier contract is the complete live C1 schema.  Keep this
-    # route aligned with /telemetry/log-session so both paths produce the
-    # same 19-field vector.
-    model_features = {
-        **c1_partial["behavior"],
-        **c1_partial["indices"],
-        "fatigue_score": c1_partial["fatigue"]["score"],
-        "cognitive_load_score": c1_partial["interaction_state"]["score"],
+    # Per-session model retired: the estimate is per learner (c1_learner_estimates).
+    c1_partial["model"] = {
+        "model_name": "c1_learner_model",
+        "model_version": "learner-level",
+        "feature_schema_version": "c1-learner-v2",
+        "predicted_pattern": None,
+        "probabilities": {},
+        "confidence": None,
+        "model_used": "learner_level_only",
+        "unavailable_reason": "The C1 pattern estimate is made per learner over 14 days (c1_learner_estimates), not per session.",
     }
-    model_metadata = predict_c1_pattern(model_features)
-    c1_partial["model"] = model_metadata
     
     await c1_repository.save_c1_state(c1_partial)
     return c1_partial

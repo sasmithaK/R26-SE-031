@@ -338,7 +338,7 @@ async def test_canonical_abandoned_retry_is_persisted_and_summarized(
     assert stored["item_id"] == "S1A1R01"
     assert stored["phase"] == "ABANDONED"
     assert summary["overall"]["abandonment_rate"] == 1.0
-    assert summary["overall"]["eventual_completion_rate"] == 0.0
+    assert summary["overall"]["eventual_completion_rate"] is None
 
 
 @pytest.mark.asyncio
@@ -395,4 +395,19 @@ async def test_submission_reports_c1_interaction_state(client, mock_db, mock_use
     await mock_db.students.insert_one({"_id": ObjectId(student_id), "parent_id": mock_user["_id"]})
     response = client.post("/api/v1/auth/telemetry", json=MOCK_TELEMETRY_PAYLOAD)
     assert response.status_code == 201
-    assert response.json()["cognitive_load"] in {None, "ENGAGED", "MODERATE_LOAD", "HIGH_LOAD"}
+    assert response.json()["cognitive_load"] in {None, "ENGAGED", "MODERATE_LOAD", "HIGH_LOAD", "INSUFFICIENT_DATA"}
+
+
+@pytest.mark.asyncio
+async def test_submission_stores_learner_level_c1_estimate(client, mock_db, mock_user):
+    """Each upload recomputes the 14-day learner estimate; one session is not enough evidence."""
+    student_id = MOCK_TELEMETRY_PAYLOAD["student_id"]
+    await mock_db.students.insert_one({"_id": ObjectId(student_id), "parent_id": mock_user["_id"]})
+    response = client.post("/api/v1/auth/telemetry", json=MOCK_TELEMETRY_PAYLOAD)
+    assert response.status_code == 201
+    assert response.json()["c1_processing"]["learner_estimate_status"] == "insufficient_evidence"
+    stored = await mock_db.c1_learner_estimates.find_one({"student_id": student_id})
+    assert stored["status"] == "insufficient_evidence"
+    assert stored["predicted_pattern"] is None
+    state = await mock_db.behavioral_features.find_one({"student_id": student_id})
+    assert state["model"]["model_used"] == "learner_level_only"
