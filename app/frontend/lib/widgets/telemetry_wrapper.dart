@@ -161,7 +161,8 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
   /// Mark the child's first answer in this round (the first call wins).
   /// [logAttempt] calls this too, so single-choice games need no extra call.
   void markAnswer() {
-    _firstResponseMs ??= _responseCompleteMs ?? _roundStopwatch.elapsedMilliseconds;
+    _firstResponseMs ??=
+        _responseCompleteMs ?? _roundStopwatch.elapsedMilliseconds;
   }
 
   /// A drag released outside every target. Counted separately from wrong
@@ -174,16 +175,25 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
   void _logAbandonment() {
     if (widget.activityNode.isParentPractice) return;
     if (_activityCompleted || _abandonmentLogged) return;
-    // Every round of this run was already completed (e.g. the child closes
-    // the completion screen while the backend was offline): there is no
-    // unfinished round, so nothing was abandoned.
-    if (widget.activityNode.rounds.isNotEmpty &&
+    // Letter-pronunciation practice is reading-aloud (C2) evidence; it has no
+    // touch rounds, so leaving it is not a C1 abandoned round.
+    if (widget.activityNode.templateType == 'letter_pronunciation') return;
+    final answeredThisRound =
+        _attemptCount > 0 || _firstResponseMs != null || _responseCompleteMs != null;
+    // All rounds of the run were completed and nothing was answered since
+    // (e.g. closing the completion screen while offline): nothing abandoned.
+    // Remediation rounds also increase the completed count, so a round the
+    // child had started answering is still logged.
+    if (!answeredThisRound &&
+        widget.activityNode.rounds.isNotEmpty &&
         (_roundsCompletedTotal >= widget.activityNode.rounds.length ||
             _currentRound > widget.activityNode.rounds.length)) {
       return;
     }
-    // The answer was already given; the child left during the feedback.
-    if (_responseCompleteMs != null) return;
+    // The final correct answer was given and the child left during the
+    // celebration: record the round as completed (C1 only; Component 4 never
+    // received it), not as abandoned.
+    final completedDuringFeedback = _responseCompleteMs != null;
     // Seal the unfinished round exactly once. PopScope calls this while the
     // route is still alive so the level map can submit the event immediately
     // after Navigator.push completes. dispose() remains a defensive fallback.
@@ -211,28 +221,36 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     final researchMeta = widget.activityNode.researchMetadata;
     final sessionId = TelemetryService().sessionId;
 
+    final completedMs = _responseCompleteMs ?? totalRoundLatency;
     final event = TelemetryEvent(
-      eventId: '$sessionId:${canonical.itemId}:abandoned',
-      phase: 'ABANDONED',
+      eventId: completedDuringFeedback
+          ? '$sessionId:${canonical.itemId}:complete'
+          : '$sessionId:${canonical.itemId}:abandoned',
+      phase: completedDuringFeedback ? 'COMPLETE' : 'ABANDONED',
       activityName: widget.activityNode.templateType,
       roundNumber: _currentRound,
-      isCorrect: false,
-      score: 0,
+      isCorrect: completedDuringFeedback,
+      score: completedDuringFeedback ? 100 : 0,
       timestamp: DateTime.now(),
       firstTouchLatencyMs: _firstTouchLatencyMs < 0 ? 0 : _firstTouchLatencyMs,
-      totalRoundLatencyMs: totalRoundLatency,
+      totalRoundLatencyMs: completedDuringFeedback ? completedMs : totalRoundLatency,
       misclickCount: _misclickCount,
       hesitationCount: _hesitationCount,
       audioReplayCount: _audioReplayCount,
-      isAbandoned: true, // FLAG SET!
+      isAbandoned: !completedDuringFeedback,
       touchPath: List.unmodifiable(_currentTouchPath),
-      attemptCount: _attemptCount > 0 ? _attemptCount : 1,
+      attemptCount: completedDuringFeedback
+          ? _attemptCount + 1
+          : (_attemptCount > 0 ? _attemptCount : 1),
       incorrectAttemptCount: _incorrectAttemptCount,
-      firstAttemptCorrect: _firstAttemptCorrect,
-      finalCorrect: false,
+      firstAttemptCorrect: completedDuringFeedback
+          ? (_firstAttemptCorrect ?? true)
+          : _firstAttemptCorrect,
+      finalCorrect: completedDuringFeedback,
       timeToFirstResponseMs:
-          _firstResponseMs ?? (_firstTouchLatencyMs < 0 ? 0 : _firstTouchLatencyMs),
-      timeToCorrectMs: 0,
+          _firstResponseMs ??
+          (_firstTouchLatencyMs < 0 ? 0 : _firstTouchLatencyMs),
+      timeToCorrectMs: completedDuringFeedback ? completedMs : 0,
       strayDropCount: _strayDropCount,
       skillId: widget.activityNode.skillId,
       activityId: widget.activityNode.id,
@@ -250,7 +268,8 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
       isAnchor: canonical.isAnchor,
       targets: canonical.targets,
       selectedAnswers: List.unmodifiable(_accumulatedAnswers),
-      errorType: _firstErrorType ?? 'abandoned_before_completion',
+      errorType: _firstErrorType ??
+          (completedDuringFeedback ? 'none' : 'abandoned_before_completion'),
       scaffoldLevelUsed: _highestScaffoldUsed,
       scaffoldApplications: List<Map<String, dynamic>>.unmodifiable(
         _scaffoldApplications,
@@ -290,6 +309,12 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
 
   /// Resets round and hesitation timers. Used after mandatory wait/memorization phases.
   void resetRoundTimers({bool clearPreResponseEvidence = false}) {
+    // The child already answered (e.g. tapped during the audio prompt): keep
+    // this round's timing; resetting now would measure from the second answer.
+    if (_attemptCount > 0 || _firstResponseMs != null) {
+      debugPrint('TELEMETRY: Round timers kept (an answer was already given).');
+      return;
+    }
     _responseCompleteMs = null;
     _firstResponseMs = null;
     _roundStopwatch.reset();
@@ -730,8 +755,11 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     _isSubmittingRound = true;
 
     _roundStopwatch.stop();
+    // Session record: response time ends at the final correct answer.
     final totalRoundLatency =
         _responseCompleteMs ?? _roundStopwatch.elapsedMilliseconds;
+    // Component 4 receives exactly what it received before (full elapsed time).
+    final c4TotalRoundLatency = _roundStopwatch.elapsedMilliseconds;
 
     final finalIsCorrect = isCorrect ?? baseScore > 0;
     if (!attemptAlreadyLogged) {
@@ -870,7 +898,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
         "first_touch_latency_ms": event.firstTouchLatencyMs >= 0
             ? event.firstTouchLatencyMs
             : 0,
-        "total_round_latency_ms": event.totalRoundLatencyMs,
+        "total_round_latency_ms": c4TotalRoundLatency,
         "hesitation_count": event.hesitationCount,
         "misclick_count": event.misclickCount,
         "audio_replay_count": event.audioReplayCount,
@@ -884,7 +912,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
         "error_type": event.errorType,
         "final_correct": event.finalCorrect,
         "time_to_first_response_ms": timeToFirstResponseMs,
-        "time_to_correct_ms": event.timeToCorrectMs,
+        "time_to_correct_ms": finalIsCorrect ? c4TotalRoundLatency : 0,
         "score": event.score,
         "is_abandoned": event.isAbandoned,
         "attempt_count": event.attemptCount,
@@ -1141,7 +1169,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
           MaterialPageRoute(
             builder: (context) => ActivityCompleteScreen(
               activityNode: widget.activityNode,
-              skillId: widget.activityNode.id,
+              skillId: widget.activityNode.skillId,
               score: finalScore,
               isRevisiting: false,
               recommendBreak: _breakRecommendedAfterActivity,

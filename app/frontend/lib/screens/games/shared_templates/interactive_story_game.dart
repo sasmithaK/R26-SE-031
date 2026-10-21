@@ -39,10 +39,6 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
       }
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _onPageSettled(0);
-    });
-
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -125,9 +121,10 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
       final telemetry = TelemetryWrapper.of(context);
       if (telemetry != null) {
         studentId =
-            telemetry.widget.studentData?['id'] ??
-            telemetry.widget.studentData?['_id'] ??
-            telemetry.widget.studentData?['student_id'];
+            (telemetry.widget.studentData?['id'] ??
+                    telemetry.widget.studentData?['_id'] ??
+                    telemetry.widget.studentData?['student_id'])
+                ?.toString();
       }
 
       final results = await VoiceAnalysisService().analyzeAudio(
@@ -307,6 +304,12 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
             ElevatedButton(
               onPressed: () {
                 setState(() => _readingStarted = true);
+                // The first sentence appears now (not when the start
+                // screen appeared).
+                _stimulusPageIndex = -1;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) _onPageSettled(0);
+                });
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.calmBlue,
