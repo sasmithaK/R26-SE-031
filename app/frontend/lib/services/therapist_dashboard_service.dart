@@ -99,7 +99,7 @@ class TherapistDashboardService {
     try {
       final response = await http
           .post(
-            Uri.parse('$_baseUrl/$studentId/evidence-chat'),
+            Uri.parse('${ApiConfig.diagnosticBaseUrl}/$studentId/evidence-chat'),
             headers: headers,
             body: jsonEncode({'messages': messages}),
           )
@@ -109,19 +109,19 @@ class TherapistDashboardService {
       }
     } catch (_) {
       // Backend chat endpoint may not be available or network issue;
-      // synthesize from the student's recorded multimodal evidence.
+      // use only the connected child's persisted summary as a fallback.
     }
 
     try {
       final profile = await getC3Profile(studentId);
       final summary = profile['summary_text'] ??
           profile['llm_summary'] ??
-          'Recent activity sessions show consistent motor and verbal participation.';
+          'There is not enough recorded information to answer that yet.';
       final recommendation = profile['recommendation_text'] ??
           profile['llm_recommendations'] ??
-          'Continue regular practice to strengthen foundational skills.';
+          'Collect more activity observations, then review the updated summary.';
       return {
-        'answer': '$summary\n\nClinical Recommendations:\n$recommendation',
+        'answer': '$summary\n\nSuggested next step:\n$recommendation',
       };
     } catch (_) {
       return {

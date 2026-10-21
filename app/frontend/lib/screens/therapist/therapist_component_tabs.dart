@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/therapist_dashboard_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/dashboard/dashboard_kit.dart';
+import '../../widgets/dashboard/letter_practice_grid.dart';
 
 /// Therapist student-detail tabs for C1 (activities and touch), C2 (reading
 /// and speech) and C3 (combined profile). Every number shows its period and
@@ -24,7 +25,8 @@ const Map<String, String> kIndexNames = {
 };
 
 const Map<String, String> kIndexHints = {
-  'visual_processing_index': 'From average time to first touch (3.5 s scores 50)',
+  'visual_processing_index':
+      'From average time to first touch (3.5 s scores 50)',
   'phonological_task_index': 'Only measured on sound and letter-sound tasks',
   'motor_interaction_index': 'Fewer wrong answers and long pauses score higher',
   'attention_stability_index': 'Fewer pauses over 8 seconds score higher',
@@ -111,12 +113,18 @@ Future<bool> showProfessionalFeedbackSheet(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Your professional view', style: DashText.heading(fontSize: 19)),
+              Text(
+                'Your professional view',
+                style: DashText.heading(fontSize: 19),
+              ),
               const SizedBox(height: 6),
               Text(
                 'Model estimate: $estimateLabel. Your answer is stored with the measurements '
                 'so the model can later be checked against professional judgement.',
-                style: DashText.body(fontSize: 14, color: AppColors.textSecondary),
+                style: DashText.body(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 14),
               Wrap(
@@ -129,9 +137,13 @@ Future<bool> showProfessionalFeedbackSheet(
                     ['unsure', 'Unsure'],
                   ])
                     ChoiceChip(
-                      label: Text(option[1], style: DashText.body(fontSize: 14)),
+                      label: Text(
+                        option[1],
+                        style: DashText.body(fontSize: 14),
+                      ),
                       selected: agreement == option[0],
-                      onSelected: (_) => setSheetState(() => agreement = option[0]),
+                      onSelected: (_) =>
+                          setSheetState(() => agreement = option[0]),
                     ),
                 ],
               ),
@@ -145,7 +157,10 @@ Future<bool> showProfessionalFeedbackSheet(
                 ),
                 items: [
                   for (final entry in kPatternNames.entries)
-                    DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
                 ],
                 onChanged: (value) => setSheetState(() => pattern = value),
               ),
@@ -160,7 +175,13 @@ Future<bool> showProfessionalFeedbackSheet(
                 ),
               ),
               if (error != null) ...[
-                Text(error!, style: DashText.body(fontSize: 14, color: AppColors.softCoralDark)),
+                Text(
+                  error!,
+                  style: DashText.body(
+                    fontSize: 14,
+                    color: AppColors.softCoralDark,
+                  ),
+                ),
                 const SizedBox(height: 8),
               ],
               SizedBox(
@@ -170,7 +191,10 @@ Future<bool> showProfessionalFeedbackSheet(
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Icon(Icons.save_outlined),
                   label: Text('Save', style: DashText.button()),
@@ -190,11 +214,15 @@ Future<bool> showProfessionalFeedbackSheet(
                               note: noteController.text,
                               sessionId: sessionId,
                             );
-                            if (sheetContext.mounted) Navigator.pop(sheetContext, true);
+                            if (sheetContext.mounted)
+                              Navigator.pop(sheetContext, true);
                           } catch (e) {
                             setSheetState(() {
                               saving = false;
-                              error = e.toString().replaceFirst('Exception: ', '');
+                              error = e.toString().replaceFirst(
+                                'Exception: ',
+                                '',
+                              );
                             });
                           }
                         },
@@ -279,7 +307,8 @@ class TherapistActivityTab extends StatelessWidget {
           const EmptyHint(
             icon: Icons.touch_app_outlined,
             title: 'No activity sessions yet',
-            message: 'Measures appear after the child completes an activity in Skills 1-4.',
+            message:
+                'Measures appear after the child completes an activity in Skills 1-4.',
           )
         else ...[
           _sessionState(state, data),
@@ -320,29 +349,36 @@ class TherapistActivityTab extends StatelessWidget {
       state == null || state == 'UNAVAILABLE' || state == 'INSUFFICIENT_DATA';
 
   Widget _sessionState(Map<String, dynamic> state, Map<String, dynamic> data) {
-    final fatigueState = (data['fatigue_state'] ?? _map(state['fatigue'])['state'])?.toString();
+    final fatigueState =
+        (data['fatigue_state'] ?? _map(state['fatigue'])['state'])?.toString();
     final load = _map(state['interaction_state'])['state']?.toString();
     final quality = DashFormat.number(_map(state['quality'])['quality_score']);
     return DashCard(
       title: 'During the latest session',
-      subtitle: 'Fatigue compares early and late completed rounds (2 vs 2 for 4-5 rounds, 3 vs 3 for 6+)',
+      subtitle:
+          'Fatigue compares early and late completed rounds (2 vs 2 for 4-5 rounds, 3 vs 3 for 6+)',
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
         children: [
           StatusChip(
-            label: 'Fatigue: ${_insufficient(fatigueState) ? 'needs 4+ completed rounds' : DashFormat.words(fatigueState!)}',
+            label:
+                'Fatigue: ${_insufficient(fatigueState) ? 'needs 4+ completed rounds' : DashFormat.words(fatigueState!)}',
             tone: _stateTone(fatigueState),
             icon: Icons.battery_charging_full_rounded,
           ),
           StatusChip(
-            label: 'Effort: ${_insufficient(load) ? 'needs 3+ completed rounds' : DashFormat.words(load!)}',
+            label:
+                'Effort: ${_insufficient(load) ? 'needs 3+ completed rounds' : DashFormat.words(load!)}',
             tone: _stateTone(load),
             icon: Icons.psychology_alt_outlined,
           ),
           StatusChip(
-            label: 'Data completeness: ${quality == null ? DashFormat.missing : '${(quality * 100).round()}%'}',
-            tone: quality == null ? DashTone.neutral : (quality >= 0.8 ? DashTone.good : DashTone.watch),
+            label:
+                'Data completeness: ${quality == null ? DashFormat.missing : '${(quality * 100).round()}%'}',
+            tone: quality == null
+                ? DashTone.neutral
+                : (quality >= 0.8 ? DashTone.good : DashTone.watch),
             icon: Icons.fact_check_outlined,
           ),
         ],
@@ -354,20 +390,23 @@ class TherapistActivityTab extends StatelessWidget {
     final window = _map(data['window']);
     final rounds = DashFormat.number(window['completed_rounds'])?.round();
     final started = DashFormat.number(window['sessions_started'])?.round();
-    final early = DashFormat.number(window['sessions_ended_early'])?.round() ?? 0;
+    final early =
+        DashFormat.number(window['sessions_ended_early'])?.round() ?? 0;
     return DashCard(
       title: 'Key numbers',
       subtitle: rounds == null
           ? 'Pooled over completed rounds in the period'
           : '$rounds completed rounds in $started sessions'
-              '${early > 0 ? ' ($early ended before a round was finished)' : ''}'
-              ' · every completed round counts once',
+                '${early > 0 ? ' ($early ended before a round was finished)' : ''}'
+                ' · every completed round counts once',
       child: MetricGrid(
         children: [
           MetricTile(
             label: 'Correct on first try',
             value: DashFormat.percent(data['first_attempt_accuracy']),
-            detail: rounds == null ? null : '${window['first_try_correct'] ?? 0} of $rounds rounds',
+            detail: rounds == null
+                ? null
+                : '${window['first_try_correct'] ?? 0} of $rounds rounds',
             icon: Icons.check_circle_outline_rounded,
             tone: DashTone.good,
           ),
@@ -391,7 +430,11 @@ class TherapistActivityTab extends StatelessWidget {
           ),
           MetricTile(
             label: 'Attempts per round',
-            value: DashFormat.number(data['mean_attempts_per_round'])?.toStringAsFixed(1) ?? DashFormat.missing,
+            value:
+                DashFormat.number(
+                  data['mean_attempts_per_round'],
+                )?.toStringAsFixed(1) ??
+                DashFormat.missing,
             icon: Icons.tag_rounded,
           ),
           MetricTile(
@@ -403,7 +446,9 @@ class TherapistActivityTab extends StatelessWidget {
           if (window['stray_drops_per_drag_round'] != null)
             MetricTile(
               label: 'Drags dropped outside a target',
-              value: DashFormat.number(window['stray_drops_per_drag_round'])!.toStringAsFixed(1),
+              value: DashFormat.number(
+                window['stray_drops_per_drag_round'],
+              )!.toStringAsFixed(1),
               detail: 'Per drag round; a movement miss, not a wrong answer',
               icon: Icons.pan_tool_alt_outlined,
             ),
@@ -415,21 +460,30 @@ class TherapistActivityTab extends StatelessWidget {
   Widget _indices(Map<String, dynamic> state) {
     final indices = _map(state['indices']);
     final baseline = _map(state['baseline_indices']);
-    final measured = kIndexNames.keys.where((k) => DashFormat.number(indices[k]) != null).toList();
+    final measured = kIndexNames.keys
+        .where((k) => DashFormat.number(indices[k]) != null)
+        .toList();
     return DashCard(
       title: 'Learner indices (0-100)',
       subtitle: baseline.isEmpty
           ? 'Latest session'
           : 'Latest session; the black line marks the child\'s first measured session',
       child: measured.isEmpty
-          ? Text('Indices appear after a complete activity session.', style: DashText.body(fontSize: 14))
+          ? Text(
+              'Indices appear after a complete activity session.',
+              style: DashText.body(fontSize: 14),
+            )
           : Column(
               children: [
                 for (final key in kIndexNames.keys)
                   PercentBar(
                     label: kIndexNames[key]!,
-                    value: DashFormat.number(indices[key]) == null ? null : DashFormat.number(indices[key])! / 100,
-                    marker: DashFormat.number(baseline[key]) == null ? null : DashFormat.number(baseline[key])! / 100,
+                    value: DashFormat.number(indices[key]) == null
+                        ? null
+                        : DashFormat.number(indices[key])! / 100,
+                    marker: DashFormat.number(baseline[key]) == null
+                        ? null
+                        : DashFormat.number(baseline[key])! / 100,
                     valueLabel: DashFormat.number(indices[key]) == null
                         ? null
                         : '${DashFormat.number(indices[key])!.round()} / 100',
@@ -447,7 +501,10 @@ class TherapistActivityTab extends StatelessWidget {
       title: 'Learning areas',
       subtitle: 'Correct on first try, with the number of responses',
       child: rows.isEmpty
-          ? Text('No learning-area data in this period.', style: DashText.body(fontSize: 14))
+          ? Text(
+              'No learning-area data in this period.',
+              style: DashText.body(fontSize: 14),
+            )
           : Column(
               children: [
                 for (final row in rows)
@@ -468,18 +525,23 @@ class TherapistActivityTab extends StatelessWidget {
     final categories = _list(breakdown['categories']).whereType<Map>().toList();
     return DashCard(
       title: 'Types of first-try mistakes',
-      subtitle: total == 0 ? 'No first-try mistakes in this period' : 'Share of $total first-try mistakes, as reported by each task',
+      subtitle: total == 0
+          ? 'No first-try mistakes in this period'
+          : 'Share of $total first-try mistakes, as reported by each task',
       child: total == 0
           ? Text('Nothing to show.', style: DashText.body(fontSize: 14))
           : Column(
               children: [
                 for (final row in categories)
-                  if ((DashFormat.number(row['count']) ?? 0) > 0 || row['key'] == 'unknown_error')
+                  if ((DashFormat.number(row['count']) ?? 0) > 0 ||
+                      row['key'] == 'unknown_error')
                     PercentBar(
                       label: (row['label'] ?? row['key']).toString(),
                       value: DashFormat.number(row['share']),
                       detail: '${DashFormat.count(row['count'])} mistakes',
-                      color: row['key'] == 'unknown_error' ? AppColors.textHint : AppColors.warmAmber,
+                      color: row['key'] == 'unknown_error'
+                          ? AppColors.textHint
+                          : AppColors.warmAmber,
                     ),
               ],
             ),
@@ -491,14 +553,23 @@ class TherapistActivityTab extends StatelessWidget {
     final sessions = DashFormat.number(k['sessions'])?.round() ?? 0;
     return DashCard(
       title: 'Touch and movement',
-      subtitle: 'Medians over $sessions sessions · path and smoothness from drag strokes only',
+      subtitle:
+          'Medians over $sessions sessions · path and smoothness from drag strokes only',
       child: sessions == 0
-          ? Text('Appears after drag activities such as sorting, word building or sentence order.',
-              style: DashText.body(fontSize: 14))
+          ? Text(
+              'Appears after drag activities such as sorting, word building or sentence order.',
+              style: DashText.body(fontSize: 14),
+            )
           : Column(
               children: [
-                LabeledValueRow(label: 'Time to first touch', value: DashFormat.millis(k['time_to_first_touch_ms'])),
-                LabeledValueRow(label: 'Touch hold time', value: DashFormat.millis(k['dwell_time_ms'])),
+                LabeledValueRow(
+                  label: 'Time to first touch',
+                  value: DashFormat.millis(k['time_to_first_touch_ms']),
+                ),
+                LabeledValueRow(
+                  label: 'Touch hold time',
+                  value: DashFormat.millis(k['dwell_time_ms']),
+                ),
                 LabeledValueRow(
                   label: 'Directness of finger path',
                   hint: '100% = straight line to the target',
@@ -507,12 +578,19 @@ class TherapistActivityTab extends StatelessWidget {
                 LabeledValueRow(
                   label: 'Movement smoothness (jerk)',
                   hint: 'Lower = smoother movement',
-                  value: DashFormat.number(k['dimensionless_jerk'])?.toStringAsFixed(1) ?? DashFormat.missing,
+                  value:
+                      DashFormat.number(
+                        k['dimensionless_jerk'],
+                      )?.toStringAsFixed(1) ??
+                      DashFormat.missing,
                 ),
                 LabeledValueRow(
                   label: 'Look-alike letter choices',
                   hint: k['orthographic_confusion_note']?.toString(),
-                  value: DashFormat.percent(k['orthographic_confusion_index'], fallback: 'Not measurable yet'),
+                  value: DashFormat.percent(
+                    k['orthographic_confusion_index'],
+                    fallback: 'Not measurable yet',
+                  ),
                 ),
               ],
             ),
@@ -527,15 +605,21 @@ class TherapistActivityTab extends StatelessWidget {
       final v = DashFormat.number(value);
       if (v != null) probs[kPatternNames[key] ?? key] = v;
     });
-    final predicted = kPatternNames[estimate['predicted_pattern']] ?? estimate['predicted_pattern']?.toString();
+    final predicted =
+        kPatternNames[estimate['predicted_pattern']] ??
+        estimate['predicted_pattern']?.toString();
     final evidence = _map(estimate['evidence']);
-    final missing = _list(estimate['missing_evidence']).map((e) => e.toString()).toList();
+    final missing = _list(
+      estimate['missing_evidence'],
+    ).map((e) => e.toString()).toList();
     final outside = _list(estimate['outside_range']).whereType<Map>().toList();
     final notes = _list(estimate['notes']).map((e) => e.toString()).toList();
     final rounds = DashFormat.number(evidence['completed_rounds'])?.round();
     return DashCard(
-      title: 'Learner pattern estimate (last ${estimate['window_days'] ?? 14} days)',
-      subtitle: 'Gradient boosting, version ${estimate['model_version'] ?? '-'} · trained on simulated learners · '
+      title:
+          'Learner pattern estimate (last ${estimate['window_days'] ?? 14} days)',
+      subtitle:
+          'Gradient boosting, version ${estimate['model_version'] ?? '-'} · trained on simulated learners · '
           'for review only${rounds == null ? '' : ' · $rounds completed rounds'}',
       accent: AppColors.calmBlue,
       child: !available
@@ -543,7 +627,8 @@ class TherapistActivityTab extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  estimate['unavailable_reason']?.toString() ?? 'The estimate updates after each activity.',
+                  estimate['unavailable_reason']?.toString() ??
+                      'The estimate updates after each activity.',
                   style: DashText.body(fontSize: 14),
                 ),
                 if (missing.isNotEmpty) ...[
@@ -556,8 +641,11 @@ class TherapistActivityTab extends StatelessWidget {
                   for (final row in outside)
                     LabeledValueRow(
                       label: (row['label'] ?? row['feature']).toString(),
-                      hint: 'Trained range ${_list(row['training_range']).map((v) => DashFormat.number(v)?.toStringAsFixed(2) ?? '-').join(' to ')}',
-                      value: DashFormat.number(row['value'])?.toStringAsFixed(2) ?? DashFormat.missing,
+                      hint:
+                          'Trained range ${_list(row['training_range']).map((v) => DashFormat.number(v)?.toStringAsFixed(2) ?? '-').join(' to ')}',
+                      value:
+                          DashFormat.number(row['value'])?.toStringAsFixed(2) ??
+                          DashFormat.missing,
                     ),
                 ],
               ],
@@ -572,7 +660,13 @@ class TherapistActivityTab extends StatelessWidget {
                     child: Text(note, style: DashText.caption(fontSize: 13)),
                   ),
                 const SizedBox(height: 12),
-                Text('Do you agree with "$predicted"?', style: DashText.body(fontSize: 14, fontWeight: FontWeight.w700)),
+                Text(
+                  'Do you agree with "$predicted"?',
+                  style: DashText.body(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _FeedbackButtons(
                   onSelected: (agreement) async {
@@ -600,12 +694,17 @@ class TherapistActivityTab extends StatelessWidget {
   }
 
   Widget _activities() {
-    final rows = _list(activityPerformance?['activities']).whereType<Map>().toList();
+    final rows = _list(
+      activityPerformance?['activities'],
+    ).whereType<Map>().toList();
     return DashCard(
       title: 'By activity',
       subtitle: 'Same period as above',
       child: rows.isEmpty
-          ? Text('No activity-level observations in this period.', style: DashText.body(fontSize: 14))
+          ? Text(
+              'No activity-level observations in this period.',
+              style: DashText.body(fontSize: 14),
+            )
           : Column(
               children: [
                 for (final row in rows)
@@ -619,14 +718,25 @@ class TherapistActivityTab extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                (row['activity_display'] ?? row['activity_name'] ?? row['activity_id']).toString(),
-                                style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700),
+                                (row['activity_display'] ??
+                                        row['activity_name'] ??
+                                        row['activity_id'])
+                                    .toString(),
+                                style: DashText.body(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               Text(
                                 [
-                                  if (row['skill_name_en'] != null) row['skill_name_en'].toString(),
+                                  if (row['skill_name_en'] != null)
+                                    row['skill_name_en'].toString(),
                                   '${DashFormat.count(row['trials'])} responses',
-                                  if ((DashFormat.number(_map(row['voice'])['recordings']) ?? 0) > 0)
+                                  if ((DashFormat.number(
+                                            _map(row['voice'])['recordings'],
+                                          ) ??
+                                          0) >
+                                      0)
                                     '${DashFormat.count(_map(row['voice'])['usable_recordings'])} of ${DashFormat.count(_map(row['voice'])['recordings'])} recordings clear',
                                 ].join(' · '),
                                 style: DashText.caption(fontSize: 13),
@@ -636,7 +746,10 @@ class TherapistActivityTab extends StatelessWidget {
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          DashFormat.percent(row['first_attempt_accuracy'], fallback: '-'),
+                          DashFormat.percent(
+                            row['first_attempt_accuracy'],
+                            fallback: '-',
+                          ),
                           style: DashText.heading(fontSize: 17),
                         ),
                       ],
@@ -663,24 +776,40 @@ class TherapistReadingTab extends StatelessWidget {
     String? topIssue;
     if (issues.isNotEmpty) {
       final sorted = issues.entries.toList()
-        ..sort((a, b) => (DashFormat.number(b.value) ?? 0).compareTo(DashFormat.number(a.value) ?? 0));
-      topIssue = '${DashFormat.words(sorted.first.key)} (${DashFormat.count(sorted.first.value)})';
+        ..sort(
+          (a, b) => (DashFormat.number(b.value) ?? 0).compareTo(
+            DashFormat.number(a.value) ?? 0,
+          ),
+        );
+      topIssue =
+          '${DashFormat.words(sorted.first.key)} (${DashFormat.count(sorted.first.value)})';
     }
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        Text((data['reporting_period'] ?? 'Recent recordings').toString(), style: DashText.heading(fontSize: 18)),
+        Text(
+          (data['reporting_period'] ?? 'Recent recordings').toString(),
+          style: DashText.heading(fontSize: 18),
+        ),
         const SizedBox(height: 4),
         Text(
-          'Reading-aloud measures from Skills 5 and 6. Experimental measures, not a diagnosis.',
+          'Reading recordings and repeated letter-practice attempts. These are observations, not a diagnosis.',
           style: DashText.body(fontSize: 14, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 14),
+        LetterPracticeGrid(
+          groups: _list(data['letter_progress'])
+              .whereType<Map>()
+              .map((row) => Map<String, dynamic>.from(row))
+              .toList(),
+          detailed: true,
+        ),
         if (recordings == 0)
           const EmptyHint(
             icon: Icons.mic_none_rounded,
             title: 'No reading recordings yet',
-            message: 'Ask the child to try Reading Comprehension (Skill 5) or Textbook Reading (Skill 6).',
+            message:
+                'Invite the child to try a letter-practice or reading activity.',
           )
         else ...[
           DashCard(
@@ -688,12 +817,20 @@ class TherapistReadingTab extends StatelessWidget {
             subtitle: 'Can reading be measured reliably at home?',
             child: MetricGrid(
               children: [
-                MetricTile(label: 'Recordings', value: '$recordings', icon: Icons.mic_rounded),
+                MetricTile(
+                  label: 'Recordings',
+                  value: '$recordings',
+                  icon: Icons.mic_rounded,
+                ),
                 MetricTile(
                   label: 'Clear enough to measure',
                   value: DashFormat.percent(data['usable_recording_rate']),
                   icon: Icons.graphic_eq_rounded,
-                  tone: (DashFormat.number(data['usable_recording_rate']) ?? 0) >= 0.5 ? DashTone.good : DashTone.watch,
+                  tone:
+                      (DashFormat.number(data['usable_recording_rate']) ?? 0) >=
+                          0.5
+                      ? DashTone.good
+                      : DashTone.watch,
                 ),
                 MetricTile(
                   label: 'Most common recording issue',
@@ -742,9 +879,13 @@ class TherapistReadingTab extends StatelessWidget {
       title: 'Latest reading',
       subtitle: [
         if (latest['item_id'] != null) 'Item ${latest['item_id']}',
-        if (latest['recorded_at'] != null) DashFormat.date(latest['recorded_at']),
+        if (latest['recorded_at'] != null)
+          DashFormat.date(latest['recorded_at']),
       ].join(' · '),
-      trailing: StatusChip(label: _readingStatusLabel(status), tone: _stateTone(status)),
+      trailing: StatusChip(
+        label: _readingStatusLabel(status),
+        tone: _stateTone(status),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -766,8 +907,14 @@ class TherapistReadingTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          LabeledValueRow(label: 'Letters read as expected', value: DashFormat.percent(latest['grapheme_accuracy'])),
-          LabeledValueRow(label: 'Words read as expected', value: DashFormat.percent(latest['word_accuracy'])),
+          LabeledValueRow(
+            label: 'Letters read as expected',
+            value: DashFormat.percent(latest['grapheme_accuracy']),
+          ),
+          LabeledValueRow(
+            label: 'Words read as expected',
+            value: DashFormat.percent(latest['word_accuracy']),
+          ),
           LabeledValueRow(
             label: 'Reading rate',
             value: DashFormat.number(latest['reading_rate_wpm']) == null
@@ -777,26 +924,43 @@ class TherapistReadingTab extends StatelessWidget {
           LabeledValueRow(
             label: 'Time to start speaking',
             hint: 'After the record button was pressed',
-            value: DashFormat.millis(latest['voice_onset_ms'] ?? latest['acoustic_latency_ms']),
+            value: DashFormat.millis(
+              latest['voice_onset_ms'] ?? latest['acoustic_latency_ms'],
+            ),
           ),
           LabeledValueRow(
             label: 'Time to press record',
             hint: 'Interaction time, not reading time',
             value: DashFormat.millis(latest['record_start_delay_ms']),
           ),
-          LabeledValueRow(label: 'Pauses (0.2-3 s)', value: DashFormat.count(latest['pause_count'], fallback: DashFormat.missing)),
-          LabeledValueRow(label: 'Time spent pausing', value: DashFormat.percent(latest['pause_ratio'])),
+          LabeledValueRow(
+            label: 'Pauses (0.2-3 s)',
+            value: DashFormat.count(
+              latest['pause_count'],
+              fallback: DashFormat.missing,
+            ),
+          ),
+          LabeledValueRow(
+            label: 'Time spent pausing',
+            value: DashFormat.percent(latest['pause_ratio']),
+          ),
           if (_list(latest['disagreement_reasons']).isNotEmpty)
             LabeledValueRow(
               label: 'Why confidence is low',
-              value: _list(latest['disagreement_reasons']).map((r) => DashFormat.words(r.toString())).join(', '),
+              value: _list(
+                latest['disagreement_reasons'],
+              ).map((r) => DashFormat.words(r.toString())).join(', '),
             ),
           if (_list(latest['quality_issues']).isNotEmpty)
             LabeledValueRow(
               label: 'Recording issues',
-              value: _list(latest['quality_issues']).map((r) => DashFormat.words(r.toString())).join(', '),
+              value: _list(
+                latest['quality_issues'],
+              ).map((r) => DashFormat.words(r.toString())).join(', '),
             ),
-          if (latest['measured'] == false && status != null && status != 'unavailable')
+          if (latest['measured'] == false &&
+              status != null &&
+              status != 'unavailable')
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
@@ -819,15 +983,30 @@ class TherapistReadingTab extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: AppColors.slateBg.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: AppColors.slateBg.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Expected', style: DashText.caption(fontSize: 13, fontWeight: FontWeight.w700)),
-          Text(expected.isEmpty ? '-' : expected, style: DashText.sinhala(fontSize: 17)),
+          Text(
+            'Expected',
+            style: DashText.caption(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+          Text(
+            expected.isEmpty ? '-' : expected,
+            style: DashText.sinhala(fontSize: 17),
+          ),
           const SizedBox(height: 8),
-          Text('Heard by speech recognition', style: DashText.caption(fontSize: 13, fontWeight: FontWeight.w700)),
-          Text(recognized.isEmpty ? '(nothing recognised)' : recognized, style: DashText.sinhala(fontSize: 17)),
+          Text(
+            'Heard by speech recognition',
+            style: DashText.caption(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+          Text(
+            recognized.isEmpty ? '(nothing recognised)' : recognized,
+            style: DashText.sinhala(fontSize: 17),
+          ),
         ],
       ),
     );
@@ -838,7 +1017,8 @@ class TherapistReadingTab extends StatelessWidget {
     if (counts.isEmpty) return const SizedBox.shrink();
     return DashCard(
       title: 'Letters read differently',
-      subtitle: 'Expected letter → letter recognised, across clear recordings. '
+      subtitle:
+          'Expected letter → letter recognised, across clear recordings. '
           'Speech recognition can also cause these; check before acting.',
       child: Wrap(
         spacing: 8,
@@ -860,10 +1040,14 @@ class TherapistReadingTab extends StatelessWidget {
       title: 'Recent sentences',
       subtitle: 'Red words were missed or read differently',
       child: items.isEmpty
-          ? Text('No sentences in this period.', style: DashText.body(fontSize: 14))
+          ? Text(
+              'No sentences in this period.',
+              style: DashText.body(fontSize: 14),
+            )
           : Column(
               children: [
-                for (final item in items) _itemRow(Map<String, dynamic>.from(item)),
+                for (final item in items)
+                  _itemRow(Map<String, dynamic>.from(item)),
               ],
             ),
     );
@@ -878,14 +1062,16 @@ class TherapistReadingTab extends StatelessWidget {
       final word = (op['expected'] ?? '').toString();
       if (word.isEmpty) continue;
       final wrong = kind == 'substitution' || kind == 'deletion';
-      spans.add(TextSpan(
-        text: '$word ',
-        style: DashText.sinhala(
-          fontSize: 16,
-          color: wrong ? AppColors.softCoralDark : AppColors.textPrimary,
-          fontWeight: wrong ? FontWeight.w700 : FontWeight.w500,
+      spans.add(
+        TextSpan(
+          text: '$word ',
+          style: DashText.sinhala(
+            fontSize: 16,
+            color: wrong ? AppColors.softCoralDark : AppColors.textPrimary,
+            fontWeight: wrong ? FontWeight.w700 : FontWeight.w500,
+          ),
         ),
-      ));
+      );
     }
     final status = item['status']?.toString();
     return Container(
@@ -906,24 +1092,33 @@ class TherapistReadingTab extends StatelessWidget {
                   style: DashText.caption(fontSize: 13),
                 ),
               ),
-              Text(DashFormat.percent(item['grapheme_accuracy'], fallback: '-'),
-                  style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700)),
+              Text(
+                DashFormat.percent(item['grapheme_accuracy'], fallback: '-'),
+                style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
             ],
           ),
           const SizedBox(height: 6),
           if (spans.isNotEmpty)
             RichText(text: TextSpan(children: spans))
           else
-            Text((item['expected_text'] ?? '').toString(), style: DashText.sinhala(fontSize: 16)),
+            Text(
+              (item['expected_text'] ?? '').toString(),
+              style: DashText.sinhala(fontSize: 16),
+            ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
             runSpacing: 6,
             children: [
-              StatusChip(label: _readingStatusLabel(status), tone: _stateTone(status)),
+              StatusChip(
+                label: _readingStatusLabel(status),
+                tone: _stateTone(status),
+              ),
               if ((DashFormat.number(item['attempts_for_item']) ?? 1) > 1)
                 StatusChip(
-                  label: 'Recorded ${DashFormat.count(item['attempts_for_item'])} times',
+                  label:
+                      'Recorded ${DashFormat.count(item['attempts_for_item'])} times',
                   tone: DashTone.neutral,
                 ),
             ],
@@ -958,22 +1153,35 @@ class TherapistReadingTab extends StatelessWidget {
         side: const BorderSide(color: AppColors.borderLight),
       ),
       child: ExpansionTile(
-        title: Text('Research measures (exploratory)', style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700)),
-        subtitle: Text('Not used in the reading score', style: DashText.caption(fontSize: 13)),
+        title: Text(
+          'Research measures (exploratory)',
+          style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(
+          'Not used in the reading score',
+          style: DashText.caption(fontSize: 13),
+        ),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         children: [
           LabeledValueRow(
             label: 'Voice steadiness (jitter)',
             hint: 'Unreliable on short child recordings',
-            value: DashFormat.number(latest['jitter'])?.toStringAsFixed(3) ?? DashFormat.missing,
+            value:
+                DashFormat.number(latest['jitter'])?.toStringAsFixed(3) ??
+                DashFormat.missing,
           ),
           LabeledValueRow(
             label: 'Loudness steadiness (shimmer)',
-            value: DashFormat.number(latest['shimmer'])?.toStringAsFixed(3) ?? DashFormat.missing,
+            value:
+                DashFormat.number(latest['shimmer'])?.toStringAsFixed(3) ??
+                DashFormat.missing,
           ),
           LabeledValueRow(
             label: 'Spoken beats vs expected syllables',
-            value: DashFormat.count(latest['peak_delta'], fallback: DashFormat.missing),
+            value: DashFormat.count(
+              latest['peak_delta'],
+              fallback: DashFormat.missing,
+            ),
           ),
           LabeledValueRow(
             label: 'Speech-recognition confidence',
@@ -1011,22 +1219,31 @@ class TherapistCombinedProfileTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final available = data['classifier_available'] == true;
-    final checklist = _list(data['coverage_checklist'])
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    final checklist = _list(
+      data['coverage_checklist'],
+    ).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     final probs = <String, double>{};
     _map(data['probabilities']).forEach((key, value) {
       final v = DashFormat.number(value);
       if (v != null) probs[key] = v;
     });
-    final notes = _list(data['measurement_notes']).map((e) => e.toString()).toList();
+    final notes = _list(
+      data['measurement_notes'],
+    ).map((e) => e.toString()).toList();
     final window = _map(data['evidence_window']);
+    final letterPractice = _map(window['letter_practice']);
+    final letterSkills = _list(letterPractice['skills'])
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        Text('Combined learning profile', style: DashText.heading(fontSize: 18)),
+        Text(
+          'Combined learning profile',
+          style: DashText.heading(fontSize: 18),
+        ),
         const SizedBox(height: 4),
         Text(
           'Brings touch activities and reading together over the last ${window['days'] ?? 14} days. '
@@ -1036,21 +1253,49 @@ class TherapistCombinedProfileTab extends StatelessWidget {
         const SizedBox(height: 14),
         DashCard(
           title: 'Evidence available',
-          subtitle: 'The estimate runs only when touch and reading evidence are both present',
+          subtitle:
+              'The estimate runs only when touch and reading evidence are both present',
           child: checklist.isEmpty
               ? Text(DashFormat.missing, style: DashText.body(fontSize: 14))
               : CoverageChecklist(items: checklist),
         ),
+        if ((DashFormat.number(letterPractice['attempts']) ?? 0) > 0)
+          DashCard(
+            title: 'Letter-practice context',
+            subtitle:
+                'Shown as learning evidence; automatic transcript matches are not pronunciation scores and do not enter the combined estimate.',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final skill in letterSkills) ...[
+                  Text(
+                    '${skill['title']}: ${skill['letters_practiced']}/${skill['letters_total']} letters practised',
+                    style: DashText.body(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${skill['attempts']} attempts · ${skill['clear_attempts']} clear recordings · ${skill['automatic_text_matches']} automatic text matches${skill['automatic_text_match_rate'] == null ? '' : ' (${((DashFormat.number(skill['automatic_text_match_rate']) ?? 0) * 100).round()}%)'}',
+                    style: DashText.caption(fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ],
+            ),
+          ),
         if (!available)
           EmptyHint(
             icon: Icons.hourglass_empty_rounded,
             title: 'Estimate not ready yet',
-            message: (data['skip_reason'] ?? 'More evidence is needed.').toString(),
+            message: (data['skip_reason'] ?? 'More evidence is needed.')
+                .toString(),
           )
         else
           DashCard(
             title: 'Pattern estimate',
-            subtitle: 'XGBoost ${data['model_version'] ?? ''} · trained on synthetic data · for review only',
+            subtitle: 'A learning-pattern estimate for professional review, not a diagnosis.',
             accent: AppColors.calmBlue,
             trailing: data['low_agreement'] == true
                 ? const StatusChip(label: 'Low agreement', tone: DashTone.watch)
@@ -1061,13 +1306,26 @@ class TherapistCombinedProfileTab extends StatelessWidget {
                 ProbabilityBar(probabilities: probs),
                 if (data['low_agreement'] == true) ...[
                   const SizedBox(height: 8),
-                  Text('The top two estimates are close; treat this as inconclusive.',
-                      style: DashText.body(fontSize: 14, color: dashToneColor(DashTone.watch))),
+                  Text(
+                    'The top two estimates are close; treat this as inconclusive.',
+                    style: DashText.body(
+                      fontSize: 14,
+                      color: dashToneColor(DashTone.watch),
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 14),
-                Text('What influenced the estimate', style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700)),
+                Text(
+                  'What was observed alongside this estimate',
+                  style: DashText.body(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                for (final raw in _list(data['shap_explanations']).whereType<Map>())
+                for (final raw in _list(
+                  data['shap_explanations'],
+                ).whereType<Map>())
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
@@ -1091,7 +1349,7 @@ class TherapistCombinedProfileTab extends StatelessWidget {
                     ),
                   ),
                 Text(
-                  'Contributions show what moved the model score, not causes.',
+                  'These observations describe associations; they do not establish causes.',
                   style: DashText.caption(fontSize: 12),
                 ),
               ],
@@ -1102,7 +1360,10 @@ class TherapistCombinedProfileTab extends StatelessWidget {
             title: 'Measurement notes',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [for (final note in notes) Text('• $note', style: DashText.body(fontSize: 14))],
+              children: [
+                for (final note in notes)
+                  Text('• $note', style: DashText.body(fontSize: 14)),
+              ],
             ),
           ),
         _reviewCard(context, available),
@@ -1114,10 +1375,19 @@ class TherapistCombinedProfileTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text((data['summary_text'] ?? '').toString(), style: DashText.body(fontSize: 15)),
+              Text(
+                (data['summary_text'] ?? '').toString(),
+                style: DashText.body(fontSize: 15),
+              ),
               const SizedBox(height: 10),
-              Text('Suggested next step', style: DashText.body(fontSize: 14, fontWeight: FontWeight.w700)),
-              Text((data['recommendation_text'] ?? '').toString(), style: DashText.body(fontSize: 14)),
+              Text(
+                'Suggested next step',
+                style: DashText.body(fontSize: 14, fontWeight: FontWeight.w700),
+              ),
+              Text(
+                (data['recommendation_text'] ?? '').toString(),
+                style: DashText.body(fontSize: 14),
+              ),
             ],
           ),
         ),
@@ -1134,12 +1404,18 @@ class TherapistCombinedProfileTab extends StatelessWidget {
           ? 'Not reviewed yet'
           : 'Last review: ${DashFormat.words(latest['agreement'])} · ${DashFormat.date(latest['created_at'])}',
       child: !available
-          ? Text('Review becomes available once an estimate is shown.', style: DashText.body(fontSize: 14))
+          ? Text(
+              'Review becomes available once an estimate is shown.',
+              style: DashText.body(fontSize: 14),
+            )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (latest['note'] != null) ...[
-                  Text('"${latest['note']}"', style: DashText.body(fontSize: 14)),
+                  Text(
+                    '"${latest['note']}"',
+                    style: DashText.body(fontSize: 14),
+                  ),
                   const SizedBox(height: 8),
                 ],
                 _FeedbackButtons(
@@ -1166,7 +1442,6 @@ class TherapistCombinedProfileTab extends StatelessWidget {
     );
   }
 }
-
 
 extension _IfEmpty on String {
   String ifEmpty(String fallback) => isEmpty ? fallback : this;

@@ -375,10 +375,7 @@ class _Header extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              Text(
-                'Learning overview',
-                style: DashText.caption(fontSize: 13),
-              ),
+              Text('Learning overview', style: DashText.caption(fontSize: 13)),
             ],
           ),
         ),
@@ -422,10 +419,7 @@ class _Header extends StatelessWidget {
                 ],
               ),
               child: picture == null || picture.isEmpty
-                  ? Text(
-                      _initials(name),
-                      style: DashText.button(fontSize: 16),
-                    )
+                  ? Text(_initials(name), style: DashText.button(fontSize: 16))
                   : null,
             ),
           ),
@@ -478,7 +472,7 @@ class _Hero extends StatelessWidget {
           Text(
             priorities > 0
                 ? '$priorities learner${priorities == 1 ? '' : 's'} ready for review'
-                : 'Learning evidence is up to date',
+                : 'You’re all caught up',
             style: DashText.heading(
               fontSize: 29,
               fontWeight: FontWeight.w700,
@@ -682,11 +676,7 @@ class _MetricCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 3),
-        Text(
-          metric.note,
-          maxLines: 2,
-          style: DashText.caption(fontSize: 12),
-        ),
+        Text(metric.note, maxLines: 2, style: DashText.caption(fontSize: 12)),
       ],
     ),
   );
@@ -726,10 +716,7 @@ class _SectionTitle extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 3),
-            Text(
-              subtitle,
-              style: DashText.body(fontSize: 13, height: 1.45),
-            ),
+            Text(subtitle, style: DashText.body(fontSize: 13, height: 1.45)),
           ],
         ),
       ),
@@ -833,10 +820,7 @@ class _ReviewCard extends StatelessWidget {
               const SizedBox(height: 15),
               Text(
                 learner['review_title']?.toString() ?? 'Learning evidence',
-                style: DashText.body(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: DashText.body(fontSize: 14, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 4),
               Text(
@@ -1048,10 +1032,7 @@ class _SupportRow extends StatelessWidget {
           children: [
             Text(
               title,
-              style: DashText.body(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
+              style: DashText.body(fontSize: 13, fontWeight: FontWeight.w700),
             ),
             Text(description, style: DashText.caption(fontSize: 12)),
           ],
@@ -1222,10 +1203,7 @@ class _EvidenceNotice extends StatelessWidget {
                 ),
               if (limitations.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(
-                  limitations.first,
-                  style: DashText.caption(fontSize: 12),
-                ),
+                Text(limitations.first, style: DashText.caption(fontSize: 12)),
               ],
             ],
           ),
@@ -1388,7 +1366,6 @@ String _relativeTime(String? raw) {
   return '${parsed.day}/${parsed.month}/${parsed.year}';
 }
 
-
 /// Data-coverage chips for a learner (activities / reading / questionnaire / review).
 class _CoverageChips extends StatelessWidget {
   const _CoverageChips({required this.coverage});
@@ -1412,8 +1389,12 @@ class _CoverageChips extends StatelessWidget {
           icon: Icons.touch_app_outlined,
         ),
         StatusChip(
-          label: recordings == 0 ? 'No reading yet' : '$usable/$recordings clear recordings',
-          tone: recordings == 0 ? DashTone.neutral : (usable > 0 ? DashTone.good : DashTone.watch),
+          label: recordings == 0
+              ? 'No reading yet'
+              : '$usable/$recordings clear recordings',
+          tone: recordings == 0
+              ? DashTone.neutral
+              : (usable > 0 ? DashTone.good : DashTone.watch),
           icon: Icons.mic_none_rounded,
         ),
         StatusChip(
@@ -1422,7 +1403,11 @@ class _CoverageChips extends StatelessWidget {
           icon: Icons.assignment_outlined,
         ),
         if (coverage['professional_review'] == true)
-          const StatusChip(label: 'Reviewed', tone: DashTone.good, icon: Icons.rate_review_outlined),
+          const StatusChip(
+            label: 'Reviewed',
+            tone: DashTone.good,
+            icon: Icons.rate_review_outlined,
+          ),
       ],
     );
   }

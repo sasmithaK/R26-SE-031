@@ -18,6 +18,7 @@ class VoiceAnalysisService {
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
   bool _isRecorderInitialized = false;
   String? _currentRecordingPath;
+  StreamSubscription<RecordingDisposition>? _recordingProgressSubscription;
   String? lastError; // Added to expose the last error to the UI
 
   Future<String> runHardwareDiagnostic() async {
@@ -95,7 +96,7 @@ class VoiceAnalysisService {
   }
 
   /// Starts recording audio from the device microphone (Raw WAV for acoustic analysis)
-  Future<void> startRecording() async {
+  Future<void> startRecording({VoidCallback? onSoundDetected}) async {
     lastError = null;
     try {
       await _initRecorder();
@@ -110,6 +111,20 @@ class VoiceAnalysisService {
         sampleRate: 16000,
         numChannels: 1,
       );
+      if (onSoundDetected != null) {
+        // Device-tuned activity heuristic for the child-facing no-response
+        // timeout. C2 still makes the persisted quality decision from audio.
+        await _recorder.setSubscriptionDuration(
+          const Duration(milliseconds: 100),
+        );
+        var loudWindows = 0;
+        _recordingProgressSubscription?.cancel();
+        _recordingProgressSubscription = _recorder.onProgress?.listen((event) {
+          final level = event.decibels;
+          loudWindows = level != null && level > -38 ? loudWindows + 1 : 0;
+          if (loudWindows >= 3) onSoundDetected();
+        });
+      }
       debugPrint(
         'VoiceAnalysisService: Started recording to $_currentRecordingPath',
       );
@@ -122,6 +137,8 @@ class VoiceAnalysisService {
   /// Stops recording and returns the raw audio file
   Future<File?> stopRecording() async {
     try {
+      await _recordingProgressSubscription?.cancel();
+      _recordingProgressSubscription = null;
       if (!_isRecorderInitialized) return null;
 
       final path = await _recorder.stopRecorder();
@@ -154,6 +171,7 @@ class VoiceAnalysisService {
     String? roundId,
     String? datasetId,
     String? dataOrigin,
+    String? taskKind,
     List<String> allowedVariants = const [],
     int expectedSyllables = 0,
     int tStimulus = 0,
@@ -185,6 +203,7 @@ class VoiceAnalysisService {
       if (roundId != null) request.fields['round_id'] = roundId;
       request.fields['dataset_id'] = datasetId ?? 'live:$studentId:$sessionId';
       request.fields['data_origin'] = dataOrigin ?? ApiConfig.dataOrigin;
+      if (taskKind != null) request.fields['task_kind'] = taskKind;
       request.fields['allowed_variants_json'] = jsonEncode(allowedVariants);
       request.fields['expected_text'] = expectedText;
       request.fields['expected_syllables'] = expectedSyllables.toString();

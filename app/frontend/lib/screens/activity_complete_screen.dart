@@ -125,282 +125,305 @@ class _ActivityCompleteScreenState extends State<ActivityCompleteScreen> {
         child: const Icon(Icons.bug_report, color: Colors.white),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Spacer(),
-
-              // Celebration Hero Avatar Badge
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: 140,
-                    height: 140,
-                    decoration: BoxDecoration(
-                      color: AppColors.warmAmber.withValues(alpha: 0.18),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  Image.asset(avatarPath, height: 130, fit: BoxFit.contain),
-                ],
-              ),
-
-              // Activity Name Badge
-              if (widget.activityNode.title.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.calmBlue.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppColors.calmBlue.withValues(alpha: 0.4),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Text(
-                    widget.activityNode.title,
-                    style: AppTypography.heading(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.calmBlue,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Title Banner
-              Text(
-                titleText,
-                textAlign: TextAlign.center,
-                style: AppTypography.heading(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              Text(
-                subtitleText,
-                textAlign: TextAlign.center,
-                style: AppTypography.body(
-                  fontSize: 15,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Score Card (Score % + 5 Stars)
-              Container(
-                width: double.infinity,
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  vertical: 20,
                   horizontal: 24,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.cardSurface,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppColors.warmAmber, width: 2.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.warmAmber.withValues(alpha: 0.2),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
+                  vertical: 20,
                 ),
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      '$displayScore%',
-                      style: AppTypography.heading(
-                        fontSize: 38,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.warmAmber,
-                      ),
+                    // Celebration Hero Avatar Badge
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 140,
+                          height: 140,
+                          decoration: BoxDecoration(
+                            color: AppColors.warmAmber.withValues(alpha: 0.18),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        Image.asset(
+                          avatarPath,
+                          height: 130,
+                          fit: BoxFit.contain,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        5,
-                        (i) => Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 3),
-                          child: Icon(
-                            i < stars
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
-                            color: i < stars
-                                ? AppColors.warmAmber
-                                : AppColors.borderLight,
-                            size: 32,
+
+                    // Activity Name Badge
+                    if (widget.activityNode.title.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.calmBlue.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppColors.calmBlue.withValues(alpha: 0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Text(
+                          widget.activityNode.title,
+                          style: AppTypography.heading(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.calmBlue,
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
+                      const SizedBox(height: 12),
+                    ],
 
-              if (widget.recommendBreak) ...[
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.gentleGreen.withValues(alpha: 0.11),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: AppColors.gentleGreen.withValues(alpha: 0.5),
-                      width: 2,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppColors.gentleGreen.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          _breakCompleted
-                              ? Icons.check_rounded
-                              : Icons.spa_rounded,
-                          color: AppColors.gentleGreen,
-                        ),
+                    // Title Banner
+                    Text(
+                      titleText,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.heading(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _breakCompleted
-                                  ? 'විවේකය අවසන්! 🌟'
-                                  : _breakActive
-                                  ? 'සන්සුන් වෙමු… $_breakSecondsRemaining'
-                                  : 'කෙටි විවේකයක් ගනිමු 🌿',
-                              style: AppTypography.sinhala(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    Text(
+                      subtitleText,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.body(
+                        fontSize: 15,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // Score Card (Score % + 5 Stars)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 20,
+                        horizontal: 24,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardSurface,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: AppColors.warmAmber,
+                          width: 2.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.warmAmber.withValues(alpha: 0.2),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '$displayScore%',
+                            style: AppTypography.heading(
+                              fontSize: 38,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.warmAmber,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              5,
+                              (i) => Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                ),
+                                child: Icon(
+                                  i < stars
+                                      ? Icons.star_rounded
+                                      : Icons.star_outline_rounded,
+                                  color: i < stars
+                                      ? AppColors.warmAmber
+                                      : AppColors.borderLight,
+                                  size: 32,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 5),
-                            if (_breakActive)
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: LinearProgressIndicator(
-                                  value: 1 - (_breakSecondsRemaining / 60),
-                                  minHeight: 7,
-                                  color: AppColors.gentleGreen,
-                                  backgroundColor: Colors.white,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    if (widget.recommendBreak) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.gentleGreen.withValues(alpha: 0.11),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: AppColors.gentleGreen.withValues(alpha: 0.5),
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: AppColors.gentleGreen.withValues(
+                                  alpha: 0.2,
                                 ),
-                              )
-                            else if (!_breakCompleted)
-                              Text(
-                                'විනාඩියක් ඇස් සහ මනස සන්සුන් කරමු.',
-                                style: AppTypography.sinhala(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _breakCompleted
+                                    ? Icons.check_rounded
+                                    : Icons.spa_rounded,
+                                color: AppColors.gentleGreen,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _breakCompleted
+                                        ? 'විවේකය අවසන්! 🌟'
+                                        : _breakActive
+                                        ? 'සන්සුන් වෙමු… $_breakSecondsRemaining'
+                                        : 'කෙටි විවේකයක් ගනිමු 🌿',
+                                    style: AppTypography.sinhala(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 5),
+                                  if (_breakActive)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: LinearProgressIndicator(
+                                        value:
+                                            1 - (_breakSecondsRemaining / 60),
+                                        minHeight: 7,
+                                        color: AppColors.gentleGreen,
+                                        backgroundColor: Colors.white,
+                                      ),
+                                    )
+                                  else if (!_breakCompleted)
+                                    Text(
+                                      'විනාඩියක් ඇස් සහ මනස සන්සුන් කරමු.',
+                                      style: AppTypography.sinhala(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (!_breakActive && !_breakCompleted)
+                              TextButton(
+                                onPressed: _startBreak,
+                                child: Text(
+                                  'අරඹමු',
+                                  style: AppTypography.sinhala(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.gentleGreen,
+                                  ),
                                 ),
                               ),
                           ],
                         ),
                       ),
-                      if (!_breakActive && !_breakCompleted)
-                        TextButton(
-                          onPressed: _startBreak,
-                          child: Text(
-                            'අරඹමු',
-                            style: AppTypography.sinhala(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.gentleGreen,
+                    ],
+
+                    // Action Buttons Row: Retake (Play Again) & Continue
+                    Row(
+                      children: [
+                        // Retake / Play Again Button
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              if (widget.onRetake != null) {
+                                widget.onRetake!();
+                              } else {
+                                Navigator.pop(context, 'retake');
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.softCoral,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              elevation: 4,
+                            ),
+                            icon: const Icon(Icons.refresh_rounded, size: 22),
+                            label: Text(
+                              'නැවත ක්‍රීඩා කරමු',
+                              style: AppTypography.button(fontSize: 16),
                             ),
                           ),
                         ),
-                    ],
-                  ),
+
+                        const SizedBox(width: 12),
+
+                        // Continue / Next Level Button
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              if (widget.onContinue != null) {
+                                widget.onContinue!();
+                              } else {
+                                Navigator.pop(context, 'continue');
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.gentleGreen,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              elevation: 4,
+                            ),
+                            icon: const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 22,
+                            ),
+                            label: Text(
+                              widget.isRevisiting
+                                  ? 'සිතියමට යමු'
+                                  : 'ඉදිරියට යමු',
+                              style: AppTypography.button(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                 ),
-              ],
-
-              const Spacer(),
-
-              // Action Buttons Row: Retake (Play Again) & Continue
-              Row(
-                children: [
-                  // Retake / Play Again Button
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        if (widget.onRetake != null) {
-                          widget.onRetake!();
-                        } else {
-                          Navigator.pop(context, 'retake');
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.softCoral,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        elevation: 4,
-                      ),
-                      icon: const Icon(Icons.refresh_rounded, size: 22),
-                      label: Text(
-                        'නැවත ක්‍රීඩා කරමු',
-                        style: AppTypography.button(fontSize: 16),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  // Continue / Next Level Button
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        if (widget.onContinue != null) {
-                          widget.onContinue!();
-                        } else {
-                          Navigator.pop(context, 'continue');
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.gentleGreen,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        elevation: 4,
-                      ),
-                      icon: const Icon(Icons.arrow_forward_rounded, size: 22),
-                      label: Text(
-                        widget.isRevisiting ? 'සිතියමට යමු' : 'ඉදිරියට යමු',
-                        style: AppTypography.button(fontSize: 16),
-                      ),
-                    ),
-                  ),
-                ],
               ),
-              const SizedBox(height: 16),
-            ],
+            ),
           ),
         ),
       ),

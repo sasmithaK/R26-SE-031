@@ -9,6 +9,7 @@ import '../../widgets/app_loading_indicator.dart';
 import '../../widgets/research_evidence_panel.dart';
 import '../../widgets/trend_chart.dart';
 import '../../widgets/dashboard/dashboard_kit.dart';
+import '../../widgets/dashboard/letter_practice_grid.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../models/curriculum_models.dart';
 import '../../models/comprehensive_assessment_questions.dart';
@@ -97,6 +98,9 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
   Widget build(BuildContext context) {
     final name = widget.studentData['first_name'] ?? 'student';
     final grade = widget.studentData['grade'] ?? 'Grade 1';
+    final compactToolbar =
+        MediaQuery.sizeOf(context).width < 390 ||
+        MediaQuery.textScalerOf(context).scale(12) > 14;
     final avatar = AvatarUtils.getCorrectedAvatarPath(
       widget.studentData['avatar_url'] as String?,
       'assets/images/characters/human/human_student_1.png',
@@ -112,9 +116,13 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           toolbarHeight: 78,
           surfaceTintColor: Colors.transparent,
           scrolledUnderElevation: 0,
-          leadingWidth: 66,
+          leadingWidth: compactToolbar ? 56 : 66,
           leading: Padding(
-            padding: const EdgeInsets.only(left: 14, top: 12, bottom: 12),
+            padding: EdgeInsets.only(
+              left: compactToolbar ? 8 : 14,
+              top: 12,
+              bottom: 12,
+            ),
             child: Material(
               color: AppColors.slateBg,
               borderRadius: BorderRadius.circular(16),
@@ -160,38 +168,44 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                 PopupMenuItem(value: '90', child: Text('Last 90 days')),
               ],
               child: Container(
-                margin: const EdgeInsets.only(right: 14),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
+                margin: EdgeInsets.only(right: compactToolbar ? 4 : 14),
+                padding: EdgeInsets.symmetric(
+                  horizontal: compactToolbar ? 8 : 12,
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.slateBg,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.history_rounded,
-                      size: 17,
-                      color: AppColors.calmBlue,
-                    ),
-                    const SizedBox(width: 7),
-                    Text(
-                      'Activities · ${_activityDays}d',
-                      style: DashText.caption(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                child: compactToolbar
+                    ? const Icon(
+                        Icons.history_rounded,
+                        size: 20,
+                        color: AppColors.calmBlue,
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.history_rounded,
+                            size: 17,
+                            color: AppColors.calmBlue,
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            'Activities · ${_activityDays}d',
+                            style: DashText.caption(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ],
-          titleSpacing: 8,
+          titleSpacing: compactToolbar ? 4 : 8,
           title: Row(
             children: [
               Container(
@@ -323,7 +337,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         'icon': Icons.touch_app_rounded,
         'color': AppColors.calmBlue,
         'data': data['c1_behavioral'],
-        'empty': 'Complete an activity to start collecting touch and activity observations.',
+        'empty':
+            'Complete an activity to start collecting touch and activity observations.',
         'metrics': <Map<String, dynamic>>[
           {
             'label': 'Correct on first try (last 30 days)',
@@ -346,17 +361,32 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         ],
       },
       {
+        'id': 'letter_practice',
+        'title': 'Sinhala letter practice',
+        'subtitle': 'Progress across the vowel and consonant letter sets',
+        'icon': Icons.grid_view_rounded,
+        'color': AppColors.calmBlue,
+        'data': <String, dynamic>{
+          'letter_progress': data['c2_speech'] is Map
+              ? (data['c2_speech'] as Map)['letter_progress']
+              : const [],
+        },
+        'empty': 'Letter practice will appear after the child records a try.',
+        'metrics': <Map<String, dynamic>>[],
+      },
+      {
         'title': 'Speaking and reading',
         'subtitle': 'Reading recordings and speech observations',
         'icon': Icons.record_voice_over_rounded,
         'color': AppColors.softCoral,
         'data': data['c2_speech'],
-        'empty': 'Try Reading Comprehension (Skill 5) or Textbook Reading (Skill 6) together to start reading observations.',
+        'empty':
+            'Try letter practice or one of the reading activities to start collecting speaking observations.',
         'metrics': <Map<String, dynamic>>[
           {'label': 'Recordings', 'key': 'recording_count'},
           {'label': 'Clear enough to measure', 'key': 'usable_recording_count'},
           {
-            'label': 'Letters read as expected (latest clear recording)',
+            'label': 'Text match (latest clear recording)',
             'key': 'grapheme_accuracy',
             'scale': 100.0,
             'suffix': '%',
@@ -371,7 +401,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         'icon': Icons.insights_rounded,
         'color': AppColors.warmAmber,
         'data': data['c3_explainability'],
-        'empty': 'A combined summary appears after activities and reading recordings.',
+        'empty':
+            'A combined summary appears after activities and reading recordings.',
         'metrics': <Map<String, dynamic>>[],
       },
     ];
@@ -387,7 +418,10 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
             children: [
               Text(
                 'These are learning observations from app activities. They are not marks, rankings or a diagnosis.',
-                style: DashText.body(fontSize: 14, color: AppColors.textSecondary),
+                style: DashText.body(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 12),
               _buildLearningSummaryDownload(),
@@ -417,10 +451,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         'Practice time',
         metricText(data['practice_time_minutes'], suffix: ' min', decimals: 0),
       ),
-      (
-        'Correct on first try',
-        accuracy is num ? '${accuracy.round()}%' : '—',
-      ),
+      ('Correct on first try', accuracy is num ? '${accuracy.round()}%' : '—'),
     ];
     return Container(
       padding: const EdgeInsets.all(16),
@@ -455,10 +486,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          item.$2,
-                          style: DashText.heading(fontSize: 16),
-                        ),
+                        Text(item.$2, style: DashText.heading(fontSize: 16)),
                         Text(
                           item.$1,
                           style: DashText.caption(
@@ -508,17 +536,28 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(
-                  (row['activity_display'] ?? row['activity_name'] ?? _activityLabel(row['activity_id'])).toString(),
-                  style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700),
+                  (row['activity_display'] ??
+                          row['activity_name'] ??
+                          _activityLabel(row['activity_id']))
+                      .toString(),
+                  style: DashText.body(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 subtitle: Text(
                   [
-                    (row['skill_name_en'] ?? _parentSkillLabel(row['skill_id'])).toString(),
+                    (row['skill_name_en'] ?? _parentSkillLabel(row['skill_id']))
+                        .toString(),
                     '${row['trials'] ?? 0} responses',
-                    if ((voice['recordings'] ?? 0) is num && (voice['recordings'] ?? 0) > 0)
+                    if ((voice['recordings'] ?? 0) is num &&
+                        (voice['recordings'] ?? 0) > 0)
                       '${voice['usable_recordings'] ?? 0} of ${voice['recordings']} recordings clear',
                   ].join(' · '),
-                  style: DashText.body(fontSize: 13, color: AppColors.textSecondary),
+                  style: DashText.body(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -550,6 +589,8 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         '4' => 'Sentence skills',
         '5' => 'Reading comprehension',
         '6' => 'Textbook reading',
+        'sinhala_vowels' => 'Sinhala vowel letters',
+        'sinhala_consonants' => 'Sinhala consonant letters',
         _ => 'Other practice',
       };
 
@@ -566,6 +607,14 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
     final available = component['available'] == true;
     final color = definition['color'] as Color;
     final metrics = definition['metrics'] as List<Map<String, dynamic>>;
+
+    if (definition['id'] == 'letter_practice') {
+      final groups = (component['letter_progress'] as List? ?? const [])
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+      return LetterPracticeGrid(groups: groups);
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -686,10 +735,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                     children: [
                       Text(
                         text,
-                        style: DashText.heading(
-                          fontSize: 15,
-                          color: color,
-                        ),
+                        style: DashText.heading(fontSize: 15, color: color),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -713,29 +759,48 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
   Widget _buildLearningSummaryDownload() {
     return DashCard(
       title: 'Learning summary (PDF)',
-      subtitle: 'Last 30 days, in plain language. Useful to share with a teacher or therapist.',
+      subtitle:
+          'Last 30 days, in plain language. Useful to share with a teacher or therapist.',
       child: SizedBox(
         width: double.infinity,
         child: OutlinedButton.icon(
           icon: const Icon(Icons.picture_as_pdf_outlined),
-          label: Text('Download and share', style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700)),
+          label: Text(
+            'Download and share',
+            style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700),
+          ),
           onPressed: () async {
-            final studentId = widget.studentData['student_id']?.toString() ??
+            final studentId =
+                widget.studentData['student_id']?.toString() ??
                 widget.studentData['id']?.toString() ??
                 widget.studentData['_id']?.toString();
             if (studentId == null) return;
             final messenger = ScaffoldMessenger.of(context);
-            messenger.showSnackBar(const SnackBar(content: Text('Preparing the summary...')));
+            messenger.showSnackBar(
+              const SnackBar(content: Text('Preparing the summary...')),
+            );
             try {
-              final bytes = await _dashboardService.downloadLearningSummary(studentId);
+              final bytes = await _dashboardService.downloadLearningSummary(
+                studentId,
+              );
               await SharePlus.instance.share(
                 ShareParams(
-                  files: [XFile.fromData(bytes, mimeType: 'application/pdf', name: 'Sipsara_Learning_Summary.pdf')],
+                  files: [
+                    XFile.fromData(
+                      bytes,
+                      mimeType: 'application/pdf',
+                      name: 'Sipsara_Learning_Summary.pdf',
+                    ),
+                  ],
                   fileNameOverrides: ['Sipsara_Learning_Summary.pdf'],
                 ),
               );
             } catch (e) {
-              messenger.showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(e.toString().replaceFirst('Exception: ', '')),
+                ),
+              );
             }
           },
         ),
@@ -836,10 +901,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           ),
           const SizedBox(height: 24),
 
-          Text(
-            "Interpretation Limits",
-            style: DashText.heading(fontSize: 20),
-          ),
+          Text("Interpretation Limits", style: DashText.heading(fontSize: 20)),
           const SizedBox(height: 16),
           _buildFluencyCard(),
         ],
@@ -935,10 +997,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'What you’ve shared',
-              style: DashText.heading(fontSize: 18),
-            ),
+            Text('What you’ve shared', style: DashText.heading(fontSize: 18)),
             const SizedBox(height: 4),
             Text(
               '$completed of ${categories.length} questionnaire sections completed',
@@ -992,10 +1051,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "Accuracy Over Time",
-            style: DashText.heading(fontSize: 18),
-          ),
+          Text("Accuracy Over Time", style: DashText.heading(fontSize: 18)),
           const SizedBox(height: 16),
           TrendChart(
             title: "Reading Accuracy (%)",
@@ -1057,10 +1113,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          Text(
-            "Recommended Practice",
-            style: DashText.heading(fontSize: 18),
-          ),
+          Text("Recommended Practice", style: DashText.heading(fontSize: 18)),
           const SizedBox(height: 12),
           ...(_learningPattern?['recommended_practices'] as List<dynamic>? ??
                   [])
@@ -1187,10 +1240,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: DashText.heading(
-              fontSize: 18,
-              color: AppColors.textPrimary,
-            ),
+            style: DashText.heading(fontSize: 18, color: AppColors.textPrimary),
           ),
           Text(
             label,
@@ -1756,10 +1806,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: DashText.caption(
-            fontSize: 13,
-            color: AppColors.textSecondary,
-          ),
+          style: DashText.caption(fontSize: 13, color: AppColors.textSecondary),
         ),
       ],
     );
@@ -1928,10 +1975,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          meaning.$1,
-                          style: DashText.heading(fontSize: 22),
-                        ),
+                        Text(meaning.$1, style: DashText.heading(fontSize: 22)),
                         const SizedBox(height: 4),
                         Text(
                           meaning.$2,
@@ -2527,10 +2571,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           Expanded(
             child: Text(
               'Continue with the next normal activity. The app will keep checking learning as your child progresses.',
-              style: DashText.body(
-                fontSize: 13,
-                color: AppColors.textPrimary,
-              ),
+              style: DashText.body(fontSize: 13, color: AppColors.textPrimary),
             ),
           ),
         ],

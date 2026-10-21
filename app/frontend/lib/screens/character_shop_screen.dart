@@ -2,10 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-enum CharacterType {
-  human,
-  mascot,
-}
+enum CharacterType { human, mascot }
 
 class CharacterConfig {
   final String name;
@@ -30,30 +27,97 @@ class CharacterShopScreen extends StatefulWidget {
   State<CharacterShopScreen> createState() => _CharacterShopScreenState();
 }
 
-class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerProviderStateMixin {
+class _CharacterShopScreenState extends State<CharacterShopScreen>
+    with TickerProviderStateMixin {
   static const List<CharacterConfig> _allCharacters = [
     // --- Humans (Unused in Profile Selection) ---
-    CharacterConfig(name: 'Leo', assetPath: 'assets/images/characters/human/human_student_7.png', color: AppColors.calmBlue, type: CharacterType.human),
-    CharacterConfig(name: 'Mia', assetPath: 'assets/images/characters/human/human_student_8.png', color: AppColors.gentleGreen, type: CharacterType.human),
-    CharacterConfig(name: 'Sam', assetPath: 'assets/images/characters/human/human_student_9.png', color: AppColors.warmAmber, type: CharacterType.human),
-    CharacterConfig(name: 'Zoe', assetPath: 'assets/images/characters/human/human_student_10.png', color: AppColors.softCoral, type: CharacterType.human, isLocked: true),
-    CharacterConfig(name: 'Max', assetPath: 'assets/images/characters/human/human_student_11.png', color: Colors.purpleAccent, type: CharacterType.human, isLocked: true),
-    CharacterConfig(name: 'Ava', assetPath: 'assets/images/characters/human/human_student_12.png', color: Colors.teal, type: CharacterType.human, isLocked: true),
-    
+    CharacterConfig(
+      name: 'Leo',
+      assetPath: 'assets/images/characters/human/human_student_7.png',
+      color: AppColors.calmBlue,
+      type: CharacterType.human,
+    ),
+    CharacterConfig(
+      name: 'Mia',
+      assetPath: 'assets/images/characters/human/human_student_8.png',
+      color: AppColors.gentleGreen,
+      type: CharacterType.human,
+    ),
+    CharacterConfig(
+      name: 'Sam',
+      assetPath: 'assets/images/characters/human/human_student_9.png',
+      color: AppColors.warmAmber,
+      type: CharacterType.human,
+    ),
+    CharacterConfig(
+      name: 'Zoe',
+      assetPath: 'assets/images/characters/human/human_student_10.png',
+      color: AppColors.softCoral,
+      type: CharacterType.human,
+      isLocked: true,
+    ),
+    CharacterConfig(
+      name: 'Max',
+      assetPath: 'assets/images/characters/human/human_student_11.png',
+      color: Colors.purpleAccent,
+      type: CharacterType.human,
+      isLocked: true,
+    ),
+    CharacterConfig(
+      name: 'Ava',
+      assetPath: 'assets/images/characters/human/human_student_12.png',
+      color: Colors.teal,
+      type: CharacterType.human,
+      isLocked: true,
+    ),
+
     // --- Mascots (Unused in Profile Selection) ---
-    CharacterConfig(name: 'Blue Blob', assetPath: 'assets/images/characters/mascots/blue_monster.png', color: AppColors.calmBlue, type: CharacterType.mascot),
-    CharacterConfig(name: 'Pink Berry', assetPath: 'assets/images/characters/mascots/pink_monster.png', color: AppColors.softCoral, type: CharacterType.mascot),
-    CharacterConfig(name: 'Yellow Star', assetPath: 'assets/images/characters/mascots/yellow_monster.png', color: AppColors.warmAmber, type: CharacterType.mascot),
-    CharacterConfig(name: 'Green Slime', assetPath: 'assets/images/characters/mascots/green_monster.png', color: AppColors.gentleGreen, type: CharacterType.mascot, isLocked: true),
-    CharacterConfig(name: 'Blue Jump', assetPath: 'assets/images/characters/mascots/mascot_blue_jumping.png', color: Colors.teal, type: CharacterType.mascot, isLocked: true),
-    CharacterConfig(name: 'Yellow Solo', assetPath: 'assets/images/characters/mascots/solo_yellow.png', color: Colors.orangeAccent, type: CharacterType.mascot, isLocked: true),
+    CharacterConfig(
+      name: 'Blue Blob',
+      assetPath: 'assets/images/characters/mascots/blue_monster.png',
+      color: AppColors.calmBlue,
+      type: CharacterType.mascot,
+    ),
+    CharacterConfig(
+      name: 'Pink Berry',
+      assetPath: 'assets/images/characters/mascots/pink_monster.png',
+      color: AppColors.softCoral,
+      type: CharacterType.mascot,
+    ),
+    CharacterConfig(
+      name: 'Yellow Star',
+      assetPath: 'assets/images/characters/mascots/yellow_monster.png',
+      color: AppColors.warmAmber,
+      type: CharacterType.mascot,
+    ),
+    CharacterConfig(
+      name: 'Green Slime',
+      assetPath: 'assets/images/characters/mascots/green_monster.png',
+      color: AppColors.gentleGreen,
+      type: CharacterType.mascot,
+      isLocked: true,
+    ),
+    CharacterConfig(
+      name: 'Blue Jump',
+      assetPath: 'assets/images/characters/mascots/mascot_blue_jumping.png',
+      color: Colors.teal,
+      type: CharacterType.mascot,
+      isLocked: true,
+    ),
+    CharacterConfig(
+      name: 'Yellow Solo',
+      assetPath: 'assets/images/characters/mascots/solo_yellow.png',
+      color: Colors.orangeAccent,
+      type: CharacterType.mascot,
+      isLocked: true,
+    ),
   ];
 
   late AnimationController _gridController;
   CharacterType _selectedCategory = CharacterType.human;
   int _selectedIndex = 0;
 
-  List<CharacterConfig> get _filteredCharacters => 
+  List<CharacterConfig> get _filteredCharacters =>
       _allCharacters.where((c) => c.type == _selectedCategory).toList();
 
   @override
@@ -89,7 +153,9 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
   @override
   Widget build(BuildContext context) {
     final characters = _filteredCharacters;
-    final selectedCharacter = characters.isNotEmpty ? characters[_selectedIndex] : _allCharacters.first;
+    final selectedCharacter = characters.isNotEmpty
+        ? characters[_selectedIndex]
+        : _allCharacters.first;
 
     return Scaffold(
       backgroundColor: AppColors.cream, // Matched with app theme
@@ -98,12 +164,19 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 24),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: AppColors.textPrimary,
+            size: 24,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'යාලුවෙක් තෝරමු',
-          style: AppTypography.heading(fontSize: 22, color: AppColors.textPrimary),
+          style: AppTypography.heading(
+            fontSize: 22,
+            color: AppColors.textPrimary,
+          ),
         ),
         centerTitle: true,
       ),
@@ -129,13 +202,16 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
               ),
             ),
           ),
-          
+
           SafeArea(
             child: Column(
               children: [
                 // Top Custom Tab Bar
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 8,
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
@@ -162,48 +238,61 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
                 // Main Stage
                 Expanded(
                   flex: 5,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Stage base/pedestal
-                      Positioned(
-                        bottom: 30,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          width: 220,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: selectedCharacter.color.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(100),
-                            boxShadow: [
-                              BoxShadow(
-                                color: selectedCharacter.color.withValues(alpha: 0.3),
-                                blurRadius: 20,
-                                spreadRadius: 5,
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Container(
-                              width: 160,
-                              height: 20,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final imageSize = constraints.maxHeight < 360
+                          ? constraints.maxHeight * 0.72
+                          : 260.0;
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Stage base/pedestal
+                          Positioned(
+                            bottom: 30,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              width: 220,
+                              height: 40,
                               decoration: BoxDecoration(
-                                color: selectedCharacter.color.withValues(alpha: 0.5),
+                                color: selectedCharacter.color.withValues(
+                                  alpha: 0.2,
+                                ),
                                 borderRadius: BorderRadius.circular(100),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: selectedCharacter.color.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                    blurRadius: 20,
+                                    spreadRadius: 5,
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Container(
+                                  width: 160,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: selectedCharacter.color.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                      
-                      // Static Character Image
-                      Image.asset(
-                        selectedCharacter.assetPath,
-                        width: 260,
-                        height: 260,
-                        fit: BoxFit.contain,
-                      ),
-                    ],
+
+                          // Static Character Image
+                          Image.asset(
+                            selectedCharacter.assetPath,
+                            width: imageSize,
+                            height: imageSize,
+                            fit: BoxFit.contain,
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
 
@@ -213,7 +302,9 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
                   child: Container(
                     decoration: BoxDecoration(
                       color: AppColors.cardSurface,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(40),
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: AppColors.shadowMedium,
@@ -239,17 +330,24 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
                         Padding(
                           padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'යාලුවෙක් තෝරන්න',
-                                style: AppTypography.heading(
-                                  fontSize: 22,
-                                  color: AppColors.textPrimary,
+                              Expanded(
+                                child: Text(
+                                  'යාලුවෙක් තෝරන්න',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.heading(
+                                    fontSize: 22,
+                                    color: AppColors.textPrimary,
+                                  ),
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Text(
                                 '${characters.where((c) => !c.isLocked).length}/${characters.length} ක් විවෘතයි',
+                                textAlign: TextAlign.end,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: AppTypography.caption(
                                   fontSize: 16,
                                   color: AppColors.calmBlue,
@@ -261,53 +359,70 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
                         ),
                         Expanded(
                           child: GridView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            physics: const BouncingScrollPhysics(),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              childAspectRatio: 0.85,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 10,
                             ),
+                            physics: const BouncingScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                  childAspectRatio: 0.85,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
+                                ),
                             itemCount: characters.length,
                             itemBuilder: (context, index) {
                               final config = characters[index];
                               final isSelected = index == _selectedIndex;
 
                               return SlideTransition(
-                                position: Tween<Offset>(
-                                  begin: const Offset(0, 0.5),
-                                  end: Offset.zero,
-                                ).animate(CurvedAnimation(
-                                  parent: _gridController,
-                                  curve: Interval(index * 0.1, 1.0, curve: Curves.easeOutBack),
-                                )),
+                                position:
+                                    Tween<Offset>(
+                                      begin: const Offset(0, 0.5),
+                                      end: Offset.zero,
+                                    ).animate(
+                                      CurvedAnimation(
+                                        parent: _gridController,
+                                        curve: Interval(
+                                          index * 0.1,
+                                          1.0,
+                                          curve: Curves.easeOutBack,
+                                        ),
+                                      ),
+                                    ),
                                 child: GestureDetector(
                                   onTap: () => _selectCharacter(index),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 300),
                                     curve: Curves.easeOutCubic,
                                     decoration: BoxDecoration(
-                                      color: isSelected ? config.color.withValues(alpha: 0.1) : Colors.white,
+                                      color: isSelected
+                                          ? config.color.withValues(alpha: 0.1)
+                                          : Colors.white,
                                       borderRadius: BorderRadius.circular(24),
                                       border: Border.all(
-                                        color: isSelected ? config.color : AppColors.borderLight,
+                                        color: isSelected
+                                            ? config.color
+                                            : AppColors.borderLight,
                                         width: isSelected ? 3 : 1,
                                       ),
                                       boxShadow: isSelected
                                           ? [
                                               BoxShadow(
-                                                color: config.color.withValues(alpha: 0.2),
+                                                color: config.color.withValues(
+                                                  alpha: 0.2,
+                                                ),
                                                 blurRadius: 12,
                                                 spreadRadius: 2,
-                                              )
+                                              ),
                                             ]
                                           : [
                                               BoxShadow(
                                                 color: AppColors.shadow,
                                                 blurRadius: 4,
                                                 offset: const Offset(0, 2),
-                                              )
+                                              ),
                                             ],
                                     ),
                                     child: Stack(
@@ -326,15 +441,21 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
                                         if (config.isLocked)
                                           Positioned.fill(
                                             child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(21),
+                                              borderRadius:
+                                                  BorderRadius.circular(21),
                                               child: BackdropFilter(
-                                                filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                                                filter: ImageFilter.blur(
+                                                  sigmaX: 4,
+                                                  sigmaY: 4,
+                                                ),
                                                 child: Container(
-                                                  color: AppColors.cream.withValues(alpha: 0.4),
+                                                  color: AppColors.cream
+                                                      .withValues(alpha: 0.4),
                                                   child: const Center(
                                                     child: Icon(
                                                       Icons.lock_rounded,
-                                                      color: AppColors.textPrimary,
+                                                      color:
+                                                          AppColors.textPrimary,
                                                       size: 32,
                                                     ),
                                                   ),
@@ -380,7 +501,7 @@ class _CharacterShopScreenState extends State<CharacterShopScreen> with TickerPr
                       color: AppColors.calmBlue.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
-                    )
+                    ),
                   ]
                 : [],
           ),

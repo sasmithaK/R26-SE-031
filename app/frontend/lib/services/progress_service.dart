@@ -246,6 +246,12 @@ class ProgressService {
           completedCount++;
         }
       }
+      // skill_4 has 4 activities but act_4 counts as two (5 stars), matching
+      // getCompletedActivitiesCount; without this, act_5 never exists and the
+      // next skill can never unlock through the progression rule.
+      if (prevSkillId == 'skill_4' && isActivityCompleted(prevSkillId, 'act_4')) {
+        completedCount++;
+      }
       if (completedCount >= prevTotalActivities) return true;
     }
 
