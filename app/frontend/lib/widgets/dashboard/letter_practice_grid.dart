@@ -50,7 +50,7 @@ class LetterPracticeGrid extends StatelessWidget {
                     crossAxisCount: columns,
                     crossAxisSpacing: 7,
                     mainAxisSpacing: 7,
-                    childAspectRatio: 1,
+                    childAspectRatio: detailed ? 0.80 : 1,
                   ),
                   itemBuilder: (context, index) {
                     final item = _letters(group)[index];
@@ -99,26 +99,39 @@ class LetterPracticeGrid extends StatelessWidget {
                             ),
                           ),
                           alignment: Alignment.center,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                item['letter']?.toString() ?? '·',
-                                style: AppTypography.sinhala(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              if (detailed && attempts > 0)
-                                Text(
-                                  '$attempts×',
-                                  style: DashText.caption(
-                                    fontSize: 9,
-                                    color: tone,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 2,
+                              horizontal: 2,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    item['letter']?.toString() ?? '·',
+                                    style: AppTypography.sinhala(
+                                      fontSize: detailed ? 19 : 22,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textPrimary,
+                                    ),
                                   ),
                                 ),
-                            ],
+                                if (detailed && attempts > 0)
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      '$attempts×',
+                                      style: DashText.caption(
+                                        fontSize: 9,
+                                        color: tone,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
