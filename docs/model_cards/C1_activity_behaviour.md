@@ -7,12 +7,12 @@
 Summarise how a child interacts with the Skill 1–4 touch activities over the last 14 days. A professional sees it as one input to review. It never labels a child, and parents never see it.
 
 ## What it uses
-Rounds captured by the app. Only completed rounds count; duplicate rounds are dropped.
+Rounds captured by the app in **Skills 1-4** (the scope the model is trained on; Skill 5 reading questions and letter practice are excluded). Only completed rounds count; duplicate rounds are dropped. Timing inputs use first touch, as in the simulator.
 
 | Group | Features |
 | --- | --- |
 | Accuracy | first-try accuracy; accuracy trend; share of rounds finished |
-| Timing | mean, median and spread of round time; mean time to first answer (first touch for older data) |
+| Timing | mean, median and spread of round time; mean time to first touch |
 | Behaviour | long pauses (> 8 s), wrong answers and audio replays, each per round |
 | Within-session change | slowing, more errors and more pauses late in a session. These are medians over sessions with 4+ rounds: 2 vs 2 rounds for 4–5-round sessions, 3 vs 3 for 6+ |
 | Indices (0–100) | visual-task speed, sound-task speed (Skill 2 activities 3–4, Skill 3 activities 1 and 3), wrong taps and pauses, attention stability |
