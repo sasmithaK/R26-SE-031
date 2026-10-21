@@ -6,7 +6,6 @@ import '../services/auth_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'select_student_screen.dart';
 import 'therapist/therapist_dashboard_screen.dart';
-import 'character_intro_screen.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import '../widgets/sliding_role_toggle.dart';
@@ -144,7 +143,8 @@ class _SignInScreenState extends State<SignInScreen>
         return Scaffold(
           backgroundColor: AppColors.cream,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
