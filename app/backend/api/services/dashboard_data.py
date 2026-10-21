@@ -241,6 +241,8 @@ def speech(doc):
     # A historical 1-WER value is not a recognition confidence estimate.
     confidence = field("stt_confidence") if field("stt_confidence_method") not in (None, "one_minus_wer") else None
     fusion = doc.get("fusion") or {}
+    raw_rps = number(field("reading_performance_score"))
+    norm_rps = (raw_rps / 100.0) if (raw_rps is not None and raw_rps > 1.0) else raw_rps
     result = dict(pause_count=number(field("pause_count", "Pause_Count")),
                 mean_pause_duration_ms=number(field("mean_pause_duration_ms", "Mean_Pause_Duration_ms")),
                 pause_ratio=number(field("pause_ratio", "Pause_Ratio")), speech_duration_ms=number(field("speech_duration_ms", "Speech_Duration_ms")),
@@ -257,7 +259,7 @@ def speech(doc):
                 word_accuracy=number(field("word_accuracy")),
                 reading_rate_wpm=number(field("reading_rate_wpm")),
                 combined_confidence=number(field("combined_confidence")),
-                reading_performance_score=number(field("reading_performance_score")),
+                reading_performance_score=norm_rps,
                 method_disagreement=bool(fusion.get("method_disagreement", False)),
                 quality_issues=field("recording_quality_issues") or [],
                 recording_quality=field("recording_quality") or "Unknown",
