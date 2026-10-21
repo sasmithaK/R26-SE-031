@@ -131,7 +131,7 @@ class ActionPolicyModel:
     """Load portable coefficients and rank safe scaffold actions in real time."""
 
     def __init__(self, path: Path | None = None):
-        """Resolve the configured artifact path and load it once at startup."""
+        #"""Resolve the configured artifact path and load it once at startup."""#
         self.path = Path(os.getenv("C4_ACTION_MODEL_PATH", str(path or DEFAULT_MODEL_PATH)))
         self.artifact: Dict[str, Any] = {}
         self.reload()
