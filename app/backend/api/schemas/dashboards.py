@@ -266,6 +266,7 @@ class SpeechTrends(BaseModel):
 
 class TherapistC2SpeechDTO(MLResponseBase):
     recording_count: int = 0
+    letter_recording_count: int = 0
     usable_recording_count: int = 0
     latest: SpeechLatest
     trends: SpeechTrends
@@ -275,6 +276,7 @@ class TherapistC2SpeechDTO(MLResponseBase):
     items: List[Dict[str, Any]] = Field(default_factory=list)
     session_trend: List[Dict[str, Any]] = Field(default_factory=list)
     letter_change_counts: Dict[str, int] = Field(default_factory=dict)
+    letter_progress: List[Dict[str, Any]] = Field(default_factory=list)
 
 class ShapExplanation(BaseModel):
     feature: str

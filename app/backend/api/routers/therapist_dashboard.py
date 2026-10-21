@@ -15,7 +15,7 @@ from services.dashboard_data import (ACTIVITY_NAMES, KC_NAMES, SKILL_NAMES,
                                      shap_phrase, learner_coverage, window_or_latest, learner_alerts,
                                      public_coverage, activity_label, stamp,
                                      USABLE_SPEECH_STATUSES, c1_window_metrics, completed_trials, has_completed_rounds,
-                                     practised_mastery)
+                                     practised_mastery, letter_practice_progress, READING_ONLY)
 from dependencies import get_current_user
 
 router = APIRouter(prefix="/api/v1/therapist/students", tags=["Therapist Dashboard"],
@@ -292,7 +292,7 @@ async def _latest_profile(db, student_id):
 async def get_therapist_overview(student_id: str):
     db = get_db()
     summaries = await records(db, "session_summaries", student_id)
-    speeches = await records(db, "speech_features", student_id, 1)
+    speeches = await records(db, "speech_features", student_id, 1, extra=READING_ONLY)
     profile_doc = await _latest_profile(db, student_id)
     states = await records(db, "knowledge_states", student_id, 1)
     decisions = await records(db, "adaptive_decisions", student_id, 1)
@@ -574,8 +574,10 @@ def _speech_item(row, attempts=1):
 @router.get("/{student_id}/c2-speech", response_model=TherapistC2SpeechDTO)
 async def get_therapist_c2_speech(student_id: str, days: Optional[int] = Query(None, ge=1, le=365)):
     days = _window_days(days)
-    all_rows = await records(get_db(), "speech_features", student_id)
-    history, period = window_or_latest(all_rows, days, fallback=20)
+    reading_rows = await records(get_db(), "speech_features", student_id, extra=READING_ONLY)
+    letter_rows = in_window(await records(get_db(), "speech_features", student_id,
+                                          extra={"task_kind": "letter_pronunciation"}), days)
+    history, period = window_or_latest(reading_rows, days, fallback=20)
     latest = history[0] if history else {}
     usable_rows = [row for row in history if row.get("measurement_status") in USABLE_SPEECH_STATUSES]
     issues = {}
@@ -626,7 +628,8 @@ async def get_therapist_c2_speech(student_id: str, days: Optional[int] = Query(N
     latest_view.update({"item_id": latest.get("item_id"), "recorded_at": timestamp(latest)})
     return TherapistC2SpeechDTO(**{**mlbase(student_id, latest, "speech analysis", "c2-pipeline-v3"),
                                    "reporting_period": period.replace("sessions", "recordings")},
-        recording_count=len(history), usable_recording_count=len(usable_rows), latest=latest_view,
+        recording_count=len(history), letter_recording_count=len(letter_rows),
+        usable_recording_count=len(usable_rows), latest=latest_view,
         trends=dict(accuracy=trend("word_accuracy"), wer=trend("wer"), latency=trend("voice_onset_ms"),
                     silence_ratio=trend("silence_ratio"), peak_delta=trend("peak_delta")),
         window_days=days,
@@ -635,6 +638,7 @@ async def get_therapist_c2_speech(student_id: str, days: Optional[int] = Query(N
         items=[_speech_item(row, attempts.get((row.get("session_id"), row.get("item_id")), 1))
                for row in history[: setting("limits", "speech_items", default=20)]],
         letter_change_counts=letter_counts,
+        letter_progress=await letter_practice_progress(get_db(), student_id, days=days),
         session_trend=session_trend[-setting("limits", "trend_sessions", default=12):])
 
 
@@ -661,7 +665,7 @@ async def get_therapist_c3_profile(student_id: str):
     elif not doc.get("model_applied"):
         skip_reason = ("The combined estimate is not ready yet. Still needed: " + "; ".join(missing_inputs) + ".") if missing_inputs \
             else "The combined estimate is not ready yet: more activity and reading observations are needed."
-    metadata = mlbase(student_id, doc or audit, "XGBoost", "c3-fusion-v1")
+    metadata = mlbase(student_id, doc or audit, "XGBoost", "c3-learner-window")
     metadata["available"] = bool(doc)
     metadata["validation_status"] = "synthetic_trained_model"
 
@@ -700,7 +704,7 @@ async def get_therapist_c3_profile(student_id: str):
         {"key": "activities", "label": "Touch activities (Skills 1-4)",
          "done": (window.get("movement_sessions") or 0) >= (window.get("min_movement_sessions") or 1),
          "detail": f"{window.get('movement_sessions', 0)} sessions with finger-movement data in {window.get('days', '-')} days"},
-        {"key": "reading", "label": "Reading recordings (Skills 5-6)",
+        {"key": "reading", "label": "Oral-reading recordings",
          "done": (window.get("usable_recordings") or 0) >= (window.get("min_usable_recordings") or 1),
          "detail": f"{window.get('usable_recordings', 0)} clear recordings of {window.get('recordings', 0)}"},
         {"key": "age", "label": "Child's age recorded", "done": "age" not in missing_inputs and bool(doc),
@@ -710,6 +714,7 @@ async def get_therapist_c3_profile(student_id: str):
     ]
     sources = [s for s, ok in (("touch activities", bool(evidence.get("c1", {}).get("first_attempt_accuracy") is not None)),
                                ("reading recordings", evidence.get("c2", {}).get("word_accuracy") is not None),
+                               ("letter-practice context", bool((evidence.get("c2", {}).get("letter_practice") or {}).get("attempts"))),
                                ("parent questionnaire", bool(evidence.get("parent_observation_count")))) if ok]
     feedback = await records(db, "professional_feedback", student_id, 20)
     latest_feedback = next((f for f in feedback if f.get("component") == "c3"), None)

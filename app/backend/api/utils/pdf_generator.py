@@ -85,7 +85,7 @@ def generate_parent_learning_report(data: dict) -> bytes:
     heading("Reading aloud")
     recordings = data.get("recordings", 0)
     if not recordings:
-        line("No reading recordings yet. Try the reading activities (Skills 5 and 6) together.")
+        line("No reading recordings yet. Try an oral-reading activity together.")
     else:
         line(f"Recordings: {recordings}, clear enough to measure: {data.get('usable_recordings', 0)}")
         line(f"Letters read as expected (typical recording): {_pct(data.get('reading_letters'))}")

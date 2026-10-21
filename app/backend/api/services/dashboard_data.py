@@ -88,6 +88,62 @@ READING_ACTIVITY_NAMES = {
     "6.2": "පෙළපොතෙන් කියවමු - 2",
 }
 
+LETTER_PRACTICE_BANK = {
+    "skill_sinhala_vowels": {
+        "title": "ස්වර අකුරු (පණ අකුරු)",
+        "prefix": "SVOWA1R",
+        "letters": ["අ", "ආ", "ඇ", "ඈ", "ඉ", "ඊ", "උ", "ඌ", "එ", "ඒ", "ඔ", "ඕ"],
+    },
+    "skill_sinhala_consonants": {
+        "title": "ව්‍යංජන අකුරු (ගත අකුරු)",
+        "prefix": "SCONSA1R",
+        "letters": ["ක", "ග", "ච", "ජ", "ට", "ඩ", "ත", "ද", "න", "ප", "බ", "ම", "ය", "ර", "ල", "ව", "ස", "හ"],
+    },
+}
+
+
+async def letter_practice_progress(db, student_id, days=None):
+    """Aggregate persisted C2 letter attempts without treating unclear audio as errors."""
+    from datetime import timedelta
+
+    rows = await records(db, "speech_features", student_id, 2000,
+                         extra={"skill_id": {"$in": list(LETTER_PRACTICE_BANK)}})
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
+    groups = []
+    for skill_id, bank in LETTER_PRACTICE_BANK.items():
+        tiles = []
+        for index, letter in enumerate(bank["letters"], start=1):
+            item_id = f"{bank['prefix']}{index:02d}"
+            matches = []
+            for row in rows:
+                if row.get("skill_id") != skill_id or row.get("item_id") != item_id:
+                    continue
+                recorded = parse_time(timestamp(row))
+                if cutoff and (recorded is None or recorded < cutoff):
+                    continue
+                matches.append(row)
+            clear = [
+                row for row in matches
+                if row.get("recording_quality") == "valid"
+                and str(row.get("recognized_text") or "").strip()
+                and row.get("measurement_status") not in {"retry_required", "persistence_failed"}
+            ]
+            accepted = sum(1 for row in clear if row.get("exact_match") is True)
+            rate = accepted / len(clear) if clear else None
+            sessions = {str(row.get("session_id")) for row in clear if row.get("session_id")}
+            tiles.append({
+                "letter": letter,
+                "item_id": item_id,
+                "attempts": len(matches),
+                "clear_attempts": len(clear),
+                "matched_attempts": accepted,
+                "sessions": len(sessions),
+                "match_rate": rate,
+                "last_practiced_at": timestamp(matches[0]) if matches else None,
+            })
+        groups.append({"skill_id": skill_id, "title": bank["title"], "letters": tiles})
+    return groups
+
 ACTIVITY_NAMES_EN = {
     "1.1": "Hidden picture search", "1.2": "Shadow matching", "1.3": "Picture sorting",
     "1.4": "Pattern completion", "1.5": "Picture memory",
@@ -146,9 +202,15 @@ def stamp(value):
 def timestamp(doc):
     return stamp(doc.get("completed_at") or doc.get("created_at") or doc.get("timestamp") or doc.get("updated_at"))
 
-async def records(db, collection, student_id, limit=200):
+LETTER_TASK = "letter_pronunciation"
+READING_ONLY = {"task_kind": {"$ne": LETTER_TASK}}  # oral reading, not letter practice
+
+
+async def records(db, collection, student_id, limit=200, extra=None):
     # Bounded projection: newest ingested records, then chronological presentation.
-    docs = await db[collection].find({"student_id": student_id}).sort("_id", -1).limit(limit).to_list(length=limit)
+    # ``extra`` filters in the query itself, so a limit never cuts the wanted rows.
+    query = {"student_id": student_id, **(extra or {})}
+    docs = await db[collection].find(query).sort("_id", -1).limit(limit).to_list(length=limit)
     return sorted(docs, key=lambda d: timestamp(d) or "", reverse=True)
 
 def provenance(doc):
@@ -337,7 +399,7 @@ async def activity_performance(db, student_id, days=30, skill_id=None, limit=100
                 group["latencies"].append(latency)
             group["last_activity_at"] = group["last_activity_at"] or stamp_value
 
-    speech_rows = await records(db, "speech_features", student_id, 500)
+    speech_rows = await records(db, "speech_features", student_id, 500, extra=READING_ONLY)
     for row in speech_rows:
         sid, aid = _skill_digits(row.get("skill_id")), str(row.get("activity_id") or "unknown")
         if skill_id and sid != _skill_digits(skill_id):
@@ -629,6 +691,7 @@ SHAP_FEATURE_NAMES = {
     "age": ("Age", "years"),
     "age_years": ("Age", "years"),
     "c1_first_try_accuracy": ("Activities correct on first try", "%"),
+    "beat_mismatch_per_syllable": ("Spoken beats vs expected syllables", "%"),
     "c1_visual_task_index": ("Visual task speed index", ""),
     "c1_sound_task_index": ("Sound task speed index", ""),
     "c1_long_pauses_per_round": ("Long pauses per activity round", ""),
@@ -643,15 +706,19 @@ def _format_value(value, unit):
         return f"{round(value * 100)}%"
     if unit == "ms":
         return f"{round(value)} ms"
-    if unit in {"years", "h"}:
-        return f"{round(value)} {unit}"
+    if unit == "years":
+        return f"{value:.1f} years"
+    if unit == "h":
+        return f"{round(value)} h"
+    if abs(value) >= 10000:
+        return f"{value:.2e}"
     return f"{value:.2f}"
 
 
 def shap_phrase(feature, contribution, value=None):
     """Plain-language SHAP line. SHAP is a signed contribution, not a cause."""
     name, unit = SHAP_FEATURE_NAMES.get(feature, (feature.replace("_", " ").capitalize(), ""))
-    verb = "raised" if contribution > 0 else "lowered"
+    verb = "raised" if contribution > 0 else "lowered" if contribution < 0 else "did not change"
     return f"{name} ({_format_value(value, unit)}) {verb} the model estimate."
 
 
@@ -661,7 +728,8 @@ async def learner_coverage(db, student_id, student_doc=None, days=None):
     """Which evidence sources exist for a learner (data-completeness view)."""
     days = days if isinstance(days, int) else setting("default_window_days", default=30)
     summaries = await records(db, "session_summaries", student_id, setting("limits", "records", default=200))
-    speech_rows = await records(db, "speech_features", student_id, setting("limits", "records", default=200))
+    speech_rows = await records(db, "speech_features", student_id, setting("limits", "records", default=200),
+                                extra=READING_ONLY)
     window_summaries = in_window(summaries, days)
     window_speech = in_window(speech_rows, days)
     usable = [r for r in window_speech if r.get("measurement_status") in USABLE_SPEECH_STATUSES]
@@ -798,9 +866,16 @@ def pooled_round_metrics(events):
 
 
 def _skill_digits(value):
-    """'skill_1', '1' and 1 all mean Skill 1."""
+    """'skill_1', '1' and 1 all mean Skill 1; other ids (letter practice) stay as they are."""
     digits = re.sub(r"\D", "", str(value or ""))
-    return digits or "unknown"
+    return digits or (str(value) if value else "unknown")
+
+
+def _is_c1_event(event):
+    """Touch-activity rounds. Letter practice (non-numeric skill ids such as
+    skill_sinhala_vowels) is C2 only; rounds without a skill id are kept."""
+    skill = str(event.get("skill_id") or "").strip()
+    return skill in {"", "unknown"} or bool(re.sub(r"\D", "", skill))
 
 
 def _skill_matches(event, skill_id):
@@ -821,7 +896,9 @@ async def window_sessions(db, student_id, days, skill_id=None, fallback=True):
         sessions, period = in_window(docs, days), f"Last {days} days"
     rows = []
     for doc in sessions:
-        events = _dedupe_events(doc.get("events"))
+        events = [e for e in _dedupe_events(doc.get("events")) if _is_c1_event(e)]
+        if not events:
+            continue
         if skill_id:
             events = [e for e in events if _skill_matches(e, skill_id)]
             if not events:

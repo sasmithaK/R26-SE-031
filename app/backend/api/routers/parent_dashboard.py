@@ -21,7 +21,8 @@ from shared.database import get_db
 from services.dashboard_access import require_dashboard_access
 from services.dashboard_data import (KC_NAMES, number, timestamp, records, base, pattern_profile, research_evidence,
                                      speech, activity_performance, c1_window_metrics, practised_kcs,
-                                     USABLE_SPEECH_STATUSES, usable_speech, has_completed_rounds)
+                                     USABLE_SPEECH_STATUSES, usable_speech, has_completed_rounds,
+                                     letter_practice_progress, READING_ONLY)
 
 router=APIRouter(prefix="/api/v1/parent/students",tags=["Parent Dashboard"],dependencies=[Depends(require_dashboard_access)])
 
@@ -139,7 +140,7 @@ async def get_parent_learning_pattern(student_id:str):
     db=get_db()
     summary_rows=await records(db,"session_summaries",student_id,1)
     c1=await c1_window_metrics(db,student_id)
-    speech_row=usable_speech(await records(db,"speech_features",student_id,50))
+    speech_row=usable_speech(await records(db, "speech_features", student_id, 50, extra=READING_ONLY))
     accuracy=c1["first_attempt_accuracy"]
     word_accuracy=speech(speech_row)["word_accuracy"] if speech_row else None
     observations=[]
@@ -195,8 +196,12 @@ async def get_parent_component_analytics(student_id: str):
     """
     db = get_db()
     summaries = (await records(db, "session_summaries", student_id))[:10]
-    speech_rows = (await records(db, "speech_features", student_id))[:50]
-    profile_rows = await records(db, "learner_profiles", student_id, 1)
+    speech_rows = (await records(db, "speech_features", student_id, extra=READING_ONLY))[:50]
+    letter_progress = await letter_practice_progress(db, student_id, days=30)
+    # Prefer the learner-window profile over one-off legacy requests.
+    profile_rows = await records(db, "learner_profiles", student_id, 20)
+    profile_rows = ([r for r in profile_rows if str(r.get("feature_version") or "").startswith("c3-learner-window")]
+                    or profile_rows)[:1]
     state_rows = await records(db, "knowledge_states", student_id, 1)
     decisions = (await records(db, "adaptive_decisions", student_id))[:50]
     professional_feedback = await records(db, "professional_feedback", student_id, 1)
@@ -242,6 +247,13 @@ async def get_parent_component_analytics(student_id: str):
     mastery_values = [number(value) for kc, value in (latest_state.get("knowledge_state") or {}).items() if kc in practised]
     mastery_values = [value for value in mastery_values if value is not None]
     assisted = [d for d in decisions if (d.get("scaffold_level_used", d.get("scaffold_level", 0)) or 0) > 0]
+    letter_practice_parts = []
+    for group in letter_progress:
+        tiles = group.get("letters") or []
+        practiced_count = sum(1 for tile in tiles if tile.get("attempts", 0) > 0)
+        if practiced_count:
+            letter_practice_parts.append(f"{practiced_count} {group.get('title', 'letters')}")
+    letter_practice_text = " and ".join(letter_practice_parts)
 
     def component(doc, **values):
         return {
@@ -291,6 +303,7 @@ async def get_parent_component_analytics(student_id: str):
             recording_quality=speech_latest.get("recording_quality"),
             measurement_status=speech_latest.get("measurement_status"),
             trend=c2_trend,
+            letter_progress=letter_progress,
         ),
         # Parents receive the plain-language summary only. Pattern names and
         # model probabilities are professional-review material and are not
@@ -307,6 +320,7 @@ async def get_parent_component_analytics(student_id: str):
                     if c1["completed_rounds"] else "",
                     f"The latest clear reading recording matched {round(speech_measured_latest['word_accuracy']*100)}% of the expected words."
                     if speech_measured_latest.get("word_accuracy") is not None else "",
+                    f"Letter practice included {letter_practice_text}." if letter_practice_text else "",
                 ]).strip()
                 or "Complete activities and a speaking task to build a progress summary."
             ),
@@ -1303,7 +1317,7 @@ async def download_parent_report(student_id: str, days: int = Query(30, ge=1, le
          "first_try": row.get("first_attempt_accuracy"), "retry": row.get("retry_rate")}
         for row in perf["activities"] if row.get("trials")
     ]
-    speech_rows, _ = window_or_latest(await records(db, "speech_features", student_id), days)
+    speech_rows, _ = window_or_latest(await records(db, "speech_features", student_id, extra=READING_ONLY), days)
     usable = [speech_view(r)["grapheme_accuracy"] for r in speech_rows
               if r.get("measurement_status") in USABLE_SPEECH_STATUSES]
     usable = sorted(v for v in usable if v is not None)
