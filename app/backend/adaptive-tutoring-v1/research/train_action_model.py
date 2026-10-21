@@ -33,7 +33,7 @@ def main() -> None:
     from sklearn.metrics import accuracy_score, brier_score_loss, log_loss, roc_auc_score
     from sklearn.model_selection import GroupShuffleSplit
     from sklearn.preprocessing import StandardScaler
-
+#Read the CSV and prepare features#
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
@@ -157,6 +157,7 @@ def main() -> None:
         "observed_random_policy_success": round(float(np.mean(y[test_index])), 6),
         "interpretation": "Simulation evidence only; not a child outcome claim.",
     }
+#Train and save the model artifact#
     artifact = {
         "model_type": "per_action_logistic_outcome_model",
         "model_version": "c4-action-outcome-synthetic-v2",

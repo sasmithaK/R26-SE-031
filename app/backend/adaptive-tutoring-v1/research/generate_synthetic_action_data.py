@@ -66,7 +66,7 @@ def generate_rows(seed: int, learners: int, interactions: int):
             profile = min(1.0, max(0.0, rng.gauss(0.25, 0.18)))
             action = rng.choice(ACTIONS)
             propensity = 1.0 / len(ACTIONS)
-
+#the outcome calculation#
             base = 1.4 + 2.2 * mastery - 0.65 * difficulty - 0.55 * fatigue
             base -= 0.30 * struggle + 0.08 * max(0.0, latency - 8.0)
             effects = {
