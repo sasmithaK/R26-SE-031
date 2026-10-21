@@ -18,14 +18,30 @@ router = APIRouter(prefix="/stt", tags=["Speech-to-Text"])
 _analysis_slots = asyncio.Semaphore(max(1, int(os.getenv("C2_MAX_CONCURRENT_ANALYSES", "1"))))
 
 
+LETTER_SKILLS = {"skill_sinhala_vowels", "skill_sinhala_consonants"}
+
+
+def _task_kind(skill_id: str) -> str:
+    """The task family is fixed by the skill, so letter practice can never be
+    counted as oral reading (or the reverse), whatever the client sends."""
+    return "letter_pronunciation" if skill_id in LETTER_SKILLS else "reading"
+
+
 def _validate_curriculum_scope(skill_id: str, activity_id: str, item_id: str) -> None:
-    """Keep C2 evidence attached to the two oral-language curriculum skills."""
-    if skill_id not in {"skill_5", "skill_6"}:
-        raise HTTPException(status_code=422, detail="C2 recordings are supported only for Skills 5 and 6")
+    """Keep C2 evidence attached to a supported speech curriculum skill."""
+    item_prefixes = {
+        "skill_5": "S5",
+        "skill_6": "S6",
+        "skill_sinhala_vowels": "SVOW",
+        "skill_sinhala_consonants": "SCONS",
+    }
+    expected_prefix = item_prefixes.get(skill_id)
+    if expected_prefix is None:
+        raise HTTPException(status_code=422, detail="Unsupported C2 curriculum skill")
     if not activity_id.startswith("act_"):
         raise HTTPException(status_code=422, detail="Invalid C2 activity_id")
-    expected_prefix = f"S{skill_id.removeprefix('skill_')}A{activity_id.removeprefix('act_')}"
-    if not item_id.startswith(expected_prefix):
+    activity_prefix = f"A{activity_id.removeprefix('act_')}"
+    if not item_id.startswith(expected_prefix + activity_prefix):
         raise HTTPException(status_code=422, detail="item_id does not match the submitted skill and activity")
 
 
@@ -112,6 +128,8 @@ async def transcribe_audio(
             "data_origin": data_origin,
             "validation_status": "synthetic_pipeline_test" if data_origin == "synthetic" else "not_clinically_validated",
             "pipeline_version": "c2-transcription-v1",
+            "task_kind": _task_kind(skill_id),
+            "acoustics_measured": False,
             "audio_sha256": hashlib.sha256(audio_bytes).hexdigest(),
             "recognized_text": transcription,
             "recording_quality": quality.get("status"),
@@ -210,6 +228,9 @@ async def analyze_reading(
             "created_at": datetime.now(timezone.utc),
             "persistence_status": "pending",
             "alignment": alignment, "quality": quality,
+            "task_kind": _task_kind(skill_id),
+            # This endpoint does no acoustic analysis (no timing/voice measures).
+            "acoustics_measured": False,
         }
         try:
             await get_db().speech_features.update_one(
@@ -261,6 +282,7 @@ async def analyze_acoustics(
     round_id: str = Form(None),
     dataset_id: str = Form(None),
     data_origin: str = Form("observed"),
+    task_kind: str = Form("reading"),
     expected_text: str = Form(""),
     allowed_variants_json: str = Form("[]"),
     expected_syllables: int = Form(0),
@@ -293,6 +315,9 @@ async def analyze_acoustics(
             raise HTTPException(422, "allowed_variants_json must be a JSON string array")
         if data_origin not in {"observed", "synthetic"}:
             raise HTTPException(422, "data_origin must be observed or synthetic")
+        if task_kind not in {"reading", "letter_pronunciation"}:
+            raise HTTPException(422, "task_kind is not supported")
+        task_kind = _task_kind(skill_id)
         # Match C1's dataset key so modalities align within one child/session.
         resolved_dataset_id = dataset_id or f"live:{student_id}:{session_id}"
 
@@ -369,6 +394,7 @@ async def analyze_acoustics(
             "pipeline_version": result.get("pipeline_version"),
             "feature_version": result.get("pipeline_version"),
             "data_origin": data_origin,
+            "task_kind": task_kind,
             "validation_status": "speech_feature_analysis",
             "measurement_status": fusion.get("measurement_status"),
             "persistence_status": "pending",
@@ -420,7 +446,8 @@ async def analyze_acoustics(
             **acoustic,
             **doc,
             "transcription": recognized_text,
-            "word_error_rate": word_metrics.get("error_rate"),
+            # Same value as stored: None when nothing was recognised.
+            "word_error_rate": doc.get("word_error_rate"),
             "Acoustic_Latency_ms": acoustic.get("Acoustic_Latency_ms"),
             "Peak_Count_Delta": acoustic.get("Peak_Count_Delta"),
             "Local_Jitter": acoustic.get("Local_Jitter"),

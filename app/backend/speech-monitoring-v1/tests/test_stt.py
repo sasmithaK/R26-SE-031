@@ -1,6 +1,24 @@
 import pytest
 import io
 from unittest.mock import patch, Mock
+from fastapi import HTTPException
+from routers.stt import _validate_curriculum_scope
+
+
+@pytest.mark.parametrize("skill_id,item_id", [
+    ("skill_5", "S5A1R01"),
+    ("skill_6", "S6A1R01"),
+    ("skill_sinhala_vowels", "SVOWA1R01"),
+    ("skill_sinhala_consonants", "SCONSA1R18"),
+])
+def test_c2_accepts_supported_reading_and_letter_item_ids(skill_id, item_id):
+    _validate_curriculum_scope(skill_id, "act_1", item_id)
+
+
+def test_c2_rejects_letter_item_mapped_to_wrong_skill():
+    with pytest.raises(HTTPException) as error:
+        _validate_curriculum_scope("skill_sinhala_vowels", "act_1", "SCONSA1R01")
+    assert error.value.status_code == 422
 
 def test_stt_analyze_success(client):
     pipeline_result = {
