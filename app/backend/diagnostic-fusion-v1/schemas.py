@@ -7,6 +7,7 @@ class AcousticFeatures(BaseModel):
     intra_word_silence_ratio: float = Field(..., description="Percentage of silence inside vocalization block")
     local_jitter: float = Field(..., description="Instability in pitch/frequency")
     local_shimmer: float = Field(..., description="Instability in amplitude/loudness")
+    expected_syllables: Optional[int] = Field(None, ge=1, description="Syllables in the expected text (for the per-syllable beat mismatch)")
 
 class KinematicFeatures(BaseModel):
     time_to_first_touch_ms: float = Field(..., description="Time to first interaction (ms)")

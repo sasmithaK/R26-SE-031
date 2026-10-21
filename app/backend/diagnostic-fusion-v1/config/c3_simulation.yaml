@@ -4,7 +4,7 @@
 # are simulated per recording (no audio is synthesised) and aggregated by the
 # live C3 code (services/c3_features.py). Calibrate with real recordings.
 
-version: c3-sim-v1
+version: c3-sim-v2
 random_seed: 77
 recordings_per_learner: [0, 8]     # in the 14-day window
 min_usable_recordings: 2
@@ -28,12 +28,14 @@ voice_onset:
     PHONOLOGICAL_PATTERN: 1.5
     COMBINED_PATTERN: 1.6
 
-# |detected beats - expected syllables| per recording: Poisson mean
-beat_mismatch:
-  TYPICAL: 1.5
-  VISUAL_ORTHOGRAPHIC_PATTERN: 1.8
-  PHONOLOGICAL_PATTERN: 3.0
-  COMBINED_PATTERN: 3.2
+# syllables in a reading item (Skill 5 sentences, Skill 6 textbook lines)
+syllables_per_item: [4, 24]
+# |detected beats - expected syllables| per syllable (Poisson rate x syllables)
+beat_mismatch_per_syllable:
+  TYPICAL: 0.12
+  VISUAL_ORTHOGRAPHIC_PATTERN: 0.15
+  PHONOLOGICAL_PATTERN: 0.28
+  COMBINED_PATTERN: 0.30
 
 # share of silence inside words: learner range, recording noise sd
 silence_ratio:
@@ -48,3 +50,6 @@ silence_noise_sd: 0.04
 jitter: [0.010, 0.040]
 shimmer: [0.040, 0.120]
 voice_noise_sd: 0.15   # relative, per recording
+# share of clear recordings where jitter/shimmer cannot be computed (Praat
+# fails on short child voices); the model learns to handle the gap
+voice_measure_missing: 0.10

@@ -29,7 +29,8 @@ from sklearn.model_selection import train_test_split
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from services.c3_features import FEATURES, FEATURE_VERSION, build_c3_inputs, evidence_gaps  # noqa: E402
+from services.c3_features import (FEATURES, FEATURE_VERSION, build_c3_inputs, evidence_gaps,  # noqa: E402
+                                  required_gaps, usable_reading_rows)
 
 TOUCH_FILE = ROOT / "research" / "c3_touch_simulation.jsonl"
 MODELS = ROOT / "models"
@@ -58,13 +59,16 @@ def simulate_recordings(rng, learner: dict, cfg: dict) -> list:
         if rng.random() > cfg["usable_probability"][pattern]:
             rows.append({"measurement_status": "retry_required"})
             continue
+        syllables = int(rng.integers(cfg["syllables_per_item"][0], cfg["syllables_per_item"][1] + 1))
+        voice_ok = rng.random() > cfg["voice_measure_missing"]
         rows.append({
             "measurement_status": "valid",
             "acoustic_latency_ms": learner_onset * math.exp(rng.normal(0, onset["recording_log_sd"])),
-            "syllabic_event_mismatch": int(rng.poisson(cfg["beat_mismatch"][pattern])),
+            "expected_syllables": syllables,
+            "syllabic_event_mismatch": int(rng.poisson(cfg["beat_mismatch_per_syllable"][pattern] * syllables)),
             "intra_word_silence_ratio": float(np.clip(silence + rng.normal(0, cfg["silence_noise_sd"]), 0, 0.9)),
-            "local_jitter": jitter * math.exp(rng.normal(0, cfg["voice_noise_sd"])),
-            "local_shimmer": shimmer * math.exp(rng.normal(0, cfg["voice_noise_sd"])),
+            "local_jitter": jitter * math.exp(rng.normal(0, cfg["voice_noise_sd"])) if voice_ok else None,
+            "local_shimmer": shimmer * math.exp(rng.normal(0, cfg["voice_noise_sd"])) if voice_ok else None,
         })
     return rows
 
@@ -76,13 +80,13 @@ def build_dataset(cfg):
         for line in handle:
             learner = json.loads(line)
             recordings = simulate_recordings(rng, learner, cfg)
-            usable = [r for r in recordings if r["measurement_status"] == "valid"]
+            usable = usable_reading_rows(recordings)
             age = round(learner["age_months"] / 12, 2)
+            values, _ = build_c3_inputs(usable, learner["motion_rows"], learner["c1_features"], age)
             if evidence_gaps(len(usable), len(learner["motion_rows"]), age,
-                             cfg["min_usable_recordings"], cfg["min_movement_sessions"]):
+                             cfg["min_usable_recordings"], cfg["min_movement_sessions"]) or required_gaps(values):
                 skipped += 1
                 continue
-            values, _ = build_c3_inputs(usable, learner["motion_rows"], learner["c1_features"], age)
             X.append([math.nan if values[f] is None else float(values[f]) for f in FEATURES])
             y.append(CLASS_INDEX[learner["pattern"]])
     return np.asarray(X, dtype=float), np.asarray(y), skipped
@@ -108,6 +112,7 @@ def main():
     X, y, skipped = build_dataset(cfg)
     x_tr, x_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, random_state=cfg["random_seed"], stratify=y)
     params = dict(objective="multi:softprob", num_class=4, n_estimators=300, max_depth=4, learning_rate=0.06,
+                  missing=np.nan,
                   subsample=0.9, colsample_bytree=0.9, min_child_weight=3, random_state=cfg["random_seed"])
     model = xgb.XGBClassifier(**params)
     model.fit(x_tr, y_tr)
@@ -115,7 +120,7 @@ def main():
     pred = probs.argmax(axis=1)
     brier = float(np.mean([brier_score_loss((y_te == k).astype(int), probs[:, k]) for k in range(4)]))
     metrics = {
-        "model": "C3 XGBoost (native missing values)", "model_version": "C3-v2.0",
+        "model": "C3 XGBoost (native missing values)", "model_version": "C3-v2.1",
         "feature_version": FEATURE_VERSION, "features": FEATURES, "class_names": CLASS_NAMES,
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "training_data": "simulated learners: touch side via live C1/movement code, reading side simulated per recording",

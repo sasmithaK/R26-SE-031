@@ -34,7 +34,8 @@ class DB(dict):
 
 def speech(i, **extra):
     return {"student_id": STUDENT, "created_at": NOW - timedelta(days=i), "measurement_status": "valid",
-            "acoustic_latency_ms": 900 + i, "syllabic_event_mismatch": 1, "intra_word_silence_ratio": 0.2,
+            "acoustic_latency_ms": 900 + i, "syllabic_event_mismatch": 1, "expected_syllables": 8,
+            "intra_word_silence_ratio": 0.2,
             "local_jitter": 0.03, "local_shimmer": 0.05, "word_accuracy": 0.8, **extra}
 
 
@@ -91,3 +92,23 @@ def test_out_of_range_inputs_block_the_estimate():
     assert out["model_applied"] is False
     assert out["pipeline_status"] == "outside_training_range"
     assert out["outside_range"][0]["feature"] == "acoustic_latency_ms"
+
+
+def test_recordings_without_acoustic_measures_do_not_count():
+    """/analyze-reading rows carry a status but no timing/voice measures."""
+    bare = [{"student_id": STUDENT, "created_at": NOW - timedelta(days=i), "measurement_status": "valid",
+             "word_accuracy": 0.9} for i in (1, 2, 3)]
+    db = DB(students=Collection([{"_id": ObjectId(STUDENT), "age_months": 80}]),
+            speech_features=Collection(bare), kinematic_features=Collection([motion(1), motion(2)]))
+    out = run(db)
+    assert out["model_applied"] is False
+    assert any(m.startswith("usable_reading_recordings (0") for m in out["missing_inputs"])
+
+
+def test_letter_practice_is_not_reading_evidence():
+    letters = [dict(speech(i), task_kind="letter_pronunciation", skill_id="skill_sinhala_vowels") for i in (1, 2, 3)]
+    db = DB(students=Collection([{"_id": ObjectId(STUDENT), "age_months": 80}]),
+            speech_features=Collection(letters), kinematic_features=Collection([motion(1), motion(2)]))
+    out = run(db)
+    assert out["model_applied"] is False
+    assert any(m.startswith("usable_reading_recordings (0") for m in out["missing_inputs"])

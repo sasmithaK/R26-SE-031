@@ -20,38 +20,45 @@ import math
 from datetime import datetime, timezone
 from typing import Optional
 
-FEATURE_VERSION = "c3-learner-window-v2"
+FEATURE_VERSION = "c3-learner-window-v3"
 
 SPEECH_FEATURE_SOURCES = {
     "acoustic_latency_ms": ("acoustic_latency_ms",),
-    "peak_count_delta": ("syllabic_event_mismatch", "peak_count_delta"),
     "intra_word_silence_ratio": ("intra_word_silence_ratio",),
     "local_jitter": ("local_jitter",),
     "local_shimmer": ("local_shimmer",),
 }
+# Derived per recording: |detected beats - expected syllables| / expected
+# syllables. A raw count grows with sentence length; the ratio does not.
+BEAT_FEATURE = "beat_mismatch_per_syllable"
 MOTION_FEATURE_SOURCES = {
     "time_to_first_touch_ms": ("time_to_first_touch_ms",),
-    "orthographic_confusion_index": ("orthographic_confusion_index",),
     "path_efficiency_ratio": ("path_efficiency_ratio",),
     "dimensionless_jerk": ("dimensionless_jerk",),
     "dwell_time_ms": ("dwell_time_ms", "mean_dwell_time_ms"),
 }
+# The look-alike letter index is not a model input: the confusion map covers
+# 3 letters, so it is almost never measurable (it stays on the dashboard).
 C1_FEATURE_SOURCES = {
     "c1_first_try_accuracy": "accuracy",
     "c1_visual_task_index": "visual_processing_index",
     "c1_sound_task_index": "phonological_task_index",
     "c1_long_pauses_per_round": "hesitation_rate",
 }
-FEATURES = [*SPEECH_FEATURE_SOURCES, *MOTION_FEATURE_SOURCES, *C1_FEATURE_SOURCES, "age_years"]
+FEATURES = ["acoustic_latency_ms", BEAT_FEATURE, "intra_word_silence_ratio", "local_jitter", "local_shimmer",
+            *MOTION_FEATURE_SOURCES, *C1_FEATURE_SOURCES, "age_years"]
+# Measured in every training learner, so they must be measured live too
+# (otherwise the model's behaviour is undefined): missing -> evidence gap.
+REQUIRED_FEATURES = ["acoustic_latency_ms", BEAT_FEATURE, "intra_word_silence_ratio",
+                     "time_to_first_touch_ms", "dwell_time_ms", "age_years"]
 
 FEATURE_LABELS = {
     "acoustic_latency_ms": "Time to start reading aloud",
-    "peak_count_delta": "Spoken beats vs expected syllables",
+    "beat_mismatch_per_syllable": "Spoken beats vs expected syllables (per syllable)",
     "intra_word_silence_ratio": "Silence within spoken words",
     "local_jitter": "Voice steadiness (exploratory)",
     "local_shimmer": "Loudness steadiness (exploratory)",
     "time_to_first_touch_ms": "Time to first touch",
-    "orthographic_confusion_index": "Look-alike letter choices",
     "path_efficiency_ratio": "Directness of drags",
     "dimensionless_jerk": "Drag smoothness (jerk)",
     "dwell_time_ms": "Finger contact time",
@@ -62,7 +69,27 @@ FEATURE_LABELS = {
     "age_years": "Age",
 }
 
-USABLE_SPEECH_STATUSES = {"valid", "available"}
+USABLE_SPEECH_STATUSES = {"valid", "available", "synthetic_features"}
+
+
+def usable_reading_rows(rows: list) -> list:
+    """Oral-reading recordings that were clear AND acoustically measured.
+
+    A status alone is not enough: /analyze-reading stores a status but no
+    timing or voice measures.
+    """
+    return [row for row in rows
+            if row.get("task_kind") != "letter_pronunciation"
+            and row.get("measurement_status") in USABLE_SPEECH_STATUSES
+            and _number(row.get("acoustic_latency_ms")) is not None]
+
+
+def beat_mismatch_ratio(row: dict):
+    mismatch = _number(row.get("syllabic_event_mismatch", row.get("peak_count_delta")))
+    syllables = _number(row.get("expected_syllables"))
+    if mismatch is None or not syllables:
+        return None
+    return abs(mismatch) / syllables
 
 
 def _number(value) -> Optional[float]:
@@ -107,6 +134,8 @@ def build_c3_inputs(usable_speech: list, motion_rows: list, c1_features: Optiona
     values, counts = {}, {}
     for name, sources in SPEECH_FEATURE_SOURCES.items():
         values[name], counts[name] = median_feature(usable_speech, sources)
+    ratios = [{"r": beat_mismatch_ratio(row)} for row in usable_speech]
+    values[BEAT_FEATURE], counts[BEAT_FEATURE] = median_feature(ratios, ("r",))
     for name, sources in MOTION_FEATURE_SOURCES.items():
         values[name], counts[name] = median_feature(motion_rows, sources)
     for name, source in C1_FEATURE_SOURCES.items():
@@ -126,6 +155,12 @@ def evidence_gaps(n_usable_recordings: int, n_movement_sessions: int, age: Optio
     if age is None:
         gaps.append("age")
     return gaps
+
+
+def required_gaps(values: dict) -> list[str]:
+    """Inputs the model always saw in training but that are missing here."""
+    return [f"not_measured: {FEATURE_LABELS.get(name, name)}" for name in REQUIRED_FEATURES
+            if name != "age_years" and values.get(name) is None]
 
 
 def outside_training_range(values: dict, ranges: dict, margin: float = 0.10) -> list[dict]:

@@ -1,15 +1,14 @@
 {
   "model": "C3 XGBoost (native missing values)",
-  "model_version": "C3-v2.0",
-  "feature_version": "c3-learner-window-v2",
+  "model_version": "C3-v2.1",
+  "feature_version": "c3-learner-window-v3",
   "features": [
     "acoustic_latency_ms",
-    "peak_count_delta",
+    "beat_mismatch_per_syllable",
     "intra_word_silence_ratio",
     "local_jitter",
     "local_shimmer",
     "time_to_first_touch_ms",
-    "orthographic_confusion_index",
     "path_efficiency_ratio",
     "dimensionless_jerk",
     "dwell_time_ms",
@@ -25,79 +24,79 @@
     "Visual-Orthographic",
     "Combined"
   ],
-  "trained_at": "2026-10-20T19:20:34.812204+00:00",
+  "trained_at": "2026-10-21T00:04:48.181855+00:00",
   "training_data": "simulated learners: touch side via live C1/movement code, reading side simulated per recording",
-  "simulator": "c3-sim-v1",
-  "learners_eligible": 3798,
-  "learners_below_evidence_rule": 2202,
-  "learners_without_c1_evidence": 1080,
-  "test_learners": 760,
-  "accuracy": 0.8382,
-  "macro_f1": 0.8373,
-  "mean_brier_score": 0.0607,
+  "simulator": "c3-sim-v2",
+  "learners_eligible": 3852,
+  "learners_below_evidence_rule": 2148,
+  "learners_without_c1_evidence": 1111,
+  "test_learners": 771,
+  "accuracy": 0.8327,
+  "macro_f1": 0.8319,
+  "mean_brier_score": 0.0588,
   "reliability": [
     {
       "confidence": "0.2-0.4",
-      "learners": 3,
-      "mean_confidence": 0.381,
-      "observed_accuracy": 0.0
+      "learners": 8,
+      "mean_confidence": 0.354,
+      "observed_accuracy": 0.375
     },
     {
       "confidence": "0.4-0.6",
-      "learners": 97,
-      "mean_confidence": 0.516,
-      "observed_accuracy": 0.577
+      "learners": 98,
+      "mean_confidence": 0.533,
+      "observed_accuracy": 0.51
     },
     {
       "confidence": "0.6-0.8",
-      "learners": 150,
-      "mean_confidence": 0.706,
-      "observed_accuracy": 0.727
+      "learners": 131,
+      "mean_confidence": 0.7,
+      "observed_accuracy": 0.71
     },
     {
       "confidence": "0.8-1.0",
-      "learners": 510,
-      "mean_confidence": 0.943,
-      "observed_accuracy": 0.925
+      "learners": 534,
+      "mean_confidence": 0.947,
+      "observed_accuracy": 0.929
     }
   ],
   "classification_report": {
     "Typical": {
-      "precision": 0.8651162790697674,
-      "recall": 0.8773584905660378,
-      "f1-score": 0.8711943793911007,
+      "precision": 0.8551401869158879,
+      "recall": 0.8632075471698113,
+      "f1-score": 0.8591549295774648,
       "support": 212.0
     },
     "Phonological": {
-      "precision": 0.8571428571428571,
-      "recall": 0.819672131147541,
-      "f1-score": 0.8379888268156425,
-      "support": 183.0
-    },
-    "Visual-Orthographic": {
-      "precision": 0.7927461139896373,
-      "recall": 0.8052631578947368,
-      "f1-score": 0.7989556135770235,
+      "precision": 0.8342541436464088,
+      "recall": 0.7947368421052632,
+      "f1-score": 0.8140161725067385,
       "support": 190.0
     },
-    "Combined": {
-      "precision": 0.8361581920903954,
-      "recall": 0.8457142857142858,
-      "f1-score": 0.8409090909090909,
-      "support": 175.0
+    "Visual-Orthographic": {
+      "precision": 0.8195876288659794,
+      "recall": 0.8153846153846154,
+      "f1-score": 0.8174807197943444,
+      "support": 195.0
     },
-    "accuracy": 0.8381578947368421,
+    "Combined": {
+      "precision": 0.8186813186813187,
+      "recall": 0.8563218390804598,
+      "f1-score": 0.8370786516853933,
+      "support": 174.0
+    },
+    "accuracy": 0.8326848249027238,
     "macro avg": {
-      "precision": 0.8377908605731643,
-      "recall": 0.8370020163306503,
-      "f1-score": 0.8372619776732144,
-      "support": 760.0
+      "precision": 0.8319158195273986,
+      "recall": 0.8324127109350374,
+      "f1-score": 0.8319326183909852,
+      "support": 771.0
     },
     "weighted avg": {
-      "precision": 0.8384358411760313,
-      "recall": 0.8381578947368421,
-      "f1-score": 0.8381655542459228,
-      "support": 760.0
+      "precision": 0.8327732088176412,
+      "recall": 0.8326848249027238,
+      "f1-score": 0.832508876264408,
+      "support": 771.0
     }
   },
   "limitations": [
