@@ -63,15 +63,18 @@ class _LetterPronunciationGameState extends State<LetterPronunciationGame> {
 
   Future<void> _playReference() async {
     TelemetryWrapper.of(context)?.logAudioReplay();
-    final played = await TtsService().speak(
+    final played = await TtsService().speakOnDevice(
       _letter,
-      folder: 'sinhala-letter-reference',
       waitUntilComplete: true,
       playbackRate: 0.85,
     );
     if (!played && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('හඬ ලබාගත නොහැක. නැවත උත්සාහ කරන්න.')),
+        const SnackBar(
+          content: Text(
+            'සිංහල හඬ ලබාගත නොහැක. දුරකථනයේ Text-to-speech සැකසුම්වලින් Sinhala හඬ බාගත කර නැවත උත්සාහ කරන්න.',
+          ),
+        ),
       );
     }
   }
@@ -112,10 +115,9 @@ class _LetterPronunciationGameState extends State<LetterPronunciationGame> {
       }
       if (_secondsLeft <= 1) {
         timer.cancel();
-        unawaited(_finishRecording(
-          recordStartedAt,
-          noVoiceTimeout: !_soundDetected,
-        ));
+        unawaited(
+          _finishRecording(recordStartedAt, noVoiceTimeout: !_soundDetected),
+        );
       } else {
         setState(() => _secondsLeft--);
       }
@@ -220,7 +222,8 @@ class _LetterPronunciationGameState extends State<LetterPronunciationGame> {
       'saved' => 'හඬ සටහන් කළා. හොඳ උත්සාහයක්! ',
       'retry' => 'හඬ පැහැදිලිව මැනිය නොහැකි වුණා. නැවත උත්සාහ කරමු.',
       'no_voice' => 'ඔබේ හඬ ඇසුණේ නැහැ. මයික් එකට ළං වී නැවත උත්සාහ කරමු.',
-      'service_retry' => 'විශ්ලේෂණ සේවාව සූදානම් වෙමින්. මොහොතකින් නැවත උත්සාහ කරමු.',
+      'service_retry' =>
+        'විශ්ලේෂණ සේවාව සූදානම් වෙමින්. මොහොතකින් නැවත උත්සාහ කරමු.',
       'save_failed' => 'මෙම උත්සාහය සුරැකුණේ නැහැ. කරුණාකර නැවත උත්සාහ කරන්න.',
       'recording_failed' =>
         'පටිගත කළ නොහැක. මයික් අවසරය පරීක්ෂා කර නැවත උත්සාහ කරන්න.',

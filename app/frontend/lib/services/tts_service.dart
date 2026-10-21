@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path_provider/path_provider.dart';
 import '../config/api_config.dart';
 
@@ -11,12 +12,91 @@ class TtsService {
   factory TtsService() => _instance;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final FlutterTts _deviceTts = FlutterTts();
+  bool _deviceTtsConfigured = false;
+
+  static const Set<String> _deviceSinhalaSkills = {
+    'skill_sinhala_vowels',
+    'skill_sinhala_consonants',
+    'skill_6', // Textbook reading, currently the seventh curriculum skill.
+  };
 
   String get _baseUrl {
     return ApiConfig.speechBaseUrl;
   }
 
   TtsService._internal();
+
+  /// These activities use the phone's Sinhala voice so reference audio does
+  /// not depend on a live cloud TTS request during the demo.
+  Future<bool> speakForSkill(
+    String text, {
+    required String skillId,
+    String folder = 'general',
+    bool waitUntilComplete = false,
+    double playbackRate = 1.0,
+  }) {
+    if (_deviceSinhalaSkills.contains(skillId)) {
+      return speakOnDevice(
+        text,
+        waitUntilComplete: waitUntilComplete,
+        playbackRate: playbackRate,
+      );
+    }
+    return speak(
+      text,
+      folder: folder,
+      waitUntilComplete: waitUntilComplete,
+      playbackRate: playbackRate,
+    );
+  }
+
+  /// Speak using an installed Sinhala voice on the device. Returns false when
+  /// the selected Android TTS engine has no Sinhala locale installed.
+  Future<bool> speakOnDevice(
+    String text, {
+    bool waitUntilComplete = false,
+    double playbackRate = 1.0,
+  }) async {
+    if (text.trim().isEmpty) return false;
+    try {
+      await stop();
+      if (!_deviceTtsConfigured) {
+        final dynamic languageResult = await _deviceTts.getLanguages;
+        final languages = languageResult is List ? languageResult : const [];
+        String? sinhalaLocale;
+        for (final language in languages) {
+          final locale = language.toString();
+          if (locale.toLowerCase().replaceAll('_', '-').startsWith('si')) {
+            sinhalaLocale = locale;
+            if (locale.toLowerCase().replaceAll('_', '-') == 'si-lk') break;
+          }
+        }
+        if (sinhalaLocale == null) {
+          print('Device TTS: no installed Sinhala voice/locale was found.');
+          return false;
+        }
+        final languageSet = await _deviceTts.setLanguage(sinhalaLocale);
+        if (languageSet != 1 && languageSet != true) {
+          print('Device TTS: Sinhala locale $sinhalaLocale is unavailable.');
+          return false;
+        }
+        await _deviceTts.setVolume(1.0);
+        await _deviceTts.setPitch(1.0);
+        _deviceTtsConfigured = true;
+      }
+
+      await _deviceTts.setSpeechRate(
+        (0.42 * playbackRate).clamp(0.25, 0.6).toDouble(),
+      );
+      await _deviceTts.awaitSpeakCompletion(waitUntilComplete);
+      final result = await _deviceTts.speak(text);
+      return result == 1 || result == true;
+    } catch (e) {
+      print('Device Sinhala TTS error: $e');
+      return false;
+    }
+  }
 
   Future<bool> speak(
     String text, {
@@ -113,5 +193,12 @@ class TtsService {
 
   Future<void> stop() async {
     await _audioPlayer.stop();
+    if (_deviceTtsConfigured) {
+      try {
+        await _deviceTts.stop();
+      } catch (_) {
+        // The native TTS engine may have been disposed by the platform.
+      }
+    }
   }
 }

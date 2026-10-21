@@ -54,11 +54,11 @@ class _SkillIntroScreenState extends State<SkillIntroScreen> {
         });
       } catch (e) {
         debugPrint('Remote audio play error, falling back to TTS: $e');
-        await TtsService().speak(text);
+        await TtsService().speakForSkill(text, skillId: widget.skillMap.id);
         if (mounted) setState(() => _isPlayingAudio = false);
       }
     } else {
-      await TtsService().speak(text);
+      await TtsService().speakForSkill(text, skillId: widget.skillMap.id);
       if (mounted) setState(() => _isPlayingAudio = false);
     }
   }
