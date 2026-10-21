@@ -96,6 +96,15 @@ def _positive(values):
     return [v for v in values if isinstance(v, (int, float)) and v > 0]
 
 
+MODEL_SKILLS = {"1", "2", "3", "4"}  # the touch-activity skills the model is trained on
+
+
+def in_model_scope(event: dict) -> bool:
+    """Skill 1-4 rounds only (Skill 5 reading MCQs and letter practice are excluded)."""
+    digits = "".join(ch for ch in str(event.get("skill_id") or "") if ch.isdigit())
+    return digits in MODEL_SKILLS
+
+
 def build_learner_features(sessions: list[tuple[dict, list[dict]]]) -> dict:
     """Features + evidence summary for one learner.
 
@@ -104,7 +113,9 @@ def build_learner_features(sessions: list[tuple[dict, list[dict]]]) -> dict:
     """
     per_session = []
     for meta, events in sessions:
-        events = _dedupe(events)
+        events = [e for e in _dedupe(events) if in_model_scope(e)]
+        if not events:
+            continue
         done = fatigue.completed_rounds(events)
         per_session.append((meta, events, done))
 
@@ -130,8 +141,8 @@ def build_learner_features(sessions: list[tuple[dict, list[dict]]]) -> dict:
     picture = [e for e in done if e.get("knowledge_component_id") in PICTURE_KCS]
 
     def mean_first_touch(rows):
-        # Time to first answer (first touch for older data).
-        return _mean([feats.response_latency(e) for e in rows])
+        # First touch, as in the training simulator (not time to first answer).
+        return _mean(_positive([e.get("first_touch_latency_ms") for e in rows]))
 
     hesitation_rate = feats.calculate_rate(done, "hesitation_count") if done else None
     misclick_rate = feats.calculate_rate(done, "misclick_count") if done else None

@@ -70,7 +70,9 @@ def response_latency(event: dict) -> Optional[float]:
 
 
 def calculate_mean_first_touch_latency(events: List[dict]) -> Optional[float]:
-    lats = [v for v in (response_latency(e) for e in events) if v is not None]
+    # First touch (the indices are defined on it; 0 = no touch recorded).
+    lats = [e.get("first_touch_latency_ms") for e in events
+            if isinstance(e.get("first_touch_latency_ms"), (int, float)) and e.get("first_touch_latency_ms") > 0]
     return statistics.mean(lats) if lats else None
 
 def calculate_rate(events: List[dict], field: str) -> Optional[float]:

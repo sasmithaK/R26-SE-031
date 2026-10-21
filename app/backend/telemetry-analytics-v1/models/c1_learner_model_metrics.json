@@ -30,7 +30,7 @@
     "COMBINED_PATTERN"
   ],
   "simulator_version": "c1-sim-v1",
-  "trained_at": "2026-10-20T19:17:22.340316+00:00",
+  "trained_at": "2026-10-21T00:04:58.173439+00:00",
   "training_data": "simulated rounds -> live feature code (synthetic only)",
   "evidence_rule": {
     "window_days": 14,

@@ -15,7 +15,7 @@ def rounds(sid, kc, n, first=2500, total=6000, correct=True, abandon_last=False)
                        "misclick_count": 0 if correct else 1, "hesitation_count": 0, "audio_replay_count": 0,
                        "first_touch_latency_ms": first, "total_round_latency_ms": total})
     if abandon_last:
-        events.append({"event_id": f"{sid}:R{n}:abandoned", "is_abandoned": True, "is_correct": False,
+        events.append({"event_id": f"{sid}:R{n}:abandoned", "skill_id": "skill_1", "is_abandoned": True, "is_correct": False,
                        "knowledge_component_id": kc, "first_touch_latency_ms": 0, "total_round_latency_ms": 30000})
     return ({"session_id": sid}, events)
 
@@ -63,3 +63,14 @@ def test_simulated_learner_runs_through_live_features():
     assert built["evidence"]["completed_rounds"] >= 0
     assert set(built["features"]) >= {"accuracy", "phonological_task_index", "fatigue_score"}
     assert isinstance(evidence_gaps(built["evidence"]), list)
+
+
+def test_only_skill_1_to_4_rounds_feed_the_model():
+    _, picture = rounds("s1", "KC_VISUAL_IDENTIFICATION", 3)
+    letters = [dict(e, skill_id="skill_sinhala_vowels", event_id=e["event_id"] + "L") for e in picture]
+    reading = [dict(e, skill_id="skill_5", knowledge_component_id="KC_READING_COMPREHENSION",
+                    event_id=e["event_id"] + "R") for e in picture]
+    built = build_learner_features([({}, picture), ({}, letters), ({}, reading)])
+    assert built["evidence"]["completed_rounds"] == 3
+    assert built["evidence"]["sessions"] == 1
+    assert built["features"]["phonological_task_index"] is None

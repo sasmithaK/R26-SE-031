@@ -277,6 +277,18 @@ async def submit_telemetry(
                 upsert=existing is None,
             )
 
+    # Only touch-activity skills (with a numeric skill id: Skills 1-5) are C1
+    # evidence. Letter-pronunciation practice is C2 (reading aloud); its raw
+    # session is kept above but it gets no C1 summary, state or estimate.
+    def _is_c1_event(event):
+        skill = str(event.get("skill_id") or "").strip()
+        return skill in {"", "unknown"} or any(ch.isdigit() for ch in skill)
+
+    if events_list and not any(_is_c1_event(event) for event in events_list):
+        return {"message": "Telemetry session logged (not a C1 activity).",
+                "cognitive_load": None,
+                "c1_processing": {"status": "skipped_not_c1_activity"}}
+
     validated_req = TelemetrySessionSubmit.model_validate(session_doc)
     summary = extract_session_features(validated_req).model_dump()
     summary.update({

@@ -52,6 +52,37 @@ def _path_length(stroke) -> float:
     return total
 
 
+RESAMPLE_MS = 20  # fixed 50 Hz grid for path and jerk
+
+
+def _resample(stroke: List[Dict[str, Any]], step_ms: int = RESAMPLE_MS) -> List[Dict[str, Any]]:
+    """Linear resampling of a stroke onto a fixed time grid.
+
+    Phones report touch moves at 60-120 Hz. Path length and jerk computed on
+    raw samples change with that rate (more samples = more measured wobble),
+    so drags are compared on the same 50 Hz grid whatever the device.
+    """
+    pts = sorted(((float(p.get("t", 0)), float(p.get("x", 0)), float(p.get("y", 0))) for p in stroke),
+                 key=lambda v: v[0])
+    t0, t1 = pts[0][0], pts[-1][0]
+    if t1 - t0 < 3 * step_ms:
+        return stroke
+    grid, out, j = [], [], 0
+    t = t0
+    while t < t1:
+        grid.append(t)
+        t += step_ms
+    grid.append(t1)
+    for i, tg in enumerate(grid):
+        while j < len(pts) - 2 and pts[j + 1][0] < tg:
+            j += 1
+        (ta, xa, ya), (tb, xb, yb) = pts[j], pts[min(j + 1, len(pts) - 1)]
+        u = 0.0 if tb == ta else min(1.0, max(0.0, (tg - ta) / (tb - ta)))
+        kind = "DOWN" if i == 0 else "UP" if i == len(grid) - 1 else "MOVE"
+        out.append({"t": tg, "x": xa + (xb - xa) * u, "y": ya + (yb - ya) * u, "type": kind})
+    return out
+
+
 def _first_wrong_selection(event: Dict[str, Any]):
     for attempt in event.get("attempt_history") or []:
         if isinstance(attempt, dict) and attempt.get("is_correct") is False:
@@ -140,7 +171,7 @@ def extract_comp2_features(events: List[Dict[str, Any]]) -> Dict[str, Any]:
                 dwell_time_list.append(duration)
             if len(stroke) >= 3 and _path_length(stroke) >= DRAG_MIN_PATH:
                 drag_strokes += 1
-                _, _, _, _, path_eff, dj = _process_stream(stroke, screen_w, screen_h)
+                _, _, _, _, path_eff, dj = _process_stream(_resample(stroke), screen_w, screen_h)
                 if path_eff > 0:
                     path_eff_list.append(path_eff)
                 if dj > 0:

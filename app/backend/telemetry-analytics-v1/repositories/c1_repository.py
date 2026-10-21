@@ -81,10 +81,10 @@ async def get_c1_trend(student_id: str, limit: int = 10) -> list[dict]:
         trend.append({
             "session_id": state.get("session_id", ""),
             "session_index": i + 1,
-            "accuracy": state.get("behavior", {}).get("accuracy", 0.0),
-            "median_latency_ms": state.get("behavior", {}).get("median_latency_ms", 0.0),
-            "fatigue_score": state.get("fatigue", {}).get("score", 0.0),
-            "hesitation_rate": state.get("behavior", {}).get("hesitation_rate", 0.0),
+            "accuracy": (state.get("behavior") or {}).get("accuracy"),
+            "median_latency_ms": (state.get("behavior") or {}).get("median_latency_ms"),
+            "fatigue_score": (state.get("fatigue") or {}).get("score"),
+            "hesitation_rate": (state.get("behavior") or {}).get("hesitation_rate"),
             "timestamp": state.get("_id").generation_time if state.get("_id") else datetime.utcnow()
         })
     return trend
@@ -100,10 +100,10 @@ async def get_c1_sessions(student_id: str, limit: int = 10) -> list[dict]:
         sessions.append({
             "session_id": state.get("session_id", ""),
             "session_index": len(states) - i, # reverse index for display
-            "accuracy": state.get("behavior", {}).get("accuracy", 0.0),
-            "median_latency_ms": state.get("behavior", {}).get("median_latency_ms", 0.0),
-            "hesitation_rate": state.get("behavior", {}).get("hesitation_rate", 0.0),
-            "fatigue_score": state.get("fatigue", {}).get("score", 0.0),
+            "accuracy": (state.get("behavior") or {}).get("accuracy"),
+            "median_latency_ms": (state.get("behavior") or {}).get("median_latency_ms"),
+            "hesitation_rate": (state.get("behavior") or {}).get("hesitation_rate"),
+            "fatigue_score": (state.get("fatigue") or {}).get("score"),
             "timestamp": state.get("_id").generation_time if state.get("_id") else datetime.utcnow()
         })
     return sessions
@@ -140,9 +140,11 @@ async def get_parent_summary(student_id: str) -> dict | None:
     obs = []
     if len(states) >= 2:
         prev = states[1].get("behavior", {})
-        if behavior.get("accuracy", 0) > prev.get("accuracy", 0):
+        acc_now, acc_prev = behavior.get("accuracy"), prev.get("accuracy")
+        lat_now, lat_prev = behavior.get("median_latency_ms"), prev.get("median_latency_ms")
+        if isinstance(acc_now, (int, float)) and isinstance(acc_prev, (int, float)) and acc_now > acc_prev:
             obs.append("The learner's accuracy improved since the last session.")
-        if behavior.get("median_latency_ms", 0) > prev.get("median_latency_ms", 0) + 1000:
+        if isinstance(lat_now, (int, float)) and isinstance(lat_prev, (int, float)) and lat_now > lat_prev + 1000:
             obs.append("Response time increased, which might indicate harder activities or lower focus.")
             
     if not obs:
@@ -163,7 +165,8 @@ async def get_parent_summary(student_id: str) -> dict | None:
         "student_id": student_id,
         # Missing completion data is missing data, not 68% progress.
         "overall_progress": overall_progress,
-        "accuracy": int(behavior.get("accuracy", 0.0) * 100),
+        "accuracy": (int(behavior["accuracy"] * 100)
+                     if isinstance(behavior.get("accuracy"), (int, float)) else None),
         "response_speed": response_speed,
         "attention": attention,
         "fatigue": fatigue_state,

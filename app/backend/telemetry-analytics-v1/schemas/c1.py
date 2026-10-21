@@ -80,7 +80,7 @@ from datetime import datetime
 class ParentC1Summary(BaseModel):
     student_id: str
     overall_progress: Optional[int] = None
-    accuracy: int
+    accuracy: Optional[int] = None
     response_speed: str
     attention: str
     fatigue: str
@@ -92,21 +92,23 @@ class TherapistC1State(C1Result):
     updated_at: Optional[datetime] = None
 
 class C1TrendPoint(BaseModel):
+    # None = not measured in that session (e.g. fewer than 4 rounds for
+    # fatigue, or every round abandoned), never a fake 0.
     session_id: str
     session_index: int
-    accuracy: float
-    median_latency_ms: float
-    fatigue_score: float
-    hesitation_rate: float
+    accuracy: Optional[float] = None
+    median_latency_ms: Optional[float] = None
+    fatigue_score: Optional[float] = None
+    hesitation_rate: Optional[float] = None
     timestamp: datetime
 
 class C1SessionSummary(BaseModel):
     session_id: str
     session_index: int
-    accuracy: float
-    median_latency_ms: float
-    hesitation_rate: float
-    fatigue_score: float
+    accuracy: Optional[float] = None
+    median_latency_ms: Optional[float] = None
+    hesitation_rate: Optional[float] = None
+    fatigue_score: Optional[float] = None
     timestamp: datetime
 
 class SessionSummary(BaseModel):

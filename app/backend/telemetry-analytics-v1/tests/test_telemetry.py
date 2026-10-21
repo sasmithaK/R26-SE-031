@@ -411,3 +411,20 @@ async def test_submission_stores_learner_level_c1_estimate(client, mock_db, mock
     assert stored["predicted_pattern"] is None
     state = await mock_db.behavioral_features.find_one({"student_id": student_id})
     assert state["model"]["model_used"] == "learner_level_only"
+
+
+@pytest.mark.asyncio
+async def test_letter_practice_session_is_not_c1(client, mock_db, mock_user):
+    """Letter-pronunciation sessions are stored raw but get no C1 summary or estimate."""
+    import copy
+    student_id = MOCK_TELEMETRY_PAYLOAD["student_id"]
+    await mock_db.students.insert_one({"_id": ObjectId(student_id), "parent_id": mock_user["_id"]})
+    payload = copy.deepcopy(MOCK_TELEMETRY_PAYLOAD)
+    payload["session_id"] = "letters-1"
+    for event in payload["events"]:
+        event["skill_id"] = "skill_sinhala_vowels"
+    response = client.post("/api/v1/auth/telemetry", json=payload)
+    assert response.status_code == 201
+    assert response.json()["c1_processing"]["status"] == "skipped_not_c1_activity"
+    assert await mock_db.session_summaries.find_one({"session_id": "letters-1"}) is None
+    assert await mock_db.telemetry_sessions.find_one({"session_id": "letters-1"}) is not None

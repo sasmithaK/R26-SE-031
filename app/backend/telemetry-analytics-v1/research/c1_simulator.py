@@ -129,7 +129,9 @@ def _movement_traits(rng, pattern: str, cfg: dict) -> dict:
     m = cfg["movement"]
     draw = lambda name: float(rng.uniform(*m[name][pattern]))
     return {"curvature": draw("path_curvature"), "tremor": draw("tremor"),
-            "drag_ms": draw("drag_duration_ms"), "stray": draw("stray_drops_per_drag")}
+            "drag_ms": draw("drag_duration_ms"), "stray": draw("stray_drops_per_drag"),
+            # phones report touch moves at different rates
+            "hz": int(rng.choice([60, 90, 120]))}
 
 
 def _stroke(rng, t0, start, end, duration, curvature, tremor, hz=60):
@@ -167,7 +169,8 @@ def add_touch_streams(rng, pattern: str, learner: dict, sessions: list, cfg: dic
                     start = (float(rng.uniform(0.15, 0.85)), float(rng.uniform(0.65, 0.9)))
                     end = (float(rng.uniform(0.1, 0.9)), float(rng.uniform(0.15, 0.45)))
                     duration = traits["drag_ms"] * learner["speed"] * math.exp(rng.normal(0, 0.25))
-                    path += _stroke(rng, t, start, end, duration, traits["curvature"], traits["tremor"])
+                    path += _stroke(rng, t, start, end, duration, traits["curvature"], traits["tremor"],
+                                    hz=traits["hz"])
                     t += duration + float(rng.uniform(300, 1500)) * learner["speed"]
                 event["stray_drop_count"] = strays
                 event["response_modality"] = "drag"
