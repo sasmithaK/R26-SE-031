@@ -893,7 +893,12 @@ class TherapistReadingTab extends StatelessWidget {
             children: [
               MetricTile(
                 label: 'Reading score',
-                value: DashFormat.percent(latest['reading_performance_score']),
+                value: DashFormat.percent(
+                  (latest['reading_performance_score'] is num &&
+                          (latest['reading_performance_score'] as num) > 1.0)
+                      ? (latest['reading_performance_score'] as num) / 100.0
+                      : latest['reading_performance_score'],
+                ),
                 detail: '70% letters, 20% words, 10% syllable beats',
                 icon: Icons.menu_book_rounded,
                 tone: DashTone.good,
