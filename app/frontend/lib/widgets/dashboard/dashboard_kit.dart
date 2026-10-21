@@ -40,7 +40,9 @@ class DashFormat {
 
   static String percent(dynamic value, {String fallback = missing}) {
     final v = number(value);
-    return v == null ? fallback : '${(v * 100).round()}%';
+    if (v == null) return fallback;
+    final normalized = v > 1.0 ? v / 100.0 : v;
+    return '${(normalized * 100).round()}%';
   }
 
   static String millis(dynamic value, {String fallback = missing}) {
