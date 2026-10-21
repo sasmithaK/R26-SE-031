@@ -100,15 +100,21 @@ class SlidingRoleToggle extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeIn,
-            style: AppTypography.body(
-              fontSize: 16,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-              color: isSelected ? Colors.white : AppColors.textSecondary,
+          Flexible(
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeIn,
+              style: AppTypography.body(
+                fontSize: 16,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            child: Text(label),
           ),
         ],
       ),

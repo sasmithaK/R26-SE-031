@@ -418,8 +418,9 @@ class _SignInScreenState extends State<SignInScreen>
 
                         // Sign up link
                         Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Text(
                                 LocalizationService.instance.t(
@@ -430,6 +431,7 @@ class _SignInScreenState extends State<SignInScreen>
                                   color: AppColors.textSecondary,
                                 ),
                               ),
+                              const SizedBox(width: 4),
                               GestureDetector(
                                 onTap: () {
                                   Navigator.of(context).pushReplacement(
@@ -487,20 +489,27 @@ class _SignInScreenState extends State<SignInScreen>
             ),
           ],
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            iconWidget,
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: AppTypography.body(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              iconWidget,
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.body(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
