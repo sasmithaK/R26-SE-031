@@ -1,0 +1,42 @@
+[
+  {
+    "id": "skill_sinhala_consonants",
+    "title": "සිංහල අකුරු කියවමු - ව්‍යංජන අකුරු (ගත අකුරු)",
+    "intro_text": "අකුරේ හඬට සවන් දී, ඔබත් කියවා බලන්න!",
+    "description": "අකුර අසා කියවා පුහුණු වෙමු.",
+    "activities": [
+      {
+        "id": "act_1",
+        "title": "ව්‍යංජන අකුරු අසා කියවමු",
+        "description": "සවන් දෙන්න, පසුව අකුර කියවා පටිගත කරන්න.",
+        "template_type": "letter_pronunciation",
+        "telemetry_tags": ["letter_sound", "oral_practice", "repeated_attempts"],
+        "research_metadata": {
+          "knowledge_component_id": "KC_SINHALA_CONSONANT_PRONUNCIATION",
+          "response_modality": "speech",
+          "research_role": "primary"
+        },
+        "rounds": [
+          {"letter": "ක", "prompt": "ක", "expected_text": "ක", "allowed_spoken_variants": ["ක"], "item_id": "SCONSA1R01", "expected_syllables": 1},
+          {"letter": "ග", "prompt": "ග", "expected_text": "ග", "allowed_spoken_variants": ["ග"], "item_id": "SCONSA1R02", "expected_syllables": 1},
+          {"letter": "ච", "prompt": "ච", "expected_text": "ච", "allowed_spoken_variants": ["ච"], "item_id": "SCONSA1R03", "expected_syllables": 1},
+          {"letter": "ජ", "prompt": "ජ", "expected_text": "ජ", "allowed_spoken_variants": ["ජ"], "item_id": "SCONSA1R04", "expected_syllables": 1},
+          {"letter": "ට", "prompt": "ට", "expected_text": "ට", "allowed_spoken_variants": ["ට"], "item_id": "SCONSA1R05", "expected_syllables": 1},
+          {"letter": "ඩ", "prompt": "ඩ", "expected_text": "ඩ", "allowed_spoken_variants": ["ඩ"], "item_id": "SCONSA1R06", "expected_syllables": 1},
+          {"letter": "ත", "prompt": "ත", "expected_text": "ත", "allowed_spoken_variants": ["ත"], "item_id": "SCONSA1R07", "expected_syllables": 1},
+          {"letter": "ද", "prompt": "ද", "expected_text": "ද", "allowed_spoken_variants": ["ද"], "item_id": "SCONSA1R08", "expected_syllables": 1},
+          {"letter": "න", "prompt": "න", "expected_text": "න", "allowed_spoken_variants": ["න"], "item_id": "SCONSA1R09", "expected_syllables": 1},
+          {"letter": "ප", "prompt": "ප", "expected_text": "ප", "allowed_spoken_variants": ["ප"], "item_id": "SCONSA1R10", "expected_syllables": 1},
+          {"letter": "බ", "prompt": "බ", "expected_text": "බ", "allowed_spoken_variants": ["බ"], "item_id": "SCONSA1R11", "expected_syllables": 1},
+          {"letter": "ම", "prompt": "ම", "expected_text": "ම", "allowed_spoken_variants": ["ම"], "item_id": "SCONSA1R12", "expected_syllables": 1},
+          {"letter": "ය", "prompt": "ය", "expected_text": "ය", "allowed_spoken_variants": ["ය"], "item_id": "SCONSA1R13", "expected_syllables": 1},
+          {"letter": "ර", "prompt": "ර", "expected_text": "ර", "allowed_spoken_variants": ["ර"], "item_id": "SCONSA1R14", "expected_syllables": 1},
+          {"letter": "ල", "prompt": "ල", "expected_text": "ල", "allowed_spoken_variants": ["ල"], "item_id": "SCONSA1R15", "expected_syllables": 1},
+          {"letter": "ව", "prompt": "ව", "expected_text": "ව", "allowed_spoken_variants": ["ව"], "item_id": "SCONSA1R16", "expected_syllables": 1},
+          {"letter": "ස", "prompt": "ස", "expected_text": "ස", "allowed_spoken_variants": ["ස"], "item_id": "SCONSA1R17", "expected_syllables": 1},
+          {"letter": "හ", "prompt": "හ", "expected_text": "හ", "allowed_spoken_variants": ["හ"], "item_id": "SCONSA1R18", "expected_syllables": 1}
+        ]
+      }
+    ]
+  }
+]
