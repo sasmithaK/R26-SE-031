@@ -13,6 +13,21 @@ def _median_or_none(values: List[float]) -> Optional[float]:
 def _safe_divide(numerator: float, denominator: float) -> float:
     return numerator / denominator if denominator > 0 else 0.0
 
+
+def _rate(numerator: float, denominator: float) -> Optional[float]:
+    """A share over completed rounds; ``None`` (not 0) when nothing was completed.
+
+    A session in which every round was abandoned has no accuracy. Storing 0
+    made dashboards average a fake 0% into the learner's accuracy and a fake
+    0 into attempts per round.
+    """
+    return numerator / denominator if denominator > 0 else None
+
+def _response_ms(e: TelemetryEvent) -> int:
+    """Time to first answer; first touch for older app versions."""
+    return e.time_to_first_response_ms or e.first_touch_latency_ms
+
+
 def _is_first_attempt_correct(e: TelemetryEvent) -> bool:
     if e.first_attempt_correct is not None:
         return e.first_attempt_correct
@@ -42,6 +57,19 @@ _ERROR_CATEGORIES = {
     "spelling_sequence_error": "sequence_error",
     "sentence_order_error": "sequence_error",
     "visual_pattern_error": "sequence_error",
+    "sequence_memory_error": "sequence_error",
+    # Letter tasks (Skill 2): look-alike letter choices
+    "orthographic_discrimination_error": "visual_confusion",
+    # Sound-letter, word and sentence tasks (Skills 2-5)
+    "phoneme_grapheme_confusion": "phonological_confusion",
+    "image_word_mapping_error": "phonological_confusion",
+    "word_formation_error": "phonological_confusion",
+    "auditory_word_error": "phonological_confusion",
+    "word_completion_error": "phonological_confusion",
+    "sentence_comprehension_error": "phonological_confusion",
+    "sentence_completion_error": "phonological_confusion",
+    "auditory_sentence_error": "phonological_confusion",
+    "reading_comprehension_error": "phonological_confusion",
     "unknown_error": "unknown_error",
 }
 
@@ -105,21 +133,25 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
     correct_trials = len(correct_events)
     incorrect_trials = len(incorrect_events)
     
-    accuracy = _safe_divide(correct_trials, valid_trials)
-    error_rate = _safe_divide(incorrect_trials, valid_trials)
+    accuracy = _rate(correct_trials, valid_trials)
+    error_rate = _rate(incorrect_trials, valid_trials)
     abandonment_rate = _safe_divide(len(abandoned_events), total_trials)
     
     events_with_correction = [e for e in valid_events if e.correction_count > 0]
-    correction_rate = _safe_divide(len(events_with_correction), valid_trials)
+    correction_rate = _rate(len(events_with_correction), valid_trials)
     
-    median_response_latency = _median_or_none([e.first_touch_latency_ms for e in valid_events if e.first_touch_latency_ms > 0])
+    median_response_latency = _median_or_none([_response_ms(e) for e in valid_events if _response_ms(e)])
+    drag_rounds = [e for e in valid_events if e.response_modality == "drag"]
+    stray_drops_per_drag_round = (
+        sum(e.stray_drop_count for e in drag_rounds) / len(drag_rounds) if drag_rounds else None
+    )
     median_time_to_correct_ms = _median_or_none([e.time_to_correct_ms for e in valid_events if e.time_to_correct_ms > 0])
     
-    mean_attempts_per_round = _safe_divide(sum(e.attempt_count for e in valid_events), valid_trials)
-    mean_incorrect_attempts_per_round = _safe_divide(sum(e.incorrect_attempt_count for e in valid_events), valid_trials)
+    mean_attempts_per_round = _rate(sum(e.attempt_count for e in valid_events), valid_trials)
+    mean_incorrect_attempts_per_round = _rate(sum(e.incorrect_attempt_count for e in valid_events), valid_trials)
     retry_events = [e for e in valid_events if e.attempt_count > 1]
-    retry_rate = _safe_divide(len(retry_events), valid_trials)
-    eventual_completion_rate = _safe_divide(len([e for e in valid_events if e.final_correct]), valid_trials)
+    retry_rate = _rate(len(retry_events), valid_trials)
+    eventual_completion_rate = _rate(len([e for e in valid_events if e.final_correct]), valid_trials)
     
     # Error breakdowns (shares of first-attempt errors, by reported type)
     error_counts = {key: 0 for key in ERROR_CATEGORY_KEYS}
@@ -138,9 +170,9 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
     audio_replay_trial_rate = _safe_divide(trials_with_replays, audio_prompt_trials) if audio_prompt_trials > 0 else None
     
     # Deprecated fallback
-    audio_replay_rate = _safe_divide(total_audio_replays, audio_prompt_trials)
+    audio_replay_rate = _rate(total_audio_replays, audio_prompt_trials)
     
-    mean_hesitation_count = _safe_divide(sum(e.hesitation_count for e in valid_events), valid_trials)
+    mean_hesitation_count = _rate(sum(e.hesitation_count for e in valid_events), valid_trials)
     
     # Aggregations
     activity_breakdown = _aggregate_by_activity(valid_events)
@@ -164,7 +196,8 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
         "mean_incorrect_attempts_per_round": mean_incorrect_attempts_per_round,
         "retry_rate": retry_rate,
         "median_time_to_correct_ms": median_time_to_correct_ms,
-        "eventual_completion_rate": eventual_completion_rate
+        "eventual_completion_rate": eventual_completion_rate,
+        "stray_drops_per_drag_round": stray_drops_per_drag_round,
     }
     
     error_profile = {
@@ -183,6 +216,8 @@ def extract_session_features(session: TelemetrySessionSubmit) -> SessionSummary:
         started_at=started_at,
         completed_at=completed_at,
         total_trials=total_trials,
+        valid_trials=valid_trials,
+        abandoned_trials=len(abandoned_events),
         overall=overall,
         error_profile=error_profile,
         behavioral_fatigue_proxy=fatigue_proxy,
@@ -281,46 +316,7 @@ def _aggregate_by_kc(events: List[TelemetryEvent]) -> dict:
         }
     return result
 
-FATIGUE_MIN_TRIALS = 6
-FATIGUE_WINDOW = 3
-
-
 def _calculate_fatigue(events: List[TelemetryEvent]) -> tuple[Optional[float], dict]:
-    """Within-session fatigue proxy shared with C1 (``services/c1/fatigue.py``).
-
-    Compares the first and last three completed rounds. Only slowing down,
-    more errors and more hesitation count towards fatigue (negative drifts are
-    clipped to zero), so the score is always 0-1 and maps to the same
-    LOW / MODERATE / HIGH / VERY_HIGH bands used by C1.
-    """
-    from services.c1.fatigue import calculate_fatigue_score, get_fatigue_state
-
-    n = len(events)
-    if n < FATIGUE_MIN_TRIALS:
-        return None, {"reason": f"needs at least {FATIGUE_MIN_TRIALS} completed rounds", "trials": n}
-
-    early = events[:FATIGUE_WINDOW]
-    late = events[-FATIGUE_WINDOW:]
-
-    early_lat = statistics.mean(e.total_round_latency_ms for e in early)
-    late_lat = statistics.mean(e.total_round_latency_ms for e in late)
-    latency_drift = ((late_lat / early_lat) - 1.0) if early_lat > 0 else 0.0
-
-    early_err = statistics.mean(0.0 if _is_first_attempt_correct(e) else 1.0 for e in early)
-    late_err = statistics.mean(0.0 if _is_first_attempt_correct(e) else 1.0 for e in late)
-    error_drift = late_err - early_err
-
-    early_hes = statistics.mean(e.hesitation_count for e in early)
-    late_hes = statistics.mean(e.hesitation_count for e in late)
-    hesitation_drift = late_hes - early_hes
-
-    score = calculate_fatigue_score(latency_drift, error_drift, hesitation_drift)
-    components = {
-        "latency_drift": latency_drift,
-        "error_drift": error_drift,
-        "hesitation_drift": hesitation_drift,
-        "state": get_fatigue_state(score),
-        "window_rounds": FATIGUE_WINDOW,
-        "trials": n,
-    }
-    return round(score, 4), components
+    """Within-session fatigue proxy; one shared definition (``services/c1/fatigue.py``)."""
+    from services.c1.fatigue import fatigue_from_events
+    return fatigue_from_events(events)

@@ -64,7 +64,7 @@ def test_missing_reading_evidence_skips_model_without_defaults():
     assert stored["learner_profile"]["class_probabilities"] == {}
 
 
-def test_unknown_age_blocks_and_unknown_gender_is_marginalised():
+def test_unknown_age_blocks_and_gender_is_not_an_input():
     base = dict(speech_features=Collection([speech(1), speech(2)]),
                 kinematic_features=Collection([motion(1), motion(3)]))
     no_age = DB(students=Collection([{"_id": ObjectId(STUDENT)}]), **copy.deepcopy(base))
@@ -73,8 +73,21 @@ def test_unknown_age_blocks_and_unknown_gender_is_marginalised():
     db = DB(students=Collection([{"_id": ObjectId(STUDENT), "age_months": 80}]), **base)
     out = run(db)
     assert out["model_applied"] is True
-    profile = db.learner_profiles.writes[-1]["learner_profile"]
-    assert profile["marginalized_covariates"] == ["gender"]
+    stored = db.learner_profiles.writes[-1]
+    profile = stored["learner_profile"]
     assert abs(sum(profile["class_probabilities"].values()) - 1.0) < 0.01
-    names = [f["feature_name"] for f in db.learner_profiles.writes[-1]["shap_explanations"]["top_contributing_features"]]
-    assert "gender" not in names
+    assert "gender" not in stored["model_inputs"]
+    # No C1 learner estimate yet: those inputs are missing, not filled in.
+    assert "c1_first_try_accuracy" in stored["not_measured_inputs"]
+    names = [f["feature_name"] for f in stored["shap_explanations"]["top_contributing_features"]]
+    assert "c1_first_try_accuracy" not in names
+
+
+def test_out_of_range_inputs_block_the_estimate():
+    far = [dict(speech(i), acoustic_latency_ms=60000) for i in (1, 2)]
+    db = DB(students=Collection([{"_id": ObjectId(STUDENT), "age_months": 80}]),
+            speech_features=Collection(far), kinematic_features=Collection([motion(1), motion(2)]))
+    out = run(db)
+    assert out["model_applied"] is False
+    assert out["pipeline_status"] == "outside_training_range"
+    assert out["outside_range"][0]["feature"] == "acoustic_latency_ms"

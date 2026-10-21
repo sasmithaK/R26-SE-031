@@ -68,8 +68,14 @@ class DashboardImprovementTests(unittest.TestCase):
         }]
         self.db.kinematic_features.rows = [{"_id": "k1", "student_id": STUDENT, "timestamp": NOW.isoformat(),
                                             "path_efficiency_ratio": 0.8, "orthographic_confusion_coverage": 0}]
+        # The pattern estimate is learner-level (c1_learner_estimates), never per session.
+        self.db.c1_learner_estimates.rows = [{
+            "student_id": STUDENT, "status": "estimated", "predicted_pattern": "TYPICAL",
+            "probabilities": {"TYPICAL": 0.7}, "confidence": 0.7, "model_version": "3.0.0",
+            "features": {"accuracy": 0.8}, "session_ids": ["s1"]}]
         dto = self.call(therapist.get_therapist_c1_behavioral, STUDENT, 30)
         self.assertTrue(dto.c1_state["pattern_estimate"]["available"])
+        self.assertEqual(dto.c1_state["pattern_estimate"]["model_version"], "3.0.0")
         self.assertEqual(dto.c1_state["indices"]["visual_processing_index"], 61.0)
         self.assertEqual(dto.kinematics["path_efficiency_ratio"], 0.8)
         self.assertIsNone(dto.kinematics["orthographic_confusion_index"])
@@ -117,3 +123,14 @@ class DashboardImprovementTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LearnerEstimateViewTests(unittest.TestCase):
+    def test_reasons_and_labels(self):
+        view = therapist._learner_estimate_view({
+            "status": "outside_training_range",
+            "outside_range": [{"feature": "completion_rate", "value": 0.5, "training_range": [0.76, 1.0]}]})
+        self.assertFalse(view["available"])
+        self.assertEqual(view["outside_range"][0]["label"], "Rounds finished")
+        self.assertIn("outside", view["unavailable_reason"])
+        self.assertEqual(therapist._learner_estimate_view(None)["status"], "not_computed")

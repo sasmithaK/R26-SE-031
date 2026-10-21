@@ -88,6 +88,19 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
   bool _abandonmentLogged = false;
   String? _activeItemId;
 
+  /// Round time (ms) at the moment the child gave the final correct answer.
+  /// Games call [markResponseComplete] there, so celebration animations that
+  /// run before the round is submitted are not counted as response time.
+  int? _responseCompleteMs;
+
+  /// Round time (ms) of the child's first answer (first choice, tap on a
+  /// picture or drop on a target). Unlike first touch, taps on the speaker,
+  /// back button or tray are not answers.
+  int? _firstResponseMs;
+
+  /// Drags released outside every target (a motor miss, not a wrong answer).
+  int _strayDropCount = 0;
+
   @visibleForTesting
   int get currentRound => _currentRound;
 
@@ -139,9 +152,38 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     super.dispose();
   }
 
+  /// Freeze the round's response time at the child's final correct answer.
+  /// Touches after this point (during feedback/celebration) are not recorded.
+  void markResponseComplete() {
+    _responseCompleteMs ??= _roundStopwatch.elapsedMilliseconds;
+  }
+
+  /// Mark the child's first answer in this round (the first call wins).
+  /// [logAttempt] calls this too, so single-choice games need no extra call.
+  void markAnswer() {
+    _firstResponseMs ??= _responseCompleteMs ?? _roundStopwatch.elapsedMilliseconds;
+  }
+
+  /// A drag released outside every target. Counted separately from wrong
+  /// answers so movement precision is not confused with knowledge.
+  void recordStrayDrop() {
+    if (_responseCompleteMs != null || _isSubmittingRound) return;
+    _strayDropCount++;
+  }
+
   void _logAbandonment() {
     if (widget.activityNode.isParentPractice) return;
     if (_activityCompleted || _abandonmentLogged) return;
+    // Every round of this run was already completed (e.g. the child closes
+    // the completion screen while the backend was offline): there is no
+    // unfinished round, so nothing was abandoned.
+    if (widget.activityNode.rounds.isNotEmpty &&
+        (_roundsCompletedTotal >= widget.activityNode.rounds.length ||
+            _currentRound > widget.activityNode.rounds.length)) {
+      return;
+    }
+    // The answer was already given; the child left during the feedback.
+    if (_responseCompleteMs != null) return;
     // Seal the unfinished round exactly once. PopScope calls this while the
     // route is still alive so the level map can submit the event immediately
     // after Navigator.push completes. dispose() remains a defensive fallback.
@@ -188,10 +230,10 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
       incorrectAttemptCount: _incorrectAttemptCount,
       firstAttemptCorrect: _firstAttemptCorrect,
       finalCorrect: false,
-      timeToFirstResponseMs: _firstTouchLatencyMs < 0
-          ? 0
-          : _firstTouchLatencyMs,
+      timeToFirstResponseMs:
+          _firstResponseMs ?? (_firstTouchLatencyMs < 0 ? 0 : _firstTouchLatencyMs),
       timeToCorrectMs: 0,
+      strayDropCount: _strayDropCount,
       skillId: widget.activityNode.skillId,
       activityId: widget.activityNode.id,
       itemId: canonical.itemId,
@@ -248,6 +290,8 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
 
   /// Resets round and hesitation timers. Used after mandatory wait/memorization phases.
   void resetRoundTimers({bool clearPreResponseEvidence = false}) {
+    _responseCompleteMs = null;
+    _firstResponseMs = null;
     _roundStopwatch.reset();
     _roundStopwatch.start();
     _hesitationStopwatch.reset();
@@ -263,7 +307,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
 
   /// Called by the transparent Listener widget on every pointer event.
   void _recordTouch(PointerEvent details, Size screenSize) {
-    if (_isSubmittingRound) return;
+    if (_isSubmittingRound || _responseCompleteMs != null) return;
 
     // Check for hesitation since last touch
     if (_hesitationStopwatch.elapsedMilliseconds > _hesitationThresholdMs) {
@@ -614,6 +658,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     List<String> selectedAnswers = const [],
     String? errorType,
   }) {
+    markAnswer();
     _attemptCount++;
     if (_firstAttemptCorrect == null) {
       _firstAttemptCorrect = isCorrect;
@@ -685,7 +730,8 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     _isSubmittingRound = true;
 
     _roundStopwatch.stop();
-    final totalRoundLatency = _roundStopwatch.elapsedMilliseconds;
+    final totalRoundLatency =
+        _responseCompleteMs ?? _roundStopwatch.elapsedMilliseconds;
 
     final finalIsCorrect = isCorrect ?? baseScore > 0;
     if (!attemptAlreadyLogged) {
@@ -695,9 +741,12 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
         errorType: errorType,
       );
     }
+    // Sent to Component 4 unchanged (first touch); the session record below
+    // carries the first ANSWER time instead.
     int timeToFirstResponseMs = _firstTouchLatencyMs >= 0
         ? _firstTouchLatencyMs
         : 0;
+    final firstAnswerMs = _firstResponseMs ?? timeToFirstResponseMs;
     int timeToCorrectMs = finalIsCorrect ? totalRoundLatency : 0;
 
     // Nuanced Scoring: Apply penalties for cognitive effort struggles
@@ -766,8 +815,9 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
       incorrectAttemptCount: _incorrectAttemptCount,
       firstAttemptCorrect: _firstAttemptCorrect,
       finalCorrect: finalIsCorrect,
-      timeToFirstResponseMs: timeToFirstResponseMs,
+      timeToFirstResponseMs: firstAnswerMs,
       timeToCorrectMs: timeToCorrectMs,
+      strayDropCount: _strayDropCount,
       skillId: widget.activityNode.skillId,
       activityId: widget.activityNode.id,
       itemId: canonical.itemId,
@@ -833,7 +883,7 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
         "difficulty_label": event.difficultyLabel,
         "error_type": event.errorType,
         "final_correct": event.finalCorrect,
-        "time_to_first_response_ms": event.timeToFirstResponseMs,
+        "time_to_first_response_ms": timeToFirstResponseMs,
         "time_to_correct_ms": event.timeToCorrectMs,
         "score": event.score,
         "is_abandoned": event.isAbandoned,
@@ -942,6 +992,9 @@ class TelemetryWrapperState extends State<TelemetryWrapper> {
     _correctionCount = 0;
     _hintCount = 0;
     _scaffoldApplications.clear();
+    _responseCompleteMs = null;
+    _firstResponseMs = null;
+    _strayDropCount = 0;
     _roundStopwatch.reset();
     _roundStopwatch.start();
     _hesitationStopwatch.reset();

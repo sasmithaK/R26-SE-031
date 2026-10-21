@@ -258,8 +258,13 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
       _tappedBottomLetter = letter;
     });
 
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
     if (letter == _selectedTopLetter) {
       // Match Correct!
+      if (_matchedLetters.length + 1 == _pairController.visibleOptions.length) {
+        // Last pair: response time ends now, not after the 0.4 s feedback.
+        context.findAncestorStateOfType<TelemetryWrapperState>()?.markResponseComplete();
+      }
       setState(() {
         _isBottomLetterCorrect = true;
       });

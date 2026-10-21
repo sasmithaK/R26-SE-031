@@ -10,10 +10,23 @@ attention:
   hesitation_scale: 2.0
 
 fatigue:
+  # Fewest completed rounds needed to compare early vs late rounds.
+  # Activities have 4-5 rounds, so 4 rounds use a 2-vs-2 window and
+  # 6+ rounds use 3-vs-3.
+  min_rounds: 4
+  full_window_min_rounds: 6
   low_max: 0.30
   moderate_max: 0.60
   high_max: 0.80
 
 interaction_state:
+  # Fewest completed rounds before an effort/load state is shown.
+  min_rounds: 3
   engaged_max: 0.40
   moderate_max: 0.70
+
+c1_learner_window:
+  # Learner-level C1 estimate: pool completed rounds from Skills 1-4.
+  window_days: 14
+  min_completed_rounds: 20
+  min_sessions: 2

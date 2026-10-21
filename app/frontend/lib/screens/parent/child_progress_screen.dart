@@ -326,7 +326,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         'empty': 'Complete an activity to start collecting touch and activity observations.',
         'metrics': <Map<String, dynamic>>[
           {
-            'label': 'Correct on first try (latest session)',
+            'label': 'Correct on first try (last 30 days)',
             'key': 'first_attempt_accuracy',
             'scale': 100.0,
             'suffix': '%',
@@ -338,7 +338,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
             'suffix': '%',
           },
           {
-            'label': 'Typical time to answer',
+            'label': 'Typical time to first touch',
             'key': 'median_response_latency_ms',
             'scale': 0.001,
             'suffix': ' s',
@@ -356,7 +356,7 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
           {'label': 'Recordings', 'key': 'recording_count'},
           {'label': 'Clear enough to measure', 'key': 'usable_recording_count'},
           {
-            'label': 'Letters read as expected (latest)',
+            'label': 'Letters read as expected (latest clear recording)',
             'key': 'grapheme_accuracy',
             'scale': 100.0,
             'suffix': '%',
@@ -412,12 +412,13 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
     final accuracy = data['accuracy'];
     final items = <(String, String)>[
       ('Practice sessions', '${data['sessions_completed'] ?? 0}'),
+      ('Completed rounds', '${data['completed_rounds'] ?? 0}'),
       (
         'Practice time',
         metricText(data['practice_time_minutes'], suffix: ' min', decimals: 0),
       ),
       (
-        'Correct on first try (latest session)',
+        'Correct on first try',
         accuracy is num ? '${accuracy.round()}%' : '—',
       ),
     ];
@@ -431,6 +432,11 @@ class _ChildProgressScreenState extends State<ChildProgressScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Overall progress', style: DashText.heading(fontSize: 17)),
+          Text(
+            'Last ${data['window_days'] ?? 30} days'
+            '${(data['sessions_ended_early'] ?? 0) is num && (data['sessions_ended_early'] ?? 0) > 0 ? ' · ${data['sessions_ended_early']} session(s) ended before a round was finished' : ''}',
+            style: DashText.caption(fontSize: 13),
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 10,

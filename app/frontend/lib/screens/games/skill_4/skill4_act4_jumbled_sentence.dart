@@ -158,6 +158,7 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence>
 
   void _onPoolWordTapped(int poolIndex) async {
     if (_isChecking || _poolWords[poolIndex] == null) return;
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
 
     // Find first empty slot
     int emptySlotIndex = _filledSlots.indexWhere((s) => s == null);

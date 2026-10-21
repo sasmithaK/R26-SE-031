@@ -1,0 +1,1868 @@
+{
+  "dataset_id": "sipsara-synthetic-benchmark-v1",
+  "created_at_utc": "2026-10-20T18:50:50.820939+00:00",
+  "seed": 20261021,
+  "generator": "synthetic_research_benchmark.py",
+  "generator_version": "1.0.0",
+  "data_origin": "fully_synthetic_no_real_child_records",
+  "output_is_research_only": true,
+  "c1": {
+    "metadata": {
+      "skipped_for_evidence_train_generation": 104,
+      "eligible_train_rows": 216,
+      "nominal_training_rows": 162,
+      "nominal_test_rows": 54,
+      "challenge_rows": 111,
+      "subject_overlap_train_test": 0,
+      "feature_schema": "c1-learner-v2",
+      "features": [
+        "accuracy",
+        "mean_latency_ms",
+        "median_latency_ms",
+        "latency_std_ms",
+        "mean_first_touch_latency_ms",
+        "hesitation_rate",
+        "misclick_rate",
+        "replay_rate",
+        "completion_rate",
+        "latency_drift",
+        "error_drift",
+        "hesitation_drift",
+        "accuracy_slope",
+        "visual_processing_index",
+        "phonological_task_index",
+        "motor_interaction_index",
+        "attention_stability_index",
+        "fatigue_score",
+        "cognitive_load_score"
+      ],
+      "label_order": [
+        "TYPICAL",
+        "VISUAL_ORTHOGRAPHIC_PATTERN",
+        "PHONOLOGICAL_PATTERN",
+        "COMBINED_PATTERN"
+      ],
+      "evidence_rule": {
+        "window_days": 14,
+        "min_completed_rounds": 20,
+        "min_sessions": 2
+      }
+    },
+    "nominal": {
+      "majority_baseline": {
+        "confusion_matrix": [
+          [
+            14,
+            0,
+            0,
+            0
+          ],
+          [
+            13,
+            0,
+            0,
+            0
+          ],
+          [
+            14,
+            0,
+            0,
+            0
+          ],
+          [
+            13,
+            0,
+            0,
+            0
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.25925925925925924,
+            "recall": 1.0,
+            "f1-score": 0.4117647058823529,
+            "support": 14.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 13.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 14.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 13.0
+          },
+          "accuracy": 0.25925925925925924,
+          "macro avg": {
+            "precision": 0.06481481481481481,
+            "recall": 0.25,
+            "f1-score": 0.10294117647058823,
+            "support": 54.0
+          },
+          "weighted avg": {
+            "precision": 0.0672153635116598,
+            "recall": 0.25925925925925924,
+            "f1-score": 0.10675381263616558,
+            "support": 54.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.27927927927927926,
+          "balanced_accuracy": 0.25,
+          "macro_f1": 0.10915492957746478
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            31,
+            0,
+            0,
+            0
+          ],
+          [
+            27,
+            0,
+            0,
+            0
+          ],
+          [
+            30,
+            0,
+            0,
+            0
+          ],
+          [
+            23,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_regression": {
+        "confusion_matrix": [
+          [
+            10,
+            2,
+            2,
+            0
+          ],
+          [
+            0,
+            8,
+            4,
+            1
+          ],
+          [
+            1,
+            3,
+            8,
+            2
+          ],
+          [
+            0,
+            2,
+            2,
+            9
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.9090909090909091,
+            "recall": 0.7142857142857143,
+            "f1-score": 0.8,
+            "support": 14.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.5333333333333333,
+            "recall": 0.6153846153846154,
+            "f1-score": 0.5714285714285714,
+            "support": 13.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.5,
+            "recall": 0.5714285714285714,
+            "f1-score": 0.5333333333333333,
+            "support": 14.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.75,
+            "recall": 0.6923076923076923,
+            "f1-score": 0.72,
+            "support": 13.0
+          },
+          "accuracy": 0.6481481481481481,
+          "macro avg": {
+            "precision": 0.6731060606060606,
+            "recall": 0.6483516483516484,
+            "f1-score": 0.6561904761904762,
+            "support": 54.0
+          },
+          "weighted avg": {
+            "precision": 0.6742704826038158,
+            "recall": 0.6481481481481481,
+            "f1-score": 0.6565784832451499,
+            "support": 54.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.6126126126126126,
+          "balanced_accuracy": 0.6008077502467404,
+          "macro_f1": 0.6058421693454079
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            25,
+            2,
+            4,
+            0
+          ],
+          [
+            4,
+            14,
+            7,
+            2
+          ],
+          [
+            3,
+            6,
+            18,
+            3
+          ],
+          [
+            0,
+            4,
+            8,
+            11
+          ]
+        ]
+      },
+      "random_forest": {
+        "confusion_matrix": [
+          [
+            11,
+            1,
+            2,
+            0
+          ],
+          [
+            0,
+            9,
+            3,
+            1
+          ],
+          [
+            3,
+            2,
+            7,
+            2
+          ],
+          [
+            0,
+            1,
+            2,
+            10
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.7857142857142857,
+            "recall": 0.7857142857142857,
+            "f1-score": 0.7857142857142857,
+            "support": 14.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.6923076923076923,
+            "recall": 0.6923076923076923,
+            "f1-score": 0.6923076923076923,
+            "support": 13.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.5,
+            "recall": 0.5,
+            "f1-score": 0.5,
+            "support": 14.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.7692307692307693,
+            "recall": 0.7692307692307693,
+            "f1-score": 0.7692307692307693,
+            "support": 13.0
+          },
+          "accuracy": 0.6851851851851852,
+          "macro avg": {
+            "precision": 0.6868131868131868,
+            "recall": 0.6868131868131868,
+            "f1-score": 0.6868131868131868,
+            "support": 54.0
+          },
+          "weighted avg": {
+            "precision": 0.6851851851851852,
+            "recall": 0.6851851851851852,
+            "f1-score": 0.6851851851851852,
+            "support": 54.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.5495495495495496,
+          "balanced_accuracy": 0.5398433847592333,
+          "macro_f1": 0.5387261777081099
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            27,
+            0,
+            4,
+            0
+          ],
+          [
+            7,
+            9,
+            10,
+            1
+          ],
+          [
+            4,
+            9,
+            13,
+            4
+          ],
+          [
+            0,
+            6,
+            5,
+            12
+          ]
+        ]
+      },
+      "extra_trees": {
+        "confusion_matrix": [
+          [
+            11,
+            2,
+            1,
+            0
+          ],
+          [
+            0,
+            9,
+            3,
+            1
+          ],
+          [
+            3,
+            2,
+            7,
+            2
+          ],
+          [
+            0,
+            1,
+            2,
+            10
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.7857142857142857,
+            "recall": 0.7857142857142857,
+            "f1-score": 0.7857142857142857,
+            "support": 14.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.6428571428571429,
+            "recall": 0.6923076923076923,
+            "f1-score": 0.6666666666666666,
+            "support": 13.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.5384615384615384,
+            "recall": 0.5,
+            "f1-score": 0.5185185185185185,
+            "support": 14.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.7692307692307693,
+            "recall": 0.7692307692307693,
+            "f1-score": 0.7692307692307693,
+            "support": 13.0
+          },
+          "accuracy": 0.6851851851851852,
+          "macro avg": {
+            "precision": 0.6840659340659341,
+            "recall": 0.6868131868131868,
+            "f1-score": 0.68503256003256,
+            "support": 54.0
+          },
+          "weighted avg": {
+            "precision": 0.6832519332519332,
+            "recall": 0.6851851851851852,
+            "f1-score": 0.6838134430727023,
+            "support": 54.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.5675675675675675,
+          "balanced_accuracy": 0.5585086489013558,
+          "macro_f1": 0.5495990695128626
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            29,
+            0,
+            2,
+            0
+          ],
+          [
+            7,
+            9,
+            10,
+            1
+          ],
+          [
+            5,
+            8,
+            12,
+            5
+          ],
+          [
+            0,
+            6,
+            4,
+            13
+          ]
+        ]
+      },
+      "hist_gradient_boosting": {
+        "confusion_matrix": [
+          [
+            12,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            6,
+            5,
+            2
+          ],
+          [
+            2,
+            1,
+            9,
+            2
+          ],
+          [
+            0,
+            2,
+            2,
+            9
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.8571428571428571,
+            "recall": 0.8571428571428571,
+            "f1-score": 0.8571428571428571,
+            "support": 14.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.6,
+            "recall": 0.46153846153846156,
+            "f1-score": 0.5217391304347826,
+            "support": 13.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.5294117647058824,
+            "recall": 0.6428571428571429,
+            "f1-score": 0.5806451612903226,
+            "support": 14.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.6923076923076923,
+            "recall": 0.6923076923076923,
+            "f1-score": 0.6923076923076923,
+            "support": 13.0
+          },
+          "accuracy": 0.6666666666666666,
+          "macro avg": {
+            "precision": 0.669715578539108,
+            "recall": 0.6634615384615385,
+            "f1-score": 0.6629587102939136,
+            "support": 54.0
+          },
+          "weighted avg": {
+            "precision": 0.6705882352941176,
+            "recall": 0.6666666666666666,
+            "f1-score": 0.6650303880317905,
+            "support": 54.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.5585585585585585,
+          "balanced_accuracy": 0.5469819749623397,
+          "macro_f1": 0.5421059966275068
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            28,
+            0,
+            2,
+            1
+          ],
+          [
+            4,
+            8,
+            13,
+            2
+          ],
+          [
+            5,
+            7,
+            14,
+            4
+          ],
+          [
+            0,
+            3,
+            8,
+            12
+          ]
+        ]
+      },
+      "current_runtime_c1_learner_model": {
+        "confusion_matrix": [
+          [
+            11,
+            2,
+            1,
+            0
+          ],
+          [
+            0,
+            8,
+            3,
+            2
+          ],
+          [
+            1,
+            4,
+            9,
+            0
+          ],
+          [
+            0,
+            3,
+            0,
+            10
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.9166666666666666,
+            "recall": 0.7857142857142857,
+            "f1-score": 0.8461538461538461,
+            "support": 14.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.47058823529411764,
+            "recall": 0.6153846153846154,
+            "f1-score": 0.5333333333333333,
+            "support": 13.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.6923076923076923,
+            "recall": 0.6428571428571429,
+            "f1-score": 0.6666666666666666,
+            "support": 14.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.8333333333333334,
+            "recall": 0.7692307692307693,
+            "f1-score": 0.8,
+            "support": 13.0
+          },
+          "accuracy": 0.7037037037037037,
+          "macro avg": {
+            "precision": 0.7282239819004525,
+            "recall": 0.7032967032967032,
+            "f1-score": 0.7115384615384615,
+            "support": 54.0
+          },
+          "weighted avg": {
+            "precision": 0.7310485447740349,
+            "recall": 0.7037037037037037,
+            "f1-score": 0.7132003798670465,
+            "support": 54.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.6036036036036037,
+          "balanced_accuracy": 0.5914536907173653,
+          "macro_f1": 0.5835244465679249
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            27,
+            0,
+            4,
+            0
+          ],
+          [
+            8,
+            8,
+            6,
+            5
+          ],
+          [
+            3,
+            7,
+            19,
+            1
+          ],
+          [
+            0,
+            4,
+            6,
+            13
+          ]
+        ]
+      }
+    },
+    "scenario_shift_metrics": [
+      {
+        "model": "logistic_regression",
+        "accuracy": 0.6126126126126126,
+        "balanced_accuracy": 0.6008077502467404,
+        "macro_f1": 0.6058421693454079,
+        "n_train": 162,
+        "n_test": 111,
+        "model_source": "retrained_candidate"
+      },
+      {
+        "model": "current_runtime_c1_learner_model",
+        "accuracy": 0.6036036036036037,
+        "balanced_accuracy": 0.5914536907173653,
+        "macro_f1": 0.5835244465679249,
+        "n_train": 0,
+        "n_test": 111,
+        "model_source": "existing_runtime_artifact_not_retrained"
+      },
+      {
+        "model": "extra_trees",
+        "accuracy": 0.5675675675675675,
+        "balanced_accuracy": 0.5585086489013558,
+        "macro_f1": 0.5495990695128626,
+        "n_train": 162,
+        "n_test": 111,
+        "model_source": "retrained_candidate"
+      },
+      {
+        "model": "hist_gradient_boosting",
+        "accuracy": 0.5585585585585585,
+        "balanced_accuracy": 0.5469819749623397,
+        "macro_f1": 0.5421059966275068,
+        "n_train": 162,
+        "n_test": 111,
+        "model_source": "retrained_candidate"
+      },
+      {
+        "model": "random_forest",
+        "accuracy": 0.5495495495495496,
+        "balanced_accuracy": 0.5398433847592333,
+        "macro_f1": 0.5387261777081099,
+        "n_train": 162,
+        "n_test": 111,
+        "model_source": "retrained_candidate"
+      },
+      {
+        "model": "majority_baseline",
+        "accuracy": 0.27927927927927926,
+        "balanced_accuracy": 0.25,
+        "macro_f1": 0.10915492957746478,
+        "n_train": 162,
+        "n_test": 111,
+        "model_source": "retrained_candidate"
+      }
+    ],
+    "scenario_shift_details": {
+      "majority_baseline": {
+        "confusion_matrix": [
+          [
+            31,
+            0,
+            0,
+            0
+          ],
+          [
+            27,
+            0,
+            0,
+            0
+          ],
+          [
+            30,
+            0,
+            0,
+            0
+          ],
+          [
+            23,
+            0,
+            0,
+            0
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.27927927927927926,
+            "recall": 1.0,
+            "f1-score": 0.43661971830985913,
+            "support": 31.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 27.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 30.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 23.0
+          },
+          "accuracy": 0.27927927927927926,
+          "macro avg": {
+            "precision": 0.06981981981981981,
+            "recall": 0.25,
+            "f1-score": 0.10915492957746478,
+            "support": 111.0
+          },
+          "weighted avg": {
+            "precision": 0.07799691583475367,
+            "recall": 0.27927927927927926,
+            "f1-score": 0.12193884024869939,
+            "support": 111.0
+          }
+        }
+      },
+      "logistic_regression": {
+        "confusion_matrix": [
+          [
+            25,
+            2,
+            4,
+            0
+          ],
+          [
+            4,
+            14,
+            7,
+            2
+          ],
+          [
+            3,
+            6,
+            18,
+            3
+          ],
+          [
+            0,
+            4,
+            8,
+            11
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.78125,
+            "recall": 0.8064516129032258,
+            "f1-score": 0.7936507936507936,
+            "support": 31.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.5384615384615384,
+            "recall": 0.5185185185185185,
+            "f1-score": 0.5283018867924528,
+            "support": 27.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.4864864864864865,
+            "recall": 0.6,
+            "f1-score": 0.5373134328358209,
+            "support": 30.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.6875,
+            "recall": 0.4782608695652174,
+            "f1-score": 0.5641025641025641,
+            "support": 23.0
+          },
+          "accuracy": 0.6126126126126126,
+          "macro avg": {
+            "precision": 0.6234245062370062,
+            "recall": 0.6008077502467404,
+            "f1-score": 0.6058421693454079,
+            "support": 111.0
+          },
+          "weighted avg": {
+            "precision": 0.6231018570545597,
+            "recall": 0.6126126126126126,
+            "f1-score": 0.6122620496036435,
+            "support": 111.0
+          }
+        }
+      },
+      "random_forest": {
+        "confusion_matrix": [
+          [
+            27,
+            0,
+            4,
+            0
+          ],
+          [
+            7,
+            9,
+            10,
+            1
+          ],
+          [
+            4,
+            9,
+            13,
+            4
+          ],
+          [
+            0,
+            6,
+            5,
+            12
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.7105263157894737,
+            "recall": 0.8709677419354839,
+            "f1-score": 0.782608695652174,
+            "support": 31.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.375,
+            "recall": 0.3333333333333333,
+            "f1-score": 0.35294117647058826,
+            "support": 27.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.40625,
+            "recall": 0.43333333333333335,
+            "f1-score": 0.41935483870967744,
+            "support": 30.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.7058823529411765,
+            "recall": 0.5217391304347826,
+            "f1-score": 0.6,
+            "support": 23.0
+          },
+          "accuracy": 0.5495495495495496,
+          "macro avg": {
+            "precision": 0.5494146671826625,
+            "recall": 0.5398433847592333,
+            "f1-score": 0.5387261777081099,
+            "support": 111.0
+          },
+          "weighted avg": {
+            "precision": 0.5457127018659527,
+            "recall": 0.5495495495495496,
+            "f1-score": 0.5420804188397621,
+            "support": 111.0
+          }
+        }
+      },
+      "extra_trees": {
+        "confusion_matrix": [
+          [
+            29,
+            0,
+            2,
+            0
+          ],
+          [
+            7,
+            9,
+            10,
+            1
+          ],
+          [
+            5,
+            8,
+            12,
+            5
+          ],
+          [
+            0,
+            6,
+            4,
+            13
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.7073170731707317,
+            "recall": 0.9354838709677419,
+            "f1-score": 0.8055555555555556,
+            "support": 31.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.391304347826087,
+            "recall": 0.3333333333333333,
+            "f1-score": 0.36,
+            "support": 27.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.42857142857142855,
+            "recall": 0.4,
+            "f1-score": 0.41379310344827586,
+            "support": 30.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.6842105263157895,
+            "recall": 0.5652173913043478,
+            "f1-score": 0.6190476190476191,
+            "support": 23.0
+          },
+          "accuracy": 0.5675675675675675,
+          "macro avg": {
+            "precision": 0.5528508439710091,
+            "recall": 0.5585086489013558,
+            "f1-score": 0.5495990695128626,
+            "support": 111.0
+          },
+          "weighted avg": {
+            "precision": 0.5503246092072346,
+            "recall": 0.5675675675675675,
+            "f1-score": 0.5526496447186102,
+            "support": 111.0
+          }
+        }
+      },
+      "hist_gradient_boosting": {
+        "confusion_matrix": [
+          [
+            28,
+            0,
+            2,
+            1
+          ],
+          [
+            4,
+            8,
+            13,
+            2
+          ],
+          [
+            5,
+            7,
+            14,
+            4
+          ],
+          [
+            0,
+            3,
+            8,
+            12
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.7567567567567568,
+            "recall": 0.9032258064516129,
+            "f1-score": 0.8235294117647058,
+            "support": 31.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.4444444444444444,
+            "recall": 0.2962962962962963,
+            "f1-score": 0.35555555555555557,
+            "support": 27.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.3783783783783784,
+            "recall": 0.4666666666666667,
+            "f1-score": 0.417910447761194,
+            "support": 30.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.631578947368421,
+            "recall": 0.5217391304347826,
+            "f1-score": 0.5714285714285714,
+            "support": 23.0
+          },
+          "accuracy": 0.5585585585585585,
+          "macro avg": {
+            "precision": 0.5527896317370002,
+            "recall": 0.5469819749623397,
+            "f1-score": 0.5421059966275068,
+            "support": 111.0
+          },
+          "weighted avg": {
+            "precision": 0.5525867261286892,
+            "recall": 0.5585585585585585,
+            "f1-score": 0.5478340751387283,
+            "support": 111.0
+          }
+        }
+      },
+      "current_runtime_c1_learner_model": {
+        "confusion_matrix": [
+          [
+            27,
+            0,
+            4,
+            0
+          ],
+          [
+            8,
+            8,
+            6,
+            5
+          ],
+          [
+            3,
+            7,
+            19,
+            1
+          ],
+          [
+            0,
+            4,
+            6,
+            13
+          ]
+        ],
+        "classification_report": {
+          "TYPICAL": {
+            "precision": 0.7105263157894737,
+            "recall": 0.8709677419354839,
+            "f1-score": 0.782608695652174,
+            "support": 31.0
+          },
+          "VISUAL_ORTHOGRAPHIC_PATTERN": {
+            "precision": 0.42105263157894735,
+            "recall": 0.2962962962962963,
+            "f1-score": 0.34782608695652173,
+            "support": 27.0
+          },
+          "PHONOLOGICAL_PATTERN": {
+            "precision": 0.5428571428571428,
+            "recall": 0.6333333333333333,
+            "f1-score": 0.5846153846153846,
+            "support": 30.0
+          },
+          "COMBINED_PATTERN": {
+            "precision": 0.6842105263157895,
+            "recall": 0.5652173913043478,
+            "f1-score": 0.6190476190476191,
+            "support": 23.0
+          },
+          "accuracy": 0.6036036036036037,
+          "macro avg": {
+            "precision": 0.5896616541353383,
+            "recall": 0.5914536907173653,
+            "f1-score": 0.5835244465679249,
+            "support": 111.0
+          },
+          "weighted avg": {
+            "precision": 0.5893449840818261,
+            "recall": 0.6036036036036037,
+            "f1-score": 0.5894480242306329,
+            "support": 111.0
+          }
+        }
+      }
+    }
+  },
+  "c2": {
+    "summary": [
+      {
+        "perturbation_family": "deletion",
+        "examples": 8,
+        "mean_word_error_rate": 0.40327380952380953,
+        "mean_grapheme_error_rate": 0.18931502525252525,
+        "mean_grapheme_accuracy": 0.8106849747474747,
+        "exact_match_rate": 0.0
+      },
+      {
+        "perturbation_family": "exact",
+        "examples": 8,
+        "mean_word_error_rate": 0.0,
+        "mean_grapheme_error_rate": 0.0,
+        "mean_grapheme_accuracy": 1.0,
+        "exact_match_rate": 1.0
+      },
+      {
+        "perturbation_family": "insertion",
+        "examples": 8,
+        "mean_word_error_rate": 0.40327380952380953,
+        "mean_grapheme_error_rate": 0.18931502525252525,
+        "mean_grapheme_accuracy": 0.8106849747474747,
+        "exact_match_rate": 0.0
+      },
+      {
+        "perturbation_family": "multiple_errors",
+        "examples": 8,
+        "mean_word_error_rate": 0.49404761904761907,
+        "mean_grapheme_error_rate": 0.3204703282828283,
+        "mean_grapheme_accuracy": 0.6795296717171717,
+        "exact_match_rate": 0.0
+      },
+      {
+        "perturbation_family": "repetition",
+        "examples": 8,
+        "mean_word_error_rate": 0.40327380952380953,
+        "mean_grapheme_error_rate": 0.18931502525252525,
+        "mean_grapheme_accuracy": 0.8106849747474747,
+        "exact_match_rate": 0.0
+      },
+      {
+        "perturbation_family": "substitution",
+        "examples": 8,
+        "mean_word_error_rate": 0.40327380952380953,
+        "mean_grapheme_error_rate": 0.18931502525252525,
+        "mean_grapheme_accuracy": 0.8106849747474747,
+        "exact_match_rate": 0.0
+      }
+    ],
+    "interpretation": "C2 reports alignment behavior under controlled text edits; this does not measure Whisper/STT accuracy or child speech performance."
+  },
+  "c3": {
+    "subject_overlap_train_test": 0,
+    "label_order": [
+      "Typical Learning Pattern",
+      "Phonological Learning Pattern",
+      "Visual-Orthographic Learning Pattern",
+      "Combined Learning Pattern"
+    ],
+    "feature_schema": [
+      "acoustic_latency_ms",
+      "peak_count_delta",
+      "intra_word_silence_ratio",
+      "local_jitter",
+      "local_shimmer",
+      "time_to_first_touch_ms",
+      "orthographic_confusion_index",
+      "path_efficiency_ratio",
+      "dimensionless_jerk",
+      "dwell_time_ms",
+      "age",
+      "gender",
+      "time_of_day_hour"
+    ],
+    "train_rows": 240,
+    "test_rows": 80,
+    "challenge_rows": 160,
+    "nominal": {
+      "majority_baseline": {
+        "confusion_matrix": [
+          [
+            20,
+            0,
+            0,
+            0
+          ],
+          [
+            20,
+            0,
+            0,
+            0
+          ],
+          [
+            20,
+            0,
+            0,
+            0
+          ],
+          [
+            20,
+            0,
+            0,
+            0
+          ]
+        ],
+        "classification_report": {
+          "Typical Learning Pattern": {
+            "precision": 0.25,
+            "recall": 1.0,
+            "f1-score": 0.4,
+            "support": 20.0
+          },
+          "Phonological Learning Pattern": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 20.0
+          },
+          "Visual-Orthographic Learning Pattern": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 20.0
+          },
+          "Combined Learning Pattern": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 20.0
+          },
+          "accuracy": 0.25,
+          "macro avg": {
+            "precision": 0.0625,
+            "recall": 0.25,
+            "f1-score": 0.1,
+            "support": 80.0
+          },
+          "weighted avg": {
+            "precision": 0.0625,
+            "recall": 0.25,
+            "f1-score": 0.1,
+            "support": 80.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.25,
+          "balanced_accuracy": 0.25,
+          "macro_f1": 0.1
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            40,
+            0,
+            0,
+            0
+          ],
+          [
+            40,
+            0,
+            0,
+            0
+          ],
+          [
+            40,
+            0,
+            0,
+            0
+          ],
+          [
+            40,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "logistic_regression": {
+        "confusion_matrix": [
+          [
+            18,
+            2,
+            0,
+            0
+          ],
+          [
+            2,
+            15,
+            2,
+            1
+          ],
+          [
+            1,
+            1,
+            18,
+            0
+          ],
+          [
+            0,
+            0,
+            2,
+            18
+          ]
+        ],
+        "classification_report": {
+          "Typical Learning Pattern": {
+            "precision": 0.8571428571428571,
+            "recall": 0.9,
+            "f1-score": 0.8780487804878049,
+            "support": 20.0
+          },
+          "Phonological Learning Pattern": {
+            "precision": 0.8333333333333334,
+            "recall": 0.75,
+            "f1-score": 0.7894736842105263,
+            "support": 20.0
+          },
+          "Visual-Orthographic Learning Pattern": {
+            "precision": 0.8181818181818182,
+            "recall": 0.9,
+            "f1-score": 0.8571428571428571,
+            "support": 20.0
+          },
+          "Combined Learning Pattern": {
+            "precision": 0.9473684210526315,
+            "recall": 0.9,
+            "f1-score": 0.9230769230769231,
+            "support": 20.0
+          },
+          "accuracy": 0.8625,
+          "macro avg": {
+            "precision": 0.86400660742766,
+            "recall": 0.8624999999999999,
+            "f1-score": 0.8619355612295279,
+            "support": 80.0
+          },
+          "weighted avg": {
+            "precision": 0.86400660742766,
+            "recall": 0.8625,
+            "f1-score": 0.861935561229528,
+            "support": 80.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.525,
+          "balanced_accuracy": 0.525,
+          "macro_f1": 0.5009309539521563
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            29,
+            6,
+            5,
+            0
+          ],
+          [
+            8,
+            26,
+            5,
+            1
+          ],
+          [
+            12,
+            5,
+            21,
+            2
+          ],
+          [
+            3,
+            18,
+            11,
+            8
+          ]
+        ]
+      },
+      "random_forest": {
+        "confusion_matrix": [
+          [
+            18,
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            15,
+            1,
+            1
+          ],
+          [
+            1,
+            1,
+            17,
+            1
+          ],
+          [
+            0,
+            1,
+            3,
+            16
+          ]
+        ],
+        "classification_report": {
+          "Typical Learning Pattern": {
+            "precision": 0.8181818181818182,
+            "recall": 0.9,
+            "f1-score": 0.8571428571428571,
+            "support": 20.0
+          },
+          "Phonological Learning Pattern": {
+            "precision": 0.7894736842105263,
+            "recall": 0.75,
+            "f1-score": 0.7692307692307693,
+            "support": 20.0
+          },
+          "Visual-Orthographic Learning Pattern": {
+            "precision": 0.8095238095238095,
+            "recall": 0.85,
+            "f1-score": 0.8292682926829268,
+            "support": 20.0
+          },
+          "Combined Learning Pattern": {
+            "precision": 0.8888888888888888,
+            "recall": 0.8,
+            "f1-score": 0.8421052631578947,
+            "support": 20.0
+          },
+          "accuracy": 0.825,
+          "macro avg": {
+            "precision": 0.8265170502012608,
+            "recall": 0.825,
+            "f1-score": 0.8244367955536119,
+            "support": 80.0
+          },
+          "weighted avg": {
+            "precision": 0.8265170502012609,
+            "recall": 0.825,
+            "f1-score": 0.824436795553612,
+            "support": 80.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.4875,
+          "balanced_accuracy": 0.48750000000000004,
+          "macro_f1": 0.47186010208493595
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            30,
+            6,
+            4,
+            0
+          ],
+          [
+            12,
+            22,
+            5,
+            1
+          ],
+          [
+            18,
+            5,
+            16,
+            1
+          ],
+          [
+            3,
+            22,
+            5,
+            10
+          ]
+        ]
+      },
+      "extra_trees": {
+        "confusion_matrix": [
+          [
+            19,
+            1,
+            0,
+            0
+          ],
+          [
+            3,
+            16,
+            1,
+            0
+          ],
+          [
+            1,
+            2,
+            17,
+            0
+          ],
+          [
+            0,
+            0,
+            2,
+            18
+          ]
+        ],
+        "classification_report": {
+          "Typical Learning Pattern": {
+            "precision": 0.8260869565217391,
+            "recall": 0.95,
+            "f1-score": 0.8837209302325582,
+            "support": 20.0
+          },
+          "Phonological Learning Pattern": {
+            "precision": 0.8421052631578947,
+            "recall": 0.8,
+            "f1-score": 0.8205128205128205,
+            "support": 20.0
+          },
+          "Visual-Orthographic Learning Pattern": {
+            "precision": 0.85,
+            "recall": 0.85,
+            "f1-score": 0.85,
+            "support": 20.0
+          },
+          "Combined Learning Pattern": {
+            "precision": 1.0,
+            "recall": 0.9,
+            "f1-score": 0.9473684210526315,
+            "support": 20.0
+          },
+          "accuracy": 0.875,
+          "macro avg": {
+            "precision": 0.8795480549199085,
+            "recall": 0.875,
+            "f1-score": 0.8754005429495025,
+            "support": 80.0
+          },
+          "weighted avg": {
+            "precision": 0.8795480549199084,
+            "recall": 0.875,
+            "f1-score": 0.8754005429495025,
+            "support": 80.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.4875,
+          "balanced_accuracy": 0.4875,
+          "macro_f1": 0.4577341870340026
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            31,
+            6,
+            3,
+            0
+          ],
+          [
+            10,
+            24,
+            5,
+            1
+          ],
+          [
+            19,
+            2,
+            16,
+            3
+          ],
+          [
+            3,
+            21,
+            9,
+            7
+          ]
+        ]
+      },
+      "hist_gradient_boosting": {
+        "confusion_matrix": [
+          [
+            17,
+            2,
+            1,
+            0
+          ],
+          [
+            3,
+            13,
+            2,
+            2
+          ],
+          [
+            2,
+            2,
+            14,
+            2
+          ],
+          [
+            0,
+            1,
+            3,
+            16
+          ]
+        ],
+        "classification_report": {
+          "Typical Learning Pattern": {
+            "precision": 0.7727272727272727,
+            "recall": 0.85,
+            "f1-score": 0.8095238095238095,
+            "support": 20.0
+          },
+          "Phonological Learning Pattern": {
+            "precision": 0.7222222222222222,
+            "recall": 0.65,
+            "f1-score": 0.6842105263157895,
+            "support": 20.0
+          },
+          "Visual-Orthographic Learning Pattern": {
+            "precision": 0.7,
+            "recall": 0.7,
+            "f1-score": 0.7,
+            "support": 20.0
+          },
+          "Combined Learning Pattern": {
+            "precision": 0.8,
+            "recall": 0.8,
+            "f1-score": 0.8,
+            "support": 20.0
+          },
+          "accuracy": 0.75,
+          "macro avg": {
+            "precision": 0.7487373737373737,
+            "recall": 0.75,
+            "f1-score": 0.7484335839598997,
+            "support": 80.0
+          },
+          "weighted avg": {
+            "precision": 0.7487373737373737,
+            "recall": 0.75,
+            "f1-score": 0.7484335839598997,
+            "support": 80.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.45,
+          "balanced_accuracy": 0.45,
+          "macro_f1": 0.4330378043683047
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            29,
+            7,
+            4,
+            0
+          ],
+          [
+            12,
+            20,
+            4,
+            4
+          ],
+          [
+            19,
+            5,
+            13,
+            3
+          ],
+          [
+            3,
+            21,
+            6,
+            10
+          ]
+        ]
+      },
+      "current_runtime_c3_xgboost": {
+        "confusion_matrix": [
+          [
+            18,
+            1,
+            1,
+            0
+          ],
+          [
+            10,
+            9,
+            1,
+            0
+          ],
+          [
+            8,
+            0,
+            12,
+            0
+          ],
+          [
+            7,
+            3,
+            9,
+            1
+          ]
+        ],
+        "classification_report": {
+          "Typical Learning Pattern": {
+            "precision": 0.4186046511627907,
+            "recall": 0.9,
+            "f1-score": 0.5714285714285714,
+            "support": 20.0
+          },
+          "Phonological Learning Pattern": {
+            "precision": 0.6923076923076923,
+            "recall": 0.45,
+            "f1-score": 0.5454545454545454,
+            "support": 20.0
+          },
+          "Visual-Orthographic Learning Pattern": {
+            "precision": 0.5217391304347826,
+            "recall": 0.6,
+            "f1-score": 0.5581395348837209,
+            "support": 20.0
+          },
+          "Combined Learning Pattern": {
+            "precision": 1.0,
+            "recall": 0.05,
+            "f1-score": 0.09523809523809523,
+            "support": 20.0
+          },
+          "accuracy": 0.5,
+          "macro avg": {
+            "precision": 0.6581628684763164,
+            "recall": 0.5,
+            "f1-score": 0.44256518675123324,
+            "support": 80.0
+          },
+          "weighted avg": {
+            "precision": 0.6581628684763163,
+            "recall": 0.5,
+            "f1-score": 0.44256518675123324,
+            "support": 80.0
+          }
+        },
+        "scenario_shift_metrics": {
+          "accuracy": 0.35,
+          "balanced_accuracy": 0.35,
+          "macro_f1": 0.28341443230718305
+        },
+        "scenario_shift_confusion_matrix": [
+          [
+            34,
+            1,
+            5,
+            0
+          ],
+          [
+            28,
+            9,
+            3,
+            0
+          ],
+          [
+            27,
+            0,
+            13,
+            0
+          ],
+          [
+            23,
+            3,
+            14,
+            0
+          ]
+        ]
+      }
+    },
+    "scenario_shift_metrics": [
+      {
+        "model": "logistic_regression",
+        "accuracy": 0.525,
+        "balanced_accuracy": 0.525,
+        "macro_f1": 0.5009309539521563,
+        "n_train": 240,
+        "n_test": 160,
+        "model_source": "retrained_candidate"
+      },
+      {
+        "model": "random_forest",
+        "accuracy": 0.4875,
+        "balanced_accuracy": 0.48750000000000004,
+        "macro_f1": 0.47186010208493595,
+        "n_train": 240,
+        "n_test": 160,
+        "model_source": "retrained_candidate"
+      },
+      {
+        "model": "extra_trees",
+        "accuracy": 0.4875,
+        "balanced_accuracy": 0.4875,
+        "macro_f1": 0.4577341870340026,
+        "n_train": 240,
+        "n_test": 160,
+        "model_source": "retrained_candidate"
+      },
+      {
+        "model": "hist_gradient_boosting",
+        "accuracy": 0.45,
+        "balanced_accuracy": 0.45,
+        "macro_f1": 0.4330378043683047,
+        "n_train": 240,
+        "n_test": 160,
+        "model_source": "retrained_candidate"
+      },
+      {
+        "model": "current_runtime_c3_xgboost",
+        "accuracy": 0.35,
+        "balanced_accuracy": 0.35,
+        "macro_f1": 0.28341443230718305,
+        "n_train": 0,
+        "n_test": 160,
+        "model_source": "existing_runtime_artifact_not_retrained"
+      },
+      {
+        "model": "majority_baseline",
+        "accuracy": 0.25,
+        "balanced_accuracy": 0.25,
+        "macro_f1": 0.1,
+        "n_train": 240,
+        "n_test": 160,
+        "model_source": "retrained_candidate"
+      }
+    ]
+  },
+  "standards_guidance": [
+    {
+      "reference": "ISO/IEC 5259-1:2024 and ISO/IEC 5259-2:2024 (https://www.iso.org/standard/81088.html; https://www.iso.org/standard/81860.html)",
+      "application": "document data quality, provenance, schema, utility, and evaluation metrics; no claim of certification"
+    },
+    {
+      "reference": "NIST SDNist synthetic data report guidance (https://www.nist.gov/services-resources/software/sdnist-synthetic-data-report-tool)",
+      "application": "report utility/limitations and avoid implying synthetic fidelity proves real-population validity"
+    },
+    {
+      "reference": "TRIPOD+AI scope (https://www.tripod-statement.org/scope/)",
+      "application": "make intended use, data provenance, evaluation split, metrics, and limitations explicit; not a diagnostic model validation claim"
+    }
+  ],
+  "interpretation_limits": [
+    "C1/C3 scores measure recovery of labels created by these provisional simulation rules, not real children, learning outcomes, or clinical accuracy.",
+    "C2 is deterministic Sinhala text alignment evaluated with controlled edits. It is not an evaluation of Whisper or spoken-child recordings.",
+    "Synthetic classes are exploratory behavioral scenarios and must not be described as dyslexia diagnoses or clinical findings.",
+    "No generated artifacts are loaded by runtime services; production model directories and MongoDB are not modified."
+  ],
+  "versions": {
+    "c1_simulator": "c1-sim-v1",
+    "c1_feature_schema": "c1-learner-v2",
+    "c2_alignment": "c2-sinhala-alignment-v1",
+    "c3_feature_schema": [
+      "acoustic_latency_ms",
+      "peak_count_delta",
+      "intra_word_silence_ratio",
+      "local_jitter",
+      "local_shimmer",
+      "time_to_first_touch_ms",
+      "orthographic_confusion_index",
+      "path_efficiency_ratio",
+      "dimensionless_jerk",
+      "dwell_time_ms",
+      "age",
+      "gender",
+      "time_of_day_hour"
+    ]
+  }
+}

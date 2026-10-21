@@ -21,16 +21,20 @@ from services import c2_settings
 QUALITY_VERSION = "c2-audio-quality-v1"
 
 
+class UnreadableAudioError(ValueError):
+    """The upload is not a usable WAV file (a client error, not a server fault)."""
+
+
 class AudioQualityService:
     target_sample_rate = 16_000
 
     def decode(self, wav_bytes: bytes) -> Tuple[np.ndarray, int]:
         if not wav_bytes:
-            raise ValueError("Audio payload is empty")
+            raise UnreadableAudioError("Audio payload is empty")
         try:
             audio, sample_rate = sf.read(io.BytesIO(wav_bytes), always_2d=False)
         except Exception as exc:
-            raise ValueError("Audio payload is not a readable WAV file") from exc
+            raise UnreadableAudioError("Audio payload is not a readable WAV file") from exc
         if getattr(audio, "ndim", 1) > 1:
             audio = np.mean(audio, axis=1)
         audio = np.asarray(audio, dtype=np.float32)
@@ -40,7 +44,7 @@ class AudioQualityService:
             )
             sample_rate = self.target_sample_rate
         if audio.size == 0 or not np.all(np.isfinite(audio)):
-            raise ValueError("Audio contains no finite samples")
+            raise UnreadableAudioError("Audio contains no finite samples")
         return audio, int(sample_rate)
 
     def analyze(self, wav_bytes: bytes) -> Dict[str, Any]:

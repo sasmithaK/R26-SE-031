@@ -1,5 +1,6 @@
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends, BackgroundTasks, Request
 from services.stt_service import get_stt_engine, get_stt_status
+from services.audio_quality_service import UnreadableAudioError
 from datetime import datetime, timezone
 from uuid import uuid4
 import hashlib
@@ -143,6 +144,8 @@ async def transcribe_audio(
     except Exception as e:
         if isinstance(e, HTTPException):
             raise
+        if isinstance(e, UnreadableAudioError):
+            raise HTTPException(status_code=422, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -240,6 +243,8 @@ async def analyze_reading(
     except HTTPException:
         raise
     except Exception as e:
+        if isinstance(e, UnreadableAudioError):
+            raise HTTPException(status_code=422, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/analyze-acoustics")
@@ -360,7 +365,7 @@ async def analyze_acoustics(
             "recording_quality_issues": quality.get("issues", []),
             "combined_confidence": fusion.get("combined_confidence"),
             "reading_performance_score": fusion.get("reading_performance_score"),
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
             "pipeline_version": result.get("pipeline_version"),
             "feature_version": result.get("pipeline_version"),
             "data_origin": data_origin,
@@ -376,6 +381,17 @@ async def analyze_acoustics(
             "fusion": fusion,
         }
         
+        # A recording with nothing recognised (quality gate failed or STT
+        # returned no text) has no reading accuracy. Alignment against an
+        # empty transcript yields 0% / WER 1.0, which dashboards would show as
+        # a real result, so those fields are stored as missing.
+        if not str(recognized_text or "").strip():
+            for key in ("exact_match", "character_error_rate", "grapheme_error_rate", "grapheme_accuracy",
+                        "word_error_rate", "word_accuracy", "normalized_similarity",
+                        "reading_rate_wpm", "reading_performance_score"):
+                doc[key] = None
+            doc["reading_measurement"] = "not_measured_no_transcript"
+
         # Save to DB
         try:
             db = get_db()
@@ -417,4 +433,6 @@ async def analyze_acoustics(
         raise
     except Exception as e:
         print(f"Acoustic analysis error: {e}")
+        if isinstance(e, UnreadableAudioError):
+            raise HTTPException(status_code=422, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))

@@ -39,6 +39,10 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
       }
     });
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onPageSettled(0);
+    });
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -47,6 +51,10 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
 
   @override
   void dispose() {
+    if (_isRecording) {
+      // Leaving mid-recording: stop the microphone and discard the audio.
+      VoiceAnalysisService().stopRecording();
+    }
     _pageController.dispose();
     _pulseController.dispose();
     super.dispose();
@@ -58,12 +66,26 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
 
   int _tStimulus = 0;
   int _tRecordStart = 0;
-  int _lastStimulusPageIndex = -1;
+  int _stimulusPageIndex = -1;
+  // The page (item) being read is fixed when recording starts, so a swipe
+  // during recording cannot attach the audio to another item.
+  int _recordingPageIndex = 0;
+
+  /// Called when a page settles: the sentence is now on screen.
+  void _onPageSettled(int index) {
+    if (_stimulusPageIndex == index) return;
+    _stimulusPageIndex = index;
+    _tStimulus = DateTime.now().millisecondsSinceEpoch;
+  }
 
   void _startRecording() async {
     setState(() {
       _isRecording = true;
       _tRecordStart = DateTime.now().millisecondsSinceEpoch;
+      _recordingPageIndex = _currentPage.round().clamp(
+        0,
+        widget.activityNode.rounds.length - 1,
+      );
     });
 
     await VoiceAnalysisService().startRecording();
@@ -92,10 +114,7 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
       String? studentId;
       String sessionId = TelemetryService().sessionId;
       String activityId = widget.activityNode.id;
-      final index = _currentPage.round().clamp(
-        0,
-        widget.activityNode.rounds.length - 1,
-      );
+      final index = _recordingPageIndex;
       final round = widget.activityNode.rounds[index];
       String itemId = CanonicalItemResolver.resolve(
         widget.activityNode,
@@ -107,7 +126,8 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
       if (telemetry != null) {
         studentId =
             telemetry.widget.studentData?['id'] ??
-            telemetry.widget.studentData?['_id'];
+            telemetry.widget.studentData?['_id'] ??
+            telemetry.widget.studentData?['student_id'];
       }
 
       final results = await VoiceAnalysisService().analyzeAudio(
@@ -215,6 +235,11 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
           PageView.builder(
             controller: _pageController,
             scrollDirection: Axis.vertical,
+            // No swiping while a sentence is being recorded.
+            physics: _isRecording || _isAnalyzing
+                ? const NeverScrollableScrollPhysics()
+                : null,
+            onPageChanged: _onPageSettled,
             itemCount: rounds.length + 1, // +1 for the final completion page
             itemBuilder: (context, index) {
               if (index == rounds.length) {
@@ -317,15 +342,8 @@ class _InteractiveStoryGameState extends State<InteractiveStoryGame>
     final overlays = round['overlays'] as List<dynamic>?;
     final expectedSyllables = round['expected_syllables'] as int? ?? 0;
 
-    // Capture t_stimulus when the page is first rendered
-    if (_lastStimulusPageIndex != index) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _lastStimulusPageIndex = index;
-          _tStimulus = DateTime.now().millisecondsSinceEpoch;
-        }
-      });
-    }
+    // t_stimulus is set when a page settles (_onPageSettled), not during
+    // build: PageView builds neighbouring pages on every scroll frame.
 
     return Stack(
       fit: StackFit.expand,

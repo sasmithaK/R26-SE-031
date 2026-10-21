@@ -54,7 +54,11 @@ class TelemetryEvent(BaseModel):
     incorrect_attempt_count: int = Field(default=0, ge=0)
     first_attempt_correct: Optional[bool] = Field(default=None)
     final_correct: bool = Field(default=False)
+    # First ANSWER (choice, picture tap or drop on a target); app versions
+    # before 2026-10-21 sent the first touch of any kind here.
     time_to_first_response_ms: int = Field(default=0, ge=0)
+    # Drags released outside every target (movement precision).
+    stray_drop_count: int = Field(default=0, ge=0)
     time_to_correct_ms: int = Field(default=0, ge=0)
 
     # --- Dyslexia Cognitive Indicators ---

@@ -23,32 +23,103 @@ ORTHOGRAPHIC_CONFUSION_MAP = {
 # ``orthographic_confusion_coverage`` (share of errors the map could classify)
 # and dashboards hide the index when coverage is 0.
 
-def extract_comp2_features(events: List[Dict[str, Any]]) -> Dict[str, float]:
-    """
-    Extracts the 5 deterministic kinematic features from a list of telemetry events.
+DRAG_MIN_PATH = 0.03  # screen fraction; shorter strokes are taps
+
+
+def _kind(p):
+    return str(p.get("type") or p.get("action") or "").upper()
+
+
+def _strokes(stream: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+    """Split a round's touch stream into strokes (finger down -> up)."""
+    strokes, current = [], None
+    for point in stream:
+        kind = _kind(point)
+        if kind in {"DOWN", "START"}:
+            current = [point]
+        elif current is not None:
+            current.append(point)
+            if kind in {"UP", "END"}:
+                strokes.append(current)
+                current = None
+    return strokes
+
+
+def _path_length(stroke) -> float:
+    total = 0.0
+    for a, b in zip(stroke, stroke[1:]):
+        total += math.hypot(float(b.get("x", 0)) - float(a.get("x", 0)), float(b.get("y", 0)) - float(a.get("y", 0)))
+    return total
+
+
+def _first_wrong_selection(event: Dict[str, Any]):
+    for attempt in event.get("attempt_history") or []:
+        if isinstance(attempt, dict) and attempt.get("is_correct") is False:
+            selected = attempt.get("selected_answers") or []
+            return selected[0] if selected else None
+    return None
+
+
+def normalize_touch_events(events: list) -> list:
+    """Normalize Flutter ratio/timestamp touch points for the C2 extractor."""
+    normalized = []
+    for event in events:
+        source = event.get("touch_stream") or event.get("touch_path") or []
+        points = []
+        for point in source:
+            if not isinstance(point, dict):
+                continue
+            points.append({
+                "x": point.get("x_ratio", point.get("x", 0.0)),
+                "y": point.get("y_ratio", point.get("y", 0.0)),
+                "t": point.get("timestamp_ms", point.get("t", 0)),
+                "type": str(point.get("type") or "").upper(),
+            })
+        # Any touch gives first-touch and contact time; path directness and
+        # jerk are computed per drag stroke only (see comp2_kinematics), so a
+        # tap is never reported as a perfectly efficient trajectory.
+        if event.get("is_abandoned") or not any(point["type"] == "DOWN" for point in points):
+            continue
+        targets = event.get("targets") or event.get("target_ids") or []
+        selected = event.get("selected_answers") or []
+        normalized.append({
+            **event,
+            "touch_stream": points,
+            "target_stimulus": targets[0] if targets else None,
+            "selected_stimulus": selected[0] if selected else None,
+        })
+    return normalized
+
+
+def extract_comp2_features(events: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Kinematic features for one session, measured per stroke.
+
+    * time to first touch: first finger-down of each round (mean over rounds);
+    * dwell time: finger contact time per stroke (mean);
+    * path efficiency and jerk: drag strokes only (a tap has no path), each
+      stroke on its own, so several drags in one round are not merged into
+      one meaningless path. ``None`` when the session had no drags;
+    * look-alike letter index: share of first-try letter errors that the
+      confusion map classifies as visual; ``None`` when no error could be
+      classified (never a fake 0).
     """
     if not events:
         return _zero_features()
 
-    t_ft_list = []
-    dwell_time_list = []
-    path_eff_list = []
-    jerk_list = []
-    
-    total_errors = 0
-    visual_errors = 0
-    classifiable_errors = 0
+    t_ft_list, dwell_time_list, path_eff_list, jerk_list = [], [], [], []
+    total_errors = visual_errors = classifiable_errors = 0
+    drag_strokes = 0
 
     for event in events:
         touch_stream = event.get("touch_stream", [])
         if not touch_stream:
             continue
-            
+
         target = event.get("target_stimulus")
-        selected = event.get("selected_stimulus")
-        
-        # 1. Orthographic Confusion Classification
-        if not event.get("is_correct", True) and target and selected:
+        first_try = event.get("first_attempt_correct")
+        wrong_first = (first_try is False) if isinstance(first_try, bool) else not event.get("is_correct", True)
+        selected = _first_wrong_selection(event) or event.get("selected_stimulus")
+        if wrong_first and target and selected:
             total_errors += 1
             mapping = ORTHOGRAPHIC_CONFUSION_MAP.get(target, {})
             if selected in mapping:
@@ -56,31 +127,38 @@ def extract_comp2_features(events: List[Dict[str, Any]]) -> Dict[str, float]:
             if mapping.get(selected) == "Visual":
                 visual_errors += 1
 
-        # Calculate Stream Metrics
         screen_w = event.get("screen_width_px") or 1000
         screen_h = event.get("screen_height_px") or 1000
-        t_start, t_end, t_ft, dwell, path_eff, dj = _process_stream(touch_stream, screen_w, screen_h)
-        
-        if t_ft > 0: t_ft_list.append(t_ft)
-        if dwell > 0: dwell_time_list.append(dwell)
-        if path_eff > 0: path_eff_list.append(path_eff)
-        if dj > 0: jerk_list.append(dj)
+        strokes = _strokes(touch_stream)
+        if strokes:
+            first_down = float(strokes[0][0].get("t", 0))
+            if first_down > 0:
+                t_ft_list.append(first_down)
+        for stroke in strokes:
+            duration = float(stroke[-1].get("t", 0)) - float(stroke[0].get("t", 0))
+            if duration > 0:
+                dwell_time_list.append(duration)
+            if len(stroke) >= 3 and _path_length(stroke) >= DRAG_MIN_PATH:
+                drag_strokes += 1
+                _, _, _, _, path_eff, dj = _process_stream(stroke, screen_w, screen_h)
+                if path_eff > 0:
+                    path_eff_list.append(path_eff)
+                if dj > 0:
+                    jerk_list.append(dj)
 
-    n_events = max(1, len(events))
-    
-    # 2. Orthographic Confusion Index (OCI)
-    # Sum(Visual Errors) / (Sum(Total Errors) + epsilon)
-    oci = visual_errors / (total_errors + 1e-5) if total_errors > 0 else 0.0
-    
+    def mean(values, digits):
+        return round(sum(values) / len(values), digits) if values else None
+
     return {
-        "time_to_first_touch_ms": round(sum(t_ft_list) / len(t_ft_list) if t_ft_list else 0, 2),
-        "orthographic_confusion_index": round(oci, 3),
-        "path_efficiency_ratio": round(sum(path_eff_list) / len(path_eff_list) if path_eff_list else 1.0, 3),
-        "dimensionless_jerk": round(sum(jerk_list) / len(jerk_list) if jerk_list else 0, 2),
-        "mean_dwell_time_ms": round(sum(dwell_time_list) / len(dwell_time_list) if dwell_time_list else 0, 2),
+        "time_to_first_touch_ms": mean(t_ft_list, 2),
+        "orthographic_confusion_index": round(visual_errors / classifiable_errors, 3) if classifiable_errors else None,
+        "path_efficiency_ratio": mean(path_eff_list, 3),
+        "dimensionless_jerk": mean(jerk_list, 2),
+        "mean_dwell_time_ms": mean(dwell_time_list, 2),
         "orthographic_confusion_coverage": round(classifiable_errors / total_errors, 3) if total_errors else None,
         "first_attempt_error_count": total_errors,
         "movement_event_count": len(path_eff_list),
+        "drag_stroke_count": drag_strokes,
     }
 
 def _process_stream(stream: List[Dict[str, Any]], screen_w: int, screen_h: int) -> Tuple[int, int, float, float, float, float]:
@@ -214,11 +292,16 @@ def _compute_dimensionless_jerk(stream: List[Dict[str, Any]], total_t: float, d_
     
     return dj
     
-def _zero_features() -> Dict[str, float]:
+def _zero_features() -> Dict[str, Any]:
+    """No touch data: nothing measured (missing, not zero)."""
     return {
-        "time_to_first_touch_ms": 0.0,
-        "orthographic_confusion_index": 0.0,
-        "path_efficiency_ratio": 1.0,
-        "dimensionless_jerk": 0.0,
-        "mean_dwell_time_ms": 0.0
+        "time_to_first_touch_ms": None,
+        "orthographic_confusion_index": None,
+        "path_efficiency_ratio": None,
+        "dimensionless_jerk": None,
+        "mean_dwell_time_ms": None,
+        "orthographic_confusion_coverage": None,
+        "first_attempt_error_count": 0,
+        "movement_event_count": 0,
+        "drag_stroke_count": 0,
     }

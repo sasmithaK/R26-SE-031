@@ -25,7 +25,7 @@ from dependencies import get_current_user
 from schemas.telemetry import TelemetrySessionSubmit
 from services.assessment_report_generator import generate_assessment_report
 from services.behavioral_engine import extract_session_features
-from services.comp2_kinematics import extract_comp2_features
+from services.comp2_kinematics import extract_comp2_features, normalize_touch_events
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Telemetry"])
 
@@ -159,36 +159,6 @@ async def _trigger_c3_background(student_id: str, session_summary: dict, authori
         )
 
 
-def _kinematic_events(events: list[dict]) -> list[dict]:
-    """Normalize Flutter ratio/timestamp touch points for the C2 extractor."""
-    normalized = []
-    for event in events:
-        source = event.get("touch_stream") or event.get("touch_path") or []
-        points = []
-        for point in source:
-            if not isinstance(point, dict):
-                continue
-            points.append({
-                "x": point.get("x_ratio", point.get("x", 0.0)),
-                "y": point.get("y_ratio", point.get("y", 0.0)),
-                "t": point.get("timestamp_ms", point.get("t", 0)),
-                "type": str(point.get("type") or "").upper(),
-            })
-        # Kinematic path metrics are meaningful only when an actual movement
-        # path was captured. A DOWN/UP tap must not be reported as a perfectly
-        # efficient motor trajectory.
-        if len(points) < 3 or not any(point["type"] == "MOVE" for point in points):
-            continue
-        targets = event.get("targets") or event.get("target_ids") or []
-        selected = event.get("selected_answers") or []
-        normalized.append({
-            **event,
-            "touch_stream": points,
-            "target_stimulus": targets[0] if targets else None,
-            "selected_stimulus": selected[0] if selected else None,
-        })
-    return normalized
-
 # ---------------------------------------------------------------------------
 # POST /telemetry  — Ingest enriched telemetry session
 # ---------------------------------------------------------------------------
@@ -320,9 +290,10 @@ async def submit_telemetry(
         {"$set": summary}, upsert=True,
     )
 
-    normalized_motion = _kinematic_events(events_list)
+    normalized_motion = normalize_touch_events(events_list)
     if normalized_motion:
         motion = extract_comp2_features(normalized_motion)
+        motion = {k: v for k, v in motion.items() if v is not None}  # missing stays missing
         motion_doc = {
             "student_id": req.student_id,
             "session_id": req.session_id,
@@ -333,7 +304,7 @@ async def submit_telemetry(
             "dataset_id": session_doc["dataset_id"],
             "validation_status": session_doc["validation_status"],
             **motion,
-            "dwell_time_ms": motion.get("mean_dwell_time_ms", 0.0),
+            "dwell_time_ms": motion.get("mean_dwell_time_ms"),
         }
         await db.kinematic_features.update_one(
             {"student_id": req.student_id, "session_id": req.session_id},
@@ -348,7 +319,7 @@ async def submit_telemetry(
 
     # Process & Save C1 State for Therapist/Parent dashboards
     from services.c1.processor import process_session
-    from services.ml.inference import predict_c1_pattern
+    from services.ml.learner_inference import compute_and_store
     from repositories import c1_repository
     
     try:
@@ -361,21 +332,25 @@ async def submit_telemetry(
             e["student_id"] = req.student_id
             
         c1_partial = process_session(req.session_id, req.student_id, events_data)
-        model_features = {
-            **c1_partial["behavior"],
-            **c1_partial["indices"],
-            "fatigue_score": c1_partial["fatigue"]["score"],
-            "cognitive_load_score": c1_partial["interaction_state"]["score"],
+        # One session (4-5 rounds of one task) is too little for a pattern
+        # estimate; the model runs per learner over a 14-day window instead.
+        c1_partial["model"] = {
+            "model_name": "c1_learner_model",
+            "model_version": "learner-level",
+            "feature_schema_version": "c1-learner-v2",
+            "predicted_pattern": None,
+            "probabilities": {},
+            "confidence": None,
+            "model_used": "learner_level_only",
+            "unavailable_reason": "The C1 pattern estimate is made per learner over 14 days (c1_learner_estimates), not per session.",
         }
-        model_metadata = predict_c1_pattern(model_features)
-        c1_partial["model"] = model_metadata
         await c1_repository.save_c1_state(c1_partial)
         cognitive_load = (c1_partial.get("interaction_state") or {}).get("state")
+        learner = await compute_and_store(db, req.student_id)
         c1_processing = {
             "status": "processed",
-            "model_used": model_metadata.get("model_used"),
-            "unavailable_reason": model_metadata.get("unavailable_reason"),
-            "missing_features": model_metadata.get("missing_features", []),
+            "learner_estimate_status": learner.get("status"),
+            "missing_evidence": learner.get("missing_evidence", []),
         }
     except Exception as err:
         c1_processing = {"status": "failed", "error_type": type(err).__name__}

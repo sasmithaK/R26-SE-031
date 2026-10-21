@@ -302,6 +302,8 @@ class _VisualAct4PatternAdventureState extends State<VisualAct4PatternAdventure>
       SoundUtils.playFeedback('audio/correct.mp3');
       _capturePositions(index);
 
+      // Response time ends at the correct tap, not after the fly/bounce.
+      context.findAncestorStateOfType<TelemetryWrapperState>()?.markResponseComplete();
       setState(() {
         _matchedChoiceIndex = index;
         _roundComplete = true;

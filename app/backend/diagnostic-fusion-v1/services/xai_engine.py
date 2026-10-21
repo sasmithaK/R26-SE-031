@@ -4,6 +4,8 @@ import joblib
 import shap
 import pandas as pd
 
+from services.c3_features import FEATURE_LABELS
+
 # Map model predictions to learning patterns
 SUBTYPE_MAP = {
     0: "Typical Learning Pattern",
@@ -41,8 +43,9 @@ class XAIEngine:
         self.explainer = shap.TreeExplainer(self.model)
         
     def _translate_shap_to_human(self, feature_name, feature_value, shap_val):
-        direction = "increased" if shap_val > 0 else "decreased" if shap_val < 0 else "did not change"
-        return f"{feature_name}={feature_value:.3f} {direction} the relative feature contribution to the identified learning pattern."
+        direction = "raised" if shap_val > 0 else "lowered" if shap_val < 0 else "did not change"
+        label = FEATURE_LABELS.get(feature_name, feature_name)
+        return f"{label} ({feature_value:.3f}) {direction} the estimate for this pattern."
 
     def _class_shap(self, df: pd.DataFrame, predicted_class: int) -> np.ndarray:
         shap_values = self.explainer.shap_values(df)
@@ -53,27 +56,33 @@ class XAIEngine:
             return shap_values[0, :, predicted_class]
         return shap_values[0]
 
-    def analyze_patient(self, request_data: dict, marginalize: dict | None = None) -> dict:
-        """Run prediction and SHAP for one complete feature vector.
+    def analyze_patient(self, request_data: dict, marginalize: dict | None = None,
+                        allow_missing: bool = True) -> dict:
+        """Prediction and SHAP for one learner.
 
-        ``marginalize`` maps an *unknown* covariate (for example gender) to the
-        values it can take. Instead of inventing one value, the model is run
-        for each value and the probabilities and SHAP values are averaged
-        with equal weight. Every other feature must be measured.
+        Missing inputs are passed as NaN: the model was trained with natural
+        gaps (for example no activity evidence yet) and handles them natively;
+        nothing is imputed. ``marginalize`` maps an unknown covariate to its
+        possible values and averages over them (kept for older feature sets).
         """
         if self.model is None:
             raise RuntimeError("Fusion model unavailable; no fabricated prediction is returned")
         marginalize = marginalize or {}
-        required = [name for name in self.feature_names if name not in marginalize]
-        missing = []
-        for name in required:
+        cleaned, missing = {}, []
+        for name in self.feature_names:
+            if name in marginalize:
+                continue
             try:
-                if not np.isfinite(float(request_data[name])):
-                    missing.append(name)
+                value = float(request_data[name])
+                if not np.isfinite(value):
+                    raise ValueError
             except (KeyError, TypeError, ValueError):
+                value = np.nan
                 missing.append(name)
-        if missing:
+            cleaned[name] = value
+        if missing and not allow_missing:
             raise ValueError("Missing/non-finite fusion inputs: " + ", ".join(missing))
+        request_data = cleaned
 
         variants = [dict(request_data)]
         for name, values in marginalize.items():
@@ -86,8 +95,8 @@ class XAIEngine:
 
         feature_importance = []
         for i, feat_name in enumerate(self.feature_names):
-            if feat_name in marginalize:
-                continue  # averaged out; not a measured contribution
+            if feat_name in marginalize or feat_name in missing:
+                continue  # averaged out or not measured: no contribution to explain
             val = float(frames[0].iloc[0][feat_name])
             s_val = float(class_shap_values[i])
             feature_importance.append({"feature_name": feat_name, "value": val, "shap_val": s_val, "abs_shap": abs(s_val)})
@@ -109,6 +118,7 @@ class XAIEngine:
                 "primary_pattern": SUBTYPE_MAP[predicted_class],
                 "confidence": round(float(np.max(probas)), 3),
                 "modalities_used": ["speech-reading measures", "touch-interaction measures", "learner context"],
+                "missing_inputs": missing,
                 "final_predicted_risk": round(float(1.0 - probas[0]), 3),
                 "marginalized_covariates": sorted(marginalize),
                 "validation_status": "synthetic_trained_model",

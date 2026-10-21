@@ -264,6 +264,8 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
   void _onItemTapped(_GameItem item) {
     if (_roundComplete || item.isFound || _scaffoldPending) return;
 
+    // Any picture tap is an answer (first one sets the response time).
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
     _resetHintTimer();
 
     if (item.isTarget) {
@@ -277,6 +279,9 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
       _foundCountBounceController.forward(from: 0);
 
       if (_foundCount == _targetCount) {
+        // Response time ends at the last correct tap, not after the
+        // 1.4 s celebration below.
+        context.findAncestorStateOfType<TelemetryWrapperState>()?.markResponseComplete();
         _roundComplete = true;
         Future.delayed(const Duration(milliseconds: 1400), () {
           if (!mounted) return;

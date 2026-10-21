@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../services/therapist_dashboard_service.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/c3_evidence_chat_panel.dart';
 import '../../widgets/dashboard/dashboard_kit.dart';
 
 /// Therapist student-detail tabs for C1 (activities and touch), C2 (reading
@@ -20,14 +19,14 @@ const Map<String, String> kPatternNames = {
 const Map<String, String> kIndexNames = {
   'visual_processing_index': 'Visual processing speed',
   'phonological_task_index': 'Sound-task speed',
-  'motor_interaction_index': 'Touch precision',
+  'motor_interaction_index': 'Wrong taps and pauses',
   'attention_stability_index': 'Attention steadiness',
 };
 
 const Map<String, String> kIndexHints = {
-  'visual_processing_index': 'From first-touch time on picture and letter tasks',
+  'visual_processing_index': 'From average time to first touch (3.5 s scores 50)',
   'phonological_task_index': 'Only measured on sound and letter-sound tasks',
-  'motor_interaction_index': 'Fewer misclicks and hesitations score higher',
+  'motor_interaction_index': 'Fewer wrong answers and long pauses score higher',
   'attention_stability_index': 'Fewer pauses over 8 seconds score higher',
 };
 
@@ -62,7 +61,7 @@ String _readingStatusLabel(String? status) {
     case 'available':
       return 'Clear enough to measure';
     case 'uncertain':
-      return 'Measured, but methods disagree';
+      return 'Measured with low confidence';
     case 'retry_required':
       return 'Recording too unclear to measure';
     case 'persistence_failed':
@@ -317,29 +316,32 @@ class TherapistActivityTab extends StatelessWidget {
     );
   }
 
+  static bool _insufficient(String? state) =>
+      state == null || state == 'UNAVAILABLE' || state == 'INSUFFICIENT_DATA';
+
   Widget _sessionState(Map<String, dynamic> state, Map<String, dynamic> data) {
     final fatigueState = (data['fatigue_state'] ?? _map(state['fatigue'])['state'])?.toString();
     final load = _map(state['interaction_state'])['state']?.toString();
     final quality = DashFormat.number(_map(state['quality'])['quality_score']);
     return DashCard(
       title: 'During the latest session',
-      subtitle: 'Fatigue compares the first and last three rounds',
+      subtitle: 'Fatigue compares early and late completed rounds (2 vs 2 for 4-5 rounds, 3 vs 3 for 6+)',
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
         children: [
           StatusChip(
-            label: 'Fatigue: ${fatigueState == null || fatigueState == 'UNAVAILABLE' ? 'needs 6+ rounds' : DashFormat.words(fatigueState)}',
+            label: 'Fatigue: ${_insufficient(fatigueState) ? 'needs 4+ completed rounds' : DashFormat.words(fatigueState!)}',
             tone: _stateTone(fatigueState),
             icon: Icons.battery_charging_full_rounded,
           ),
           StatusChip(
-            label: 'Effort: ${load == null ? DashFormat.missing : DashFormat.words(load)}',
+            label: 'Effort: ${_insufficient(load) ? 'needs 3+ completed rounds' : DashFormat.words(load!)}',
             tone: _stateTone(load),
             icon: Icons.psychology_alt_outlined,
           ),
           StatusChip(
-            label: 'Data quality: ${quality == null ? DashFormat.missing : '${(quality * 100).round()}%'}',
+            label: 'Data completeness: ${quality == null ? DashFormat.missing : '${(quality * 100).round()}%'}',
             tone: quality == null ? DashTone.neutral : (quality >= 0.8 ? DashTone.good : DashTone.watch),
             icon: Icons.fact_check_outlined,
           ),
@@ -349,14 +351,23 @@ class TherapistActivityTab extends StatelessWidget {
   }
 
   Widget _keyNumbers() {
+    final window = _map(data['window']);
+    final rounds = DashFormat.number(window['completed_rounds'])?.round();
+    final started = DashFormat.number(window['sessions_started'])?.round();
+    final early = DashFormat.number(window['sessions_ended_early'])?.round() ?? 0;
     return DashCard(
       title: 'Key numbers',
-      subtitle: 'Weighted by responses across the period',
+      subtitle: rounds == null
+          ? 'Pooled over completed rounds in the period'
+          : '$rounds completed rounds in $started sessions'
+              '${early > 0 ? ' ($early ended before a round was finished)' : ''}'
+              ' · every completed round counts once',
       child: MetricGrid(
         children: [
           MetricTile(
             label: 'Correct on first try',
             value: DashFormat.percent(data['first_attempt_accuracy']),
+            detail: rounds == null ? null : '${window['first_try_correct'] ?? 0} of $rounds rounds',
             icon: Icons.check_circle_outline_rounded,
             tone: DashTone.good,
           ),
@@ -367,13 +378,15 @@ class TherapistActivityTab extends StatelessWidget {
             tone: DashTone.watch,
           ),
           MetricTile(
-            label: 'Median response time',
+            label: 'Median time to first answer',
             value: DashFormat.millis(data['median_response_latency_ms']),
+            detail: 'First choice, tap or drop (older sessions: first touch)',
             icon: Icons.timer_outlined,
           ),
           MetricTile(
             label: 'Time to correct answer',
             value: DashFormat.millis(data['median_time_to_correct_ms']),
+            detail: 'Round start to final correct answer',
             icon: Icons.hourglass_bottom_rounded,
           ),
           MetricTile(
@@ -384,8 +397,16 @@ class TherapistActivityTab extends StatelessWidget {
           MetricTile(
             label: 'Self-corrections',
             value: DashFormat.percent(data['correction_rate']),
+            detail: 'Recorded in letter/word ordering tasks only',
             icon: Icons.edit_outlined,
           ),
+          if (window['stray_drops_per_drag_round'] != null)
+            MetricTile(
+              label: 'Drags dropped outside a target',
+              value: DashFormat.number(window['stray_drops_per_drag_round'])!.toStringAsFixed(1),
+              detail: 'Per drag round; a movement miss, not a wrong answer',
+              icon: Icons.pan_tool_alt_outlined,
+            ),
         ],
       ),
     );
@@ -409,6 +430,9 @@ class TherapistActivityTab extends StatelessWidget {
                     label: kIndexNames[key]!,
                     value: DashFormat.number(indices[key]) == null ? null : DashFormat.number(indices[key])! / 100,
                     marker: DashFormat.number(baseline[key]) == null ? null : DashFormat.number(baseline[key])! / 100,
+                    valueLabel: DashFormat.number(indices[key]) == null
+                        ? null
+                        : '${DashFormat.number(indices[key])!.round()} / 100',
                     detail: kIndexHints[key],
                     color: AppColors.calmBlue,
                   ),
@@ -467,7 +491,7 @@ class TherapistActivityTab extends StatelessWidget {
     final sessions = DashFormat.number(k['sessions'])?.round() ?? 0;
     return DashCard(
       title: 'Touch and movement',
-      subtitle: 'Medians from drag and trace activities ($sessions sessions)',
+      subtitle: 'Medians over $sessions sessions · path and smoothness from drag strokes only',
       child: sessions == 0
           ? Text('Appears after drag activities such as sorting, word building or sentence order.',
               style: DashText.body(fontSize: 14))
@@ -504,19 +528,49 @@ class TherapistActivityTab extends StatelessWidget {
       if (v != null) probs[kPatternNames[key] ?? key] = v;
     });
     final predicted = kPatternNames[estimate['predicted_pattern']] ?? estimate['predicted_pattern']?.toString();
+    final evidence = _map(estimate['evidence']);
+    final missing = _list(estimate['missing_evidence']).map((e) => e.toString()).toList();
+    final outside = _list(estimate['outside_range']).whereType<Map>().toList();
+    final notes = _list(estimate['notes']).map((e) => e.toString()).toList();
+    final rounds = DashFormat.number(evidence['completed_rounds'])?.round();
     return DashCard(
-      title: 'Activity pattern estimate',
-      subtitle: 'Random Forest, version ${estimate['model_version'] ?? '-'} · trained on synthetic data · for review only',
+      title: 'Learner pattern estimate (last ${estimate['window_days'] ?? 14} days)',
+      subtitle: 'Gradient boosting, version ${estimate['model_version'] ?? '-'} · trained on simulated learners · '
+          'for review only${rounds == null ? '' : ' · $rounds completed rounds'}',
       accent: AppColors.calmBlue,
       child: !available
-          ? Text(
-              estimate['unavailable_reason']?.toString() ?? 'The estimate appears after a complete activity session.',
-              style: DashText.body(fontSize: 14),
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  estimate['unavailable_reason']?.toString() ?? 'The estimate updates after each activity.',
+                  style: DashText.body(fontSize: 14),
+                ),
+                if (missing.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  for (final gap in missing)
+                    LabeledValueRow(label: 'Still needed', value: gap),
+                ],
+                if (outside.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  for (final row in outside)
+                    LabeledValueRow(
+                      label: (row['label'] ?? row['feature']).toString(),
+                      hint: 'Trained range ${_list(row['training_range']).map((v) => DashFormat.number(v)?.toStringAsFixed(2) ?? '-').join(' to ')}',
+                      value: DashFormat.number(row['value'])?.toStringAsFixed(2) ?? DashFormat.missing,
+                    ),
+                ],
+              ],
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ProbabilityBar(probabilities: probs),
+                for (final note in notes)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(note, style: DashText.caption(fontSize: 13)),
+                  ),
                 const SizedBox(height: 12),
                 Text('Do you agree with "$predicted"?', style: DashText.body(fontSize: 14, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
@@ -667,6 +721,14 @@ class TherapistReadingTab extends StatelessWidget {
             color: AppColors.warmAmber,
             minY: 0,
           ),
+          DateTrendChart(
+            title: 'Reading rate (words per minute, clear recordings)',
+            points: _list(data['session_trend']),
+            valueKey: 'reading_rate_wpm',
+            color: AppColors.calmBlue,
+            minY: 0,
+          ),
+          _letterChanges(),
           _items(),
           _research(latest),
         ],
@@ -724,6 +786,24 @@ class TherapistReadingTab extends StatelessWidget {
           ),
           LabeledValueRow(label: 'Pauses (0.2-3 s)', value: DashFormat.count(latest['pause_count'], fallback: DashFormat.missing)),
           LabeledValueRow(label: 'Time spent pausing', value: DashFormat.percent(latest['pause_ratio'])),
+          if (_list(latest['disagreement_reasons']).isNotEmpty)
+            LabeledValueRow(
+              label: 'Why confidence is low',
+              value: _list(latest['disagreement_reasons']).map((r) => DashFormat.words(r.toString())).join(', '),
+            ),
+          if (_list(latest['quality_issues']).isNotEmpty)
+            LabeledValueRow(
+              label: 'Recording issues',
+              value: _list(latest['quality_issues']).map((r) => DashFormat.words(r.toString())).join(', '),
+            ),
+          if (latest['measured'] == false && status != null && status != 'unavailable')
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'This recording could not be measured, so no reading accuracy is shown for it.',
+                style: DashText.caption(fontSize: 13),
+              ),
+            ),
           const SizedBox(height: 10),
           _comparison(
             (latest['expected_text'] ?? '').toString(),
@@ -748,6 +828,27 @@ class TherapistReadingTab extends StatelessWidget {
           const SizedBox(height: 8),
           Text('Heard by speech recognition', style: DashText.caption(fontSize: 13, fontWeight: FontWeight.w700)),
           Text(recognized.isEmpty ? '(nothing recognised)' : recognized, style: DashText.sinhala(fontSize: 17)),
+        ],
+      ),
+    );
+  }
+
+  Widget _letterChanges() {
+    final counts = _map(data['letter_change_counts']);
+    if (counts.isEmpty) return const SizedBox.shrink();
+    return DashCard(
+      title: 'Letters read differently',
+      subtitle: 'Expected letter → letter recognised, across clear recordings. '
+          'Speech recognition can also cause these; check before acting.',
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final entry in counts.entries)
+            StatusChip(
+              label: '${entry.key} · ${DashFormat.count(entry.value)}',
+              tone: DashTone.watch,
+            ),
         ],
       ),
     );
@@ -815,7 +916,34 @@ class TherapistReadingTab extends StatelessWidget {
           else
             Text((item['expected_text'] ?? '').toString(), style: DashText.sinhala(fontSize: 16)),
           const SizedBox(height: 6),
-          StatusChip(label: _readingStatusLabel(status), tone: _stateTone(status)),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              StatusChip(label: _readingStatusLabel(status), tone: _stateTone(status)),
+              if ((DashFormat.number(item['attempts_for_item']) ?? 1) > 1)
+                StatusChip(
+                  label: 'Recorded ${DashFormat.count(item['attempts_for_item'])} times',
+                  tone: DashTone.neutral,
+                ),
+            ],
+          ),
+          if (_list(item['letter_changes']).isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Letters: ${_list(item['letter_changes']).whereType<Map>().map((c) => c['op'] == 'deletion' ? '${c['expected']} missed' : '${c['expected']} → ${c['observed']}').join(', ')}',
+                style: DashText.sinhala(fontSize: 14),
+              ),
+            ),
+          if (_list(item['quality_issues']).isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Recording issues: ${_list(item['quality_issues']).map((r) => DashFormat.words(r.toString())).join(', ')}',
+                style: DashText.caption(fontSize: 13),
+              ),
+            ),
         ],
       ),
     );
@@ -852,7 +980,13 @@ class TherapistReadingTab extends StatelessWidget {
             hint: 'Model certainty about the transcript, not reading accuracy',
             value: DashFormat.percent(latest['stt_confidence']),
           ),
-          LabeledValueRow(label: 'Pipeline', value: (data['model_version'] ?? '-').toString()),
+          LabeledValueRow(
+            label: 'Pipeline',
+            value: [latest['pipeline_version'], latest['asr_model']]
+                .where((v) => v != null && v.toString().isNotEmpty)
+                .join(' · ')
+                .ifEmpty((data['model_version'] ?? '-').toString()),
+          ),
         ],
       ),
     );
@@ -987,10 +1121,6 @@ class TherapistCombinedProfileTab extends StatelessWidget {
             ],
           ),
         ),
-        if (studentId.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          C3EvidenceChatPanel(studentId: studentId),
-        ],
       ],
     );
   }
@@ -1035,4 +1165,9 @@ class TherapistCombinedProfileTab extends StatelessWidget {
             ),
     );
   }
+}
+
+
+extension _IfEmpty on String {
+  String ifEmpty(String fallback) => isEmpty ? fallback : this;
 }

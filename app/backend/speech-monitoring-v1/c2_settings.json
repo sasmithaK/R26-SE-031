@@ -7,15 +7,36 @@
     "min_active_frame_ratio": 0.04,
     "max_clipping_ratio": 0.02,
     "noisy_snr_db": 7.0,
-    "noisy_spectral_flatness": 0.30,
-    "score_weights": {"duration": 0.20, "level": 0.25, "clarity": 0.35, "clipping": 0.20}
+    "noisy_spectral_flatness": 0.3,
+    "score_weights": {
+      "duration": 0.2,
+      "level": 0.25,
+      "clarity": 0.35,
+      "clipping": 0.2
+    }
   },
   "fusion": {
-    "reading_score_weights": {"grapheme_accuracy": 0.70, "word_accuracy": 0.20, "syllable_consistency": 0.10},
+    "reading_score_weights": {
+      "grapheme_accuracy": 0.7,
+      "word_accuracy": 0.2,
+      "syllable_consistency": 0.1
+    },
     "text_acoustic_disagreement": 0.45,
     "low_asr_confidence": 0.35,
-    "close_text_grapheme_accuracy": 0.80,
-    "disagreement_confidence_penalty": 0.70
+    "close_text_grapheme_accuracy": 0.8,
+    "disagreement_confidence_penalty": 0.7
   },
-  "pauses": {"min_ms": 200, "max_ms": 3000}
+  "pauses": {
+    "min_ms": 200,
+    "max_ms": 3000
+  },
+  "syllable_peaks": {
+    "_comment": "librosa onset_detect windows in frames of 32 ms. Provisional: tune on labelled child recordings (expected vs detected beats).",
+    "wait": 4,
+    "pre_max": 3,
+    "post_max": 3,
+    "pre_avg": 10,
+    "post_avg": 10,
+    "delta": 0.2
+  }
 }

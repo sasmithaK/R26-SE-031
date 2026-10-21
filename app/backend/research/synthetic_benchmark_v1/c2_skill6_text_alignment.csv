@@ -1,0 +1,73 @@
+synthetic_subject_id,dataset_id,skill_id,activity_id,item_id,expected_text,recognized_text,perturbation_family,word_error_rate,grapheme_error_rate,grapheme_accuracy,grapheme_edit_count,raw_codepoint_edit_count,reference_graphemes,observed_graphemes,exact_match,data_origin,validation_status
+syn-c2-20261021-0000-exact,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R01,ගස,ගස,exact,0.0,0.0,1.0,0,0,2,2,True,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0000-substitution,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R01,ගස,ගග,substitution,1.0,0.5,0.5,1,1,2,2,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0000-deletion,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R01,ගස,ග,deletion,1.0,0.5,0.5,1,1,2,1,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0000-insertion,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R01,ගස,ගසස,insertion,1.0,0.5,0.5,1,1,2,3,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0000-repetition,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R01,ගස,ගසස,repetition,1.0,0.5,0.5,1,1,2,3,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0000-multiple_errors,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R01,ගස,සගසස,multiple_errors,1.0,1.0,0.0,2,2,2,4,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0001-exact,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R02,"ගඟ
+මල",ගඟ මල,exact,0.0,0.0,1.0,0,0,4,4,True,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0001-substitution,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R02,"ගඟ
+මල",ගඟ ඟල,substitution,0.5,0.25,0.75,1,1,4,4,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0001-deletion,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R02,"ගඟ
+මල",ගඟ ම,deletion,0.5,0.25,0.75,1,1,4,3,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0001-insertion,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R02,"ගඟ
+මල",ගඟ මගල,insertion,0.5,0.25,0.75,1,1,4,5,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0001-repetition,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R02,"ගඟ
+මල",ගඟ මලල,repetition,0.5,0.25,0.75,1,1,4,5,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0001-multiple_errors,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R02,"ගඟ
+මල",ගඟ ඟල,multiple_errors,0.5,0.25,0.75,1,1,4,4,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0002-exact,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R03,"ගඟ ළඟ ගස
+ගස යට මල",ගඟ ළඟ ගස ගස යට මල,exact,0.0,0.0,1.0,0,0,12,12,True,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0002-substitution,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R03,"ගඟ ළඟ ගස
+ගස යට මල",ගඟ ළඟ ගස ටස යට මල,substitution,0.16666666666666666,0.08333333333333333,0.9166666666666666,1,1,12,12,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0002-deletion,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R03,"ගඟ ළඟ ගස
+ගස යට මල",ගඟ ළඟ ස ගස යට මල,deletion,0.16666666666666666,0.08333333333333333,0.9166666666666666,1,1,12,11,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0002-insertion,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R03,"ගඟ ළඟ ගස
+ගස යට මල",ගඟ ළඟල ගස ගස යට මල,insertion,0.16666666666666666,0.08333333333333333,0.9166666666666666,1,1,12,13,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0002-repetition,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R03,"ගඟ ළඟ ගස
+ගස යට මල",ගඟ ළඟ ගස ගගස යට මල,repetition,0.16666666666666666,0.08333333333333333,0.9166666666666666,1,1,12,13,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0002-multiple_errors,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R03,"ගඟ ළඟ ගස
+ගස යට මල",ගගඟ ළඟ ගස ගස යම ළල,multiple_errors,0.5,0.25,0.75,3,3,12,13,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0003-exact,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R04,"ගගන නයන
+අර බලන්න.",ගගන නයන අර බලන්න,exact,0.0,0.0,1.0,0,0,11,11,True,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0003-substitution,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R04,"ගගන නයන
+අර බලන්න.",ගගග නයන අර බලන්න,substitution,0.25,0.09090909090909091,0.9090909090909091,1,1,11,11,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0003-deletion,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R04,"ගගන නයන
+අර බලන්න.",ගගන නය අර බලන්න,deletion,0.25,0.09090909090909091,0.9090909090909091,1,1,11,10,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0003-insertion,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R04,"ගගන නයන
+අර බලන්න.",ගන්නගන නයන අර බලන්න,insertion,0.25,0.09090909090909091,0.9090909090909091,1,3,11,12,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0003-repetition,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R04,"ගගන නයන
+අර බලන්න.",ගගන නයන අඅර බලන්න,repetition,0.25,0.09090909090909091,0.9090909090909091,1,1,11,12,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0003-multiple_errors,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R04,"ගගන නයන
+අර බලන්න.",ගගන ලයන අර බරන්න,multiple_errors,0.5,0.18181818181818182,0.8181818181818181,2,2,11,11,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0004-exact,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R05,"ගස වට කර මල්
+ඉහළ පහළ මල්",ගස වට කර මල් ඉහළ පහළ මල්,exact,0.0,0.0,1.0,0,0,16,16,True,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0004-substitution,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R05,"ගස වට කර මල්
+ඉහළ පහළ මල්",ගස වල් කර මල් ඉහළ පහළ මල්,substitution,0.14285714285714285,0.0625,0.9375,1,2,16,16,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0004-deletion,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R05,"ගස වට කර මල්
+ඉහළ පහළ මල්",ගස වට ක මල් ඉහළ පහළ මල්,deletion,0.14285714285714285,0.0625,0.9375,1,1,16,15,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0004-insertion,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R05,"ගස වට කර මල්
+ඉහළ පහළ මල්",ගස වට කර මල් ඉහළල් පහළ මල්,insertion,0.14285714285714285,0.0625,0.9375,1,2,16,17,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0004-repetition,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R05,"ගස වට කර මල්
+ඉහළ පහළ මල්",ගස වට කර මල්ල් ඉහළ පහළ මල්,repetition,0.14285714285714285,0.0625,0.9375,1,2,16,16,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0004-multiple_errors,sip-c2-alignment-v1,skill_6,act_1,S6_A1_R05,"ගස වට කර මල්
+ඉහළ පහළ මල්",ගස වට කර මල් ඉළ හ මල්,multiple_errors,0.2857142857142857,0.1875,0.8125,3,3,16,13,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0005-exact,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R01,රෝස මල,රෝස මල,exact,0.0,0.0,1.0,0,0,4,4,True,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0005-substitution,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R01,රෝස මල,රෝම මල,substitution,0.5,0.25,0.75,1,1,4,4,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0005-deletion,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R01,රෝස මල,රෝස ම,deletion,0.5,0.25,0.75,1,1,4,3,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0005-insertion,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R01,රෝස මල,රෝසස මල,insertion,0.5,0.25,0.75,1,1,4,5,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0005-repetition,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R01,රෝස මල,රෝස මලල,repetition,0.5,0.25,0.75,1,1,4,5,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0005-multiple_errors,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R01,රෝස මල,ස මල,multiple_errors,0.5,0.25,0.75,1,2,4,3,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0006-exact,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R02,මව කිරිබත් උයයි.,මව කිරිබත් උයයි,exact,0.0,0.0,1.0,0,0,9,9,True,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0006-substitution,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R02,මව කිරිබත් උයයි.,මව මරිබත් උයයි,substitution,0.3333333333333333,0.1111111111111111,0.8888888888888888,1,2,9,9,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0006-deletion,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R02,මව කිරිබත් උයයි.,ම කිරිබත් උයයි,deletion,0.3333333333333333,0.1111111111111111,0.8888888888888888,1,1,9,8,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0006-insertion,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R02,මව කිරිබත් උයයි.,මව කිරිබයිත් උයයි,insertion,0.3333333333333333,0.1111111111111111,0.8888888888888888,1,2,9,10,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0006-repetition,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R02,මව කිරිබත් උයයි.,මවව කිරිබත් උයයි,repetition,0.3333333333333333,0.1111111111111111,0.8888888888888888,1,1,9,10,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0006-multiple_errors,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R02,මව කිරිබත් උයයි.,මව කිමබත් උයයි,multiple_errors,0.3333333333333333,0.1111111111111111,0.8888888888888888,1,2,9,9,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0007-exact,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R03,පියා කඩේ යයි.,පියා කඩේ යයි,exact,0.0,0.0,1.0,0,0,6,6,True,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0007-substitution,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R03,පියා කඩේ යයි.,ඩේයා කඩේ යයි,substitution,0.3333333333333333,0.16666666666666666,0.8333333333333334,1,2,6,6,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0007-deletion,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R03,පියා කඩේ යයි.,පියා ක යයි,deletion,0.3333333333333333,0.16666666666666666,0.8333333333333334,1,2,6,5,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0007-insertion,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R03,පියා කඩේ යයි.,පියා කඩේ යයියා,insertion,0.3333333333333333,0.16666666666666666,0.8333333333333334,1,2,6,7,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0007-repetition,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R03,පියා කඩේ යයි.,පියා කඩේඩේ යයි,repetition,0.3333333333333333,0.16666666666666666,0.8333333333333334,1,2,6,7,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy
+syn-c2-20261021-0007-multiple_errors,sip-c2-alignment-v1,skill_6,act_2,S6_A2_R03,පියා කඩේ යයි.,පිඩේයියා කඩේ යයි,multiple_errors,0.3333333333333333,0.3333333333333333,0.6666666666666667,2,4,6,8,False,synthetic_text_perturbation_not_audio,alignment_algorithm_test_not_asr_accuracy

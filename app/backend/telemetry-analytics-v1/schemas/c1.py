@@ -22,6 +22,8 @@ class BehavioralFeatures(BaseModel):
     hesitation_count: Optional[int] = 0
     misclick_count: Optional[int] = 0
     replay_count: Optional[int] = 0
+    completed_rounds: Optional[int] = None
+    abandoned_rounds: Optional[int] = None
 
 class LearnerIndices(BaseModel):
     # New non-overclaiming terminology
@@ -38,18 +40,20 @@ class LearnerIndices(BaseModel):
     attention_stability_index: Optional[float] = None
 
 class FatigueState(BaseModel):
-    score: float = Field(default=0.0)
-    state: str = Field(default="LOW", description="LOW, MODERATE, HIGH, VERY_HIGH")
+    # None (not 0) when too few completed rounds were played to measure it.
+    score: Optional[float] = None
+    state: str = Field(default="INSUFFICIENT_DATA", description="LOW, MODERATE, HIGH, VERY_HIGH or INSUFFICIENT_DATA")
 
 class InteractionState(BaseModel):
-    score: float = Field(default=0.0)
-    state: str = Field(default="ENGAGED", description="ENGAGED, MODERATE_LOAD, HIGH_LOAD")
+    score: Optional[float] = None
+    state: str = Field(default="INSUFFICIENT_DATA", description="ENGAGED, MODERATE_LOAD, HIGH_LOAD or INSUFFICIENT_DATA")
 
 class QualityMetrics(BaseModel):
     events_received: int
     events_valid: int
     events_invalid: int
     missing_feature_rate: float
+    missing_features: list[str] = Field(default_factory=list)
     quality_score: float
 
 class ModelMetadata(BaseModel):
@@ -111,6 +115,10 @@ class SessionSummary(BaseModel):
     started_at: str
     completed_at: str
     total_trials: int
+    # Completed vs abandoned rounds; every rate in ``overall`` is over
+    # ``valid_trials`` and is None when no round was completed.
+    valid_trials: Optional[int] = None
+    abandoned_trials: Optional[int] = None
     overall: dict
     error_profile: dict
     behavioral_fatigue_proxy: Optional[float]

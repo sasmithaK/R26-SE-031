@@ -43,6 +43,11 @@ class ParentOverviewDTO(APIResponseBase):
     sessions_completed: int
     reading_progress: str
     assessment_summary: Dict[str, Any] = Field(default_factory=dict)
+    # Same pooled window as the therapist dashboard.
+    window_days: Optional[int] = None
+    completed_rounds: int = 0
+    sessions_ended_early: int = 0
+    median_response_latency_ms: Optional[float] = None
 
 class ParentReadingFluencyDTO(APIResponseBase):
     fluency_status: str
@@ -153,6 +158,12 @@ class TherapistOverviewDTO(MLResponseBase):
     gender: Optional[str] = None
     coverage: Dict[str, Any] = Field(default_factory=dict)
     alerts: List[Dict[str, Any]] = Field(default_factory=list)
+    # Pooled completed rounds over the dashboard window (same numbers as the
+    # Activities tab and the parent dashboard).
+    c1_window: Dict[str, Any] = Field(default_factory=dict)
+    # ``overall_mastery`` averages practised areas only.
+    mastery_practised_areas: int = 0
+    mastery_total_areas: int = 0
 
 class KCPerformance(BaseModel):
     KC_VISUAL_IDENTIFICATION: Optional[float] = None
@@ -190,6 +201,7 @@ class BehavioralTrends(BaseModel):
 class TherapistC1BehavioralDTO(MLResponseBase):
     session_id: Optional[str] = None
     data_source: str = "session_summaries"
+    window: Dict[str, Any] = Field(default_factory=dict)
     first_attempt_accuracy: Optional[float] = None
     median_response_latency_ms: Optional[float] = None
     retry_rate: Optional[float] = None
@@ -238,6 +250,10 @@ class SpeechLatest(BaseModel):
     recording_quality: str
     record_start_delay_ms: Optional[float] = None
     recording_quality_score: Optional[float] = None
+    measured: bool = False
+    pipeline_version: Optional[str] = None
+    asr_model: Optional[str] = None
+    disagreement_reasons: List[str] = Field(default_factory=list)
     item_id: Optional[str] = None
     recorded_at: Optional[str] = None
 
@@ -258,6 +274,7 @@ class TherapistC2SpeechDTO(MLResponseBase):
     quality_issue_counts: Dict[str, int] = Field(default_factory=dict)
     items: List[Dict[str, Any]] = Field(default_factory=list)
     session_trend: List[Dict[str, Any]] = Field(default_factory=list)
+    letter_change_counts: Dict[str, int] = Field(default_factory=dict)
 
 class ShapExplanation(BaseModel):
     feature: str
@@ -286,6 +303,9 @@ class TherapistC3ProfileDTO(MLResponseBase):
     sources_used: List[str] = Field(default_factory=list)
     latest_feedback: Optional[Dict[str, Any]] = None
     marginalized_covariates: List[str] = Field(default_factory=list)
+    outside_range: List[Dict[str, Any]] = Field(default_factory=list)
+    not_measured_inputs: List[str] = Field(default_factory=list)
+    c1_evidence_used: bool = False
 
 class KnowledgeComponent(BaseModel):
     id: str

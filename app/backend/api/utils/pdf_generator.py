@@ -54,11 +54,15 @@ def generate_parent_learning_report(data: dict) -> bytes:
     pdf.set_font("Helvetica", "", 11)
 
     heading("Practice")
-    line(f"Practice sessions: {data.get('sessions', 0)}")
+    line(f"Practice sessions: {data.get('sessions', 0)}"
+         + (f" ({data['sessions_ended_early']} ended before a round was finished)" if data.get("sessions_ended_early") else ""))
+    line(f"Completed activity rounds: {data.get('completed_rounds', 0)}")
     minutes = data.get("minutes")
     line(f"Practice time: {'not recorded yet' if minutes is None else f'{minutes} minutes'}")
     line(f"Last activity: {data.get('last_active') or 'not recorded yet'}")
     line(f"Correct on the first try: {_pct(data.get('first_try_accuracy'))}")
+    seconds = data.get("typical_answer_seconds")
+    line(f"Typical time to first touch: {'not recorded yet' if seconds is None else f'{seconds:.1f} seconds'}")
 
     heading("Activities")
     activities = data.get("activities") or []
