@@ -57,12 +57,11 @@ class _SplashScreenState extends State<SplashScreen>
           final isTherapist = cachedRole == 'therapist' || cachedRole == 'specialist';
           
           // We can let getUserProfile run in the background if we want, but no need to await it here
-          void fetchProfile() async {
+          Future.microtask(() async {
             try {
               await AuthService().getUserProfile();
             } catch (_) {}
-          }
-          fetchProfile();
+          });
 
           if (!mounted) return;
           Navigator.of(context).pushReplacement(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -24,6 +26,7 @@ class _SpeechBubbleState extends State<SpeechBubble>
   late AnimationController _scaleController;
   late AnimationController _typeController;
   late Animation<double> _scaleAnimation;
+  Timer? _delayTimer;
 
   // Break text into grapheme clusters to safely handle all characters
   late List<String> _characters;
@@ -48,7 +51,7 @@ class _SpeechBubbleState extends State<SpeechBubble>
       vsync: this,
     );
 
-    Future.delayed(widget.delay, () {
+    _delayTimer = Timer(widget.delay, () {
       if (mounted) {
         _scaleController.forward().then((_) {
           if (mounted) _typeController.forward();
@@ -59,6 +62,7 @@ class _SpeechBubbleState extends State<SpeechBubble>
 
   @override
   void dispose() {
+    _delayTimer?.cancel();
     _scaleController.dispose();
     _typeController.dispose();
     super.dispose();
@@ -98,8 +102,8 @@ class _SpeechBubbleState extends State<SpeechBubble>
             child: AnimatedBuilder(
               animation: _typeController,
               builder: (context, child) {
-                final charCount =
-                    (_typeController.value * _characters.length).round();
+                final charCount = (_typeController.value * _characters.length)
+                    .round();
                 final displayText = _characters.take(charCount).join();
                 return Text(
                   displayText,
@@ -114,10 +118,7 @@ class _SpeechBubbleState extends State<SpeechBubble>
             ),
           ),
           // Triangle tail pointing down
-          CustomPaint(
-            size: const Size(24, 14),
-            painter: _BubbleTailPainter(),
-          ),
+          CustomPaint(size: const Size(24, 14), painter: _BubbleTailPainter()),
         ],
       ),
     );

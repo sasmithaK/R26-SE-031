@@ -1,9 +1,31 @@
 {
   "c1_random_forest": {
-    "version": "1.0.0",
+    "version": "2.0.0",
     "feature_schema": "c1-features-v1",
-    "training_dataset": "synthetic-v1",
+    "training_dataset": "synthetic-only-c1-live-schema-v2",
     "algorithm": "RandomForestClassifier",
+    "artifact": "dyslexia_rf_model.pkl",
+    "enabled": false,
+    "provenance": "synthetic_only",
+    "validation_status": "integration_validated_not_clinically_validated",
+    "class_names": [
+      "TYPICAL",
+      "VISUAL_ORTHOGRAPHIC_PATTERN",
+      "PHONOLOGICAL_PATTERN",
+      "COMBINED_PATTERN"
+    ],
+    "disabled_reason": "Retired 2026-10-21: per-session features rarely complete and outside training ranges; replaced by c1_learner_model."
+  },
+  "c1_learner_model": {
+    "version": "3.0.0",
+    "feature_schema": "c1-learner-v2",
+    "training_dataset": "simulated-rounds-c1-sim-v1",
+    "algorithm": "HistGradientBoostingClassifier",
+    "artifact": "c1_learner_model.pkl",
+    "ranges": "c1_learner_feature_ranges.json",
+    "enabled": true,
+    "provenance": "synthetic_only",
+    "validation_status": "integration_validated_not_clinically_validated",
     "class_names": [
       "TYPICAL",
       "VISUAL_ORTHOGRAPHIC_PATTERN",

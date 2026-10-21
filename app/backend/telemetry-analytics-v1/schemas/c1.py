@@ -3,6 +3,8 @@ from typing import Optional, Dict
 
 class BehavioralFeatures(BaseModel):
     accuracy: Optional[float] = None
+    independent_accuracy: Optional[float] = None
+    eventual_completion_accuracy: Optional[float] = None
     mean_latency_ms: Optional[float] = None
     median_latency_ms: Optional[float] = None
     latency_std_ms: Optional[float] = None
@@ -20,6 +22,8 @@ class BehavioralFeatures(BaseModel):
     hesitation_count: Optional[int] = 0
     misclick_count: Optional[int] = 0
     replay_count: Optional[int] = 0
+    completed_rounds: Optional[int] = None
+    abandoned_rounds: Optional[int] = None
 
 class LearnerIndices(BaseModel):
     # New non-overclaiming terminology
@@ -36,18 +40,20 @@ class LearnerIndices(BaseModel):
     attention_stability_index: Optional[float] = None
 
 class FatigueState(BaseModel):
-    score: float = Field(default=0.0)
-    state: str = Field(default="LOW", description="LOW, MODERATE, HIGH, VERY_HIGH")
+    # None (not 0) when too few completed rounds were played to measure it.
+    score: Optional[float] = None
+    state: str = Field(default="INSUFFICIENT_DATA", description="LOW, MODERATE, HIGH, VERY_HIGH or INSUFFICIENT_DATA")
 
 class InteractionState(BaseModel):
-    score: float = Field(default=0.0)
-    state: str = Field(default="ENGAGED", description="ENGAGED, MODERATE_LOAD, HIGH_LOAD")
+    score: Optional[float] = None
+    state: str = Field(default="INSUFFICIENT_DATA", description="ENGAGED, MODERATE_LOAD, HIGH_LOAD or INSUFFICIENT_DATA")
 
 class QualityMetrics(BaseModel):
     events_received: int
     events_valid: int
     events_invalid: int
     missing_feature_rate: float
+    missing_features: list[str] = Field(default_factory=list)
     quality_score: float
 
 class ModelMetadata(BaseModel):
@@ -73,8 +79,8 @@ from datetime import datetime
 
 class ParentC1Summary(BaseModel):
     student_id: str
-    overall_progress: int
-    accuracy: int
+    overall_progress: Optional[int] = None
+    accuracy: Optional[int] = None
     response_speed: str
     attention: str
     fatigue: str
@@ -86,21 +92,23 @@ class TherapistC1State(C1Result):
     updated_at: Optional[datetime] = None
 
 class C1TrendPoint(BaseModel):
+    # None = not measured in that session (e.g. fewer than 4 rounds for
+    # fatigue, or every round abandoned), never a fake 0.
     session_id: str
     session_index: int
-    accuracy: float
-    median_latency_ms: float
-    fatigue_score: float
-    hesitation_rate: float
+    accuracy: Optional[float] = None
+    median_latency_ms: Optional[float] = None
+    fatigue_score: Optional[float] = None
+    hesitation_rate: Optional[float] = None
     timestamp: datetime
 
 class C1SessionSummary(BaseModel):
     session_id: str
     session_index: int
-    accuracy: float
-    median_latency_ms: float
-    hesitation_rate: float
-    fatigue_score: float
+    accuracy: Optional[float] = None
+    median_latency_ms: Optional[float] = None
+    hesitation_rate: Optional[float] = None
+    fatigue_score: Optional[float] = None
     timestamp: datetime
 
 class SessionSummary(BaseModel):
@@ -109,12 +117,20 @@ class SessionSummary(BaseModel):
     started_at: str
     completed_at: str
     total_trials: int
+    # Completed vs abandoned rounds; every rate in ``overall`` is over
+    # ``valid_trials`` and is None when no round was completed.
+    valid_trials: Optional[int] = None
+    abandoned_trials: Optional[int] = None
     overall: dict
     error_profile: dict
     behavioral_fatigue_proxy: Optional[float]
+    fatigue_state: Optional[str] = None
     fatigue_components: dict
     knowledge_components: dict
     activity_breakdown: dict
+    # Collision-safe grouping for dashboards; keep the legacy activity-only
+    # map above for existing consumers.
+    activity_breakdown_by_skill: dict = Field(default_factory=dict)
     feature_version: str = "c1-v2"
     schema_version: str = "1.0"
 
@@ -143,4 +159,3 @@ class C3ReadyFeatures(BaseModel):
     audio_replay_rate: Optional[float] = None # Deprecated, use mean_audio_replays_per_audio_trial
     behavioral_fatigue_proxy: Optional[float] = None
     visual_support_accuracy: Optional[float] = None
-

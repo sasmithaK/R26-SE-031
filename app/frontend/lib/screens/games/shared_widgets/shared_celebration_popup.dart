@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../../theme/app_theme.dart';
-import '../../../../../utils/avatar_utils.dart';
+import '../../../theme/app_theme.dart';
+import '../../../utils/avatar_utils.dart';
 
 class SharedCelebrationPopup extends StatelessWidget {
   final Map<String, dynamic>? studentData;
@@ -20,7 +20,9 @@ class SharedCelebrationPopup extends StatelessWidget {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
       duration: const Duration(milliseconds: 800),
-      curve: delay ? const Interval(0.2, 1.0, curve: Curves.elasticOut) : Curves.elasticOut,
+      curve: delay
+          ? const Interval(0.2, 1.0, curve: Curves.elasticOut)
+          : Curves.elasticOut,
       builder: (context, value, child) {
         return Transform.scale(
           scale: value,
@@ -32,7 +34,7 @@ class SharedCelebrationPopup extends StatelessWidget {
               Shadow(
                 color: const Color(0xFFFFD700).withValues(alpha: 0.6),
                 blurRadius: 15 * value,
-              )
+              ),
             ],
           ),
         );
@@ -54,10 +56,7 @@ class SharedCelebrationPopup extends StatelessWidget {
         return Container(
           color: Colors.black.withValues(alpha: 0.4 * scaleAnimation.value),
           child: Center(
-            child: Transform.scale(
-              scale: scaleAnimation.value,
-              child: child,
-            ),
+            child: Transform.scale(scale: scaleAnimation.value, child: child),
           ),
         );
       },
@@ -94,7 +93,7 @@ class SharedCelebrationPopup extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            
+
             // Student Avatar
             Container(
               padding: const EdgeInsets.all(12),
@@ -107,11 +106,12 @@ class SharedCelebrationPopup extends StatelessWidget {
                 width: 80,
                 height: 80,
                 fit: BoxFit.contain,
-                errorBuilder: (c, e, s) => const Icon(Icons.person, size: 80, color: Colors.grey),
+                errorBuilder: (c, e, s) =>
+                    const Icon(Icons.person, size: 80, color: Colors.grey),
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // Title Text
             Text(
               'හොඳයි!',
@@ -123,14 +123,17 @@ class SharedCelebrationPopup extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            
+
             // Activity Title Highlight
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFF4A90D9).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF4A90D9).withValues(alpha: 0.3), width: 1.5),
+                border: Border.all(
+                  color: const Color(0xFF4A90D9).withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
               ),
               child: Text(
                 activityTitle,
@@ -143,7 +146,7 @@ class SharedCelebrationPopup extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Subtitle Text
             Text(
               'ඔබ සියල්ල සාර්ථකව නිම කළා!',
@@ -155,12 +158,15 @@ class SharedCelebrationPopup extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            
+
             // Redesigned Button
             GestureDetector(
               onTap: onFinish,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 36,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF6EC074), Color(0xFF4A9E50)],

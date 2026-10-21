@@ -1,3 +1,4 @@
+from __future__ import annotations
 from database import get_db
 
 async def save_session(session_data: dict) -> None:
@@ -24,10 +25,23 @@ async def save_events(events_list: list[dict]) -> None:
         
     for event in events_list:
         if "event_id" in event:
+            student_id = str(event.get("student_id") or "unknown")
+            ingestion_key = f"{student_id}:{event['event_id']}"
+            event["ingestion_key"] = ingestion_key
+            existing = await db.telemetry_events.find_one(
+                {"ingestion_key": ingestion_key}, {"_id": 1}
+            )
+            if not existing:
+                existing = await db.telemetry_events.find_one(
+                    {"event_id": event["event_id"]}, {"_id": 1}
+                )
+            event_filter = {"_id": existing["_id"]} if existing else {
+                "ingestion_key": ingestion_key
+            }
             await db.telemetry_events.update_one(
-                {"event_id": event["event_id"]},
+                event_filter,
                 {"$set": event},
-                upsert=True
+                upsert=existing is None,
             )
         else:
             await db.telemetry_events.insert_one(event)

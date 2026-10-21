@@ -1,0 +1,83 @@
+{
+  "model_type": "reviewed_item_independent_success_logistic_model",
+  "model_version": "c4-practice-selector-synthetic-v1",
+  "trained_at": "2026-10-14T11:52:05.389913+00:00",
+  "data_origin": "synthetic",
+  "dataset_id": "c4-synthetic-practice-v1-seed-26031",
+  "training_file_sha256": "d3f1e4663c50d370e456c7c5bcdccaf5efc10d37282934276e59c573f285e3f2",
+  "validation_status": "synthetic_only",
+  "activation_allowed": false,
+  "outcome": "next_item_independent_success",
+  "feature_names": [
+    "primary_target_match",
+    "component_overlap",
+    "error_tag_overlap",
+    "difficulty_fit",
+    "role_fit",
+    "novelty",
+    "same_group",
+    "micro_mastery",
+    "support_dependency",
+    "fatigue",
+    "diagnostic_confidence",
+    "confirmation_phase"
+  ],
+  "feature_means": {
+    "primary_target_match": 0.380333333333,
+    "component_overlap": 0.656097721067,
+    "error_tag_overlap": 0.5774275744,
+    "difficulty_fit": 0.621535101733,
+    "role_fit": 0.82178,
+    "novelty": 0.604065333333,
+    "same_group": 0.351733333333,
+    "micro_mastery": 0.432242293333,
+    "support_dependency": 0.567757706667,
+    "fatigue": 0.450088293867,
+    "diagnostic_confidence": 0.676005116133,
+    "confirmation_phase": 0.46
+  },
+  "feature_scales": {
+    "primary_target_match": 0.414624193966,
+    "component_overlap": 0.301056248456,
+    "error_tag_overlap": 0.244634387585,
+    "difficulty_fit": 0.217190835514,
+    "role_fit": 0.174970373492,
+    "novelty": 0.28279786609,
+    "same_group": 0.477511251758,
+    "micro_mastery": 0.205138300461,
+    "support_dependency": 0.205138300461,
+    "fatigue": 0.262225469261,
+    "diagnostic_confidence": 0.186447857412,
+    "confirmation_phase": 0.498397431775
+  },
+  "model": {
+    "intercept": 1.557687695765,
+    "weights": {
+      "primary_target_match": 0.548322416246,
+      "component_overlap": 0.189500626066,
+      "error_tag_overlap": 0.168472522804,
+      "difficulty_fit": 0.239803389955,
+      "role_fit": 0.020170962865,
+      "novelty": 0.082423802812,
+      "same_group": 0.1186413165,
+      "micro_mastery": 0.200643274013,
+      "support_dependency": -0.200643274013,
+      "fatigue": -0.212377533265,
+      "diagnostic_confidence": 0.045718058989,
+      "confirmation_phase": -0.130626457829
+    }
+  },
+  "held_out_group_evaluation": {
+    "train_learners": 375,
+    "test_learners": 125,
+    "test_rows": 2500,
+    "accuracy": 0.8032,
+    "brier_score": 0.14465,
+    "roc_auc": 0.709945
+  },
+  "limitations": [
+    "Trained on simulated learners, not observed Grade 1 participants.",
+    "May control only explicitly labelled simulation runs.",
+    "Ranks reviewed items and never generates child-facing content."
+  ]
+}

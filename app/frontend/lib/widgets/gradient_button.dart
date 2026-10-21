@@ -12,6 +12,7 @@ class GradientButton extends StatefulWidget {
   final IconData? icon;
   final Color? textColor;
   final Color? iconColor;
+  final FontWeight? fontWeight;
 
   const GradientButton({
     super.key,
@@ -23,6 +24,7 @@ class GradientButton extends StatefulWidget {
     this.icon,
     this.textColor,
     this.iconColor,
+    this.fontWeight,
   });
 
   @override
@@ -99,6 +101,7 @@ class _GradientButtonState extends State<GradientButton>
                 widget.text,
                 style: AppTypography.button(
                   fontSize: 18,
+                  fontWeight: widget.fontWeight ?? FontWeight.w700,
                   color: widget.textColor ?? Colors.white,
                 ),
               ),

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 
 class TouchPoint(BaseModel):
@@ -31,12 +31,18 @@ class TelemetryEvent(BaseModel):
     prompt_modality: str = Field(default="visual")
     response_modality: str = Field(default="tap")
     research_role: str = Field(default="primary")
+    item_role: str = Field(default="CORE")
+    equivalent_group_id: Optional[str] = Field(default=None)
+    response_load_relation: str = Field(default="core")
     difficulty_label: str = Field(default="medium")
     difficulty_b: float = Field(default=0.0)
     is_anchor: bool = Field(default=False)
     targets: List[str] = Field(default_factory=list)
     selected_answers: List[str] = Field(default_factory=list)
     error_type: str = Field(default="unknown_error")
+    phase: str = Field(default="COMPLETE")
+    scaffold_level_used: int = Field(default=0, ge=0)
+    scaffold_applications: List[dict] = Field(default_factory=list)
 
     activity_name: str
     round_number: int = Field(..., ge=1)
@@ -48,7 +54,11 @@ class TelemetryEvent(BaseModel):
     incorrect_attempt_count: int = Field(default=0, ge=0)
     first_attempt_correct: Optional[bool] = Field(default=None)
     final_correct: bool = Field(default=False)
+    # First ANSWER (choice, picture tap or drop on a target); app versions
+    # before 2026-10-21 sent the first touch of any kind here.
     time_to_first_response_ms: int = Field(default=0, ge=0)
+    # Drags released outside every target (movement precision).
+    stray_drop_count: int = Field(default=0, ge=0)
     time_to_correct_ms: int = Field(default=0, ge=0)
 
     # --- Dyslexia Cognitive Indicators ---
@@ -115,9 +125,19 @@ class TelemetrySessionSubmit(BaseModel):
     """Full session payload submitted after activity completion."""
     student_id: str
     session_id: str = Field(..., description="Unique identifier for the session instance")
+    data_origin: Literal["observed", "synthetic"] = "observed"
+    dataset_id: Optional[str] = None
     skill_id: str = Field(default="unknown", description="Skill ID being practiced")
     activity_id: str = Field(default="unknown", description="Activity ID being practiced")
-    session_number: int = Field(default=1, ge=1)
+    started_at: Optional[str] = Field(
+        default=None, description="UTC timestamp captured when the session started"
+    )
+    completed_at: Optional[str] = Field(
+        default=None, description="UTC timestamp captured when the session ended"
+    )
+    # Older clients omitted this field. The ingestion service assigns the next
+    # per-student ordinal while preserving an existing value on retries.
+    session_number: Optional[int] = Field(default=None, ge=1)
     session_duration_seconds: int = Field(..., ge=0)
     events: List[TelemetryEvent]
     device_metrics: Optional[dict] = Field(default_factory=dict, description="Hardware metrics like OS and Model used for normalisation")

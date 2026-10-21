@@ -9,6 +9,7 @@ def _load_config():
         return yaml.safe_load(f)
 
 CONFIG = _load_config()
+MIN_ROUNDS = int((CONFIG.get("interaction_state") or {}).get("min_rounds", 3))
 
 def calculate_cognitive_load_score(latency: float, hesitation_rate: float, misclick_rate: float) -> float:
     # A simple normalized score from behavioral indicators

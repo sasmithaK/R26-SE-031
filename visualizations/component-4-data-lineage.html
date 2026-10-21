@@ -1,0 +1,319 @@
+<div id="sipsara-c4-lineage">
+  <style>
+    #sipsara-c4-lineage { width:100%; color:var(--foreground); }
+    #sipsara-c4-lineage .top { display:flex; justify-content:space-between; align-items:end; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+    #sipsara-c4-lineage h2, #sipsara-c4-lineage h3 { margin:0; }
+    #sipsara-c4-lineage .subtitle, #sipsara-c4-lineage .muted { color:var(--muted-foreground); }
+    #sipsara-c4-lineage .subtitle { margin-top:4px; }
+    #sipsara-c4-lineage .stage-nav { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:18px; }
+    #sipsara-c4-lineage .stage-head { display:flex; justify-content:space-between; align-items:start; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+    #sipsara-c4-lineage .stage-label { color:var(--muted-foreground); margin-bottom:3px; }
+    #sipsara-c4-lineage .lineage-grid { display:grid; grid-template-columns:minmax(0,0.9fr) 28px minmax(0,1.25fr) 28px minmax(0,0.9fr); gap:8px; align-items:stretch; }
+    #sipsara-c4-lineage .arrow { display:grid; place-items:center; color:var(--muted-foreground); }
+    #sipsara-c4-lineage .pane h3 { margin-bottom:8px; }
+    #sipsara-c4-lineage .pane ul { margin:0; padding-left:18px; }
+    #sipsara-c4-lineage .pane li + li { margin-top:6px; }
+    #sipsara-c4-lineage pre { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--card-foreground); }
+    #sipsara-c4-lineage .field-map { margin-top:18px; }
+    #sipsara-c4-lineage .field-map h3 { margin-bottom:8px; }
+    #sipsara-c4-lineage .footer-controls { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:16px; }
+    #sipsara-c4-lineage .legend { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    #sipsara-c4-lineage .kind-expert { color:var(--blue); }
+    #sipsara-c4-lineage .kind-runtime { color:var(--orange); }
+    #sipsara-c4-lineage .kind-learned { color:var(--green); }
+    #sipsara-c4-lineage .kind-rule { color:var(--purple); }
+    @media (max-width:760px) {
+      #sipsara-c4-lineage .lineage-grid { grid-template-columns:1fr; }
+      #sipsara-c4-lineage .arrow { transform:rotate(90deg); }
+      #sipsara-c4-lineage .footer-controls { align-items:stretch; flex-direction:column; }
+      #sipsara-c4-lineage .footer-controls .viz-controls { justify-content:space-between; width:100%; }
+    }
+  </style>
+
+  <div class="top">
+    <div>
+      <h2>Component 4 data journey — field by field</h2>
+      <div class="subtitle">Implemented pipeline plus clearly labelled future calibration: Grade 1 Sinhala item <code>S2A2R01V1</code></div>
+    </div>
+    <span class="viz-badge" id="lineage-kind">Expert-defined</span>
+  </div>
+
+  <nav class="stage-nav" aria-label="Data pipeline stages" id="lineage-stage-nav"></nav>
+
+  <section aria-live="polite">
+    <div class="stage-head">
+      <div>
+        <div class="stage-label" id="lineage-stage-label">Stage 1 of 11</div>
+        <h3 id="lineage-title">Sinhala knowledge-component design</h3>
+      </div>
+      <div class="muted" id="lineage-owner"></div>
+    </div>
+
+    <div class="lineage-grid">
+      <article class="card pane">
+        <h3>Where the data comes from</h3>
+        <ul id="lineage-sources"></ul>
+      </article>
+      <div class="arrow" aria-hidden="true">→</div>
+      <article class="card pane">
+        <h3>Real example data</h3>
+        <pre><code id="lineage-example"></code></pre>
+      </article>
+      <div class="arrow" aria-hidden="true">→</div>
+      <article class="card pane">
+        <h3>Where it goes / why needed</h3>
+        <ul id="lineage-uses"></ul>
+      </article>
+    </div>
+
+    <div class="field-map">
+      <h3>Field ownership and production</h3>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead><tr><th>Field</th><th>Example</th><th>Produced by</th><th>Type</th><th>Consumer</th></tr></thead>
+          <tbody id="lineage-fields"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="legend text-small">
+    <span class="kind-expert">● Expert/content-defined</span>
+    <span class="kind-runtime">● Runtime measurement</span>
+    <span class="kind-learned">● Learned from pilot data</span>
+    <span class="kind-rule">● Safety/policy rule</span>
+  </div>
+
+  <div class="footer-controls">
+    <div class="muted" id="lineage-summary"></div>
+    <div class="viz-controls">
+      <button type="button" class="btn" id="lineage-prev">Previous</button>
+      <button type="button" class="btn btn-primary" id="lineage-next">Next stage</button>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('sipsara-c4-lineage');
+      const stages = [
+        {
+          short:'1 KC design', title:'Sinhala knowledge-component design', kind:'Expert-defined', kindClass:'kind-expert', owner:'Owner: Sinhala literacy researcher + Grade 1 teacher',
+          sources:['Grade 1 Sinhala curriculum and textbooks','Expert analysis of the cognitive skill required by each task','Sinhala script features: graphemes, vowel signs, visually similar forms and word/sentence structure'],
+          example:`KC_LETTER_MATCHING\nDescription: Match identical Sinhala letter forms\nExamples: ක ↔ ක, ම ↔ ම\nScope: knowledge component\nActivity: 2.2`,
+          uses:['Stored in a versioned KC registry','Every item receives one primary KC and optional secondary KCs','BKT maintains a separate mastery probability for each KC'],
+          summary:'The KC is not guessed by ML at first; specialists define what is being learned.',
+          fields:[
+            ['kc_id','KC_LETTER_MATCHING','Researcher','Expert','Item bank + BKT'],
+            ['description','Distinguish similar graphemes','Teacher/linguist','Expert','Reports + authoring'],
+            ['ability_scope','KC_LETTER_MATCHING','Item/KC mapping','Expert','KC-scoped IRT'],
+            ['activity_id','2.2','Curriculum expert','Expert','Progression policy']
+          ]
+        },
+        {
+          short:'2 Item bank', title:'Research item bank', kind:'Mixed: expert + learned', kindClass:'kind-expert', owner:'Owners: content author, linguist, psychometric model',
+          sources:['Curriculum JSON supplies the prompt and Sinhala content','The builder assigns stable option IDs, KC, equivalent group and scaffold capabilities','Expert difficulty is explicitly provisional','Real first-attempt data can later replace difficulty using the Rasch calibrator'],
+          example:`{\n  "item_id": "S2A2R01V1",\n  "item_role": "REMEDIATION",\n  "activity_id": "2.2",\n  "knowledge_component_id": "KC_LETTER_MATCHING",\n  "difficulty_b": -1.0,\n  "difficulty_source": "expert_provisional",\n  "calibration_status": "not_empirically_calibrated",\n  "equivalent_group_id": "S2A2R01",\n  "content": {"letters": ["ත", "ව"]},\n  "allowed_scaffolds": [\n    "HIGHLIGHT_OPTION",\n    "REPLAY_INSTRUCTION"\n  ]\n}`,
+          uses:['Flutter renders prompt/content using stable option IDs','BKT receives the item KC','IRT uses the provisional or calibrated difficulty','The deterministic policy chooses only supported scaffolds','Equivalent groups support future confirmation-item authoring'],
+          summary:'The app never presents provisional difficulty as empirically calibrated.',
+          fields:[
+            ['item_id','S2A2R01V1','Curriculum build process','Expert','All services'],
+            ['stimulus','[ප, බ]','Sinhala content author','Expert','Flutter'],
+            ['knowledge_component_id','KC_LETTER_MATCHING','Curriculum mapping','Expert','BKT'],
+            ['difficulty_b','-1.0','Expert now; Rasch after sufficient data','Mixed','Item selector'],
+            ['distractor_tags','visual_confusable','Sinhala linguist','Expert','C2 + scaffold policy'],
+            ['equivalent_group','EQ_PA_BA_01','Teacher review','Expert','Confirmation selector'],
+            ['allowed_scaffolds','HIGHLIGHT_OPTION, REPLAY...','Task capability adapter','Safety rule','Policy action space']
+          ]
+        },
+        {
+          short:'3 Session', title:'Child and session context', kind:'Runtime', kindClass:'kind-runtime', owner:'Producer: Flutter session manager + backend profile service',
+          sources:['Pseudonymous child ID from authenticated student profile','New session and event IDs generated by the application/backend','Device and app versions captured automatically','Current KC state loaded from the Component 4 database'],
+          example:`{\n  "participant_id": "P014",\n  "session_id": "SES_2026_0041",\n  "event_id": "EVT_000238",\n  "age_months": 78,\n  "grade": 1,\n  "device_class": "tablet",\n  "app_version": "1.8.0",\n  "model_bundle": "C4_2026_1"\n}`,
+          uses:['Joins all events belonging to one child/session','Prevents duplicate decision records through event_id','Supports child-level train/test splitting','Allows auditing by model and content version'],
+          summary:'Identity must be pseudonymous; event_id is the unique key for exactly one response decision.',
+          fields:[
+            ['participant_id','P014','Profile service','Runtime','Learner state + research dataset'],
+            ['session_id','SES_2026_0041','Session manager','Runtime','Fatigue history'],
+            ['event_id','EVT_000238','Backend UUID generator','Runtime','Deduplication'],
+            ['model_bundle','C4_2026_1','Deployment configuration','Safety rule','Reproducibility']
+          ]
+        },
+        {
+          short:'4 Task adapter', title:'Flutter task adapter converts each game into evidence', kind:'Runtime', kindClass:'kind-runtime', owner:'Producer: activity widget + shared TelemetryWrapper',
+          sources:['MCQ: first selected option','Search: each required target and false tap','Matching: each submitted pair','Sorting: every object placement','Pattern/memory: first complete submitted sequence','Jumbled word/sentence: first complete arrangement','Audio identification: selected answer + replay count','Oral reading: recorded WAV passed to Component 1','Story: must add a scored reading/comprehension action; passive viewing is not mastery evidence'],
+          example:`{\n  "item_id": "S2A2R01V1",\n  "prompt_shown_at_ms": 0,\n  "first_action_at_ms": 1840,\n  "response": "ප",\n  "expected": "බ",\n  "first_response_correct": false,\n  "final_correct": true,\n  "attempt_count": 2,\n  "scaffold_level_used": 1,\n  "total_latency_ms": 4920\n}`,
+          uses:['Creates consistent evidence even though games behave differently','Separates independent knowledge from completion after help','Feeds C2 touch processing and the unified interaction event'],
+          summary:'Every game needs an adapter, but every adapter produces the same core response fields.',
+          fields:[
+            ['first_response_correct','false','Game correctness logic','Runtime','BKT observation'],
+            ['final_correct','true','Game completion logic','Runtime','UX/progress only'],
+            ['attempt_count','2','Task adapter','Runtime','Struggle model'],
+            ['scaffold_level_used','1','TelemetryWrapper','Runtime','Confirmation rule'],
+            ['total_latency_ms','4920','Monotonic timer','Runtime','Struggle/fatigue model']
+          ]
+        },
+        {
+          short:'5 C1–C3', title:'Real signals from Components 1, 2 and 3', kind:'Runtime + learned', kindClass:'kind-runtime', owner:'Producers: acoustic service, kinematic service, diagnostic fusion service',
+          sources:['Component 1 processes WAV only for speech/reading tasks','Component 2 derives touch features from normalized x-y-time events and distractor regions','Component 3 fuses accumulated acoustic/kinematic evidence into learner-pattern probabilities','For a simple tap item with no speech, Component 1 fields are null—not invented'],
+          example:`{\n  "c1": null,\n  "c2": {\n    "first_touch_latency_ms": 1840,\n    "visual_distractor_dwell_ms": 620,\n    "orthographic_confusion_index": 0.68,\n    "normalized_jerk": 2.1\n  },\n  "c3": {\n    "visual_orthographic_probability": 0.72,\n    "phonological_probability": 0.18,\n    "model_version": "C3_2026_1"\n  }\n}`,
+          uses:['C2 helps detect visual hesitation rather than only wrong answers','C3 adjusts the preferred scaffold type','C1 supports oral-reading and phonological activities','These features do not directly declare KC mastery'],
+          summary:'Missing modalities stay null; only features genuinely available for that task are used.',
+          fields:[
+            ['c1.acoustic_latency_ms','null','C1; no speech in this task','Runtime','Not used for this event'],
+            ['c2.OCI','0.68','C2 kinematic engine','Learned/runtime','Struggle model + policy'],
+            ['c2.dwell_ms','620','C2 region calculation','Runtime','Confusion evidence'],
+            ['c3.visual_probability','0.72','C3 fusion model','Learned/runtime','Scaffold context'],
+            ['c3.model_version','C3_2026_1','Model registry','Safety rule','Audit log']
+          ]
+        },
+        {
+          short:'6 Event', title:'Unified Component 4 interaction event', kind:'Runtime', kindClass:'kind-runtime', owner:'Producer: learning API event normalizer',
+          sources:['Joins item-bank metadata','Adds child/session context','Adds task-adapter evidence','Adds available C1/C2/C3 outputs','Validates required fields and rejects incompatible versions'],
+          example:`{\n  "event_id": "EVT_000238",\n  "student_id": "P014",\n  "session_id": "SES_2026_0041",\n  "item_id": "S2A2R01V1",\n  "knowledge_component_id": "KC_LETTER_MATCHING",\n  "first_attempt_correct": false,\n  "final_correct": true,\n  "attempt_count": 2,\n  "scaffold_level_used": 1,\n  "latency_ms": 4920\n}`,
+          uses:['One canonical input is sent to BKT, IRT and the scaffold policy','Stable event IDs support deduplication','Research export no longer needs to reconstruct incompatible activity formats'],
+          summary:'This contract is the central bridge between all Flutter activities and all Component 4 models.',
+          fields:[
+            ['event_id','EVT_000238','Gateway','Runtime','All models + DB'],
+            ['knowledge_component_id','KC_LETTER_MATCHING','Item-bank join','Expert','BKT'],
+            ['ability_scope','KC_LETTER_MATCHING','KC mapping','Expert','IRT'],
+            ['first_attempt_correct','false','Task adapter','Runtime','BKT + calibration'],
+            ['scaffold_level_used','1','Treatment-fidelity record','Runtime','Policy audit']
+          ]
+        },
+        {
+          short:'7 BKT', title:'BKT updates KC mastery', kind:'Provisional model', kindClass:'kind-learned', owner:'Producer: BKT engine using versioned provisional parameters',
+          sources:['Previous mastery loaded for this child and KC','First independent response from the unified event','Versioned P(L0), P(T), P(G), P(S) values','Assistance is retained separately from independent correctness'],
+          example:`Input\n  mastery_before = 0.30\n  first_attempt_correct = false\n  KC = GRAPHEME_VISUAL_DISCRIMINATION\n\nProvisional parameters\n  P(T)=0.10, P(G)=0.20, P(S)=0.10\n\nOutput\n  mastery_after = 0.146\n  mastery_status = NEEDS_SUPPORT`,
+          uses:['Tracks learning separately for every KC','Policy decides whether to remediate or confirm','Dashboard can show mastery with the model version and evidence count'],
+          summary:'The inference path works now; fitting and validating BKT parameters requires consented longitudinal response sequences.',
+          fields:[
+            ['mastery_before','0.30','Knowledge-state DB','Runtime','BKT'],
+            ['P(T/G/S)','0.10/0.20/0.10','Versioned provisional config','Provisional','BKT inference'],
+            ['observation','incorrect','First independent response','Runtime','BKT inference'],
+            ['mastery_after','0.146','BKT inference','Learned/runtime','Policy + DB']
+          ]
+        },
+        {
+          short:'8 IRT', title:'IRT updates ability and item targeting', kind:'Mixed: runtime + calibration', kindClass:'kind-learned', owner:'Producer: online IRT engine + offline Rasch calibrator',
+          sources:['Expert-provisional difficulty until calibration','Previous learner ability','Current independent response','Eligible first-attempt observations for offline Rasch fitting'],
+          example:`Item parameters\n  difficulty b = -0.35\n  calibration_status = not_empirically_calibrated\n\nChild state\n  theta_before = -0.10\n  response = incorrect\n\nOutput\n  theta_after = -0.34\n  target_next_difficulty = -0.34`,
+          uses:['Selects an active item near target difficulty','Stores raw logit difficulty and backward-compatible normalized difficulty','Updates calibration metadata only with --apply after review'],
+          summary:'IRT item parameters require cohort data; one child cannot calibrate an item bank.',
+          fields:[
+            ['difficulty_b','-1.0','Expert now; offline Rasch later','Mixed','Runtime IRT + selector'],
+            ['theta_before','-0.10','Knowledge-state DB','Runtime','IRT update'],
+            ['theta_after','-0.34','IRT inference','Learned/runtime','Item selector'],
+            ['calibration_sample_count','0','Calibration job','Runtime','Research audit']
+          ]
+        },
+        {
+          short:'9 Signals', title:'Observed struggle and support signals', kind:'Runtime evidence', kindClass:'kind-runtime', owner:'Producer: activity adapter + telemetry wrapper',
+          sources:['Current latency and attempt count','Wrong selections and visible option IDs','Scaffold use and replay requests','Optional upstream fatigue/profile values when genuinely available'],
+          example:`Policy input\n  attempt_count = 2\n  correct_option_ids = ["S2A2R01V1_pair_1"]\n  visible_option_ids = ["..._pair_1", "..._pair_2"]\n  supported_actions = ["HIGHLIGHT_OPTION", "REPLAY_INSTRUCTION"]\n  minimum_visible_options = 2`,
+          uses:['Repeated difficulty escalates support','The policy never removes the correct target','Unavailable modalities remain absent rather than fabricated'],
+          summary:'Current decisions use measured signals and explicit rules; a fatigue classifier is a future study only after labelled data exists.',
+          fields:[
+            ['attempt_count','2','Telemetry wrapper','Runtime','Scaffold policy'],
+            ['incorrect_option_ids','..._O2','Task adapter','Runtime','Safe removal candidates'],
+            ['supported_actions','REMOVE, HIGHLIGHT','Task adapter','Safety rule','Policy'],
+            ['fatigue_score','optional','Upstream component','Runtime','Policy when available']
+          ]
+        },
+        {
+          short:'10 Policy', title:'Deterministic policy selects an approved scaffold', kind:'Safety/policy rule', kindClass:'kind-rule', owner:'Producer: capability-driven scaffold policy',
+          sources:['Current attempt and scaffold state','Ordered incorrect option IDs from the adapter','Action list comes only from supported task capabilities','Hard minimum of two visible choices'],
+          example:`Context\n  attempts = 2\n  required pairs = 2\n\nAllowed actions\n  A1 HIGHLIGHT_OPTION\n  A2 REPLAY_INSTRUCTION\n\nSelected command\n  type = HIGHLIGHT_OPTION\n  option_id = S2A2R01V1_pair_1\n  action_id = S2A2R01V1-highlight-1\n  policy_version = C4_POLICY_V2`,
+          uses:['Returns an approved semantic scaffold','Produces repeatable decisions for research audits','Logs applied action IDs and treatment fidelity'],
+          summary:'The policy is deliberately deterministic until enough ethical outcome data exists to justify learning a policy.',
+          fields:[
+            ['policy_version','C4_POLICY_V2','Backend config','Safety rule','Audit log'],
+            ['allowed_actions','A1, A2','Item/task capabilities','Safety rule','Policy filter'],
+            ['selected_action','HIGHLIGHT_OPTION','Deterministic policy','Runtime','Flutter'],
+            ['action_id','item-remove-1','Backend','Runtime','Idempotency']
+          ]
+        },
+        {
+          short:'11 Decision', title:'Flutter response, persistence and future validation', kind:'Mixed', kindClass:'kind-rule', owner:'Producers: policy + learning API + research pipeline',
+          sources:['BKT mastery and IRT ability come from learner state','Active item candidates come from the validated bank','Policy commands contain stable action IDs','Decision evidence includes reason codes and policy version'],
+          example:`{\n  "next_action": {\n    "decision": "SCAFFOLD_HIGHLIGHT",\n    "next_item": "S2A2R01V1",\n    "difficulty": 0.3333,\n    "difficulty_b": -1.0,\n    "commands": [{\n      "type": "HIGHLIGHT_OPTIONS",\n      "option_ids": ["S2A2R01V1_pair_1"]\n    }],\n    "reason_codes": ["CAPABILITY_SAFE_HIGHLIGHT"],\n    "policy_version": "C4_POLICY_V2"\n  }\n}`,
+          uses:['Flutter applies the semantic command and answer pool reflows','Decision evidence is persisted with inputs and version','De-identified events can later calibrate BKT/Rasch models','Child-level validation must measure learning, fairness and retention before efficacy claims'],
+          summary:'Runtime events become future training data only after consent, quality checks, de-identification and dataset versioning.',
+          fields:[
+            ['decision','SCAFFOLD_REMOVE_DISTRACTOR','Policy orchestrator','Rule','Flutter'],
+            ['next_item','S2A2R01V1','Item selector','Runtime','Flutter'],
+            ['difficulty_b','-1.0','Item bank','Mixed','Flutter + audit'],
+            ['reason_codes','MODERATE_MASTERY','Policy orchestrator','Runtime','Audit/dashboard'],
+            ['policy_version','C4_POLICY_V2','Backend config','Safety rule','Reproducibility']
+          ]
+        }
+      ];
+
+      const nav = root.querySelector('#lineage-stage-nav');
+      const sourceList = root.querySelector('#lineage-sources');
+      const useList = root.querySelector('#lineage-uses');
+      const fieldBody = root.querySelector('#lineage-fields');
+      const example = root.querySelector('#lineage-example');
+      const title = root.querySelector('#lineage-title');
+      const label = root.querySelector('#lineage-stage-label');
+      const owner = root.querySelector('#lineage-owner');
+      const kind = root.querySelector('#lineage-kind');
+      const summary = root.querySelector('#lineage-summary');
+      const prev = root.querySelector('#lineage-prev');
+      const next = root.querySelector('#lineage-next');
+      let current = 0;
+
+      stages.forEach((stage, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = index === 0 ? 'btn btn-primary' : 'btn';
+        button.textContent = stage.short;
+        button.setAttribute('aria-pressed', String(index === 0));
+        button.addEventListener('click', () => render(index));
+        nav.appendChild(button);
+      });
+
+      function fillList(element, values) {
+        element.replaceChildren(...values.map((value) => {
+          const item = document.createElement('li');
+          item.textContent = value;
+          return item;
+        }));
+      }
+
+      function render(index) {
+        current = index;
+        const stage = stages[index];
+        label.textContent = `Stage ${index + 1} of ${stages.length}`;
+        title.textContent = stage.title;
+        owner.textContent = stage.owner;
+        kind.textContent = stage.kind;
+        kind.className = `viz-badge ${stage.kindClass}`;
+        example.textContent = stage.example;
+        fillList(sourceList, stage.sources);
+        fillList(useList, stage.uses);
+        fieldBody.replaceChildren(...stage.fields.map((row) => {
+          const tr = document.createElement('tr');
+          row.forEach((value, cellIndex) => {
+            const cell = document.createElement(cellIndex === 0 ? 'th' : 'td');
+            cell.textContent = value;
+            tr.appendChild(cell);
+          });
+          return tr;
+        }));
+        summary.textContent = stage.summary;
+        [...nav.children].forEach((button, buttonIndex) => {
+          const active = buttonIndex === index;
+          button.setAttribute('aria-pressed', String(active));
+          button.classList.toggle('btn-primary', active);
+        });
+        prev.disabled = index === 0;
+        next.disabled = index === stages.length - 1;
+        next.textContent = index === stages.length - 1 ? 'Pipeline complete' : 'Next stage';
+      }
+
+      prev.addEventListener('click', () => render(Math.max(0, current - 1)));
+      next.addEventListener('click', () => render(Math.min(stages.length - 1, current + 1)));
+      render(0);
+    })();
+  </script>
+</div>

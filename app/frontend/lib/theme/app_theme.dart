@@ -189,6 +189,73 @@ class AppTypography {
   }
 }
 
+/// ─────────────────────────────────────────────────────────────
+/// Dashboard typography (parent and therapist screens)
+///
+/// The child-facing [AppTypography] scales every size by 0.80 and adds wide
+/// word/letter spacing for early readers. On adult dashboards that produced
+/// 9–11 pt text and broken-looking gaps between words. [DashText] keeps the
+/// same method names (so screens can switch by name) but uses the requested
+/// size, a readable floor, normal spacing and a compact line height.
+///   Title 22 · Section 18 · Card title 16 · Body 15 · Secondary 13 · Axis 12
+/// ─────────────────────────────────────────────────────────────
+class DashText {
+  static const double minSize = 12;
+  static const double minBodySize = 13;
+
+  static double _floor(double size, double floor) => size < floor ? floor : size;
+
+  static TextStyle _base(double size, FontWeight weight, Color color, double height) {
+    return GoogleFonts.notoSansSinhala(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      height: height,
+      letterSpacing: 0.1,
+      wordSpacing: 0,
+    );
+  }
+
+  static TextStyle sinhala({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.w500,
+    Color color = AppColors.textPrimary,
+    double? height,
+    double? letterSpacing,
+  }) =>
+      _base(_floor(fontSize, minBodySize), fontWeight, color, height ?? 1.45);
+
+  static TextStyle heading({
+    double fontSize = 22,
+    FontWeight fontWeight = FontWeight.w700,
+    Color color = AppColors.textPrimary,
+    double? height,
+  }) =>
+      _base(_floor(fontSize, 15), fontWeight, color, height ?? 1.25);
+
+  static TextStyle body({
+    double fontSize = 15,
+    FontWeight fontWeight = FontWeight.w500,
+    Color color = AppColors.textPrimary,
+    double? height,
+  }) =>
+      _base(_floor(fontSize, minBodySize), fontWeight, color, height ?? 1.4);
+
+  static TextStyle button({
+    double fontSize = 15,
+    FontWeight fontWeight = FontWeight.w700,
+    Color color = Colors.white,
+  }) =>
+      _base(_floor(fontSize, minBodySize), fontWeight, color, 1.2);
+
+  static TextStyle caption({
+    double fontSize = 13,
+    FontWeight fontWeight = FontWeight.w500,
+    Color color = AppColors.textSecondary,
+  }) =>
+      _base(_floor(fontSize, minSize), fontWeight, color, 1.35);
+}
+
 class AppTheme {
   /// The single, dyslexia-friendly light theme
   static ThemeData get lightTheme {

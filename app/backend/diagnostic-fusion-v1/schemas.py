@@ -7,6 +7,7 @@ class AcousticFeatures(BaseModel):
     intra_word_silence_ratio: float = Field(..., description="Percentage of silence inside vocalization block")
     local_jitter: float = Field(..., description="Instability in pitch/frequency")
     local_shimmer: float = Field(..., description="Instability in amplitude/loudness")
+    expected_syllables: Optional[int] = Field(None, ge=1, description="Syllables in the expected text (for the per-syllable beat mismatch)")
 
 class KinematicFeatures(BaseModel):
     time_to_first_touch_ms: float = Field(..., description="Time to first interaction (ms)")
@@ -31,6 +32,22 @@ class FusionRequest(BaseModel):
     item_id: Optional[str] = None
     data_origin: Literal["synthetic", "observed", "unspecified"] = "unspecified"
     dataset_id: Optional[str] = None
+
+
+class SessionFusionRequest(BaseModel):
+    student_id: str
+    session_id: str
+    data_origin: Literal["synthetic", "observed", "unspecified"] = "observed"
+    dataset_id: Optional[str] = None
+
+
+class EvidenceChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=1000)
+
+
+class EvidenceChatRequest(BaseModel):
+    messages: List[EvidenceChatMessage]
 
 class LearnerProfileOutput(BaseModel):
     class_probabilities: dict

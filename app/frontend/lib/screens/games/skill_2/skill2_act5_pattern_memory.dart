@@ -2,15 +2,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../models/curriculum_models.dart';
+import '../../../theme/app_theme.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../models/curriculum_models.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
-import '../../../../services/progress_service.dart';
+import '../../../services/progress_service.dart';
 import '../shared_widgets/shared_celebration_popup.dart';
-import '../../../../services/tts_service.dart';
+import '../../../services/tts_service.dart';
+import '../../../adaptive/controllers/adaptive_choice_controller.dart';
+import '../../../adaptive/models/adaptive_scaffold_models.dart';
+import '../../../adaptive/widgets/adaptive_answer_pool.dart';
+import 'skill2_round_resolver.dart';
+import '../../../adaptive/utils/adaptive_option_order.dart';
 
-/// Activity 3: රටාව මතක තබා ගනිමු (Remember the Pattern)
+/// Activity 5: අකුරු මතකයෙන් සකසමු (Remember the Pattern)
 /// Template: pattern_memory_game
 class Skill2Act5PatternMemory extends StatefulWidget {
   final ActivityNode? activityNode;
@@ -30,7 +35,7 @@ class Skill2Act5PatternMemory extends StatefulWidget {
 
 class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
     with SingleTickerProviderStateMixin {
-  Set<String> _spokenInstructions = {};
+  final Skill2ItemAutoplayGate _autoplayGate = Skill2ItemAutoplayGate();
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isMemorizing = true;
   int _countdown = 3;
@@ -42,8 +47,15 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
   bool _activityComplete = false;
   int _currentRoundIndex = 0;
 
+  String _currentItemId = '';
+  String? _currentVariantId;
+  Map<String, dynamic> _activeRoundData = <String, dynamic>{};
+
   String? _wrongTappedOption;
   String? _correctTappedOption;
+
+  final AdaptiveChoiceController<String> _choiceController =
+      AdaptiveChoiceController<String>();
 
   @override
   void initState() {
@@ -61,14 +73,63 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
       _currentRoundIndex = 0;
     }
     _timerController = AnimationController(vsync: this);
+    _setupRound();
     _startMemorizeTimer();
   }
+
+  void _setupRound() {
+    final rounds = widget.activityNode?.rounds ?? [];
+    if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
+      final resolved = Skill2RoundResolver.resolve(
+        activity: widget.activityNode,
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
+      );
+      _currentItemId = resolved.itemId;
+      _currentVariantId = resolved.variantId;
+      _activeRoundData = Map<String, dynamic>.from(resolved.data);
+      final rawOptions = (_activeRoundData['options'] as List? ?? const [])
+          .map((value) => value.toString())
+          .toList();
+      _activeRoundData['options'] = AdaptiveOptionOrder.shuffled<String>(
+        rawOptions,
+        _currentItemId,
+        salt: 'sequence-pool',
+      );
+    } else {
+      _currentItemId = '';
+      _activeRoundData = <String, dynamic>{};
+    }
+    final data = _getCurrentRoundData();
+    final pattern =
+        (data['pattern'] as List?)?.map((value) => value.toString()).toList() ??
+        const <String>[];
+    final options =
+        (data['options'] as List?)?.map((value) => value.toString()).toList() ??
+        const <String>[];
+    _choiceController.configure(
+      List<AdaptiveOption<String>>.generate(
+        options.length,
+        (index) => AdaptiveOption<String>(
+          id: _optionId(index),
+          value: options[index],
+          role: pattern.contains(options[index])
+              ? AdaptiveOptionRole.sequenceToken
+              : AdaptiveOptionRole.unrelatedDistractor,
+        ),
+      ),
+    );
+    _isCorrect = false;
+  }
+
+  String _optionId(int index) => '${_currentItemId}_O${index + 1}';
 
   @override
   void dispose() {
     _timer?.cancel();
     _audioPlayer.dispose();
     _timerController.dispose();
+    _choiceController.dispose();
     super.dispose();
   }
 
@@ -77,8 +138,25 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
     return r.length > 5 ? r.sublist(0, 5) : r;
   }
 
-  void _playCurrentInstruction({bool autoPlay = false}) {
-    final promptText = _isMemorizing ? 'රටාව මතක තබා ගන්න!' : 'රටාව නැවත සකසන්න';
+  Map<String, dynamic> _getCurrentRoundData() {
+    return _activeRoundData;
+  }
+
+  Future<void> _playCurrentInstruction({
+    bool autoPlay = false,
+    bool waitUntilComplete = false,
+  }) async {
+    if (autoPlay &&
+        !Skill2RoundResolver.shouldAutoplayActivityIntroduction(
+          roundIndex: _currentRoundIndex,
+          variantId: _currentVariantId,
+        )) {
+      return;
+    }
+
+    final promptText = _isMemorizing
+        ? 'රටාව මතක තබා ගන්න!'
+        : 'රටාව නැවත සකසන්න';
     String spokenInstruction = promptText
         .replaceAll('මා', 'ම')
         .replaceAllMapped(
@@ -89,26 +167,47 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
           RegExp(r"'?(.)'? පින්තූරය"),
           (match) => '${match.group(1)}, පින්තූරය',
         );
-    
-    if (autoPlay && _spokenInstructions.contains(spokenInstruction)) {
+
+    final phase = _isMemorizing ? 'memorize' : 'recall';
+    if (autoPlay && !_autoplayGate.shouldPlay('$_currentItemId:$phase')) {
       return;
     }
-    _spokenInstructions.add(spokenInstruction);
-    TtsService().speak(spokenInstruction, folder: 'skill_2');
+
+    final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+    final isManualReplay = !autoPlay;
+    if (isManualReplay) {
+      wrapper?.pauseHesitationTimer();
+    }
+
+    try {
+      await TtsService().speak(
+        spokenInstruction,
+        folder: 'skill_2',
+        // A manual replay is learner-requested listening time, so wait for it
+        // to finish before restarting hesitation measurement.
+        waitUntilComplete: waitUntilComplete || isManualReplay,
+      );
+    } finally {
+      if (isManualReplay && mounted) {
+        wrapper?.resumeHesitationTimer();
+      }
+    }
   }
 
   void _startMemorizeTimer() {
-    final rounds = _rounds;
-    if (rounds.isEmpty) return;
+    final roundData = _getCurrentRoundData();
+    if (roundData.isEmpty) return;
+    final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+    wrapper?.pauseHesitationTimer();
 
-    final currentRound = rounds[_currentRoundIndex];
-    final showSeconds = (currentRound['show_seconds'] as int?) ?? 4;
+    final showSeconds = (roundData['show_seconds'] as int?) ?? 4;
 
     setState(() {
       _isMemorizing = true;
       _countdown = showSeconds;
       _userSequence.clear();
       _isCorrect = false;
+      _choiceController.reset();
     });
 
     _playCurrentInstruction(autoPlay: true);
@@ -117,7 +216,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
     _timerController.forward(from: 0.0);
 
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (_countdown > 1) {
         setState(() {
           _countdown--;
@@ -127,35 +226,131 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
         setState(() {
           _isMemorizing = false;
         });
-        _playCurrentInstruction(autoPlay: true);
+        await _playCurrentInstruction(autoPlay: true, waitUntilComplete: true);
+
+        // Reset telemetry timers so memorization time isn't counted as hesitation/latency
+        wrapper?.resetRoundTimers(clearPreResponseEvidence: true);
+      }
+    });
+  }
+
+  void _transitionToNextRound(Map<String, dynamic>? nextAction) {
+    if (nextAction != null && nextAction['decision'] == 'ACTIVITY_COMPLETE') {
+      _completeActivity();
+      return;
+    }
+
+    int totalRounds = widget.activityNode?.rounds.length ?? 1;
+    setState(() {
+      if (nextAction != null && nextAction.containsKey('next_item')) {
+        final nextItem = nextAction['next_item'].toString();
+        final nextRound = Skill2RoundResolver.roundIndexFromItemId(nextItem);
+        if (nextRound != null) {
+          _currentRoundIndex = nextRound;
+        } else {
+          _currentRoundIndex++;
+        }
+        _currentVariantId = Skill2RoundResolver.variantFromItemId(nextItem);
+      } else {
+        _currentVariantId = null;
+        _currentRoundIndex++;
+      }
+
+      final sId = widget.activityNode?.skillId ?? '';
+      final aId = widget.activityNode?.id ?? '';
+      if (sId.isNotEmpty && aId.isNotEmpty) {
+        int progress = ((_currentRoundIndex / totalRounds) * 100).toInt();
+        ProgressService().saveActivityScore(sId, aId, progress);
+        ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+      }
+      _setupRound();
+    });
+
+    if (_currentRoundIndex < totalRounds || _currentVariantId != null) {
+      _startMemorizeTimer();
+    } else {
+      _completeActivity();
+    }
+  }
+
+  void _completeActivity() {
+    setState(() {
+      _activityComplete = true;
+      final sId = widget.activityNode?.skillId ?? '';
+      final aId = widget.activityNode?.id ?? '';
+      if (sId.isNotEmpty && aId.isNotEmpty) {
+        ProgressService().saveActivityScore(sId, aId, 100);
+        ProgressService().clearActivityState(sId, aId);
       }
     });
   }
 
   void _addItemToUserSequence(
     String item,
+    String optionId,
     List<String> targetPattern,
+    List<String> allOptions,
     int totalRounds,
   ) async {
     if (_isCorrect || _isMemorizing || _wrongTappedOption != null) return;
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
 
-    setState(() {
-      _userSequence.add(item);
-    });
-
-    // Check if user sequence matches target pattern so far
-    final currentIndex = _userSequence.length - 1;
-    if (_userSequence[currentIndex] != targetPattern[currentIndex]) {
+    final currentIndex = _userSequence.length;
+    if (item != targetPattern[currentIndex]) {
       // Wrong item picked
       setState(() {
         _wrongTappedOption = item;
+        _choiceController.markIncorrect(optionId);
       });
       SoundUtils.playFeedback('audio/wrong.mp3');
+
+      // Calculate genuine distractors
+      final genuineDistractors = _choiceController.visibleOptions
+          .where((option) => !targetPattern.contains(option.value))
+          .map((option) => option.id)
+          .toList();
+      final expectedIds = _choiceController.visibleOptions
+          .where((option) => option.value == targetPattern[currentIndex])
+          .map((option) => option.id)
+          .toList();
+
+      final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+      if (wrapper != null) {
+        final result = await wrapper.registerAdaptiveWrongAttempt(
+          itemId: _currentItemId,
+          extraTelemetry: {
+            "selected_option_id": item,
+            "selected_option_ids": [optionId],
+            "selected_answer_values": <String>[item],
+            "correct_option_ids": expectedIds,
+            "struggled_target_units":
+                Skill2RoundResolver.sequenceStruggledUnits(
+                  pattern: targetPattern,
+                  currentPosition: currentIndex,
+                ),
+            "original_options_count": allOptions.length,
+            "incorrect_option_ids": genuineDistractors,
+            "visible_option_ids": _choiceController.visibleOptions
+                .map((option) => option.id)
+                .toList(),
+            "supported_actions": ["HIGHLIGHT_OPTION", "REVEAL_FIRST_TOKEN"],
+            "minimum_visible_options": 2,
+            "error_type": "sequence_memory_error",
+          },
+        );
+        wrapper.applyScaffoldResult<String>(
+          controller: _choiceController,
+          result: result,
+          correctOptionIds: expectedIds,
+        );
+      }
+
       Future.delayed(const Duration(milliseconds: 600), () {
         if (mounted) {
           setState(() {
             _wrongTappedOption = null;
-            _userSequence.clear();
+            _choiceController.clearTransientFeedback();
+            // DO NOT clear user sequence!
           });
         }
       });
@@ -165,7 +360,10 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
     // Correct item picked
     setState(() {
       _correctTappedOption = item;
+      _userSequence.add(item);
+      _choiceController.markCorrect(optionId);
     });
+
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {
         setState(() {
@@ -178,76 +376,48 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
 
     // Check if pattern completed
     if (_userSequence.length == targetPattern.length) {
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
-        100,
-      );
       setState(() {
         _isCorrect = true;
       });
       SoundUtils.playFeedback('audio/correct.mp3');
 
-      Future.delayed(const Duration(milliseconds: 1400), () {
-        if (!mounted) return;
-        if (_currentRoundIndex < totalRounds - 1) {
-          _currentRoundIndex++;
-          final sId = widget.activityNode?.skillId ?? '';
-          final aId = widget.activityNode?.id ?? '';
-          if (sId.isNotEmpty && aId.isNotEmpty) {
-            int progress =
-                ((_currentRoundIndex /
-                            (widget.activityNode?.rounds.length ?? 1)) *
-                        100)
-                    .toInt();
-            ProgressService().saveActivityScore(sId, aId, progress);
-            ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
-          }
-          _startMemorizeTimer();
-        } else {
-          setState(() {
-            _activityComplete = true;
-            final sId = widget.activityNode?.skillId ?? '';
-            final aId = widget.activityNode?.id ?? '';
-            if (sId.isNotEmpty && aId.isNotEmpty) {
-              ProgressService().saveActivityScore(sId, aId, 100);
-              ProgressService().clearActivityState(sId, aId);
-            }
-          });
-        }
-      });
+      final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+      if (wrapper != null) {
+        final result = await wrapper.completeAdaptiveRound(
+          100,
+          itemId: _currentItemId,
+          selectedAnswers: List<String>.from(_userSequence),
+        );
+        Future.delayed(const Duration(milliseconds: 1400), () {
+          if (!mounted) return;
+          _transitionToNextRound(result?['next_action']);
+        });
+      } else {
+        Future.delayed(const Duration(milliseconds: 1400), () {
+          if (!mounted) return;
+          _transitionToNextRound(null);
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final rounds = _rounds;
-    if (rounds.isEmpty) {
+    final roundData = _getCurrentRoundData();
+    if (roundData.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('රටාව මතක තබා ගනිමු')),
         body: const Center(child: Text('No rounds available.')),
       );
     }
 
-    final currentRound = rounds[_currentRoundIndex];
     final titleText = widget.activityNode?.title ?? 'රටාව මතක තබා ගනිමු';
     final targetPattern =
-        (currentRound['pattern'] as List?)?.map((e) => e.toString()).toList() ??
+        (roundData['pattern'] as List?)?.map((e) => e.toString()).toList() ??
         ['🔴', '🔵'];
     var options =
-        (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ??
+        (roundData['options'] as List?)?.map((e) => e.toString()).toList() ??
         ['🔴', '🔵', '🟢'];
-
-    if (widget.isRemedial && options.length > 2) {
-      // Reduce distractors: Keep only items in the target pattern + 1 distractor (if any)
-      final requiredItems = targetPattern.toSet();
-      final distractors = options
-          .where((o) => !requiredItems.contains(o))
-          .toList();
-      options = requiredItems.toList();
-      if (distractors.isNotEmpty) {
-        options.add(distractors.first);
-      }
-      options.shuffle();
-    }
 
     double itemSize;
     double spacing;
@@ -297,7 +467,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
       activityTitle: widget.activityNode?.title ?? '',
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
-      totalRounds: rounds.length,
+      totalRounds: _rounds.length,
       isRoundComplete: _isCorrect,
       isActivityComplete: _activityComplete,
       onNext: () {
@@ -364,9 +534,10 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
                                   : '?');
                         final isFilled =
                             _isMemorizing || i < _userSequence.length;
+                        // Determine if this is the currently expected slot and there is an error
                         final isCurrentWrong =
                             (_wrongTappedOption != null) &&
-                            (i == _userSequence.length - 1);
+                            (i == _userSequence.length);
 
                         return AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
@@ -453,102 +624,42 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
                               width: 2,
                             ),
                           ),
-                          child: Wrap(
-                            spacing: 16.0,
-                            runSpacing: 16.0,
-                            alignment: WrapAlignment.center,
-                            children: options.map((opt) {
-                              final isWrong = _wrongTappedOption == opt;
-                              final isCorrect = _correctTappedOption == opt;
-                              final isPressed = isWrong || isCorrect;
-
-                              Color tileColor = Colors.white;
-                              Color borderColor = Colors.transparent;
-                              Color textColor = AppColors.textPrimary;
-                              double borderWidth = isPressed ? 4.0 : 1.0;
-
-                              if (isCorrect) {
-                                tileColor = const Color(
-                                  0xFF6DBE6D,
-                                ).withValues(alpha: 0.15);
-                                borderColor = const Color(0xFF6DBE6D);
-                                textColor = const Color(0xFF6DBE6D);
-                              } else if (isWrong) {
-                                tileColor = const Color(
-                                  0xFFE87C6D,
-                                ).withValues(alpha: 0.15);
-                                borderColor = const Color(0xFFE87C6D);
-                                textColor = const Color(0xFFE87C6D);
-                              }
-
-                              return GestureDetector(
+                          child: AdaptiveAnswerPool<String>(
+                            controller: _choiceController,
+                            spacing: 16,
+                            minExtent: itemSize,
+                            maxExtent: itemSize,
+                            itemBuilder: (context, option, state, extent) {
+                              return AdaptiveOptionFrame(
+                                state: state,
                                 onTap: () => _addItemToUserSequence(
-                                  opt,
+                                  option.value,
+                                  option.id,
                                   targetPattern,
-                                  rounds.length,
+                                  options,
+                                  _rounds.length,
                                 ),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 150),
-                                  margin: EdgeInsets.all(spacing / 2),
-                                  width: hasLongText ? null : itemSize,
-                                  height: hasLongText ? null : itemSize,
-                                  padding: hasLongText
-                                      ? const EdgeInsets.symmetric(
-                                          horizontal: 24,
-                                          vertical: 16,
-                                        )
-                                      : null,
-                                  decoration: BoxDecoration(
-                                    color: tileColor,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: isPressed
-                                          ? borderColor
-                                          : const Color(0xFFE2E8F0),
-                                      width: borderWidth,
-                                    ),
-                                    boxShadow: [
-                                      if (isCorrect)
-                                        BoxShadow(
-                                          color: const Color(
-                                            0xFF6DBE6D,
-                                          ).withValues(alpha: 0.3),
-                                          blurRadius: 16,
-                                          spreadRadius: 2,
-                                        )
-                                      else if (isWrong)
-                                        BoxShadow(
-                                          color: const Color(
-                                            0xFFE87C6D,
-                                          ).withValues(alpha: 0.3),
-                                          blurRadius: 16,
-                                          spreadRadius: 2,
-                                        )
-                                      else if (!isPressed)
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.08,
-                                          ),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                    ],
+                                width: hasLongText ? null : extent,
+                                height: hasLongText ? null : extent,
+                                padding: hasLongText
+                                    ? const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 16,
+                                      )
+                                    : const EdgeInsets.all(12),
+                                semanticLabel: option.value,
+                                child: Text(
+                                  option.value,
+                                  style: TextStyle(
+                                    fontSize: hasLongText ? 40.0 : fontSize,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.1,
+                                    color: AppColors.textPrimary,
                                   ),
-                                  child: Center(
-                                    child: Text(
-                                      opt,
-                                      style: TextStyle(
-                                        fontSize: hasLongText ? 40.0 : fontSize,
-                                        fontWeight: FontWeight.bold,
-                                        height: 1.1,
-                                        color: textColor,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
                               );
-                            }).toList(),
+                            },
                           ),
                         ),
                       ),
@@ -572,7 +683,7 @@ class _Skill2Act5PatternMemoryState extends State<Skill2Act5PatternMemory>
         context
             .findAncestorStateOfType<TelemetryWrapperState>()
             ?.logAudioReplay();
-        _playCurrentInstruction();
+        await _playCurrentInstruction();
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),

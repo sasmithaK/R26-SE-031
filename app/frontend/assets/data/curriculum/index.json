@@ -48,14 +48,26 @@
     "is_locked": true
   },
   {
-    "id": "skill_5",
-    "title": "කියවා තේරුම් ගනිමු",
-    "description": "සැබෑ උගතෙකු සේ ඔබ කියවන දේ තේරුම් ගන්න! 🧠",
-    "file_path": "skill_5.json",
-    "total_activities": 4,
+    "id": "skill_sinhala_vowels",
+    "title": "සිංහල අකුරු කියවමු - ස්වර අකුරු",
+    "description": "අකුර අසා කියවා විනෝදයෙන් පුහුණු වෙමු!",
+    "file_path": "skill_sinhala_vowels.json",
+    "total_activities": 1,
     "image_path": "assets/images/skills/s4.png",
-    "color_hex": "#9B7ED4",
-    "emoji": "🧠",
+    "color_hex": "#E8A54B",
+    "emoji": "🔊",
+    "audio_url": "",
+    "is_locked": true
+  },
+  {
+    "id": "skill_sinhala_consonants",
+    "title": "සිංහල අකුරු කියවමු - ව්‍යංජන අකුරු",
+    "description": "අකුර අසා කියවා විනෝදයෙන් පුහුණු වෙමු!",
+    "file_path": "skill_sinhala_consonants.json",
+    "total_activities": 1,
+    "image_path": "assets/images/skills/s4.png",
+    "color_hex": "#5CA9D6",
+    "emoji": "🔊",
     "audio_url": "",
     "is_locked": true
   },
@@ -68,6 +80,18 @@
     "image_path": "assets/images/skills/s4.png",
     "color_hex": "#5CA9D6",
     "emoji": "📚",
+    "audio_url": "",
+    "is_locked": true
+  },
+  {
+    "id": "skill_5",
+    "title": "කියවා තේරුම් ගනිමු",
+    "description": "සැබෑ උගතෙකු සේ ඔබ කියවන දේ තේරුම් ගන්න! 🧠",
+    "file_path": "skill_5.json",
+    "total_activities": 4,
+    "image_path": "assets/images/skills/s4.png",
+    "color_hex": "#9B7ED4",
+    "emoji": "🧠",
     "audio_url": "",
     "is_locked": true
   }

@@ -1,0 +1,26 @@
+{
+  "_comment": "Tunable dashboard thresholds. Descriptive review signals only, not diagnostic cut-offs. Change here, not in code.",
+  "default_window_days": 30,
+  "mastery_labels": {"higher": 0.8, "developing": 0.5},
+  "worklist": {
+    "support_ratio_review": 0.35,
+    "weak_kc_mastery": 0.65,
+    "min_kc_observations": 5
+  },
+  "alerts": {
+    "inactive_days": 7,
+    "min_recordings_for_usable_rate": 3,
+    "low_usable_recording_rate": 0.5,
+    "high_fatigue_states": ["HIGH", "VERY_HIGH"],
+    "high_fatigue_sessions": 2,
+    "questionnaire_sections_total": 4
+  },
+  "c3": {
+    "low_agreement_gap": 0.15
+  },
+  "limits": {
+    "trend_sessions": 12,
+    "speech_items": 20,
+    "records": 200
+  }
+}

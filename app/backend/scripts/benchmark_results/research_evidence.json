@@ -1,0 +1,217 @@
+{
+  "student_id": "000000000000000000000031",
+  "evaluation_id": "pp2-overlap-v1-seed-20260831-eval",
+  "created_at": "2026-08-31T06:00:00+00:00",
+  "sample_count": 960,
+  "split_description": "160 synthetic learners × 6 observations; 96 train / 32 validation / 32 test learners; zero learner overlap",
+  "generator_seed": 20260831,
+  "model_sha256": "9ef01fc60198780d219b116060dee66a6f6315e75ffb7d699e919c962da3cf66",
+  "components": [
+    {
+      "component": "C1",
+      "objective": "Preserve first attempts separately from eventual completion",
+      "evidence_type": "Synthetic event contract check, not predictive validation",
+      "input_summary": "18 canonical-schema synthetic sessions across six skills",
+      "comparisons": [
+        {
+          "method": "C1 first-attempt aggregate",
+          "metric": "mean_absolute_error_to_synthetic_first_attempt_truth",
+          "value": 0.0,
+          "n": 18
+        },
+        {
+          "method": "Final-completion baseline",
+          "metric": "mean_absolute_error_to_synthetic_first_attempt_truth",
+          "value": 0.316931216931217,
+          "n": 18
+        }
+      ],
+      "claim": "C1 can preserve failed first attempts even when later completion succeeds on correctly instrumented input.",
+      "limitation": "Tests the event contract; it does not repair inconsistent Flutter attempt hooks or validate fatigue."
+    },
+    {
+      "component": "C2",
+      "objective": "Measure acoustic onset timing with known stimulus timing",
+      "evidence_type": "Generated harmonic waveform timing check",
+      "input_summary": "40 generated tones with known leading silence; first20 baseline fit, final20 comparison",
+      "comparisons": [
+        {
+          "method": "librosa onset detector",
+          "metric": "onset_MAE_ms_lower_is_better",
+          "value": 51.340625,
+          "n": 20
+        },
+        {
+          "method": "Training-mean onset baseline",
+          "metric": "onset_MAE_ms_lower_is_better",
+          "value": 261.038125,
+          "n": 20
+        }
+      ],
+      "claim": "Onset extraction is compared against known timings on controlled waveforms.",
+      "limitation": "Harmonic tones are not Sinhala child speech. STT, pauses, jitter and shimmer still need labelled speech evaluation."
+    },
+    {
+      "component": "C3",
+      "objective": "Compare multimodal pattern classification with simpler baselines",
+      "evidence_type": "Grouped held-out synthetic classification",
+      "input_summary": "13 correlated features; overlapping latent traits; independent device/task noise",
+      "comparisons": [
+        {
+          "method": "Class-prior baseline",
+          "metric": "macro_f1",
+          "value": 0.1,
+          "n": 192
+        },
+        {
+          "method": "Class-prior baseline",
+          "metric": "balanced_accuracy",
+          "value": 0.25,
+          "n": 192
+        },
+        {
+          "method": "Class-prior baseline",
+          "metric": "log_loss",
+          "value": 1.3862943611198906,
+          "n": 192
+        },
+        {
+          "method": "Logistic regression baseline",
+          "metric": "macro_f1",
+          "value": 0.7823745358244374,
+          "n": 192
+        },
+        {
+          "method": "Logistic regression baseline",
+          "metric": "balanced_accuracy",
+          "value": 0.7864583333333334,
+          "n": 192
+        },
+        {
+          "method": "Logistic regression baseline",
+          "metric": "log_loss",
+          "value": 0.5178769192780258,
+          "n": 192
+        },
+        {
+          "method": "XGBoost candidate (not deployed)",
+          "metric": "macro_f1",
+          "value": 0.7523277255446537,
+          "n": 192
+        },
+        {
+          "method": "XGBoost candidate (not deployed)",
+          "metric": "balanced_accuracy",
+          "value": 0.7552083333333333,
+          "n": 192
+        },
+        {
+          "method": "XGBoost candidate (not deployed)",
+          "metric": "log_loss",
+          "value": 0.6931760907173157,
+          "n": 192
+        },
+        {
+          "method": "Speech-only logistic ablation",
+          "metric": "macro_f1",
+          "value": 0.4483430020561818,
+          "n": 192
+        },
+        {
+          "method": "Speech-only logistic ablation",
+          "metric": "balanced_accuracy",
+          "value": 0.47395833333333337,
+          "n": 192
+        },
+        {
+          "method": "Speech-only logistic ablation",
+          "metric": "log_loss",
+          "value": 0.893768059454883,
+          "n": 192
+        },
+        {
+          "method": "Kinematics-only logistic ablation",
+          "metric": "macro_f1",
+          "value": 0.4613559395155202,
+          "n": 192
+        },
+        {
+          "method": "Kinematics-only logistic ablation",
+          "metric": "balanced_accuracy",
+          "value": 0.46875,
+          "n": 192
+        },
+        {
+          "method": "Kinematics-only logistic ablation",
+          "metric": "log_loss",
+          "value": 1.010738549597009,
+          "n": 192
+        },
+        {
+          "method": "Frozen repository XGBoost (different training generator)",
+          "metric": "macro_f1",
+          "value": 0.3664705584270802,
+          "n": 192
+        },
+        {
+          "method": "Frozen repository XGBoost (different training generator)",
+          "metric": "balanced_accuracy",
+          "value": 0.421875,
+          "n": 192
+        },
+        {
+          "method": "Frozen repository XGBoost (different training generator)",
+          "metric": "log_loss",
+          "value": 3.085028648376465,
+          "n": 192
+        }
+      ],
+      "claim": "Scores report performance on this declared synthetic generator; any advantage or regression is shown without selecting only favorable metrics.",
+      "limitation": "Labels and feature relationships are assumed. Frozen model used a different generator; candidate is not deployed. No Sri Lankan child validation.",
+      "artifacts": "classification_details.json; synthetic_cohort.csv; generator_manifest.json"
+    },
+    {
+      "component": "C4",
+      "objective": "Track knowledge/ability for next-response prediction",
+      "evidence_type": "Sequential synthetic learner simulation",
+      "input_summary": "80 learners × 20 responses per simulator; predict before update",
+      "comparisons": [
+        {
+          "method": "BKT fixed priors",
+          "metric": "next_response_brier_score_lower_is_better",
+          "value": 0.17275499186618753,
+          "n": 1600
+        },
+        {
+          "method": "Fixed 0.5 baseline (BKT simulation)",
+          "metric": "next_response_brier_score_lower_is_better",
+          "value": 0.25,
+          "n": 1600
+        },
+        {
+          "method": "Online Rasch theta",
+          "metric": "next_response_brier_score_lower_is_better",
+          "value": 0.21029855710657633,
+          "n": 1600
+        },
+        {
+          "method": "Fixed theta=0 Rasch baseline",
+          "metric": "next_response_brier_score_lower_is_better",
+          "value": 0.22582770124382048,
+          "n": 1600
+        },
+        {
+          "method": "Fixed 0.5 baseline (IRT simulation)",
+          "metric": "next_response_brier_score_lower_is_better",
+          "value": 0.25,
+          "n": 1600
+        }
+      ],
+      "claim": "Prediction error is measured before each response updates the state.",
+      "limitation": "Simulator is related to model assumptions. Does not establish better learning, calibrated item difficulty, or applied Flutter adaptation."
+    }
+  ],
+  "data_origin": "synthetic",
+  "dataset_id": "pp2-overlap-v1-seed-20260831",
+  "validation_status": "synthetic_only"
+}

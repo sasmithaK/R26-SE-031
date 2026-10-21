@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../config/api_config.dart';
+import 'auth_service.dart';
 
 /// Handles all student-related API calls.
 /// Separated from AuthService for clean architecture.
@@ -20,13 +21,14 @@ class StudentService {
   }
 
   Future<String?> _getAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('access_token');
+    return AuthService().getAccessToken();
   }
 
   /// Add a student under the current parent.
   /// Returns a Map with student data on success (including 'id'), or a Map with 'error' key on failure.
-  Future<Map<String, dynamic>> addStudent(Map<String, dynamic> studentData) async {
+  Future<Map<String, dynamic>> addStudent(
+    Map<String, dynamic> studentData,
+  ) async {
     try {
       final token = await _getAccessToken();
       if (token == null) return {'error': 'Not authenticated.'};
@@ -65,13 +67,15 @@ class StudentService {
       final token = await _getAccessToken();
       if (token == null) return [];
 
-      final response = await http.get(
-        Uri.parse('$_baseUrl/students'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/students'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final students = jsonDecode(response.body) as List<dynamic>;
@@ -103,7 +107,10 @@ class StudentService {
 
   /// Update an existing student's details.
   /// Returns null on success, or an error message string on failure.
-  Future<String?> updateStudent(String studentId, Map<String, dynamic> studentData) async {
+  Future<String?> updateStudent(
+    String studentId,
+    Map<String, dynamic> studentData,
+  ) async {
     try {
       final token = await _getAccessToken();
       if (token == null) return 'Not authenticated.';
@@ -166,7 +173,10 @@ class StudentService {
 
   /// Submit assessment results for an existing student.
   /// Returns null on success, or an error message string on failure.
-  Future<String?> submitAssessment(String studentId, List<Map<String, dynamic>> assessmentResults) async {
+  Future<String?> submitAssessment(
+    String studentId,
+    List<Map<String, dynamic>> assessmentResults,
+  ) async {
     try {
       final token = await _getAccessToken();
       if (token == null) return 'Not authenticated.';
@@ -196,16 +206,26 @@ class StudentService {
 
   /// Submit comprehensive assessment results for a specific category.
   /// Returns null on success, or an error message string on failure.
-  Future<String?> submitComprehensiveAssessment(String studentId, String category, List<Map<String, dynamic>> assessmentResults) async {
+  Future<String?> submitComprehensiveAssessment(
+    String studentId,
+    String category,
+    List<Map<String, dynamic>> assessmentResults,
+  ) async {
     try {
       final token = await _getAccessToken();
       if (token == null) return 'Not authenticated.';
 
-      debugPrint('[STUDENT_SERVICE] Submitting $category comprehensive assessment for student: $studentId');
-      debugPrint('[STUDENT_SERVICE] Payload answers count: ${assessmentResults.length}');
+      debugPrint(
+        '[STUDENT_SERVICE] Submitting $category comprehensive assessment for student: $studentId',
+      );
+      debugPrint(
+        '[STUDENT_SERVICE] Payload answers count: ${assessmentResults.length}',
+      );
 
       final response = await http.patch(
-        Uri.parse('$_baseUrl/students/$studentId/comprehensive-assessment/$category'),
+        Uri.parse(
+          '$_baseUrl/students/$studentId/comprehensive-assessment/$category',
+        ),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -213,7 +233,9 @@ class StudentService {
         body: jsonEncode({'assessment_results': assessmentResults}),
       );
 
-      debugPrint('[STUDENT_SERVICE] Server response status: ${response.statusCode}');
+      debugPrint(
+        '[STUDENT_SERVICE] Server response status: ${response.statusCode}',
+      );
       debugPrint('[STUDENT_SERVICE] Server response body: ${response.body}');
 
       if (response.statusCode == 200) {
@@ -235,13 +257,18 @@ class StudentService {
     }
   }
 
-  Future<void> _updateCachedStudent(String studentId, Map<String, dynamic> updatedStudent) async {
+  Future<void> _updateCachedStudent(
+    String studentId,
+    Map<String, dynamic> updatedStudent,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedStr = prefs.getString('cached_students_list');
       if (cachedStr != null && cachedStr.isNotEmpty) {
         final List<dynamic> list = jsonDecode(cachedStr);
-        final index = list.indexWhere((s) => s['id'] == studentId || s['_id'] == studentId);
+        final index = list.indexWhere(
+          (s) => s['id'] == studentId || s['_id'] == studentId,
+        );
         if (index != -1) {
           list[index] = updatedStudent;
         } else {
@@ -256,7 +283,11 @@ class StudentService {
 
   /// Sync progress data to the backend for an existing student.
   /// Returns null on success, or an error message string on failure.
-  Future<String?> syncProgress(String studentId, List<String> completedActivities, Map<String, int> activityScores) async {
+  Future<String?> syncProgress(
+    String studentId,
+    List<String> completedActivities,
+    Map<String, int> activityScores,
+  ) async {
     try {
       final token = await _getAccessToken();
       if (token == null) return 'Not authenticated.';
@@ -300,11 +331,13 @@ class StudentService {
   Future<String?> submitTelemetry(Map<String, dynamic> payload) async {
     try {
       final headers = await _getHeaders();
-      final response = await http.post(
-        Uri.parse('${ApiConfig.telemetryBaseUrl}/telemetry'),
-        headers: headers,
-        body: jsonEncode(payload),
-      );
+      final response = await http
+          .post(
+            Uri.parse('${ApiConfig.telemetryBaseUrl}/telemetry'),
+            headers: headers,
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 201) {
         return null; // Success
@@ -321,7 +354,9 @@ class StudentService {
   }
 
   /// Submit real-time interaction to the unified C1-C4 pipeline.
-  Future<Map<String, dynamic>?> submitInteraction(Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>?> submitInteraction(
+    Map<String, dynamic> payload,
+  ) async {
     try {
       final headers = await _getHeaders();
       final response = await http.post(
@@ -365,52 +400,23 @@ class StudentService {
     }
   }
 
-  /// Fetch the ML-generated cognitive analytics profile for a student.
-  ///
-  /// Returns a Map with cognitive indices, risk assessment, and
-  /// intervention recommendations on success, or an empty Map on failure.
-  ///
-  /// Accessible by: parent (who owns the student) or a connected specialist.
-  Future<Map<String, dynamic>> getCognitiveAnalytics(String studentId) async {
-    try {
-      final token = await _getAccessToken();
-      if (token == null) return {};
-
-      final response = await http.get(
-        Uri.parse('$_telemetryBaseUrl/telemetry/$studentId/analytics'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-      return {};
-    } catch (e) {
-      return {};
-    }
-  }
-
-  /// Download the PDF Clinical Report
+  /// Download the parent learning summary PDF (plain-language observations;
+  /// replaces the removed "clinical risk" report).
   Future<String?> downloadClinicalReport(String studentId) async {
     try {
       final token = await _getAccessToken();
       if (token == null) return 'Not authenticated.';
 
       final response = await http.get(
-        Uri.parse('$_telemetryBaseUrl/telemetry/$studentId/report/pdf'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        Uri.parse('${ApiConfig.parentDashboardBaseUrl}/$studentId/report'),
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
         final tempDir = await getTemporaryDirectory();
-        final file = File('${tempDir.path}/Clinical_Report_$studentId.pdf');
+        final file = File('${tempDir.path}/Sipsara_Learning_Summary_$studentId.pdf');
         await file.writeAsBytes(response.bodyBytes);
-        await Share.shareXFiles([XFile(file.path)], text: 'Clinical Report');
+        await Share.shareXFiles([XFile(file.path)], text: 'Sipsara learning summary');
         return null;
       } else {
         return 'Failed to download report: ${response.statusCode}';
@@ -427,17 +433,19 @@ class StudentService {
       if (token == null) return 'Not authenticated.';
 
       final response = await http.get(
-        Uri.parse('$_telemetryBaseUrl/students/$studentId/assessment/report/pdf'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        Uri.parse(
+          '$_telemetryBaseUrl/students/$studentId/assessment/report/pdf',
+        ),
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
         final tempDir = await getTemporaryDirectory();
         final file = File('${tempDir.path}/Assessment_Report_$studentId.pdf');
         await file.writeAsBytes(response.bodyBytes);
-        await Share.shareXFiles([XFile(file.path)], text: 'Comprehensive Assessment Report');
+        await Share.shareXFiles([
+          XFile(file.path),
+        ], text: 'Comprehensive Assessment Report');
         return null;
       } else {
         return 'Failed to download assessment report: ${response.statusCode}';
@@ -447,34 +455,6 @@ class StudentService {
     }
   }
 
-  /// Submit a clinical ground-truth label for a student to train ML models.
-  Future<String?> submitClinicianLabel(String studentId, String label) async {
-    try {
-      final token = await _getAccessToken();
-      if (token == null) return 'Not authenticated.';
-
-      final response = await http.post(
-        Uri.parse('$_telemetryBaseUrl/ml/label/$studentId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'label': label}),
-      );
-
-      if (response.statusCode == 200) {
-        return null; // Success
-      } else {
-        final data = jsonDecode(response.body);
-        if (data['detail'] is String) {
-          return data['detail'];
-        }
-        return 'Failed to submit clinical label.';
-      }
-    } catch (e) {
-      return 'Failed to connect to the server.';
-    }
-  }
 
   /// Fetch C1 Behavioral Learner-State history for a student
   Future<List<dynamic>> getC1History(String studentId, {int limit = 5}) async {
@@ -482,13 +462,17 @@ class StudentService {
       final token = await _getAccessToken();
       if (token == null) return [];
 
-      final response = await http.get(
-        Uri.parse('${ApiConfig.c1BaseUrl}/student/$studentId/history?limit=$limit'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            Uri.parse(
+              '${ApiConfig.c1BaseUrl}/student/$studentId/history?limit=$limit',
+            ),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as List<dynamic>;

@@ -2,7 +2,6 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -15,9 +14,12 @@ import 'localization_service.dart';
 /// Handles authentication-only API calls: login, signup, tokens, passwords.
 /// Student management is in StudentService.
 class AuthService {
+  static Future<String?>? _refreshInFlight;
+
   static String get _baseUrl {
     return ApiConfig.authBaseUrl;
   }
+
   // Helper to get device info
   Future<Map<String, String>> _getDeviceData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -26,7 +28,7 @@ class AuthService {
       deviceId = const Uuid().v4();
       await prefs.setString('device_id', deviceId);
     }
-    
+
     String deviceName = 'Unknown Device';
     try {
       final deviceInfo = DeviceInfoPlugin();
@@ -43,11 +45,16 @@ class AuthService {
     } catch (e) {
       // fallback
     }
-    
+
     return {'device_id': deviceId, 'device_name': deviceName};
   }
+
   /// Returns null on success, or an error message string on failure.
-  Future<String?> login(String email, String password, {String role = "parent"}) async {
+  Future<String?> login(
+    String email,
+    String password, {
+    String role = "parent",
+  }) async {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/login'),
@@ -65,12 +72,12 @@ class AuthService {
         final data = jsonDecode(response.body);
         String accessToken = data['access_token'];
         String refreshToken = data['refresh_token'];
-        
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('access_token', accessToken);
         await prefs.setString('refresh_token', refreshToken);
         await prefs.setString('auth_provider', 'local');
-        
+
         return null;
       } else {
         final data = jsonDecode(response.body);
@@ -87,16 +94,24 @@ class AuthService {
       return 'Network Error: $e';
     }
   }
+
   /// Returns null on success, or an error message string on failure.
-  Future<String?> loginWithGoogle({String role = "parent", String? specialization, String? clinicName}) async {
+  Future<String?> loginWithGoogle({
+    String role = "parent",
+    String? specialization,
+    String? clinicName,
+  }) async {
     try {
       await GoogleSignIn.instance.initialize(
-        serverClientId: '733315696908-tpau04bmsk824olg6m0a3coanojl147v.apps.googleusercontent.com',
+        serverClientId:
+            '733315696908-tpau04bmsk824olg6m0a3coanojl147v.apps.googleusercontent.com',
       );
 
-      final GoogleSignInAccount googleUser = await GoogleSignIn.instance.authenticate();
+      final GoogleSignInAccount googleUser = await GoogleSignIn.instance
+          .authenticate();
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final String? idToken = googleAuth.idToken;
 
       if (idToken == null) {
@@ -121,12 +136,12 @@ class AuthService {
         final data = jsonDecode(response.body);
         String accessToken = data['access_token'];
         String refreshToken = data['refresh_token'];
-        
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('access_token', accessToken);
         await prefs.setString('refresh_token', refreshToken);
         await prefs.setString('auth_provider', 'google');
-        
+
         return null; // Success
       } else {
         try {
@@ -138,20 +153,28 @@ class AuthService {
       }
     } catch (e) {
       print('GOOGLE SIGN IN ERROR: $e');
-      if (e.toString().contains('canceled') || e.toString().contains('Canceled')) {
+      if (e.toString().contains('canceled') ||
+          e.toString().contains('Canceled')) {
         return 'CANCELED';
       }
       return 'Google Sign In Error: $e';
     }
   }
+
   /// Returns null on success, or an error message string on failure.
-  Future<String?> loginWithMicrosoft({String role = "parent", String? specialization, String? clinicName}) async {
+  Future<String?> loginWithMicrosoft({
+    String role = "parent",
+    String? specialization,
+    String? clinicName,
+  }) async {
     try {
       final Config config = Config(
-        tenant: 'common', // We will keep 'common' so any Microsoft account can log in
+        tenant:
+            'common', // We will keep 'common' so any Microsoft account can log in
         clientId: 'a1a55b82-e464-4ac1-80fd-5ad23fcbef56', // Microsoft Client ID
         scope: 'openid profile email User.Read',
-        redirectUri: 'https://login.live.com/oauth20_desktop.srf', // Standard URI for mobile webviews
+        redirectUri:
+            'https://login.live.com/oauth20_desktop.srf', // Standard URI for mobile webviews
         navigatorKey: globalNavigatorKey,
         customParameters: {'prompt': 'select_account'},
         // webUseRedirect is ONLY for web. It breaks mobile authentication.
@@ -159,20 +182,21 @@ class AuthService {
 
       final AadOAuth oauth = AadOAuth(config);
       final result = await oauth.login();
-      
+
       final String? accessToken = await oauth.getAccessToken();
 
       if (accessToken == null) {
         String errMsg = 'Failed to get Access token from Microsoft.';
         try {
-           result.fold((l) {
-             final errStr = l.toString().toLowerCase();
-             if (errStr.contains('canceled') || errStr.contains('accessdenied')) {
-               errMsg = 'CANCELED';
-             } else {
-               errMsg = 'Microsoft Auth Error: ${l.toString()}';
-             }
-           }, (r) => null);
+          result.fold((l) {
+            final errStr = l.toString().toLowerCase();
+            if (errStr.contains('canceled') ||
+                errStr.contains('accessdenied')) {
+              errMsg = 'CANCELED';
+            } else {
+              errMsg = 'Microsoft Auth Error: ${l.toString()}';
+            }
+          }, (r) => null);
         } catch (_) {}
         return errMsg;
       }
@@ -195,12 +219,12 @@ class AuthService {
         final data = jsonDecode(response.body);
         String jwtAccessToken = data['access_token'];
         String jwtRefreshToken = data['refresh_token'];
-        
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('access_token', jwtAccessToken);
         await prefs.setString('refresh_token', jwtRefreshToken);
         await prefs.setString('auth_provider', 'microsoft');
-        
+
         return null; // Success
       } else {
         try {
@@ -212,14 +236,23 @@ class AuthService {
       }
     } catch (e) {
       print('MICROSOFT SIGN IN ERROR: $e');
-      if (e.toString().contains('canceled') || e.toString().contains('Canceled')) {
+      if (e.toString().contains('canceled') ||
+          e.toString().contains('Canceled')) {
         return 'CANCELED';
       }
       return 'Microsoft Sign In Error: $e';
     }
   }
+
   /// Returns null on success, or an error message string on failure.
-  Future<String?> signup(String name, String email, String password, {String role = "parent", String? specialization, String? clinicName}) async {
+  Future<String?> signup(
+    String name,
+    String email,
+    String password, {
+    String role = "parent",
+    String? specialization,
+    String? clinicName,
+  }) async {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/signup'),
@@ -239,7 +272,7 @@ class AuthService {
         return null;
       } else {
         final data = jsonDecode(response.body);
-        
+
         if (data['detail'] is String) {
           return data['detail'];
         } else if (data['detail'] is List) {
@@ -254,6 +287,7 @@ class AuthService {
       return 'Network Error: $e';
     }
   }
+
   /// Verify Email via OTP during Signup
 
   Future<String?> resendOtp(String email) async {
@@ -271,27 +305,25 @@ class AuthService {
       return 'Network error: $e';
     }
   }
+
   Future<String?> verifyEmail(String email, String otp) async {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/verify-email'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email.trim(),
-          'otp': otp.trim()
-        }),
+        body: jsonEncode({'email': email.trim(), 'otp': otp.trim()}),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         String jwtAccessToken = data['access_token'];
         String jwtRefreshToken = data['refresh_token'];
-        
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('access_token', jwtAccessToken);
         await prefs.setString('refresh_token', jwtRefreshToken);
         await prefs.setString('auth_provider', 'local');
-        
+
         return null; // Success
       } else {
         final data = jsonDecode(response.body);
@@ -307,6 +339,7 @@ class AuthService {
       return 'Network Error: $e';
     }
   }
+
   /// Cancel a pending signup
   Future<void> cancelSignup(String email) async {
     try {
@@ -316,29 +349,114 @@ class AuthService {
     }
   }
 
-  /// Helper to get the token
+  /// Return a usable access token, renewing an expired token once when needed.
+  ///
+  /// All authenticated services use this method, so a seven-day access-token
+  /// expiry does not silently turn dashboard responses into empty data.
   Future<String?> getAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('access_token');
+    final token = prefs.getString('access_token');
+    if (token == null || token.isEmpty) return null;
+    if (!_isExpiredOrNearExpiry(token)) return token;
+    return refreshAccessToken();
   }
+
+  /// Rotate the access/refresh token pair. Concurrent dashboard and telemetry
+  /// requests share one refresh call to avoid invalidating each other's token.
+  Future<String?> refreshAccessToken() async {
+    final existing = _refreshInFlight;
+    if (existing != null) return existing;
+
+    final operation = _performTokenRefresh();
+    _refreshInFlight = operation;
+    try {
+      return await operation;
+    } finally {
+      if (identical(_refreshInFlight, operation)) {
+        _refreshInFlight = null;
+      }
+    }
+  }
+
+  Future<String?> _performTokenRefresh() async {
+    final prefs = await SharedPreferences.getInstance();
+    final refreshToken = prefs.getString('refresh_token');
+    if (refreshToken == null || refreshToken.isEmpty) return null;
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/refresh'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refresh_token': refreshToken}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final accessToken = data['access_token']?.toString();
+      final rotatedRefreshToken = data['refresh_token']?.toString();
+      if (accessToken == null ||
+          accessToken.isEmpty ||
+          rotatedRefreshToken == null ||
+          rotatedRefreshToken.isEmpty) {
+        return null;
+      }
+
+      await prefs.setString('access_token', accessToken);
+      await prefs.setString('refresh_token', rotatedRefreshToken);
+      return accessToken;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _isExpiredOrNearExpiry(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+      final payload =
+          jsonDecode(
+                utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+              )
+              as Map<String, dynamic>;
+      final exp = payload['exp'];
+      if (exp is! num) return true;
+      final expiresAt = DateTime.fromMillisecondsSinceEpoch(
+        exp.toInt() * 1000,
+        isUtc: true,
+      );
+      return expiresAt.isBefore(
+        DateTime.now().toUtc().add(const Duration(minutes: 1)),
+      );
+    } catch (_) {
+      return true;
+    }
+  }
+
   /// Helper to get the auth provider
   Future<String> getAuthProvider() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('auth_provider') ?? 'local';
   }
+
   /// Get current user profile
   Future<Map<String, dynamic>?> getUserProfile() async {
     try {
       final token = await getAccessToken();
       if (token == null) return null;
 
-      final response = await http.get(
-        Uri.parse('$_baseUrl/me'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 10)); // Reduced timeout from 60s to 10s for better UX
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/me'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(
+            const Duration(seconds: 10),
+          ); // Reduced timeout from 60s to 10s for better UX
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -356,14 +474,20 @@ class AuthService {
       return null;
     }
   }
-  
+
   /// Helper to get the cached role quickly
   Future<String> getCachedRole() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('cached_user_role') ?? 'parent';
   }
+
   /// Update Profile (Name/Email)
-  Future<String?> updateProfile({String? name, String? email, String? specialization, String? clinicName}) async {
+  Future<String?> updateProfile({
+    String? name,
+    String? email,
+    String? specialization,
+    String? clinicName,
+  }) async {
     try {
       final token = await getAccessToken();
       if (token == null) return 'Not authenticated.';
@@ -396,6 +520,7 @@ class AuthService {
       return 'Failed to connect to the server.';
     }
   }
+
   /// Request Email Update (Sends OTP)
   Future<String?> requestEmailUpdate(String newEmail) async {
     try {
@@ -421,6 +546,7 @@ class AuthService {
       return 'Failed to connect to the server.';
     }
   }
+
   /// Verify Email Update (Confirms OTP)
   Future<String?> verifyEmailUpdate(String newEmail, String otp) async {
     try {
@@ -433,10 +559,7 @@ class AuthService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'new_email': newEmail,
-          'otp': otp,
-        }),
+        body: jsonEncode({'new_email': newEmail, 'otp': otp}),
       );
 
       if (response.statusCode == 200) {
@@ -453,6 +576,7 @@ class AuthService {
       return 'Failed to connect to the server.';
     }
   }
+
   /// Change Password
   Future<String?> changePassword(String oldPassword, String newPassword) async {
     try {
@@ -488,6 +612,7 @@ class AuthService {
       return 'Failed to connect to the server.';
     }
   }
+
   /// Request Password Reset
   Future<String?> requestPasswordReset(String email) async {
     try {
@@ -502,7 +627,8 @@ class AuthService {
       } else {
         final data = jsonDecode(response.body);
         if (data['detail'] is List && data['detail'].isNotEmpty) {
-          return data['detail'][0]['msg']?.toString() ?? 'Invalid input format.';
+          return data['detail'][0]['msg']?.toString() ??
+              'Invalid input format.';
         }
         return data['detail']?.toString() ?? 'Failed to send reset code.';
       }
@@ -510,8 +636,13 @@ class AuthService {
       return 'Network Error: $e';
     }
   }
+
   /// Reset Password
-  Future<String?> resetPassword(String email, String otp, String newPassword) async {
+  Future<String?> resetPassword(
+    String email,
+    String otp,
+    String newPassword,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/reset-password'),
@@ -519,7 +650,7 @@ class AuthService {
         body: jsonEncode({
           'email': email.trim(),
           'otp': otp.trim(),
-          'new_password': newPassword
+          'new_password': newPassword,
         }),
       );
 
@@ -539,6 +670,7 @@ class AuthService {
       return 'Network Error: $e';
     }
   }
+
   /// Verify parent password
   Future<String?> verifyPassword(String password) async {
     try {
@@ -567,6 +699,7 @@ class AuthService {
       return 'Failed to connect to the server.';
     }
   }
+
   /// Delete Account
   Future<String?> deleteAccount() async {
     try {
@@ -590,11 +723,12 @@ class AuthService {
       return 'Failed to connect to the server.';
     }
   }
+
   /// Clear tokens (logout)
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     final provider = prefs.getString('auth_provider');
-    
+
     if (provider == 'google') {
       try {
         await GoogleSignIn.instance.signOut();
@@ -615,6 +749,7 @@ class AuthService {
     await prefs.remove('refresh_token');
     await prefs.remove('auth_provider');
   }
+
   // Toggle Login Alerts
   Future<Map<String, dynamic>> toggleLoginAlerts(bool enabled) async {
     final token = await getAccessToken();
@@ -636,6 +771,7 @@ class AuthService {
       throw Exception(error['detail'] ?? 'Failed to update login alerts');
     }
   }
+
   // Upload Profile Picture
   Future<String> uploadProfilePicture(File imageFile) async {
     final token = await getAccessToken();
@@ -645,16 +781,11 @@ class AuthService {
       'POST',
       Uri.parse('$_baseUrl/profile/picture'),
     );
-    
-    request.headers.addAll({
-      'Authorization': 'Bearer $token',
-    });
-    
+
+    request.headers.addAll({'Authorization': 'Bearer $token'});
+
     request.files.add(
-      await http.MultipartFile.fromPath(
-        'file',
-        imageFile.path,
-      ),
+      await http.MultipartFile.fromPath('file', imageFile.path),
     );
 
     var streamedResponse = await request.send();
@@ -667,6 +798,7 @@ class AuthService {
       throw Exception('Failed to upload profile picture: ${response.body}');
     }
   }
+
   // Delete Profile Picture
   Future<void> deleteProfilePicture() async {
     final token = await getAccessToken();
@@ -674,15 +806,14 @@ class AuthService {
 
     final response = await http.delete(
       Uri.parse('$_baseUrl/profile/picture'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode != 200) {
       throw Exception('Failed to delete profile picture: ${response.body}');
     }
   }
+
   // Connect Specialist
   Future<String?> connectSpecialist(String clinicCode, String studentId) async {
     try {
@@ -695,10 +826,7 @@ class AuthService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'clinic_code': clinicCode,
-          'student_id': studentId,
-        }),
+        body: jsonEncode({'clinic_code': clinicCode, 'student_id': studentId}),
       );
 
       if (response.statusCode == 200) {
@@ -711,6 +839,7 @@ class AuthService {
       return e.toString();
     }
   }
+
   // Disconnect a specialist
   Future<String?> disconnectSpecialist(String connectionId) async {
     try {
@@ -728,7 +857,7 @@ class AuthService {
       if (response.statusCode == 200) {
         return null; // success
       }
-      
+
       final data = jsonDecode(response.body);
       return data['detail'] ?? 'Failed to disconnect';
     } catch (e) {

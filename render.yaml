@@ -1,6 +1,7 @@
 services:
   - type: web
     name: sipsara-auth-api
+    branch: dev
     plan: free
     env: python
     buildCommand: "pip install -r app/backend/api/requirements.txt"
@@ -8,6 +9,7 @@ services:
     buildFilter:
       paths:
         - app/backend/api/**
+        - shared/**
         - render.yaml
     envVars:
       - key: PORT
@@ -16,9 +18,23 @@ services:
         value: 3.11.0
       - key: MONGODB_URL
         sync: false
+      - key: MONGODB_DB_NAME
+        value: r26_se_031
+      - key: BREVO_API_KEY
+        sync: false
       - key: SMTP_EMAIL
         sync: false
       - key: SMTP_PASSWORD
         sync: false
       - key: JWT_SECRET_KEY
-        generateValue: true
+        sync: false
+      - key: SPEECH_API_URL
+        value: https://sipsara-ml-backend-v2.azurewebsites.net/speech
+      - key: TELEMETRY_API_URL
+        value: https://sipsara-ml-backend-v2.azurewebsites.net/telemetry
+      - key: FUSION_API_URL
+        value: https://sipsara-ml-backend-v2.azurewebsites.net/diagnostic
+      - key: TUTORING_API_URL
+        value: https://sipsara-ml-backend-v2.azurewebsites.net/tutoring
+      - key: ADAPTIVE_API_URL
+        value: https://sipsara-ml-backend-v2.azurewebsites.net/tutoring

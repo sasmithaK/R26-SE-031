@@ -11,12 +11,16 @@ class ProgressService {
 
   // Constants
   static const String _keyCurrentStudentId = 'current_student_id';
-  static const String _keyCompletedActivitiesPrefix = 'completed_'; // + studentId
+  static const String _keyCompletedActivitiesPrefix =
+      'completed_'; // + studentId
   static const String _keyActivityScoresPrefix = 'scores_'; // + studentId
   static const String _keyActivityStatePrefix = 'state_'; // + studentId
   static const String _keyLastActiveDate = 'last_active_date';
   static const String _keyStreakCount = 'streak_count';
   static const String _keyStreakEarned = 'streak_earned_by_activity';
+
+  static bool _isParentPractice(String activityId) =>
+      activityId.startsWith('parent_practice_');
 
   Future<SharedPreferences> _ensurePrefs() async {
     _prefs ??= await SharedPreferences.getInstance();
@@ -28,7 +32,7 @@ class ProgressService {
   }
 
   // --- Student Management ---
-  
+
   Future<void> setCurrentStudentId(String studentId) async {
     final prefs = await _ensurePrefs();
     await prefs.setString(_keyCurrentStudentId, studentId);
@@ -61,8 +65,10 @@ class ProgressService {
     // 2. Extract cloud data
     List<dynamic> cloudCompletedRaw = studentData['completed_activities'] ?? [];
     Map<String, dynamic> cloudScoresRaw = studentData['activity_scores'] ?? {};
-    
-    List<String> cloudCompleted = cloudCompletedRaw.map((e) => e.toString()).toList();
+
+    List<String> cloudCompleted = cloudCompletedRaw
+        .map((e) => e.toString())
+        .toList();
     Map<String, int> cloudScores = {};
     cloudScoresRaw.forEach((k, v) {
       if (v is num) cloudScores[k] = v.toInt();
@@ -85,7 +91,8 @@ class ProgressService {
     await prefs.setString(scoresKey, json.encode(mergedScores));
 
     // 6. If local had progress not yet on cloud, trigger sync back
-    if (mergedCompleted.length > cloudCompleted.length || mergedScores.length > cloudScores.length) {
+    if (mergedCompleted.length > cloudCompleted.length ||
+        mergedScores.length > cloudScores.length) {
       _triggerCloudSync();
     }
   }
@@ -94,17 +101,19 @@ class ProgressService {
     final prefs = await _ensurePrefs();
     final completedKey = '$_keyCompletedActivitiesPrefix$currentStudentId';
     final scoresKey = '$_keyActivityScoresPrefix$currentStudentId';
-    
+
     List<String> completed = prefs.getStringList(completedKey) ?? [];
     String? scoresJson = prefs.getString(scoresKey);
     Map<String, int> scores = {};
     if (scoresJson != null) {
       try {
         final Map<String, dynamic> decoded = json.decode(scoresJson);
-        scores = decoded.map((key, value) => MapEntry(key, (value as num).toInt()));
+        scores = decoded.map(
+          (key, value) => MapEntry(key, (value as num).toInt()),
+        );
       } catch (_) {}
     }
-    
+
     // Network sync
     StudentService().syncProgress(currentStudentId, completed, scores);
   }
@@ -113,10 +122,11 @@ class ProgressService {
 
   /// Marks an activity as completed for the current student
   Future<void> markActivityCompleted(String skillId, String activityId) async {
+    if (_isParentPractice(activityId)) return;
     final prefs = _prefs ?? await _ensurePrefs();
     final key = '$_keyCompletedActivitiesPrefix$currentStudentId';
     List<String> completed = prefs.getStringList(key) ?? [];
-    
+
     final activityKey = '${skillId}_$activityId';
     if (!completed.contains(activityKey)) {
       completed.add(activityKey);
@@ -133,6 +143,7 @@ class ProgressService {
 
   /// Checks if an activity is completed
   bool isActivityCompleted(String skillId, String activityId) {
+    if (_isParentPractice(activityId)) return false;
     final key = '$_keyCompletedActivitiesPrefix$currentStudentId';
     List<String> completed = _prefs?.getStringList(key) ?? [];
     if (completed.contains('${skillId}_$activityId')) return true;
@@ -146,7 +157,7 @@ class ProgressService {
   int getCompletedActivitiesCount(String skillId) {
     final key = '$_keyCompletedActivitiesPrefix$currentStudentId';
     List<String> completed = _prefs?.getStringList(key) ?? [];
-    
+
     int count = 0;
     bool hasAct4 = false;
     for (String id in completed) {
@@ -199,7 +210,7 @@ class ProgressService {
   List<String> getCompletedActivitiesForSkill(String skillId) {
     final key = '$_keyCompletedActivitiesPrefix$currentStudentId';
     List<String> completed = _prefs?.getStringList(key) ?? [];
-    
+
     return completed.where((id) => id.startsWith('${skillId}_')).toList();
   }
 
@@ -211,14 +222,20 @@ class ProgressService {
   }
 
   bool isSkillIntroSeen(String skillId) {
-    return _prefs?.getBool('intro_seen_skill_${currentStudentId}_$skillId') ?? false;
+    return _prefs?.getBool('intro_seen_skill_${currentStudentId}_$skillId') ??
+        false;
   }
 
   /// Checks if a skill is unlocked based on:
   /// 1. First skill (index 0) is always unlocked.
   /// 2. Unlocked if ALL activities in preceding skill are completed.
   /// 3. Trial shortcut: Unlocked if student tried this skill and completed its 1st activity (act_1).
-  bool isSkillUnlocked(int index, String skillId, String? prevSkillId, int prevTotalActivities) {
+  bool isSkillUnlocked(
+    int index,
+    String skillId,
+    String? prevSkillId,
+    int prevTotalActivities,
+  ) {
     if (index == 0) return true;
 
     // Progression rule: All activities in previous skill must be completed
@@ -228,6 +245,12 @@ class ProgressService {
         if (isActivityCompleted(prevSkillId, 'act_${i + 1}')) {
           completedCount++;
         }
+      }
+      // skill_4 has 4 activities but act_4 counts as two (5 stars), matching
+      // getCompletedActivitiesCount; without this, act_5 never exists and the
+      // next skill can never unlock through the progression rule.
+      if (prevSkillId == 'skill_4' && isActivityCompleted(prevSkillId, 'act_4')) {
+        completedCount++;
       }
       if (completedCount >= prevTotalActivities) return true;
     }
@@ -243,7 +266,12 @@ class ProgressService {
 
   // --- Scoring ---
 
-  Future<void> saveActivityScore(String skillId, String activityId, int score) async {
+  Future<void> saveActivityScore(
+    String skillId,
+    String activityId,
+    int score,
+  ) async {
+    if (_isParentPractice(activityId)) return;
     final prefs = _prefs ?? await _ensurePrefs();
     final key = '$_keyActivityScoresPrefix$currentStudentId';
     String? scoresJson = prefs.getString(key);
@@ -253,17 +281,18 @@ class ProgressService {
         scores = json.decode(scoresJson);
       } catch (_) {}
     }
-    
+
     scores['${skillId}_$activityId'] = score;
     prefs.setString(key, json.encode(scores));
     _triggerCloudSync();
   }
 
   int getActivityScore(String skillId, String activityId) {
+    if (_isParentPractice(activityId)) return 0;
     final key = '$_keyActivityScoresPrefix$currentStudentId';
     String? scoresJson = _prefs?.getString(key);
     if (scoresJson == null) return 0;
-    
+
     try {
       Map<String, dynamic> scores = json.decode(scoresJson);
       final val = scores['${skillId}_$activityId'];
@@ -274,7 +303,11 @@ class ProgressService {
 
   // --- Partial Progress State ---
 
-  Future<void> saveActivityState(String skillId, String activityId, int currentRoundIndex) async {
+  Future<void> saveActivityState(
+    String skillId,
+    String activityId,
+    int currentRoundIndex,
+  ) async {
     final prefs = _prefs ?? await _ensurePrefs();
     final key = '$_keyActivityStatePrefix$currentStudentId';
     String? stateJson = prefs.getString(key);
@@ -284,7 +317,7 @@ class ProgressService {
         states = json.decode(stateJson);
       } catch (_) {}
     }
-    
+
     states['${skillId}_$activityId'] = currentRoundIndex;
     prefs.setString(key, json.encode(states));
   }
@@ -293,7 +326,7 @@ class ProgressService {
     final key = '$_keyActivityStatePrefix$currentStudentId';
     String? stateJson = _prefs?.getString(key);
     if (stateJson == null) return 0;
-    
+
     try {
       Map<String, dynamic> states = json.decode(stateJson);
       final val = states['${skillId}_$activityId'];
@@ -316,13 +349,13 @@ class ProgressService {
   }
 
   // --- Failure Tracking (Dynamic Difficulty Adjustment) ---
-  
+
   static const String _keyFailureCountPrefix = 'failures_'; // + studentId
 
   Future<void> incrementFailureCount(String skillId, String activityId) async {
     final prefs = await _ensurePrefs();
     final key = '$_keyFailureCountPrefix$currentStudentId';
-    
+
     String? failsJson = prefs.getString(key);
     Map<String, dynamic> fails = {};
     if (failsJson != null) {
@@ -330,18 +363,18 @@ class ProgressService {
         fails = json.decode(failsJson);
       } catch (_) {}
     }
-    
+
     final actKey = '${skillId}_$activityId';
     fails[actKey] = (fails[actKey] ?? 0) + 1;
-    
+
     await prefs.setString(key, json.encode(fails));
   }
-  
+
   int getFailureCount(String skillId, String activityId) {
     final key = '$_keyFailureCountPrefix$currentStudentId';
     String? failsJson = _prefs?.getString(key);
     if (failsJson == null) return 0;
-    
+
     try {
       Map<String, dynamic> fails = json.decode(failsJson);
       final val = fails['${skillId}_$activityId'];
@@ -349,11 +382,11 @@ class ProgressService {
     } catch (_) {}
     return 0;
   }
-  
+
   Future<void> resetFailureCount(String skillId, String activityId) async {
     final prefs = await _ensurePrefs();
     final key = '$_keyFailureCountPrefix$currentStudentId';
-    
+
     String? failsJson = prefs.getString(key);
     if (failsJson != null) {
       try {
@@ -375,7 +408,8 @@ class ProgressService {
   Future<int> updateAndGetStreak() async {
     final prefs = await _ensurePrefs();
     final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
     final lastActiveStr = prefs.getString(_keyLastActiveDate);
     int streak = prefs.getInt(_keyStreakCount) ?? 0;
@@ -384,7 +418,11 @@ class ProgressService {
       streak = 1;
     } else {
       final parts = lastActiveStr.split('-');
-      final lastActive = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+      final lastActive = DateTime(
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+        int.parse(parts[2]),
+      );
       final today0 = DateTime(today.year, today.month, today.day);
       final diff = today0.difference(lastActive).inDays;
       if (diff == 0) {
@@ -431,4 +469,3 @@ class ProgressService {
     await StudentService().syncProgress(studentId, [], {});
   }
 }
-

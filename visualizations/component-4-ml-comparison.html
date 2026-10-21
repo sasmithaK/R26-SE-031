@@ -1,0 +1,156 @@
+<div id="sipsara-c4-clear-map">
+  <style>
+    #sipsara-c4-clear-map { width:100%; color:var(--foreground); }
+    #sipsara-c4-clear-map .c4-top { display:flex; justify-content:space-between; align-items:end; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+    #sipsara-c4-clear-map h2 { margin:0; }
+    #sipsara-c4-clear-map .c4-caption { color:var(--muted-foreground); margin-top:4px; }
+    #sipsara-c4-clear-map .c4-headings, #sipsara-c4-clear-map .c4-row { display:grid; grid-template-columns:42px minmax(0,1fr) 42px minmax(0,1fr); gap:10px; align-items:stretch; }
+    #sipsara-c4-clear-map .c4-headings { align-items:end; margin-bottom:10px; }
+    #sipsara-c4-clear-map .c4-col-title { padding:8px 2px; }
+    #sipsara-c4-clear-map .c4-col-title strong { display:block; }
+    #sipsara-c4-clear-map .c4-col-title span { color:var(--muted-foreground); }
+    #sipsara-c4-clear-map .c4-current-title strong { color:var(--destructive); }
+    #sipsara-c4-clear-map .c4-target-title strong { color:var(--green); }
+    #sipsara-c4-clear-map .c4-row { margin-bottom:12px; }
+    #sipsara-c4-clear-map .c4-step { display:grid; place-items:center; align-self:center; width:34px; height:34px; border-radius:50%; background:var(--secondary); color:var(--secondary-foreground); font-weight:500; }
+    #sipsara-c4-clear-map .c4-arrow { display:grid; place-items:center; color:var(--muted-foreground); font-weight:500; }
+    #sipsara-c4-clear-map .c4-box { min-height:102px; }
+    #sipsara-c4-clear-map .c4-box h3 { margin:0 0 6px; }
+    #sipsara-c4-clear-map .c4-box p { margin:0; color:var(--muted-foreground); }
+    #sipsara-c4-clear-map .c4-box p + p { margin-top:6px; }
+    #sipsara-c4-clear-map .c4-result { margin-top:16px; display:grid; grid-template-columns:minmax(0,1fr) 42px minmax(0,1fr); gap:10px; align-items:center; }
+    #sipsara-c4-clear-map .c4-result strong { display:block; margin-bottom:5px; }
+    #sipsara-c4-clear-map .c4-result span { color:var(--muted-foreground); }
+    #sipsara-c4-clear-map .journey { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; }
+    #sipsara-c4-clear-map .lane-title { margin:0 0 12px; }
+    #sipsara-c4-clear-map .lane-title.current { color:var(--destructive); }
+    #sipsara-c4-clear-map .lane-title.target { color:var(--green); }
+    #sipsara-c4-clear-map .journey-step { display:grid; grid-template-columns:34px 1fr; gap:10px; align-items:start; position:relative; padding-bottom:18px; }
+    #sipsara-c4-clear-map .journey-step:not(:last-child)::after { content:"↓"; position:absolute; left:12px; bottom:0; color:var(--muted-foreground); }
+    #sipsara-c4-clear-map .journey-step .dot { display:grid; place-items:center; width:28px; height:28px; border-radius:50%; background:var(--secondary); color:var(--secondary-foreground); }
+    #sipsara-c4-clear-map .journey-step strong { display:block; }
+    #sipsara-c4-clear-map .journey-step span { color:var(--muted-foreground); }
+    #sipsara-c4-clear-map [hidden] { display:none !important; }
+    @media (max-width:720px) {
+      #sipsara-c4-clear-map .c4-headings { display:none; }
+      #sipsara-c4-clear-map .c4-row { grid-template-columns:34px 1fr; }
+      #sipsara-c4-clear-map .c4-arrow { display:none; }
+      #sipsara-c4-clear-map .c4-box::before { display:block; margin-bottom:6px; font-weight:500; }
+      #sipsara-c4-clear-map .c4-box.current::before { content:"BEFORE"; color:var(--destructive); }
+      #sipsara-c4-clear-map .c4-box.target::before { content:"IMPLEMENTED"; color:var(--green); }
+      #sipsara-c4-clear-map .c4-box.target { grid-column:2; }
+      #sipsara-c4-clear-map .c4-result, #sipsara-c4-clear-map .journey { grid-template-columns:1fr; }
+      #sipsara-c4-clear-map .c4-result .c4-arrow { display:grid; }
+    }
+  </style>
+
+  <div class="c4-top">
+    <div>
+      <h2>Component 4 — exactly what changes</h2>
+      <div class="c4-caption">Same Grade 1 Sinhala activities; different data, models, decisions and evidence</div>
+    </div>
+    <div class="viz-controls" aria-label="Select comparison view">
+      <button type="button" class="btn btn-primary" data-mode="comparison" aria-pressed="true">Stage comparison</button>
+      <button type="button" class="btn" data-mode="journey" aria-pressed="false">One-child example</button>
+    </div>
+  </div>
+
+  <section data-section="comparison" aria-label="Stage-by-stage system comparison">
+    <div class="c4-headings">
+      <div></div>
+      <div class="c4-col-title c4-current-title"><strong>BEFORE REFACTOR</strong><span>What the repository previously did</span></div>
+      <div></div>
+      <div class="c4-col-title c4-target-title"><strong>IMPLEMENTED FOUNDATION</strong><span>What Component 4 now does</span></div>
+    </div>
+
+    <div class="c4-row">
+      <div class="c4-step">1</div>
+      <article class="card c4-box current"><h3>Activity content</h3><p>Rounds mainly contain prompt, options and correct answer.</p><p>Skill 2 has adaptive variants; other skills mostly do not.</p></article>
+      <div class="c4-arrow">→</div>
+      <article class="card c4-box target"><h3>Traceable research item bank</h3><p>309 active canonical records include 97 Skill 1–4 core tasks, reduced-load V1 remediation where valid, and original-level V2 confirmation, with KC tags, stable option IDs, equivalent groups and allowed scaffolds.</p></article>
+    </div>
+
+    <div class="c4-row">
+      <div class="c4-step">2</div>
+      <article class="card c4-box current"><h3>Response evidence</h3><p>Main signal is correct/incorrect plus latency and touch counts.</p><p>An answer completed after highlighting may still increase mastery as “correct”.</p></article>
+      <div class="c4-arrow">→</div>
+      <article class="card c4-box target"><h3>Standard learning event</h3><p>Stores first and final correctness, selected answers, attempts, errors, latency, item/KC identity, assistance and treatment fidelity.</p></article>
+    </div>
+
+    <div class="c4-row">
+      <div class="c4-step">3</div>
+      <article class="card c4-box current"><h3>Learner estimation</h3><p>Provisional BKT values are almost identical across KCs.</p><p>One global IRT theta mixes visual, phonological and language skills.</p></article>
+      <div class="c4-arrow">→</div>
+      <article class="card c4-box target"><h3>BKT + IRT/Rasch pipeline</h3><p><strong>BKT:</strong> updates mastery for each Sinhala KC.</p><p><strong>IRT/Rasch:</strong> updates KC-scoped ability and reports information/SE. Offline calibration fits item difficulty and BKT parameters only after real-data thresholds are met.</p></article>
+    </div>
+
+    <div class="c4-row">
+      <div class="c4-step">4</div>
+      <article class="card c4-box current"><h3>Support decision</h3><p>Skill 2 follows hand-coded state machines.</p><p>Other skills receive a generic fallback; current C1/C2/C3 gateway values are mocked.</p></article>
+      <div class="c4-arrow">→</div>
+      <article class="card c4-box target"><h3>Child-safe scaffold policy</h3><p>A deterministic, auditable policy selects only actions declared by the task adapter.</p><p>No unvalidated classifier or bandit is presented as trained on children.</p></article>
+    </div>
+
+    <div class="c4-row">
+      <div class="c4-step">5</div>
+      <article class="card c4-box current"><h3>Next action in Flutter</h3><p>Adaptive navigation is explicitly accepted only for Skill 2.</p><p>Other activities continue using their local fixed sequence.</p></article>
+      <div class="c4-arrow">→</div>
+      <article class="card c4-box target"><h3>Shared adaptive contract</h3><p>All 19 Skill 1–4 activities use semantic commands plus exact V1/V2 navigation; answer pools reflow and the core progress dot remains stable.</p></article>
+    </div>
+
+    <div class="c4-row">
+      <div class="c4-step">6</div>
+      <article class="card c4-box current"><h3>Stopping and evidence</h3><p>SE calculation exists but is unused. Decisions may be stored more than once.</p><p>No trained-policy evaluation across all skills.</p></article>
+      <div class="c4-arrow">→</div>
+      <article class="card c4-box target"><h3>Auditable validation path</h3><p>Stable event/action IDs and expected-item checks prevent duplicate application or bypassing pending V1/V2.</p><p>Calibration status, sample counts, holdout loss, uncertainty and stop reasons separate software completion from empirical validation.</p></article>
+    </div>
+
+    <div class="c4-result">
+      <div class="card"><strong>Before</strong><span>Functional Skill 2 adaptive prototype with activity-specific rendering and incomplete research evidence.</span></div>
+      <div class="c4-arrow">→</div>
+      <div class="card"><strong>Implemented now</strong><span>A cross-skill adaptive ML foundation with truthful provisional parameters; real-child calibration and outcome validation remain research phases.</span></div>
+    </div>
+  </section>
+
+  <section data-section="journey" hidden aria-label="Example response journey comparison">
+    <div class="journey">
+      <div>
+        <h3 class="lane-title current">BEFORE: child confuses “බ” and “ප”</h3>
+        <div class="journey-step"><div class="dot">1</div><div><strong>Child taps “ප”</strong><span>Wrong attempt and latency are recorded.</span></div></div>
+        <div class="journey-step"><div class="dot">2</div><div><strong>Skill check</strong><span>If this is not Skill 2, adaptive result is ignored.</span></div></div>
+        <div class="journey-step"><div class="dot">3</div><div><strong>Fixed handling</strong><span>Skill 2 uses its activity-specific retry/highlight sequence.</span></div></div>
+        <div class="journey-step"><div class="dot">4</div><div><strong>Child succeeds after help</strong><span>Binary “correct” can still increase BKT mastery.</span></div></div>
+        <div class="journey-step"><div class="dot">5</div><div><strong>Continue</strong><span>No validated proof that this scaffold was best for this child.</span></div></div>
+      </div>
+      <div>
+        <h3 class="lane-title target">IMPLEMENTED: same child, same confusion</h3>
+        <div class="journey-step"><div class="dot">1</div><div><strong>Independent response stored</strong><span>Wrong “ප”, visual-distractor tag, latency and touch evidence are preserved.</span></div></div>
+        <div class="journey-step"><div class="dot">2</div><div><strong>BKT + IRT update</strong><span>KC mastery and ability evidence update from the scored response.</span></div></div>
+        <div class="journey-step"><div class="dot">3</div><div><strong>Policy detects repeated difficulty</strong><span>Uses attempts, current scaffold state and the task's declared capabilities.</span></div></div>
+        <div class="journey-step"><div class="dot">4</div><div><strong>Approved scaffold is applied</strong><span>Highlights the target or removes one irrelevant distractor using stable option IDs.</span></div></div>
+        <div class="journey-step"><div class="dot">5</div><div><strong>Equivalent unassisted confirmation</strong><span>A new බ/ප item tests whether learning transferred without help.</span></div></div>
+        <div class="journey-step"><div class="dot">6</div><div><strong>Evidence-based next action</strong><span>Continue, remediate, switch KC, pause for fatigue or terminate with a recorded reason.</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="sr-only" aria-live="polite" id="sipsara-c4-clear-status">Showing stage comparison.</div>
+  <script>
+    (() => {
+      const root = document.getElementById('sipsara-c4-clear-map');
+      const buttons = [...root.querySelectorAll('[data-mode]')];
+      const sections = [...root.querySelectorAll('[data-section]')];
+      const status = root.querySelector('#sipsara-c4-clear-status');
+      buttons.forEach((button) => button.addEventListener('click', () => {
+        const mode = button.dataset.mode;
+        buttons.forEach((candidate) => {
+          const active = candidate.dataset.mode === mode;
+          candidate.setAttribute('aria-pressed', String(active));
+          candidate.classList.toggle('btn-primary', active);
+        });
+        sections.forEach((section) => { section.hidden = section.dataset.section !== mode; });
+        status.textContent = mode === 'comparison' ? 'Showing stage comparison.' : 'Showing one-child example.';
+      }));
+    })();
+  </script>
+</div>

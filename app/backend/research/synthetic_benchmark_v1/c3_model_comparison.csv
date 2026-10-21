@@ -1,0 +1,7 @@
+model,accuracy,balanced_accuracy,macro_f1,n_train,n_test,model_source
+extra_trees,0.875,0.875,0.8754005429495025,240,80,retrained_candidate
+logistic_regression,0.8625,0.8624999999999999,0.8619355612295279,240,80,retrained_candidate
+random_forest,0.825,0.825,0.8244367955536119,240,80,retrained_candidate
+hist_gradient_boosting,0.75,0.75,0.7484335839598997,240,80,retrained_candidate
+current_runtime_c3_xgboost,0.5,0.5,0.44256518675123324,0,80,existing_runtime_artifact_not_retrained
+majority_baseline,0.25,0.25,0.1,240,80,retrained_candidate

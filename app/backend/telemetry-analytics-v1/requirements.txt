@@ -7,6 +7,7 @@ pydantic>=2.9.0
 python-multipart>=0.0.9
 python-dotenv>=1.0.1
 certifi
+httpx>=0.27.0
 
 # Security for Auth decoding
 PyJWT>=2.8.0

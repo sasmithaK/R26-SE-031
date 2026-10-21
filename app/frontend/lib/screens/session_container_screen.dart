@@ -21,32 +21,7 @@ class _SessionContainerScreenState extends State<SessionContainerScreen> {
   @override
   void initState() {
     super.initState();
-    
-    final studentId = widget.studentData?['student_id'] ?? widget.studentData?['id'] ?? widget.studentData?['_id'];
-    if (studentId == null || studentId.toString().trim().isEmpty || studentId == 'STU001' || studentId == 'unknown_student') {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Data Capture Error'),
-            content: const Text('A valid student ID is strictly required to begin an activity session.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                },
-                child: const Text('Go Back'),
-              ),
-            ],
-          ),
-        );
-      });
-      return;
-    }
-
-    _playlist = SessionManager().generateDailySession();
+    _playlist = SessionManager().generateDailySession(studentData: widget.studentData);
     
     // Start telemetry
     TelemetryService().startSession();

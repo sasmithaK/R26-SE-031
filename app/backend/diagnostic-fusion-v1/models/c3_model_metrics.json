@@ -1,0 +1,107 @@
+{
+  "model": "C3 XGBoost (native missing values)",
+  "model_version": "C3-v2.1",
+  "feature_version": "c3-learner-window-v3",
+  "features": [
+    "acoustic_latency_ms",
+    "beat_mismatch_per_syllable",
+    "intra_word_silence_ratio",
+    "local_jitter",
+    "local_shimmer",
+    "time_to_first_touch_ms",
+    "path_efficiency_ratio",
+    "dimensionless_jerk",
+    "dwell_time_ms",
+    "c1_first_try_accuracy",
+    "c1_visual_task_index",
+    "c1_sound_task_index",
+    "c1_long_pauses_per_round",
+    "age_years"
+  ],
+  "class_names": [
+    "Typical",
+    "Phonological",
+    "Visual-Orthographic",
+    "Combined"
+  ],
+  "trained_at": "2026-10-21T00:04:48.181855+00:00",
+  "training_data": "simulated learners: touch side via live C1/movement code, reading side simulated per recording",
+  "simulator": "c3-sim-v2",
+  "learners_eligible": 3852,
+  "learners_below_evidence_rule": 2148,
+  "learners_without_c1_evidence": 1111,
+  "test_learners": 771,
+  "accuracy": 0.8327,
+  "macro_f1": 0.8319,
+  "mean_brier_score": 0.0588,
+  "reliability": [
+    {
+      "confidence": "0.2-0.4",
+      "learners": 8,
+      "mean_confidence": 0.354,
+      "observed_accuracy": 0.375
+    },
+    {
+      "confidence": "0.4-0.6",
+      "learners": 98,
+      "mean_confidence": 0.533,
+      "observed_accuracy": 0.51
+    },
+    {
+      "confidence": "0.6-0.8",
+      "learners": 131,
+      "mean_confidence": 0.7,
+      "observed_accuracy": 0.71
+    },
+    {
+      "confidence": "0.8-1.0",
+      "learners": 534,
+      "mean_confidence": 0.947,
+      "observed_accuracy": 0.929
+    }
+  ],
+  "classification_report": {
+    "Typical": {
+      "precision": 0.8551401869158879,
+      "recall": 0.8632075471698113,
+      "f1-score": 0.8591549295774648,
+      "support": 212.0
+    },
+    "Phonological": {
+      "precision": 0.8342541436464088,
+      "recall": 0.7947368421052632,
+      "f1-score": 0.8140161725067385,
+      "support": 190.0
+    },
+    "Visual-Orthographic": {
+      "precision": 0.8195876288659794,
+      "recall": 0.8153846153846154,
+      "f1-score": 0.8174807197943444,
+      "support": 195.0
+    },
+    "Combined": {
+      "precision": 0.8186813186813187,
+      "recall": 0.8563218390804598,
+      "f1-score": 0.8370786516853933,
+      "support": 174.0
+    },
+    "accuracy": 0.8326848249027238,
+    "macro avg": {
+      "precision": 0.8319158195273986,
+      "recall": 0.8324127109350374,
+      "f1-score": 0.8319326183909852,
+      "support": 771.0
+    },
+    "weighted avg": {
+      "precision": 0.8327732088176412,
+      "recall": 0.8326848249027238,
+      "f1-score": 0.832508876264408,
+      "support": 771.0
+    }
+  },
+  "limitations": [
+    "Synthetic training only; reading features are simulated, not computed from audio.",
+    "Separating simulated patterns is not clinical validity.",
+    "No estimate is shown when a learner's inputs are outside the training ranges."
+  ]
+}

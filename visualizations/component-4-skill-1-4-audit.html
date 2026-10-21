@@ -1,0 +1,173 @@
+<div id="c4-audit-viz">
+  <style>
+    #c4-audit-viz { color: var(--foreground); width: 100%; }
+    #c4-audit-viz .c4-head { display: flex; gap: 12px; align-items: end; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; }
+    #c4-audit-viz .c4-head h2 { margin: 0; }
+    #c4-audit-viz .c4-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 12px 0 18px; }
+    #c4-audit-viz .c4-summary .card { min-width: 0; }
+    #c4-audit-viz .c4-activity-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+    #c4-audit-viz .c4-activity-grid .btn { min-height: 54px; white-space: normal; text-align: left; }
+    #c4-audit-viz .c4-activity-grid .is-selected { box-shadow: 0 0 0 2px var(--ring); }
+    #c4-audit-viz .c4-status { display: inline-block; margin-left: 6px; }
+    #c4-audit-viz .c4-status-good { color: var(--green); }
+    #c4-audit-viz .c4-status-partial { color: var(--orange); }
+    #c4-audit-viz .c4-status-gap { color: var(--red); }
+    #c4-audit-viz .c4-detail { margin-top: 14px; }
+    #c4-audit-viz .c4-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    #c4-audit-viz .c4-detail h3 { margin-top: 0; }
+    #c4-audit-viz .c4-detail ul { margin: 8px 0 0; padding-left: 20px; }
+    #c4-audit-viz .c4-detail li { margin: 5px 0; }
+    #c4-audit-viz .c4-flow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; align-items: stretch; margin: 14px 0 24px; }
+    #c4-audit-viz .c4-step { padding: 10px 8px; background: color-mix(in srgb, var(--viz-series-1) 10%, transparent); min-height: 94px; }
+    #c4-audit-viz .c4-step strong { display: block; margin-bottom: 5px; }
+    #c4-audit-viz .c4-arrow { text-align: center; color: var(--muted-foreground); margin-top: 34px; }
+    #c4-audit-viz .c4-gap-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+    #c4-audit-viz .c4-gap-grid section { min-width: 0; }
+    #c4-audit-viz .c4-hidden { display: none; }
+    #c4-audit-viz .c4-note { border-left: 3px solid var(--orange); padding-left: 10px; margin: 10px 0; }
+    #c4-audit-viz td, #c4-audit-viz th { vertical-align: top; }
+    @media (max-width: 760px) {
+      #c4-audit-viz .c4-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #c4-audit-viz .c4-activity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #c4-audit-viz .c4-detail-grid, #c4-audit-viz .c4-gap-grid { grid-template-columns: 1fr; }
+      #c4-audit-viz .c4-flow { grid-template-columns: 1fr; }
+      #c4-audit-viz .c4-arrow { margin: 0; transform: rotate(90deg); }
+    }
+  </style>
+
+  <div class="c4-head">
+    <div>
+      <h2>Component 4 audit — Skills 1–4</h2>
+      <div class="text-muted">Implemented Skills 1–4 runtime and the remaining empirical-validation boundary</div>
+    </div>
+    <div class="viz-controls" aria-label="Audit view">
+      <button type="button" class="btn btn-primary" data-view="activities" aria-pressed="true">Activities</button>
+      <button type="button" class="btn" data-view="workflow" aria-pressed="false">Workflow</button>
+      <button type="button" class="btn" data-view="gaps" aria-pressed="false">Validation plan</button>
+    </div>
+  </div>
+
+  <div class="c4-summary">
+    <div class="card viz-stat"><div class="text-muted">Activities audited</div><div class="viz-stat-value tabular-nums">19</div><div>Skills 1–4</div></div>
+    <div class="card viz-stat"><div class="text-muted">Core tasks</div><div class="viz-stat-value tabular-nums">97</div><div>25 + 27 + 25 + 20</div></div>
+    <div class="card viz-stat"><div class="text-muted">Shared adaptive navigation</div><div class="viz-stat-value tabular-nums">19/19</div><div>All Skills 1–4 activities</div></div>
+    <div class="card viz-stat"><div class="text-muted">Distinct equivalents</div><div class="viz-stat-value tabular-nums">194</div><div>V1 + V2 for every core task</div></div>
+  </div>
+
+  <section data-panel="activities">
+    <div class="viz-controls" aria-label="Skill filter">
+      <button type="button" class="btn btn-primary" data-skill="all" aria-pressed="true">All skills</button>
+      <button type="button" class="btn" data-skill="1" aria-pressed="false">Skill 1</button>
+      <button type="button" class="btn" data-skill="2" aria-pressed="false">Skill 2</button>
+      <button type="button" class="btn" data-skill="3" aria-pressed="false">Skill 3</button>
+      <button type="button" class="btn" data-skill="4" aria-pressed="false">Skill 4</button>
+    </div>
+    <div class="c4-activity-grid" data-activity-grid></div>
+    <div class="card c4-detail" data-detail aria-live="polite"></div>
+  </section>
+
+  <section data-panel="workflow" class="c4-hidden">
+    <h3>Current runtime path</h3>
+    <div class="c4-flow" aria-label="Current Component 4 workflow">
+      <div class="c4-step"><strong>1 · Exact item</strong>Canonical JSON supplies core, distinct V1 remediation, or distinct V2 confirmation content.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>2 · ATTEMPT</strong>Wrong answer sends IDs, capabilities, latency and touch history.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>3 · Safe scaffold</strong>The task advertises capabilities; required targets are never removed and pools reflow.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>4 · COMPLETE</strong>Independent evidence updates KC-BKT and KC-scoped IRT ability with uncertainty.</div>
+    </div>
+    <div class="c4-flow" aria-label="Current Component 4 continuation workflow">
+      <div class="c4-step"><strong>5 · Select</strong>Core clean → next core; assisted/failed → easier V1 when valid, otherwise one V2 retry; V1 → V2; V2 → next core.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>6 · Navigate</strong>One exact-item contract makes all 19 activities render the returned item at the correct progress dot.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>7 · Persist once</strong>Raw event and one C4 decision retain exact IDs, model evidence, action and fidelity.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>8 · Stop</strong>Finish only after core coverage and pending V1/V2; fatigue recommends a break after the activity and cannot fake completion.</div>
+    </div>
+
+    <h3>Implemented research contract</h3>
+    <div class="c4-flow" aria-label="Target Component 4 workflow">
+      <div class="c4-step"><strong>1 · Canonical item</strong>Reviewed KC, difficulty, distractor tags, variant group and safe capabilities.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>2 · One coordinator</strong>Every activity reports attempts and obeys the same next-action contract.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>3 · Evidence</strong>Independent first response is separated from assisted final success.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>4 · Estimation</strong>KC-BKT plus KC-specific Rasch ability, information and standard error.</div>
+    </div>
+    <div class="c4-flow" aria-label="Target Component 4 continuation workflow">
+      <div class="c4-step"><strong>5 · Policy</strong>Coverage, mastery, uncertainty, fatigue and scaffold history choose the action.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>6 · Safe rendering</strong>Task adapter applies commands without removing a required answer.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>7 · Honest stop</strong>Core coverage and pending equivalents control completion; SE is reported, not overstated.</div><div class="c4-arrow">→</div>
+      <div class="c4-step"><strong>8 · One audit record</strong>Model, item, action and treatment fidelity are stored once with versions.</div>
+    </div>
+  </section>
+
+  <section data-panel="gaps" class="c4-hidden">
+    <div class="c4-note"><strong>SE &lt; 0.30 is not reachable inside a five-item Rasch activity.</strong> With 1PL discrimination 1, each ideal item contributes at most 0.25 information; at least 45 maximally informative responses are required.</div>
+    <div class="c4-gap-grid">
+      <section><h3>Implemented in software</h3><ol><li>One exact-item contract owns rendering, navigation and progress behavior across all 19 activities.</li><li>Choice reflow and sequence/pair protections prevent unsafe removal.</li><li>Core/V1/V2 IDs survive rendering, telemetry and completion.</li><li>One C4 decision is stored per accepted completion.</li></ol></section>
+      <section><h3>Implemented in the bank</h3><ol><li>Skill 1 runtime content is snapshotted into canonical JSON.</li><li>All 97 cores have distinct variants: V1 lowers a valid task-load dimension and V2 restores the core level.</li><li>Floor tasks skip V1 at runtime and receive one different same-level V2 retry.</li><li>All 291 Skill 1–4 records are active and traceable.</li></ol></section>
+      <section><h3>Still requires real research</h3><ol><li>Teacher review all Sinhala equivalents and distractor classifications.</li><li>Fit Rasch and BKT only after consented evidence thresholds are met.</li><li>Evaluate item fit, DIF, calibration, learning gain, efficiency and fairness.</li><li>Run a preregistered study; software tests cannot establish child validity.</li></ol></section>
+    </div>
+  </section>
+
+  <script>
+    (() => {
+      const root = document.getElementById('c4-audit-viz');
+      const activities = [
+        {id:'1.1',skill:1,name:'Hidden picture search',kc:'KC_VISUAL_IDENTIFICATION',status:'good',label:'Scaffold + remediation',scaffold:'Wrong 1–2: remove a distractor and reflow the grid. Later wrong: highlight remaining target(s).',navigation:'The screen awaits C4. Assisted completion goes to the previous easier core task, then returns to the original task for unassisted confirmation.',gaps:['Only core items exist; remediation reuses a previously seen core task.','BKT/IRT parameters are provisional.'],target:'Keep this flow, but add equivalent unseen remediation items and research validation.',tasks:[['S1A1R01','Easy −1.0','Find 1 dog among 3 distractors'],['S1A1R02','Medium 0.0','Find 2 elephants among 5 distractors'],['S1A1R03','Hard 1.0','Find 3 butterflies among 6 distractors'],['S1A1R04','Hard 1.25','Find 3 bells among 9 distractors'],['S1A1R05','Hard 1.5','Find 4 vans among 11 distractors']]},
+        {id:'1.2',skill:1,name:'Picture–shadow matching',kc:'KC_VISUAL_MATCHING',status:'partial',label:'Highlight only',scaffold:'A wrong drop immediately highlights the correct shadow. Replay is advertised but is not selected while a highlight target exists.',navigation:'Completion response is ignored by the screen; it always advances to the next local round.',gaps:['Runtime-generated item bank contains no exact rendered assets.','No remediation or unassisted confirmation.'],target:'Canonicalize each rendered round and add easier equivalent matching followed by confirmation.',tasks:[['S1A2R01','Generated level 1','Match 2 objects'],['S1A2R02','Generated level 2','Match 3 objects'],['S1A2R03','Generated level 3','Match 4 objects'],['S1A2R04','Generated level 4','Match 5 objects'],['S1A2R05','Generated level 5','Match 6 objects']]},
+        {id:'1.3',skill:1,name:'Picture sorting',kc:'KC_VISUAL_CATEGORIZATION',status:'partial',label:'Destination highlight',scaffold:'A wrong drop highlights the correct category destination. Worked example and replay are advertised but not reached by the current policy order.',navigation:'The screen advances sequentially and ignores the selected next item.',gaps:['Generated content is not snapshotted into the bank.','No remediation/confirmation path.'],target:'Use reviewed category-equivalent tasks, then confirm independently on a fresh item.',tasks:[['S1A3R01','Generated level 1','2 categories, 3 objects'],['S1A3R02','Generated level 2','2 categories, 4 objects'],['S1A3R03','Generated level 3','2 categories, 6 objects'],['S1A3R04','Generated level 4','3 categories, 6 objects'],['S1A3R05','Generated level 5','3 categories, 9 objects']]},
+        {id:'1.4',skill:1,name:'Visual pattern completion',kc:'KC_VISUAL_PATTERN',status:'gap',label:'Removal not rendered',scaffold:'The backend removes choices before highlighting, but this screen renders the original options list, so removal commands are not visible. Highlighting eventually appears.',navigation:'The screen advances sequentially and ignores C4 item selection.',gaps:['First scaffold steps can produce no visible help.','No canonical rendered content or remediation variants.'],target:'Render only controller-visible options, reflow them, then use easier equivalent patterns and confirmation.',tasks:[['S1A4R01','Generated level 1','A B A ?, 2 choices'],['S1A4R02','Generated level 2','A A B ?, 3 choices'],['S1A4R03','Generated level 3','A B C A ?, 3 choices'],['S1A4R04','Generated level 4','A B C D A ?, 4 choices'],['S1A4R05','Generated level 5','A B B C A B ?, 4 choices']]},
+        {id:'1.5',skill:1,name:'Picture memory',kc:'KC_VISUAL_MEMORY',status:'partial',label:'Highlight only',scaffold:'A wrong recall highlights the target card. No distractor removal is requested.',navigation:'The screen advances sequentially and ignores the backend next item.',gaps:['Generated task content is absent from the bank.','No equivalent remediation item or independent confirmation.'],target:'Store exact exposure duration/content and adapt both memory load and confirmation item.',tasks:[['S1A5R01','Generated level 1','2 cards, 6-second exposure'],['S1A5R02','Generated level 2','3 cards, 5-second exposure'],['S1A5R03','Generated level 3','3 cards, 4-second exposure'],['S1A5R04','Generated level 4','4 cards, 4-second exposure'],['S1A5R05','Generated level 5','5 cards, 4-second exposure']]},
+
+        {id:'2.1',skill:2,name:'Find the target letter',kc:'KC_LETTER_IDENTIFICATION',status:'partial',label:'State machine; weak variants',scaffold:'Four-choice tasks remove distractors then highlight; six-choice tasks can remove twice then highlight.',navigation:'The screen follows the seven-round Skill 2 state machine and returned task index.',gaps:['All 14 authored variants duplicate their core content and are inactive.','Remediation therefore falls back to repeated core content.'],target:'Replace every duplicate with educator-reviewed equivalent letter/distractor content.',tasks:[['S2A1R01','Easy −1.0','Find අ; 4 choices, 1 target'],['S2A1R02','Easy −1.0','Find ම; 4 choices, 1 target'],['S2A1R03','Easy −1.0','Find ර; 4 choices, 1 target'],['S2A1R04','Medium 0.0','Find ඳ; 4 choices, 1 target'],['S2A1R05','Medium 0.0','Find ධ; 6 choices, 1 target'],['S2A1R06','Hard 1.0','Find two ට; 6 choices'],['S2A1R07','Hard 1.0','Find අ and ආ; 6 choices']]},
+        {id:'2.2',skill:2,name:'Match identical letters',kc:'KC_LETTER_MATCHING',status:'partial',label:'Genuine variants; ID gap',scaffold:'Wrong pairing removes a visible letter/pair, then highlights. Every letter is actually a required pair, so “distractor” semantics are not explicit.',navigation:'Core → easier V1 remediation → original-level V1 confirmation is supported.',gaps:['Displayed variant is submitted as the core item ID.','Item-bank option roles mark all letters as distractors.'],target:'Represent pair targets explicitly and preserve variant IDs end to end.',tasks:[['S2A2R01','Builder −1.0','Match 2 letters: ක, ම'],['S2A2R02','Builder −0.5','Match 2 letters: කා, ම'],['S2A2R03','Builder 0.0','Match 3 letters: ග, ටු, ව'],['S2A2R04','Builder 0.5','Match 4 letters: ර, ලි, ස, දු'],['S2A2R05','Builder 1.0','Match 5 letters: න, පා, බ, මු, ය']]},
+        {id:'2.3',skill:2,name:'Listen and identify a letter',kc:'KC_PHONEME_LETTER_MAPPING',status:'partial',label:'Variants + remediation',scaffold:'Two-choice task highlights immediately; larger pools remove distractors before highlighting.',navigation:'V1/V2 remediation and confirmation phases are implemented and followed.',gaps:['Variant content is displayed but submitted under the core ID.','Difficulty metadata is absent in JSON and defaults locally to 0.0.'],target:'Preserve variant ID/difficulty and tag phonological versus visual distractors.',tasks:[['S2A3R01','Builder −1.0','Hear අ; 2 choices'],['S2A3R02','Builder −0.5','Hear ස; 3 choices'],['S2A3R03','Builder 0.0','Hear ප; 3 choices'],['S2A3R04','Builder 0.5','Hear ට; 4 choices'],['S2A3R05','Builder 1.0','Hear බ; 5 choices']]},
+        {id:'2.4',skill:2,name:'Identify first/last letters',kc:'KC_LETTER_DECODING',status:'partial',label:'Variants + remediation',scaffold:'Wrong choices are removed until two remain, then correct target(s) are highlighted.',navigation:'V1/V2 remediation and confirmation phases are implemented and followed.',gaps:['Variant interactions lose their variant item ID.','Distractor types are unclassified; R5 has two targets but a single generic policy.'],target:'Preserve variant evidence and author error-specific remediation for initial/final-letter confusion.',tasks:[['S2A4R01','Builder −1.0','First letter of මල්; 2 choices'],['S2A4R02','Builder −0.5','First letter of ගස; 3 choices'],['S2A4R03','Builder 0.0','Last letter of පොත; 3 choices'],['S2A4R04','Builder 0.5','Last letter of අහස; 4 choices'],['S2A4R05','Builder 1.0','First and last of බල්ලා; 6 choices']]},
+        {id:'2.5',skill:2,name:'Letter pattern memory',kc:'KC_LETTER_MEMORY',status:'gap',label:'Unsafe removal risk',scaffold:'Wrong next token removes a distractor then highlights the expected token. If genuine distractors are exhausted, the generic fallback can remove a future required token.',navigation:'A state machine exists, but it requests V1/V2 items that do not exist; backend falls back to core items.',gaps:['No remediation variants.','Required sequence tokens are not protected as targets by the controller/item bank.'],target:'Never remove required tokens; use reveal/lock-next-token support plus real equivalent memory variants.',tasks:[['S2A5R01','Easy −1.0','Recall ර ට; 3 options'],['S2A5R02','Easy −1.0','Recall ම ල්; 3 options'],['S2A5R03','Medium 0.0','Recall ග ම න; 4 options'],['S2A5R04','Medium 0.0','Recall ග ස ක්; 4 options'],['S2A5R05','Hard 1.0','Recall මි හි රි; 4 options']]},
+
+        {id:'3.1',skill:3,name:'Choose word for picture',kc:'KC_WORD_RECOGNITION',status:'partial',label:'Scaffold only',scaffold:'Two choices highlight immediately; larger pools remove distractors then highlight.',navigation:'C4 computes a next item, but the screen ignores it and advances locally.',gaps:['No equivalent variants or remediation.','Distractor types are not tagged.'],target:'Add lexical/visual/semantic distractor tags and unseen remediation/confirmation items.',tasks:[['S3A1R01','Easy −1.0','Picture → ඉර; 2 choices'],['S3A1R02','Easy −1.0','Picture → හඳ; 3 choices'],['S3A1R03','Medium 0.0','Picture → බසය; 4 choices'],['S3A1R04','Medium 0.0','Picture → යතුර; 4 choices'],['S3A1R05','Hard 1.0','Picture → සීනුව; 3 choices']]},
+        {id:'3.2',skill:3,name:'Build word from shown units',kc:'KC_WORD_FORMATION',status:'partial',label:'MCQ scaffold only',scaffold:'Although named word formation, the task is MCQ. Wrong options are removed, then the answer is highlighted.',navigation:'Sequential local progression ignores backend remediation selection.',gaps:['No productive spelling evidence; only recognition is measured.','No equivalent variants.'],target:'Decide whether this KC is recognition or formation; use a true construction task if formation is claimed.',tasks:[['S3A2R01','Easy −1.0','ම + ල → මල; 2 choices'],['S3A2R02','Easy −1.0','පෑ + න → පෑන; 3 choices'],['S3A2R03','Medium 0.0','ත + රු + ව → තරුව; 3 choices'],['S3A2R04','Medium 0.0','ම + ල් + ලි → මල්ලි; 4 choices'],['S3A2R05','Hard 1.0','පු + ටු + ව → පුටුව; 3 choices']]},
+        {id:'3.3',skill:3,name:'Listen and identify a word',kc:'KC_AUDITORY_WORD_RECOGNITION',status:'partial',label:'Scaffold only',scaffold:'Wrong choices are removed, then the heard word is highlighted. Audio replay is counted but not selected while highlight is available.',navigation:'The screen advances locally regardless of C4 next-item output.',gaps:['No variants or phonological distractor labels.','No child speech is collected in this task.'],target:'Use phonologically controlled alternatives and equivalent listening items; keep this separate from speech production.',tasks:[['S3A3R01','Easy −1.0','Hear අත; 2 choices'],['S3A3R02','Easy −1.0','Hear පාර; 3 choices'],['S3A3R03','Medium 0.0','Hear ගෙදර; 3 choices'],['S3A3R04','Medium 0.0','Hear අක්කා; 4 choices'],['S3A3R05','Hard 1.0','Hear බල්ලා; 4 choices']]},
+        {id:'3.4',skill:3,name:'Fill the missing letter',kc:'KC_WORD_COMPLETION',status:'partial',label:'Scaffold only',scaffold:'Wrong letters are removed until two remain; then the missing letter is highlighted.',navigation:'The activity continues in fixed local order.',gaps:['No error-specific distractor tags.','No remediation/confirmation variants.'],target:'Tag vowel/shape/phoneme confusions and route to a matching easier item before confirmation.',tasks:[['S3A4R01','Easy −1.0','Select ග; 2 choices'],['S3A4R02','Easy −1.0','Select ත; 3 choices'],['S3A4R03','Medium 0.0','Select ස; 3 choices'],['S3A4R04','Medium 0.0','Select ම්; 4 choices'],['S3A4R05','Hard 1.0','Select තා; 4 choices']]},
+        {id:'3.5',skill:3,name:'Order letters into a word',kc:'KC_WORD_SEQUENCING',status:'partial',label:'First-token hint',scaffold:'A wrong completed sequence requests a semantic plan; the current policy highlights the first correct token.',navigation:'The screen increments sequentially and ignores C4 item selection.',gaps:['No progressive reveal/lock behavior beyond first-token highlight.','No variants for remediation or confirmation.'],target:'Use staged sequence support and an unseen equivalent word for unassisted confirmation.',tasks:[['S3A5R01','Easy −1.0','ල, ම → මල'],['S3A5R02','Easy −1.0','ස, ඇ → ඇස'],['S3A5R03','Medium 0.0','හ, ප, න → පහන'],['S3A5R04','Medium 0.0','නා, ප, ව → පනාව'],['S3A5R05','Hard 1.0','ටු, පු, ව → පුටුව']]},
+
+        {id:'4.1',skill:4,name:'Choose sentence for picture',kc:'KC_SENTENCE_COMPREHENSION',status:'partial',label:'Scaffold only',scaffold:'Wrong sentences are removed, then the correct sentence is highlighted.',navigation:'Fixed local progression ignores C4 next-item selection.',gaps:['No semantic/syntactic distractor tags.','No remediation variants.'],target:'Distinguish comprehension from word-order errors and confirm on an equivalent picture.',tasks:[['S4A1R01','Easy −1.0','Picture → අම්මා උයනවා; 2 choices'],['S4A1R02','Easy −1.0','Picture → ඉර පායනවා; 2 choices'],['S4A1R03','Medium 0.0','Picture → ඔරුව පදිනවා; 3 choices'],['S4A1R04','Medium 0.0','Picture → පොත කියවනවා; 3 choices'],['S4A1R05','Hard 1.0','Picture → teacher writing; 4 choices']]},
+        {id:'4.2',skill:4,name:'Fill the missing word',kc:'KC_SENTENCE_COMPLETION',status:'partial',label:'Scaffold only',scaffold:'Wrong words are removed until two remain, then the correct word is highlighted.',navigation:'The screen advances sequentially.',gaps:['No equivalent tasks or linguistic distractor types.','No adaptive remediation.'],target:'Classify semantic versus grammatical errors and remediate with a matched easier sentence.',tasks:[['S4A2R01','Easy −1.0','Select හඳ; 2 choices'],['S4A2R02','Easy −1.0','Select මල්; 2 choices'],['S4A2R03','Medium 0.0','Select පාසල්; 3 choices'],['S4A2R04','Medium 0.0','Select කෑම; 4 choices'],['S4A2R05','Hard 1.0','Select චිත්‍රයක්; 4 choices']]},
+        {id:'4.3',skill:4,name:'Listen and identify a sentence',kc:'KC_AUDITORY_SENTENCE_RECOGNITION',status:'partial',label:'Scaffold only',scaffold:'Wrong sentences are removed, then the correct heard sentence is highlighted.',navigation:'C4 next-item output is not used by the screen.',gaps:['No syntactic error tags or equivalent variants.','Replay does not drive a distinct scaffold stage.'],target:'Control sentence length/order and use replay/slow-audio before answer revelation.',tasks:[['S4A3R01','Easy −1.0','Hear පාසල් යනවා; 2 choices'],['S4A3R02','Easy −1.0','Hear පොත බලනවා; 2 choices'],['S4A3R03','Medium 0.0','Hear අම්මා කෑම උයයි; 3 choices'],['S4A3R04','Medium 0.0','Hear teacher writes; 4 choices'],['S4A3R05','Hard 1.0','Hear Pavani plays; 4 choices']]},
+        {id:'4.4',skill:4,name:'Order words into a sentence',kc:'KC_SENTENCE_SEQUENCING',status:'partial',label:'First-word hint',scaffold:'A wrong completed sequence highlights the first correct word.',navigation:'The screen continues through its fixed five rounds.',gaps:['No staged word locking or equivalent confirmation sentence.','No remediation navigation.'],target:'Provide bounded sequence support, then test transfer with a new sentence of the same structure.',tasks:[['S4A4R01','Easy −1.0','2 words → පාසල් යනවා'],['S4A4R02','Easy −1.0','2 words → පොතක් කියවනවා'],['S4A4R03','Medium 0.0','3 words → kite sentence'],['S4A4R04','Medium 0.0','3 words → feed the dog sentence'],['S4A4R05','Hard 1.0','4 words → two children play sentence']]}
+      ];
+
+      const grid = root.querySelector('[data-activity-grid]');
+      const detail = root.querySelector('[data-detail]');
+      let selected = '1.1';
+      let skill = 'all';
+
+      const statusText = {good:'Implemented',partial:'Implemented',gap:'Implemented'};
+      const statusClass = {good:'c4-status-good',partial:'c4-status-partial',gap:'c4-status-gap'};
+      const escapeHtml = value => String(value).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+
+      function renderGrid() {
+        const rows = activities.filter(a => skill === 'all' || String(a.skill) === skill);
+        if (!rows.some(a => a.id === selected)) selected = rows[0].id;
+        grid.innerHTML = rows.map(a => `<button type="button" class="btn viz-tile ${a.id === selected ? 'is-selected' : ''}" data-activity="${a.id}" aria-pressed="${a.id === selected}"><strong>${a.id}</strong> ${escapeHtml(a.name)}<br><span class="text-small c4-status-good">Implemented</span></button>`).join('');
+        grid.querySelectorAll('[data-activity]').forEach(button => button.addEventListener('click', () => { selected = button.dataset.activity; renderGrid(); renderDetail(); }));
+      }
+
+      function renderDetail() {
+        const a = activities.find(item => item.id === selected);
+        detail.innerHTML = `<div class="c4-head"><div><h3>${a.id} · ${escapeHtml(a.name)}</h3><div><code>${a.kc}</code><span class="c4-status c4-status-good">Implemented · shared C4 contract</span></div></div><div class="viz-badge">${a.tasks.length} core + ${a.tasks.length * 2} equivalent tasks</div></div><div class="c4-detail-grid"><section><strong>Task-specific scaffold</strong><div>${escapeHtml(a.scaffold)}</div><br><strong>Shared progression</strong><div>Clean core → unseen core. Assisted/failed core → reduced-load V1 → original-level V2 when valid. A floor task skips V1 and receives one different V2 retry. The same core progress dot is retained.</div></section><section><strong>Implemented safeguards</strong><ul><li>Exact variant content and item ID are rendered and logged.</li><li>Required answers cannot be removed; visible choices reflow.</li><li>Stale completions cannot bypass a pending equivalent.</li></ul><br><strong>Remaining validation</strong><div>Teacher review and consented learner-data calibration are required before empirical claims.</div></section></div><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Core task</th><th>Difficulty</th><th>What the child does</th></tr></thead><tbody>${a.tasks.map(t => `<tr><td class="text-nowrap"><code>${escapeHtml(t[0])}</code></td><td>${escapeHtml(t[1])}</td><td>${escapeHtml(t[2])}</td></tr>`).join('')}</tbody></table></div>`;
+      }
+
+      root.querySelectorAll('[data-skill]').forEach(button => button.addEventListener('click', () => {
+        skill = button.dataset.skill;
+        root.querySelectorAll('[data-skill]').forEach(item => { const on = item === button; item.setAttribute('aria-pressed', String(on)); item.classList.toggle('btn-primary', on); });
+        renderGrid(); renderDetail();
+      }));
+
+      root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => {
+        const view = button.dataset.view;
+        root.querySelectorAll('[data-view]').forEach(item => { const on = item === button; item.setAttribute('aria-pressed', String(on)); item.classList.toggle('btn-primary', on); });
+        root.querySelectorAll('[data-panel]').forEach(panel => panel.classList.toggle('c4-hidden', panel.dataset.panel !== view));
+      }));
+
+      renderGrid();
+      renderDetail();
+    })();
+  </script>
+</div>

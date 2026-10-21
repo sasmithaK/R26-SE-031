@@ -23,6 +23,16 @@ async def connect_to_mongo():
     db_name = os.getenv("MONGODB_DB_NAME", "r26_se_031")
     db = db_instance.client[db_name]
     db_instance.fs = AsyncIOMotorGridFSBucket(db)
+    await db.speech_features.create_index(
+        [("student_id", 1), ("attempt_id", 1)],
+        unique=True,
+        sparse=True,
+        name="speech_attempt_identity",
+    )
+    await db.speech_features.create_index(
+        [("student_id", 1), ("session_id", 1), ("created_at", -1)],
+        name="speech_student_session_time",
+    )
     
     print("Connected to MongoDB Cloud (GridFS Initialized)!")
 

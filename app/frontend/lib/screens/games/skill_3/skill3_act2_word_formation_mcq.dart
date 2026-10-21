@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../models/curriculum_models.dart';
-import '../../../../services/tts_service.dart';
+import '../../../theme/app_theme.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../models/curriculum_models.dart';
+import '../../../services/tts_service.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
-import '../../../../services/progress_service.dart';
-import '../shared_widgets/shared_celebration_popup.dart';
+import '../../../services/progress_service.dart';
+import '../../../adaptive/adapters/choice_scaffold_adapter.dart';
 
 /// Skill 3 Activity 2 (Word Formation MCQ)
 /// Premium redesign: separates instruction from visual equation.
@@ -28,18 +28,19 @@ class Skill3Act2WordFormation extends StatefulWidget {
 }
 
 class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
-    with TickerProviderStateMixin {
+    with
+        TickerProviderStateMixin,
+        ChoiceScaffoldAdapter<Skill3Act2WordFormation> {
   String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
   int? _selectedIndex;
   bool _isCorrect = false;
   bool _activityComplete = false;
+  Map<String, dynamic>? _completedRoundSnapshot;
   int _currentRoundIndex = 0;
   int _attemptCount = 0;
 
   // Animations
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
   late AnimationController _speakerBounceController;
   late Animation<double> _speakerBounceAnimation;
 
@@ -58,15 +59,6 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
     if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
       _currentRoundIndex = 0;
     }
-
-    // Pulsing glow for the speaker button
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
 
     // Speaker bounce when tapped
     _speakerBounceController = AnimationController(
@@ -87,9 +79,9 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
 
   @override
   void dispose() {
-    _pulseController.dispose();
     _speakerBounceController.dispose();
     _audioPlayer.dispose();
+    disposeChoiceScaffoldAdapter();
     super.dispose();
   }
 
@@ -97,7 +89,6 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) return;
 
-    final currentRound = rounds[_currentRoundIndex];
     // TTS should read the full prompt from JSON (e.g. "'ම' + 'ල' එකතු වූ විට...")
     final audioText = 'අකුරු එකතු කර සාදන වචනය තෝරන්න';
     String spokenInstruction = audioText
@@ -110,7 +101,7 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
           RegExp(r"'?(.)'? පින්තූරය"),
           (match) => '${match.group(1)}, පින්තූරය',
         );
-    
+
     if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
       return;
     }
@@ -126,6 +117,14 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
   void _checkAnswer(int index, int correctIndex, int totalRounds) async {
     if (_isCorrect) return;
     if (_selectedIndex != null) return;
+    if (isAdaptivelyRemoved(index)) return;
+
+    final completedRoundSnapshot = Map<String, dynamic>.from(
+      adaptiveRoundData(
+        activity: widget.activityNode,
+        roundIndex: _currentRoundIndex,
+      ),
+    );
 
     _attemptCount++;
     setState(() {
@@ -136,25 +135,40 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
     int score = isRight ? 100 : 0;
 
     if (isRight) {
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
+      final transition = await completeAdaptiveChoiceTask(
         score,
+        roundIndex: _currentRoundIndex,
       );
       setState(() {
+        _completedRoundSnapshot = completedRoundSnapshot;
         _isCorrect = true;
       });
       SoundUtils.playFeedback('audio/correct.mp3');
 
-      _advanceRoundAfterDelay(totalRounds);
+      _advanceRoundAfterDelay(totalRounds, transition);
     } else {
       SoundUtils.playFeedback('audio/wrong.mp3');
+      await requestChoiceScaffold(
+        selectedIndex: index,
+        options: adaptiveOptionLabels,
+        correctIndex: correctIndex,
+        errorType: 'word_formation_error',
+      );
+      if (mounted) setState(() {});
 
-      if (_attemptCount >= 2) {
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(0);
+      if (_attemptCount >= 3) {
+        final transition = await completeAdaptiveChoiceTask(
+          0,
+          roundIndex: _currentRoundIndex,
+          isCorrect: true,
+          attemptAlreadyLogged: true,
+        );
         setState(() {
+          _completedRoundSnapshot = completedRoundSnapshot;
           _selectedIndex = correctIndex;
           _isCorrect = true;
         });
-        _advanceRoundAfterDelay(totalRounds);
+        _advanceRoundAfterDelay(totalRounds, transition);
       } else {
         Future.delayed(const Duration(milliseconds: 700), () {
           if (!mounted) return;
@@ -166,12 +180,13 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
     }
   }
 
-  void _advanceRoundAfterDelay(int totalRounds) {
+  void _advanceRoundAfterDelay(int totalRounds, dynamic transition) {
     Future.delayed(const Duration(milliseconds: 1400), () {
       if (!mounted) return;
-      if (_currentRoundIndex < totalRounds - 1) {
+      if (transition != null && !transition.isComplete) {
         setState(() {
-          _currentRoundIndex++;
+          _completedRoundSnapshot = null;
+          _currentRoundIndex = transition.roundIndex;
           _attemptCount = 0;
           final sId = widget.activityNode?.skillId ?? '';
           final aId = widget.activityNode?.id ?? '';
@@ -227,7 +242,12 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
       rounds = rounds.sublist(0, 5);
     }
 
-    final currentRound = rounds[_currentRoundIndex];
+    final currentRound =
+        _completedRoundSnapshot ??
+        adaptiveRoundData(
+          activity: widget.activityNode,
+          roundIndex: _currentRoundIndex,
+        );
     final titleText = widget.activityNode?.title ?? 'වචනය සකසන්න';
     final promptText = currentRound['prompt']?.toString() ?? '';
 
@@ -241,9 +261,14 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
       var distractors = options.where((item) => item != correctItem).toList();
       if (distractors.isNotEmpty) distractors = distractors.sublist(0, 1);
       options = [correctItem, ...distractors];
-      options.shuffle();
       correctIndex = options.indexOf(correctItem);
     }
+    configureAdaptiveChoices(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+      options: options,
+      correctIndex: correctIndex,
+    );
 
     final equationParts = _extractEquationParts(promptText);
 
@@ -437,18 +462,21 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
         ],
       ),
       child: Wrap(
+        key: ValueKey('answers_$adaptiveItemId'),
         spacing: 16,
         runSpacing: 16,
         alignment: WrapAlignment.center,
-        children: List.generate(options.length, (index) {
-          return _buildOptionTile(
-            index,
-            options[index],
-            correctIndex,
-            totalRounds,
-            options.length,
-          );
-        }),
+        children: <Widget>[
+          for (int index = 0; index < options.length; index++)
+            if (!isAdaptivelyRemoved(index))
+              _buildOptionTile(
+                index,
+                options[index],
+                correctIndex,
+                totalRounds,
+                options.length,
+              ),
+        ],
       ),
     );
   }
@@ -464,6 +492,7 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
     final isRight = isSelected && (index == correctIndex);
     final isWrong = isSelected && (index != correctIndex);
     final isHidden = _isCorrect && (index != correctIndex);
+    final isHinted = isAdaptivelyHighlighted(index);
 
     double tileWidth = 135.0;
     double tileHeight = 90.0;
@@ -504,9 +533,14 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
           spreadRadius: 2,
         ),
       ];
+    } else if (isHinted) {
+      tileColor = AppColors.warmAmberLight.withValues(alpha: 0.42);
+      borderColor = AppColors.warmAmber;
+      borderWidth = 4.0;
     }
 
     return GestureDetector(
+      key: ValueKey(adaptiveOptionId(index)),
       onTap: () => _checkAnswer(index, correctIndex, totalRounds),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
@@ -533,7 +567,7 @@ class _Skill3Act2WordFormationState extends State<Skill3Act2WordFormation>
                   maxLines: 1,
                   style: AppTypography.sinhala(
                     fontSize: fontSize,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
                     color: textColor,
                     height: 1.3,
                   ),

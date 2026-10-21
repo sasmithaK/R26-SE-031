@@ -1,14 +1,17 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../models/curriculum_models.dart';
-import '../../../../services/tts_service.dart';
+import '../../../theme/app_theme.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../models/curriculum_models.dart';
+import '../../../services/tts_service.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
-import '../../../../services/progress_service.dart';
-import '../shared_widgets/shared_celebration_popup.dart';
+import '../../../services/progress_service.dart';
+import '../../../adaptive/adapters/sequence_scaffold_adapter.dart';
+import '../../../adaptive/models/adaptive_scaffold_models.dart';
+import '../../../adaptive/sequence_progression.dart';
 
 class PlacedLetter {
   final String letter;
@@ -32,20 +35,32 @@ class Skill3Act5JumbledWord extends StatefulWidget {
 }
 
 class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, SequenceScaffoldAdapter {
   String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isCorrect = false;
   bool _activityComplete = false;
+  Map<String, dynamic>? _completedRoundSnapshot;
   int _currentRoundIndex = 0;
 
   List<PlacedLetter?> _filledSlots = [];
   List<String?> _poolLetters = [];
+  List<int> _correctPoolOrder = const <int>[];
+  final Set<int> _lockedSlotIndices = <int>{};
   bool _isChecking = false;
   bool _showError = false;
 
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
+
+  @override
+  Future<void> handleAdaptiveSequenceSemanticScaffold(
+    ScaffoldCommand command,
+  ) async {
+    if (command.type == ScaffoldActionType.replayInstruction) {
+      _playCurrentInstruction();
+    }
+  }
 
   @override
   void initState() {
@@ -80,8 +95,12 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
   void _playCurrentInstruction({bool autoPlay = false}) {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) return;
-    final currentRound = rounds[_currentRoundIndex];
-    final instructionText = currentRound['prompt']?.toString() ?? 'පින්තූරයට අදාළ වචනය සාදන්න';
+    final currentRound = adaptiveSequenceRoundData(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+    );
+    final instructionText =
+        currentRound['prompt']?.toString() ?? 'පින්තූරයට අදාළ වචනය සාදන්න';
     String spokenInstruction = instructionText
         .replaceAll('මා', 'ම')
         .replaceAllMapped(
@@ -92,7 +111,7 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
           RegExp(r"'?(.)'? පින්තූරය"),
           (match) => '${match.group(1)}, පින්තූරය',
         );
-    
+
     if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
       return;
     }
@@ -111,16 +130,35 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) return;
 
-    final currentRound = rounds[_currentRoundIndex];
+    final currentRound = adaptiveSequenceRoundData(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+    );
     final scrambledList =
         (currentRound['scrambled_letters'] as List?)
             ?.map((e) => e.toString())
             .toList() ??
         [];
+    final correctWord = currentRound['correct_word']?.toString() ?? '';
+    _correctPoolOrder = resolveSequencePoolOrder(
+      poolTokens: scrambledList,
+      target: correctWord,
+    );
+    final correctSequence = _correctPoolOrder
+        .map((poolIndex) => scrambledList[poolIndex])
+        .toList();
+    configureAdaptiveSequence(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+      poolTokens: scrambledList,
+      correctSequence: correctSequence,
+    );
 
     setState(() {
+      _completedRoundSnapshot = null;
       _poolLetters = List.from(scrambledList);
       _filledSlots = List.filled(scrambledList.length, null);
+      _lockedSlotIndices.clear();
       _isCorrect = false;
       _isChecking = false;
       _showError = false;
@@ -129,6 +167,7 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
 
   void _onPoolLetterTapped(int poolIndex) async {
     if (_isChecking || _poolLetters[poolIndex] == null) return;
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
 
     // Find first empty slot
     int emptySlotIndex = _filledSlots.indexWhere((s) => s == null);
@@ -137,6 +176,7 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
       setState(() {
         _filledSlots[emptySlotIndex] = PlacedLetter(letter, poolIndex);
         _poolLetters[poolIndex] = null;
+        adaptiveHintedTokenIndices.remove(poolIndex);
         _showError = false;
       });
 
@@ -150,7 +190,11 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
   }
 
   void _onSlotTapped(int slotIndex) {
-    if (_isChecking || _filledSlots[slotIndex] == null) return;
+    if (_isChecking ||
+        _filledSlots[slotIndex] == null ||
+        _lockedSlotIndices.contains(slotIndex)) {
+      return;
+    }
 
     // Moving an already placed unit back to the pool is a correction
     context.findAncestorStateOfType<TelemetryWrapperState>()?.logCorrection();
@@ -168,8 +212,10 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
       _isChecking = true;
     });
 
-    final rounds = widget.activityNode?.rounds ?? [];
-    final currentRound = rounds[_currentRoundIndex];
+    final currentRound = adaptiveSequenceRoundData(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+    );
     final correctWord = currentRound['correct_word']?.toString() ?? "";
 
     final formedWord = _filledSlots.map((e) => e!.letter).join("");
@@ -177,18 +223,20 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
     if (formedWord == correctWord) {
       // Correct
       setState(() {
+        _completedRoundSnapshot = Map<String, dynamic>.from(currentRound);
         _isCorrect = true;
       });
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
+      final transition = await completeAdaptiveSequenceTask(
         100,
+        roundIndex: _currentRoundIndex,
         selectedAnswers: _filledSlots.map((e) => e!.letter).toList(),
       );
       SoundUtils.playFeedback('audio/correct.mp3');
 
       Future.delayed(const Duration(milliseconds: 1500), () {
         if (!mounted) return;
-        if (_currentRoundIndex < rounds.length - 1) {
-          _currentRoundIndex++;
+        if (transition != null && !transition.isComplete) {
+          _currentRoundIndex = transition.roundIndex;
           final sId = widget.activityNode?.skillId ?? '';
           final aId = widget.activityNode?.id ?? '';
           if (sId.isNotEmpty && aId.isNotEmpty) {
@@ -216,10 +264,29 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
       });
     } else {
       // Incorrect
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.logAttempt(
-        isCorrect: false,
-        selectedAnswers: _filledSlots.map((e) => e!.letter).toList(),
-        errorType: 'sequence_error',
+      final selectedPoolIndices = _filledSlots
+          .map((entry) => entry!.poolIndex)
+          .toList();
+      final progressiveScaffold = _filledSlots.length >= 3;
+      final correctTokens = _correctPoolOrder
+          .map(
+            (poolIndex) => _poolLetters.length > poolIndex
+                ? (currentRound['scrambled_letters'] as List)[poolIndex]
+                      .toString()
+                : '',
+          )
+          .toList();
+      final correctPrefixLength = progressiveScaffold
+          ? matchingSequencePrefixLength(
+              placedTokens: _filledSlots.map((entry) => entry?.letter).toList(),
+              correctTokens: correctTokens,
+            )
+          : 0;
+      unawaited(
+        requestSequenceScaffold(
+          selectedPoolIndices: selectedPoolIndices,
+          correctPosition: correctPrefixLength,
+        ),
       );
       SoundUtils.playFeedback('audio/wrong.mp3');
 
@@ -233,13 +300,18 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
 
       Future.delayed(const Duration(milliseconds: 800), () {
         if (!mounted) return;
-        // Return all letters to pool
+        // For three-unit and longer tasks, preserve only the consecutive
+        // correct prefix. Return the remaining tokens to the pool so the next
+        // required token can be highlighted without rebuilding the layout.
         setState(() {
           for (int i = 0; i < _filledSlots.length; i++) {
-            if (_filledSlots[i] != null) {
+            if (progressiveScaffold && i < correctPrefixLength) {
+              _lockedSlotIndices.add(i);
+            } else if (_filledSlots[i] != null) {
               _poolLetters[_filledSlots[i]!.poolIndex] =
                   _filledSlots[i]!.letter;
               _filledSlots[i] = null;
+              _lockedSlotIndices.remove(i);
             }
           }
           _showError = false;
@@ -263,7 +335,12 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
       rounds = rounds.sublist(0, 5);
     }
 
-    final currentRound = rounds[_currentRoundIndex];
+    final currentRound =
+        _completedRoundSnapshot ??
+        adaptiveSequenceRoundData(
+          activity: widget.activityNode,
+          roundIndex: _currentRoundIndex,
+        );
     final titleText = widget.activityNode?.title ?? 'අකුරු පිළිවෙලට සකසමු';
     final promptText =
         currentRound['prompt']?.toString() ?? 'පින්තූරයට අදාළ වචනය සාදන්න';
@@ -370,6 +447,7 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
                             );
                           },
                           child: Wrap(
+                            key: ValueKey('slots_$adaptiveSequenceItemId'),
                             spacing: 16,
                             runSpacing: 16,
                             alignment: WrapAlignment.center,
@@ -378,8 +456,13 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
                             ) {
                               final slot = _filledSlots[index];
                               final isFilled = slot != null;
+                              final isLocked = _lockedSlotIndices.contains(
+                                index,
+                              );
                               return GestureDetector(
-                                onTap: () => _onSlotTapped(index),
+                                onTap: isLocked
+                                    ? null
+                                    : () => _onSlotTapped(index),
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 300),
                                   width: 76,
@@ -389,6 +472,10 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
                                         ? AppColors.gentleGreen.withValues(
                                             alpha: 0.2,
                                           )
+                                        : isLocked
+                                        ? AppColors.gentleGreen.withValues(
+                                            alpha: 0.18,
+                                          )
                                         : _showError
                                         ? AppColors.softCoral.withValues(
                                             alpha: 0.2,
@@ -397,6 +484,8 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
                                       color: _isCorrect
+                                          ? AppColors.gentleGreen
+                                          : isLocked
                                           ? AppColors.gentleGreen
                                           : _showError
                                           ? AppColors.softCoral
@@ -417,13 +506,29 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
                                   ),
                                   child: Center(
                                     child: isFilled
-                                        ? Text(
-                                            slot.letter,
-                                            style: AppTypography.sinhala(
-                                              fontSize: 40,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppColors.textPrimary,
-                                            ),
+                                        ? Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+                                              Text(
+                                                slot.letter,
+                                                style: AppTypography.sinhala(
+                                                  fontSize: 40,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: AppColors.textPrimary,
+                                                ),
+                                              ),
+                                              if (isLocked)
+                                                const Positioned(
+                                                  top: 4,
+                                                  right: 4,
+                                                  child: Icon(
+                                                    Icons.check_circle_rounded,
+                                                    size: 18,
+                                                    color:
+                                                        AppColors.gentleGreen,
+                                                  ),
+                                                ),
+                                            ],
                                           )
                                         : const Icon(
                                             Icons.help_outline_rounded,
@@ -458,65 +563,77 @@ class _Skill3Act5JumbledWordState extends State<Skill3Act5JumbledWord>
                           borderRadius: BorderRadius.circular(40),
                           border: Border.all(color: Colors.white, width: 3),
                         ),
-                        child: Wrap(
-                          spacing: 24,
-                          runSpacing: 24,
-                          alignment: WrapAlignment.center,
-                          children: List.generate(_poolLetters.length, (index) {
-                            final letter = _poolLetters[index];
-                            final isAvailable = letter != null;
-                            return GestureDetector(
-                              onTap: () => _onPoolLetterTapped(index),
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 200),
-                                opacity: isAvailable ? 1.0 : 0.0,
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeOut,
-                                  width: 90,
-                                  height: 90,
-                                  margin: const EdgeInsets.all(4.0),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(
-                                      color: const Color(0xFFE5E7EB),
-                                      width: 1.5,
+                        child: Builder(
+                          builder: (context) {
+                            final availableLetters = _poolLetters
+                                .asMap()
+                                .entries
+                                .where((entry) => entry.value != null)
+                                .toList();
+                            return Wrap(
+                              key: ValueKey('pool_$adaptiveSequenceItemId'),
+                              spacing: 24,
+                              runSpacing: 24,
+                              alignment: WrapAlignment.center,
+                              children: availableLetters.map((entry) {
+                                final index = entry.key;
+                                final letter = entry.value!;
+                                final isHinted = isAdaptiveTokenHinted(index);
+                                return GestureDetector(
+                                  key: ValueKey(adaptiveTokenId(index)),
+                                  onTap: () => _onPoolLetterTapped(index),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeOut,
+                                    width: 90,
+                                    height: 90,
+                                    margin: const EdgeInsets.all(4.0),
+                                    decoration: BoxDecoration(
+                                      color: isHinted
+                                          ? AppColors.warmAmberLight
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(18),
+                                      border: Border.all(
+                                        color: isHinted
+                                            ? AppColors.warmAmber
+                                            : const Color(0xFFE5E7EB),
+                                        width: isHinted ? 4 : 1.5,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(
+                                            0xFF4A90D9,
+                                          ).withValues(alpha: 0.08),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
                                     ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(
-                                          0xFF4A90D9,
-                                        ).withValues(alpha: 0.08),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4.0,
-                                      ),
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          letter ?? '',
-                                          maxLines: 1,
-                                          style: AppTypography.sinhala(
-                                            fontSize: 46,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.textPrimary,
-                                            height: 1.3,
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4.0,
+                                        ),
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            letter,
+                                            maxLines: 1,
+                                            style: AppTypography.sinhala(
+                                              fontSize: 46,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.textPrimary,
+                                              height: 1.3,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ),
+                                );
+                              }).toList(),
                             );
-                          }),
+                          },
                         ),
                       ),
                     ],

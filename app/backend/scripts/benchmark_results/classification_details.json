@@ -1,0 +1,218 @@
+{
+  "Class-prior baseline": {
+    "macro_f1": 0.1,
+    "balanced_accuracy": 0.25,
+    "log_loss": 1.3862943611198906,
+    "macro_f1_cluster_bootstrap_95ci": [
+      0.05555555555555555,
+      0.14444444444444443
+    ],
+    "confusion_matrix": [
+      [
+        48,
+        0,
+        0,
+        0
+      ],
+      [
+        48,
+        0,
+        0,
+        0
+      ],
+      [
+        48,
+        0,
+        0,
+        0
+      ],
+      [
+        48,
+        0,
+        0,
+        0
+      ]
+    ],
+    "validation_macro_f1": 0.1
+  },
+  "Logistic regression baseline": {
+    "macro_f1": 0.7823745358244374,
+    "balanced_accuracy": 0.7864583333333334,
+    "log_loss": 0.5178769192780258,
+    "macro_f1_cluster_bootstrap_95ci": [
+      0.6798738600879858,
+      0.8646818285254078
+    ],
+    "confusion_matrix": [
+      [
+        30,
+        4,
+        14,
+        0
+      ],
+      [
+        2,
+        40,
+        0,
+        6
+      ],
+      [
+        9,
+        0,
+        34,
+        5
+      ],
+      [
+        0,
+        1,
+        0,
+        47
+      ]
+    ],
+    "validation_macro_f1": 0.7929793452034279
+  },
+  "XGBoost candidate (not deployed)": {
+    "macro_f1": 0.7523277255446537,
+    "balanced_accuracy": 0.7552083333333333,
+    "log_loss": 0.6931760907173157,
+    "macro_f1_cluster_bootstrap_95ci": [
+      0.6135463419454218,
+      0.8406058924983533
+    ],
+    "confusion_matrix": [
+      [
+        32,
+        1,
+        15,
+        0
+      ],
+      [
+        1,
+        38,
+        0,
+        9
+      ],
+      [
+        9,
+        2,
+        30,
+        7
+      ],
+      [
+        1,
+        2,
+        0,
+        45
+      ]
+    ],
+    "validation_macro_f1": 0.737493952493675
+  },
+  "Speech-only logistic ablation": {
+    "macro_f1": 0.4483430020561818,
+    "balanced_accuracy": 0.47395833333333337,
+    "log_loss": 0.893768059454883,
+    "macro_f1_cluster_bootstrap_95ci": [
+      0.35354974870793526,
+      0.5410382313519844
+    ],
+    "confusion_matrix": [
+      [
+        6,
+        1,
+        41,
+        0
+      ],
+      [
+        0,
+        23,
+        0,
+        25
+      ],
+      [
+        14,
+        4,
+        29,
+        1
+      ],
+      [
+        1,
+        14,
+        0,
+        33
+      ]
+    ],
+    "validation_macro_f1": 0.43831029760790846
+  },
+  "Kinematics-only logistic ablation": {
+    "macro_f1": 0.4613559395155202,
+    "balanced_accuracy": 0.46875,
+    "log_loss": 1.010738549597009,
+    "macro_f1_cluster_bootstrap_95ci": [
+      0.36499972327070396,
+      0.5371633508208907
+    ],
+    "confusion_matrix": [
+      [
+        15,
+        25,
+        2,
+        6
+      ],
+      [
+        11,
+        32,
+        1,
+        4
+      ],
+      [
+        6,
+        2,
+        20,
+        20
+      ],
+      [
+        5,
+        1,
+        19,
+        23
+      ]
+    ],
+    "validation_macro_f1": 0.43618707681207686
+  },
+  "Frozen repository XGBoost (different training generator)": {
+    "macro_f1": 0.3664705584270802,
+    "balanced_accuracy": 0.421875,
+    "log_loss": 3.085028648376465,
+    "macro_f1_cluster_bootstrap_95ci": [
+      0.2739825951888714,
+      0.4419933819085264
+    ],
+    "confusion_matrix": [
+      [
+        38,
+        9,
+        1,
+        0
+      ],
+      [
+        22,
+        24,
+        2,
+        0
+      ],
+      [
+        23,
+        8,
+        17,
+        0
+      ],
+      [
+        12,
+        10,
+        24,
+        2
+      ]
+    ],
+    "validation_macro_f1": 0.3939840666217387
+  }
+}

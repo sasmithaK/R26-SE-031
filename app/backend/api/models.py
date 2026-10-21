@@ -36,7 +36,7 @@ class StudentCreate(BaseModel):
     daily_limit: str
     parent_password: str
     assessment_results: list[bool]
-    avatar_url: str | None = None
+    avatar_url: Optional[str] = None
 
 class StudentUpdate(BaseModel):
     first_name: str
@@ -45,7 +45,7 @@ class StudentUpdate(BaseModel):
     grade: str
     daily_limit: str
     parent_password: str
-    avatar_url: str | None = None
+    avatar_url: Optional[str] = None
 
 class StudentResponse(BaseModel):
     id: str
@@ -54,4 +54,4 @@ class StudentResponse(BaseModel):
     username: str
     grade: str
     daily_limit: str
-    avatar_url: str | None = None
+    avatar_url: Optional[str] = None

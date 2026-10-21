@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../models/curriculum_models.dart';
+import '../../../theme/app_theme.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../models/curriculum_models.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
-import '../../../../services/progress_service.dart';
+import '../../../services/progress_service.dart';
 import '../shared_widgets/shared_celebration_popup.dart';
-import '../../../../services/tts_service.dart';
+import '../../../services/tts_service.dart';
+import '../../../adaptive/controllers/adaptive_choice_controller.dart';
+import '../../../adaptive/models/adaptive_scaffold_models.dart';
+import 'skill2_round_resolver.dart';
+import '../../../adaptive/utils/adaptive_option_order.dart';
 
 /// Activity 2: එක සමාන අකුරු (Matching Similar Letters)
 class Skill2Act2IdenticalMatch extends StatefulWidget {
@@ -27,7 +31,6 @@ class Skill2Act2IdenticalMatch extends StatefulWidget {
 }
 
 class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
-  String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   List<String> _topLetters = [];
@@ -40,6 +43,11 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
   bool _isProcessing = false;
   bool _activityComplete = false;
   int _currentRoundIndex = 0;
+  String? _currentVariantId;
+  String _currentItemId = '';
+  final AdaptiveChoiceController<String> _pairController =
+      AdaptiveChoiceController<String>();
+  final Map<String, String> _pairIdByLetter = <String, String>{};
 
   @override
   void initState() {
@@ -58,16 +66,52 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
     }
     _initRound();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playCurrentInstruction(autoPlay: true);
+      if (Skill2RoundResolver.shouldAutoplayActivityIntroduction(
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
+      )) {
+        _playCurrentInstruction();
+      }
     });
   }
 
   void _initRound() {
     var rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
-      final currentRound = rounds[_currentRoundIndex];
-      _topLetters = List<String>.from(currentRound['letters'] ?? []);
-      _bottomLetters = List<String>.from(_topLetters)..shuffle();
+      final resolved = Skill2RoundResolver.resolve(
+        activity: widget.activityNode,
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
+      );
+      _currentItemId = resolved.itemId;
+      _currentVariantId = resolved.variantId;
+      final lettersList = resolved.data['letters'] as List<dynamic>? ?? [];
+
+      _topLetters = List<String>.from(lettersList);
+      _pairIdByLetter
+        ..clear()
+        ..addEntries(
+          _topLetters.asMap().entries.map(
+            (entry) =>
+                MapEntry(entry.value, '${_currentItemId}_PAIR${entry.key + 1}'),
+          ),
+        );
+      _pairController.configure(
+        _topLetters
+            .map(
+              (letter) => AdaptiveOption<String>(
+                id: _pairId(letter),
+                value: letter,
+                role: AdaptiveOptionRole.unknown,
+              ),
+            )
+            .toList(),
+      );
+      _bottomLetters = AdaptiveOptionOrder.shuffled<String>(
+        _topLetters,
+        _currentItemId,
+        salt: 'bottom-pairs',
+      );
       _selectedTopLetter = null;
       _tappedBottomLetter = null;
       _isBottomLetterCorrect = false;
@@ -76,7 +120,14 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
     }
   }
 
-  void _playCurrentInstruction({bool autoPlay = false}) {
+  String _pairId(String letter) =>
+      _pairIdByLetter[letter] ??
+      '${_currentItemId}_PAIR_${letter.codeUnits.join('_')}';
+
+  bool _isRemoved(String letter) =>
+      _pairController.removedIds.contains(_pairId(letter));
+
+  void _playCurrentInstruction() {
     final promptText =
         widget.activityNode?.description ?? "එක සමාන අකුරු යුගල තෝරන්න.";
     String spokenInstruction = promptText
@@ -89,17 +140,14 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
           RegExp(r"'?(.)'? පින්තූරය"),
           (match) => '${match.group(1)}, පින්තූරය',
         );
-    
-    if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
-      return;
-    }
-    _lastSpokenInstruction = spokenInstruction;
+
     TtsService().speak(spokenInstruction, folder: 'skill_2');
   }
 
   @override
   void dispose() {
     _audioPlayer.dispose();
+    _pairController.dispose();
     super.dispose();
   }
 
@@ -121,7 +169,85 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
     });
   }
 
-  void _onBottomLetterTapped(String letter) async {
+  void _transitionToNextRound(Map<String, dynamic>? c4Result) {
+    final totalRounds = widget.activityNode?.rounds.length ?? 1;
+
+    if (c4Result != null && c4Result.containsKey('next_action')) {
+      final nextAction = c4Result['next_action'];
+      if (nextAction['decision'] == 'CURRICULUM_COMPLETE' ||
+          nextAction['decision'] == 'ACTIVITY_COMPLETE') {
+        setState(() {
+          _activityComplete = true;
+          final sId = widget.activityNode?.skillId ?? '';
+          final aId = widget.activityNode?.id ?? '';
+          if (sId.isNotEmpty && aId.isNotEmpty) {
+            ProgressService().saveActivityScore(sId, aId, 100);
+            ProgressService().clearActivityState(sId, aId);
+          }
+        });
+        return;
+      }
+      final nextItem = CanonicalItemResolver.normalizeItemId(
+        nextAction['next_item']?.toString() ?? "",
+      );
+      final nextRound = Skill2RoundResolver.roundIndexFromItemId(nextItem);
+      if (nextRound != null) {
+        _currentRoundIndex = nextRound;
+        _currentVariantId = Skill2RoundResolver.variantFromItemId(nextItem);
+      }
+    } else {
+      if (_currentRoundIndex < totalRounds - 1) {
+        _currentRoundIndex++;
+        _currentVariantId = null;
+      } else {
+        setState(() {
+          _activityComplete = true;
+          final sId = widget.activityNode?.skillId ?? '';
+          final aId = widget.activityNode?.id ?? '';
+          if (sId.isNotEmpty && aId.isNotEmpty) {
+            ProgressService().saveActivityScore(sId, aId, 100);
+            ProgressService().clearActivityState(sId, aId);
+          }
+        });
+        return;
+      }
+    }
+
+    if (_currentRoundIndex < totalRounds) {
+      setState(() {
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          int progress = (((_currentRoundIndex) / totalRounds) * 100).toInt();
+          ProgressService().saveActivityScore(sId, aId, progress);
+          ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+        }
+        _initRound();
+      });
+    }
+  }
+
+  Future<void> _handleRoundComplete(
+    int score, {
+    Map<String, dynamic>? forceNextIdx,
+  }) async {
+    final result =
+        forceNextIdx ??
+        await context
+            .findAncestorStateOfType<TelemetryWrapperState>()
+            ?.completeAdaptiveRound(
+              score,
+              currentRoundIndex: _currentRoundIndex,
+              itemId: _currentItemId,
+            );
+
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (!mounted) return;
+      _transitionToNextRound(result);
+    });
+  }
+
+  Future<void> _onBottomLetterTapped(String letter) async {
     if (_isProcessing ||
         _selectedTopLetter == null ||
         _matchedLetters.contains(letter))
@@ -132,8 +258,13 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
       _tappedBottomLetter = letter;
     });
 
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
     if (letter == _selectedTopLetter) {
       // Match Correct!
+      if (_matchedLetters.length + 1 == _pairController.visibleOptions.length) {
+        // Last pair: response time ends now, not after the 0.4 s feedback.
+        context.findAncestorStateOfType<TelemetryWrapperState>()?.markResponseComplete();
+      }
       setState(() {
         _isBottomLetterCorrect = true;
       });
@@ -150,8 +281,8 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
           });
 
           // Check if round is complete
-          if (_matchedLetters.length == _topLetters.length) {
-            _handleRoundComplete();
+          if (_matchedLetters.length == _pairController.visibleOptions.length) {
+            _handleRoundComplete(100);
           }
         }
       });
@@ -161,6 +292,64 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
         _isBottomLetterCorrect = false;
       });
       SoundUtils.playFeedback('audio/wrong.mp3');
+
+      final extraTelemetry = {
+        "original_options_count": _bottomLetters.length,
+        "current_pair_id": _pairId(_selectedTopLetter!),
+        "visible_option_ids": _pairController.visibleOptions
+            .map((option) => option.id)
+            .toList(),
+        "incorrect_option_ids": _bottomLetters
+            .where((l) => l != _selectedTopLetter && !_isRemoved(l))
+            .map(_pairId)
+            .toList(),
+        "correct_option_ids": [_pairId(_selectedTopLetter!)],
+        "selected_option_ids": [_pairId(letter)],
+        "selected_answer_values": <String>[letter],
+        "struggled_target_units": Skill2RoundResolver.matchingStruggledUnits(
+          _selectedTopLetter,
+        ),
+        "supported_actions": ["HIGHLIGHT_OPTION", "REPLAY_INSTRUCTION"],
+        "minimum_visible_options": 2,
+        "error_type": "visual_matching_error",
+      };
+
+      final scaffoldResult = await context
+          .findAncestorStateOfType<TelemetryWrapperState>()
+          ?.registerAdaptiveWrongAttempt(
+            itemId: _currentItemId,
+            currentRoundIndex: _currentRoundIndex,
+            extraTelemetry: extraTelemetry,
+          );
+
+      if (!mounted) return;
+
+      if (scaffoldResult != null &&
+          scaffoldResult.containsKey('next_action') &&
+          scaffoldResult['next_action']['decision'] == 'TERMINATE') {
+        _handleRoundComplete(0, forceNextIdx: scaffoldResult);
+      } else if (scaffoldResult != null &&
+          scaffoldResult.containsKey('next_action')) {
+        final wrapper = context
+            .findAncestorStateOfType<TelemetryWrapperState>();
+        wrapper?.applyScaffoldResult<String>(
+          controller: _pairController,
+          result: scaffoldResult,
+          correctOptionIds: [_pairId(_selectedTopLetter!)],
+        );
+        final rawAction = scaffoldResult['next_action'];
+        if (rawAction is Map) {
+          final plan = ScaffoldPlan.fromNextAction(
+            Map<String, dynamic>.from(rawAction),
+            correctOptionIds: [_pairId(_selectedTopLetter!)],
+          );
+          if (plan.commands.any(
+            (command) => command.type == ScaffoldActionType.replayInstruction,
+          )) {
+            _playCurrentInstruction();
+          }
+        }
+      }
 
       // Briefly show error state, but KEEP the top selection locked!
       Future.delayed(const Duration(milliseconds: 600), () {
@@ -174,47 +363,10 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
     }
   }
 
-  void _handleRoundComplete() {
-    final totalRounds = widget.activityNode?.rounds.length ?? 1;
-    context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
-      100,
-    );
-
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (!mounted) return;
-      if (_currentRoundIndex < totalRounds - 1) {
-        setState(() {
-          _currentRoundIndex++;
-          final sId = widget.activityNode?.skillId ?? '';
-          final aId = widget.activityNode?.id ?? '';
-          if (sId.isNotEmpty && aId.isNotEmpty) {
-            int progress =
-                ((_currentRoundIndex /
-                            (widget.activityNode?.rounds.length ?? 1)) *
-                        100)
-                    .toInt();
-            ProgressService().saveActivityScore(sId, aId, progress);
-            ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
-          }
-          _initRound();
-          _playCurrentInstruction(autoPlay: true);
-        });
-      } else {
-        setState(() {
-          _activityComplete = true;
-          final sId = widget.activityNode?.skillId ?? '';
-          final aId = widget.activityNode?.id ?? '';
-          if (sId.isNotEmpty && aId.isNotEmpty) {
-            ProgressService().saveActivityScore(sId, aId, 100);
-            ProgressService().clearActivityState(sId, aId);
-          }
-        });
-      }
-    });
-  }
-
   Widget _buildTopBox() {
-    final int letterCount = _topLetters.length - _matchedLetters.length;
+    final int letterCount =
+        _topLetters.where((l) => !_isRemoved(l)).length -
+        _matchedLetters.length;
     final double baseTileSize = letterCount <= 2
         ? 120.0
         : (letterCount == 3 ? 95.0 : 75.0);
@@ -263,7 +415,10 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
             runSpacing: 16,
             alignment: WrapAlignment.center,
             children: _topLetters
-                .where((letter) => !_matchedLetters.contains(letter))
+                .where(
+                  (letter) =>
+                      !_matchedLetters.contains(letter) && !_isRemoved(letter),
+                )
                 .map((letter) {
                   final isSelected = _selectedTopLetter == letter;
                   final isOtherSelected =
@@ -296,7 +451,7 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
 
                   double borderWidth = (isCorrectlyMatched || isWronglyMatched)
                       ? 4.0
-                      : (isSelected ? 0 : 2);
+                      : (isSelected ? 4.0 : 2.0);
 
                   return GestureDetector(
                     onTap: () => _onTopLetterTapped(letter),
@@ -380,7 +535,9 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
 
   Widget _buildBottomBox() {
     final bool isActive = _selectedTopLetter != null;
-    final int letterCount = _topLetters.length - _matchedLetters.length;
+    final int letterCount =
+        _topLetters.where((l) => !_isRemoved(l)).length -
+        _matchedLetters.length;
     final double baseTileSize = letterCount <= 2
         ? 120.0
         : (letterCount == 3 ? 95.0 : 75.0);
@@ -454,7 +611,11 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
               runSpacing: 16,
               alignment: WrapAlignment.center,
               children: _bottomLetters
-                  .where((letter) => !_matchedLetters.contains(letter))
+                  .where(
+                    (letter) =>
+                        !_matchedLetters.contains(letter) &&
+                        !_isRemoved(letter),
+                  )
                   .map((letter) {
                     final isTapped = _tappedBottomLetter == letter;
 
@@ -513,6 +674,15 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
                       ];
                     }
 
+                    if (_pairController.visualStateFor(_pairId(letter)) ==
+                        AdaptiveOptionVisualState.hint) {
+                      boxColor = AppColors.warmAmberLight.withValues(
+                        alpha: 0.42,
+                      );
+                      borderColor = AppColors.warmAmber;
+                      borderWidth = 4.0;
+                    }
+
                     return GestureDetector(
                       onTap: isActive
                           ? () => _onBottomLetterTapped(letter)
@@ -537,7 +707,6 @@ class _Skill2Act2IdenticalMatchState extends State<Skill2Act2IdenticalMatch> {
                               fontSize: baseFontSize,
                               fontWeight: FontWeight.w700,
                               color: textColor,
-                              height: 1.1,
                             ),
                           ),
                         ),

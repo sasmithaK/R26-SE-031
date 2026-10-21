@@ -9,6 +9,6 @@ def pytest_addoption(parser):
 def base_url(request):
     env = request.config.getoption("--env")
     if env == "azure":
-        return "https://sipsara-ml-backend-app.azurewebsites.net"
+        return "https://sipsara-ml-backend-v2.azurewebsites.net"
     else:
         return "http://localhost:8080"

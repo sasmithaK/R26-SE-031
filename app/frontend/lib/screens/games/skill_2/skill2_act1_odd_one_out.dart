@@ -2,13 +2,18 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../models/curriculum_models.dart';
+import '../../../theme/app_theme.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../models/curriculum_models.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
-import '../../../../services/progress_service.dart';
+import '../../../services/progress_service.dart';
 import '../shared_widgets/shared_celebration_popup.dart';
-import '../../../../services/tts_service.dart';
+import '../../../services/tts_service.dart';
+import '../../../adaptive/controllers/adaptive_choice_controller.dart';
+import '../../../adaptive/models/adaptive_scaffold_models.dart';
+import '../../../adaptive/widgets/adaptive_answer_pool.dart';
+import 'skill2_round_resolver.dart';
+import '../../../adaptive/utils/adaptive_option_order.dart';
 
 class Skill2Act1OddOneOut extends StatefulWidget {
   final ActivityNode? activityNode;
@@ -27,7 +32,6 @@ class Skill2Act1OddOneOut extends StatefulWidget {
 }
 
 class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
-  String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
   int _currentRoundIndex = 0;
   bool _isRoundComplete = false;
@@ -39,6 +43,11 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
 
   // Track temporarily tapped incorrect items for red flash
   Set<int> _wrongIndices = {};
+  final AdaptiveChoiceController<int> _choiceController =
+      AdaptiveChoiceController<int>();
+  String? _currentVariantId;
+  String _currentItemId = '';
+  Map<String, dynamic> _activeRoundData = <String, dynamic>{};
 
   // No randomized colors; we use clean, readable white/cream tiles
 
@@ -59,52 +68,86 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     }
     _setupRound();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playCurrentInstruction(autoPlay: true);
+      if (Skill2RoundResolver.shouldAutoplayActivityIntroduction(
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
+      )) {
+        _playCurrentInstruction();
+      }
     });
   }
 
-  void _playCurrentInstruction({bool autoPlay = false}) {
+  void _playCurrentInstruction() {
     String spokenInstruction = 'කොටුවේ පෙන්වා ඇති අකුර සොයන්න.';
-    
-    if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
-      return;
-    }
-    _lastSpokenInstruction = spokenInstruction;
     TtsService().speak(spokenInstruction, folder: 'skill_2');
   }
 
   @override
   void dispose() {
     _audioPlayer.dispose();
+    _choiceController.dispose();
     super.dispose();
   }
 
   void _setupRound() {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
-      final currentRound = rounds[_currentRoundIndex];
+      final resolved = Skill2RoundResolver.resolve(
+        activity: widget.activityNode,
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
+      );
+      _currentItemId = resolved.itemId;
+      _currentVariantId = resolved.variantId;
+      _activeRoundData = resolved.data;
 
-      final rawItems = currentRound['items'] as List<dynamic>? ?? [];
-      final items = rawItems
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList();
+      final rawItems = _activeRoundData['items'] as List<dynamic>? ?? [];
+      final items = rawItems.asMap().entries.map((entry) {
+        final item = Map<String, dynamic>.from(entry.value as Map);
+        item['option_id'] ??= '${_canonicalItemId()}_O${entry.key + 1}';
+        return item;
+      }).toList();
 
-      // Shuffle the items for this round
-      items.shuffle(Random());
-      _shuffledItems = items;
+      final targetLetter = _activeRoundData['target_letter']?.toString();
 
-      final targetLetter = currentRound['target_letter']?.toString();
+      _shuffledItems = AdaptiveOptionOrder.withTargets<Map<String, dynamic>>(
+        source: items,
+        itemId: _currentItemId,
+        isTarget: (item) =>
+            item['is_target'] == true ||
+            (item['is_target'] == null && item['value'] == targetLetter),
+      );
+      final orderedItems = _shuffledItems;
 
       // Count targets (support both new 'is_target' boolean and old 'target_letter' string)
-      _targetCount = items.where((item) {
+      _targetCount = orderedItems.where((item) {
         if (item.containsKey('is_target')) {
           return item['is_target'] == true;
         }
         return item['value'] == targetLetter;
       }).length;
+      _choiceController.configure(
+        List<AdaptiveOption<int>>.generate(orderedItems.length, (index) {
+          final item = orderedItems[index];
+          final isTarget =
+              item['is_target'] == true ||
+              (item['is_target'] == null && item['value'] == targetLetter);
+          final id = item['option_id'].toString();
+          return AdaptiveOption<int>(
+            id: id,
+            value: index,
+            role: isTarget
+                ? AdaptiveOptionRole.target
+                : AdaptiveOptionRole.visualDistractor,
+            metadata: item,
+          );
+        }),
+      );
     } else {
       _shuffledItems = [];
       _targetCount = 0;
+      _currentItemId = '';
+      _activeRoundData = <String, dynamic>{};
     }
 
     _foundIndices.clear();
@@ -112,12 +155,88 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     _isRoundComplete = false;
   }
 
+  String _canonicalItemId() {
+    return _currentItemId;
+  }
+
+  String _optionId(int index) =>
+      _shuffledItems[index]['option_id']?.toString() ??
+      '${_canonicalItemId()}_O${index + 1}';
+
+  void _transitionToNextRound(Map<String, dynamic>? c4Result) {
+    final rounds = widget.activityNode?.rounds ?? [];
+
+    int? nextIdx;
+    if (c4Result != null && c4Result.containsKey('next_action')) {
+      final nextAction = c4Result['next_action'];
+
+      if (nextAction['decision'] == 'CURRICULUM_COMPLETE' ||
+          nextAction['decision'] == 'ACTIVITY_COMPLETE') {
+        setState(() {
+          _isActivityComplete = true;
+        });
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          ProgressService().saveActivityScore(sId, aId, 100);
+          ProgressService().clearActivityState(sId, aId);
+        }
+        return;
+      }
+
+      if (nextAction['next_item'] != null) {
+        String nextItem = nextAction['next_item'];
+        _currentVariantId = Skill2RoundResolver.variantFromItemId(nextItem);
+        nextIdx = Skill2RoundResolver.roundIndexFromItemId(nextItem);
+      }
+    }
+
+    // Sequential fallback if backend fails or returns null
+    if (nextIdx == null) {
+      debugPrint(
+        'BACKEND_ERROR_SEQUENTIAL_FALLBACK (no result or missing next_action)',
+      );
+      nextIdx = _currentRoundIndex + 1;
+    }
+
+    if (nextIdx < rounds.length) {
+      setState(() {
+        _currentRoundIndex = nextIdx!;
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          int progress =
+              ((_currentRoundIndex /
+                          (widget.activityNode?.rounds.length ?? 1)) *
+                      100)
+                  .toInt();
+          ProgressService().saveActivityScore(sId, aId, progress);
+          ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+        }
+        _setupRound();
+      });
+    } else {
+      setState(() {
+        _isActivityComplete = true;
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          ProgressService().saveActivityScore(sId, aId, 100);
+          ProgressService().clearActivityState(sId, aId);
+        }
+      });
+    }
+  }
+
   Future<void> _onItemTapped(int index) async {
-    if (_isRoundComplete || _foundIndices.contains(index)) return;
+    if (_isRoundComplete ||
+        _foundIndices.contains(index) ||
+        _choiceController.removedIds.contains(_optionId(index)))
+      return;
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
 
     final item = _shuffledItems[index];
-    final currentRound = widget.activityNode?.rounds[_currentRoundIndex] ?? {};
-    final targetLetter = currentRound['target_letter']?.toString();
+    final targetLetter = _activeRoundData['target_letter']?.toString();
 
     final isCorrect =
         item['is_target'] == true ||
@@ -126,6 +245,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     if (isCorrect) {
       setState(() {
         _foundIndices.add(index);
+        _choiceController.markCorrect(_optionId(index));
       });
       SoundUtils.playFeedback('audio/correct.mp3');
 
@@ -134,62 +254,123 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
           _isRoundComplete = true;
         });
 
-        final rounds = widget.activityNode?.rounds ?? [];
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
-          100,
-          selectedAnswers: [item['value']?.toString() ?? ''],
-        );
+        final c4Result = await context
+            .findAncestorStateOfType<TelemetryWrapperState>()
+            ?.completeAdaptiveRound(
+              100,
+              currentRoundIndex: _currentRoundIndex,
+              itemId: _canonicalItemId(),
+              selectedAnswers: _foundIndices.map(_optionId).toList(),
+            );
 
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (!mounted) return;
-          if (_currentRoundIndex < rounds.length - 1) {
-            setState(() {
-              _currentRoundIndex++;
-              print(
-                "SAVING STATE: ${widget.activityNode?.skillId} ${widget.activityNode?.id} $_currentRoundIndex",
-              );
-              final sId = widget.activityNode?.skillId ?? '';
-              final aId = widget.activityNode?.id ?? '';
-              if (sId.isNotEmpty && aId.isNotEmpty) {
-                int progress =
-                    ((_currentRoundIndex /
-                                (widget.activityNode?.rounds.length ?? 1)) *
-                            100)
-                        .toInt();
-                ProgressService().saveActivityScore(sId, aId, progress);
-                ProgressService().saveActivityState(
-                  sId,
-                  aId,
-                  _currentRoundIndex,
-                );
-              }
-              _setupRound();
-              _playCurrentInstruction(autoPlay: true);
-            });
-          } else {
-            setState(() {
-              _isActivityComplete = true;
-              final sId = widget.activityNode?.skillId ?? '';
-              final aId = widget.activityNode?.id ?? '';
-              if (sId.isNotEmpty && aId.isNotEmpty) {
-                ProgressService().saveActivityScore(sId, aId, 100);
-                ProgressService().clearActivityState(sId, aId);
-              }
-            });
-          }
+          _transitionToNextRound(c4Result);
         });
       }
     } else {
       setState(() {
         _wrongIndices.add(index);
+        _choiceController.markIncorrect(_optionId(index));
       });
       SoundUtils.playFeedback('audio/wrong.mp3');
 
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.logAttempt(
-        isCorrect: false,
-        errorType: 'unknown_error',
-        selectedAnswers: [item['value']?.toString() ?? ''],
-      );
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          setState(() {
+            _wrongIndices.remove(index);
+            _choiceController.clearTransientFeedback();
+          });
+        }
+      });
+
+      final extraTelemetry = {
+        "original_options_count": _shuffledItems.length,
+        "visible_option_ids": _choiceController.visibleOptions
+            .map((option) => option.id)
+            .toList(),
+        "incorrect_option_ids": List.generate(_shuffledItems.length, (i) => i)
+            .where((i) {
+              final it = _shuffledItems[i];
+              final tg = _activeRoundData['target_letter']?.toString();
+              final isTarget =
+                  it['is_target'] == true ||
+                  (it['is_target'] == null && it['value'] == tg);
+              return !isTarget &&
+                  !_choiceController.removedIds.contains(_optionId(i));
+            })
+            .map(_optionId)
+            .toList(),
+        "remaining_target_ids": List.generate(_shuffledItems.length, (i) => i)
+            .where((i) {
+              final it = _shuffledItems[i];
+              final tg = _activeRoundData['target_letter']?.toString();
+              return (it['is_target'] == true ||
+                      (it['is_target'] == null && it['value'] == tg)) &&
+                  !_foundIndices.contains(i);
+            })
+            .map(_optionId)
+            .toList(),
+        "correct_option_ids": List.generate(_shuffledItems.length, (i) => i)
+            .where(
+              (i) =>
+                  _choiceController.allOptions[i].isTarget &&
+                  !_foundIndices.contains(i),
+            )
+            .map(_optionId)
+            .toList(),
+        "selected_option_ids": _foundIndices.map(_optionId).toList(),
+        "selected_answer_values": <String>[
+          _shuffledItems[index]['value']?.toString() ?? '',
+        ],
+        // A multi-target round is diagnosed one still-missing target at a
+        // time. This gives remediation a real Sinhala unit instead of an
+        // opaque option ID while avoiding an unsupported guess about targets
+        // the child has already found independently.
+        "struggled_target_units": List.generate(_shuffledItems.length, (i) => i)
+            .where((i) {
+              final item = _shuffledItems[i];
+              final target = _activeRoundData['target_letter']?.toString();
+              return !_foundIndices.contains(i) &&
+                  (item['is_target'] == true ||
+                      (item['is_target'] == null && item['value'] == target));
+            })
+            .map((i) => _shuffledItems[i]['value'].toString())
+            .take(1)
+            .toList(),
+        "supported_actions": ["REMOVE_OPTION", "HIGHLIGHT_OPTION"],
+        "minimum_visible_options": 2,
+      };
+
+      final c4Result = await context
+          .findAncestorStateOfType<TelemetryWrapperState>()
+          ?.registerAdaptiveWrongAttempt(
+            currentRoundIndex: _currentRoundIndex,
+            itemId: _canonicalItemId(),
+            extraTelemetry: extraTelemetry,
+          );
+
+      if (c4Result != null && c4Result.containsKey('next_action')) {
+        final nextAction = c4Result['next_action'];
+
+        if (nextAction['decision'] == 'TERMINATE' ||
+            nextAction['decision'] == 'REMEDIATION') {
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            if (!mounted) return;
+            _transitionToNextRound(c4Result);
+          });
+          return;
+        }
+
+        context
+            .findAncestorStateOfType<TelemetryWrapperState>()
+            ?.applyScaffoldResult<int>(
+              controller: _choiceController,
+              result: c4Result,
+              correctOptionIds: (extraTelemetry['correct_option_ids'] as List)
+                  .cast<String>(),
+            );
+      }
 
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted && !_isRoundComplete) {
@@ -208,14 +389,14 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       return const Scaffold(body: Center(child: Text('No rounds available')));
     }
 
-    final currentRound = rounds[_currentRoundIndex];
     final promptText = 'කොටුවේ පෙන්වා ඇති අකුර සොයන්න.';
     final titleText = widget.activityNode?.title ?? 'නිවැරදි අකුර සොයමු';
 
     String? targetLetter;
-    if (currentRound['items'] != null) {
+    final itemsList = _activeRoundData['items'];
+    if (itemsList != null) {
       List<String> uniqueLetters = [];
-      for (var item in currentRound['items']) {
+      for (var item in itemsList) {
         if (item['is_target'] == true && item['type'] == 'letter') {
           final val = item['value']?.toString();
           if (val != null && !uniqueLetters.contains(val)) {
@@ -272,12 +453,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
         context
             .findAncestorStateOfType<TelemetryWrapperState>()
             ?.logAudioReplay();
-        String spokenInstruction = instruction
-            .replaceAll('මා', 'ම')
-            .replaceAll('\'ම\' අකුර', 'ම, අකුර')
-            .replaceAll('ම අකුර', 'ම, අකුර')
-            .replaceAll('ම පින්තූරය', 'ම, පින්තූරය');
-        TtsService().speak('කොටුවේ පෙන්වා ඇති අකුර සොයන්න.', folder: 'skill_2');
+        _playCurrentInstruction();
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -450,7 +626,7 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
   }
 
   Widget _buildCardGrid() {
-    final total = _shuffledItems.length;
+    final total = _choiceController.visibleOptions.length;
 
     // Dynamic sizing based on items to perfectly fit the board
     double itemSize;
@@ -464,17 +640,16 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       spacing = 16.0;
     }
 
-    return Wrap(
+    return AdaptiveAnswerPool<int>(
+      controller: _choiceController,
       spacing: spacing,
-      runSpacing: spacing,
-      alignment: WrapAlignment.center,
-      children: List.generate(_shuffledItems.length, (index) {
-        return SizedBox(
-          width: itemSize,
-          height: itemSize + 8, // Allow extra height for the 3D press shadow
-          child: _buildCard(index),
-        );
-      }),
+      minExtent: itemSize,
+      maxExtent: itemSize,
+      itemBuilder: (context, option, state, extent) => SizedBox(
+        width: extent,
+        height: extent + 8,
+        child: _buildCard(option.value),
+      ),
     );
   }
 
@@ -482,6 +657,9 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
     final item = _shuffledItems[index];
     final isFound = _foundIndices.contains(index);
     final isWrong = _wrongIndices.contains(index);
+    final isHighlighted =
+        _choiceController.visualStateFor(_optionId(index)) ==
+        AdaptiveOptionVisualState.hint;
 
     // 3D Press state
     final isPressed = isFound || isWrong;
@@ -503,6 +681,10 @@ class _Skill2Act1OddOneOutState extends State<Skill2Act1OddOneOut> {
       borderColor = Colors.red[800]!;
       shadowColor = Colors.red[900]!;
       textColor = Colors.white;
+    } else if (isHighlighted) {
+      tileColor = AppColors.warmAmber.withOpacity(0.3);
+      borderColor = AppColors.warmAmber;
+      shadowColor = AppColors.warmAmber;
     }
 
     // Dim the unselected tiles if the round is complete to focus on the correct answers

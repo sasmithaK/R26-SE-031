@@ -1,0 +1,127 @@
+# Round-level simulator for the learner-level C1 model.
+#
+# STATUS: provisional engineering parameters (2026-10-21). They are anchored on
+# the app's own observed data (Skill 1 Activity 1: first touch ~1.5-4 s, time
+# to correct ~4-13 s) and on the task design (number of targets, drag vs tap,
+# audio prompt). They are NOT normative values for Sri Lankan Grade 1
+# children. Calibrate them with team play-throughs and consented pilot
+# sessions using scripts/c1_calibration_report.py, and record every change.
+#
+# Units: milliseconds; accuracies are first-try correct shares for a typical
+# learner. "kind" decides which pattern effects apply.
+
+version: c1-sim-v1
+window_days: 14
+learners_per_class: 1500
+random_seed: 42
+
+activities:
+  # key: [skill, activity, knowledge component, kind, rounds, audio prompt, first-touch ms, solve ms, typical first-try accuracy]
+  "1.1": [1, 1, KC_VISUAL_IDENTIFICATION, picture, 5, false, 2500, 5000, 0.85]
+  "1.2": [1, 2, KC_VISUAL_MATCHING, picture, 5, false, 2200, 2000, 0.85]
+  "1.3": [1, 3, KC_VISUAL_CATEGORIZATION, picture, 5, false, 2000, 7000, 0.80]
+  "1.4": [1, 4, KC_VISUAL_PATTERN, picture, 5, false, 2500, 1500, 0.80]
+  "1.5": [1, 5, KC_VISUAL_MEMORY, picture, 5, false, 1800, 800, 0.75]
+  "2.1": [2, 1, KC_LETTER_IDENTIFICATION, orthographic, 7, false, 2500, 1500, 0.80]
+  "2.2": [2, 2, KC_LETTER_MATCHING, orthographic, 5, false, 2500, 2500, 0.80]
+  "2.3": [2, 3, KC_PHONEME_LETTER_MAPPING, phonological, 5, true, 2000, 1500, 0.75]
+  "2.4": [2, 4, KC_LETTER_DECODING, phonological, 5, false, 3000, 1500, 0.75]
+  "2.5": [2, 5, KC_LETTER_MEMORY, orthographic, 5, false, 2000, 3000, 0.70]
+  "3.1": [3, 1, KC_WORD_RECOGNITION, phonological, 5, false, 3500, 1500, 0.75]
+  "3.2": [3, 2, KC_SPELLING_SEQUENCE, language, 5, false, 3500, 3000, 0.70]
+  "3.3": [3, 3, KC_WORD_RECOGNITION, phonological, 5, true, 3000, 1500, 0.75]
+  "3.4": [3, 4, KC_SPELLING_SEQUENCE, language, 5, false, 3500, 2000, 0.70]
+  "3.5": [3, 5, KC_SPELLING_SEQUENCE, language, 5, false, 3000, 6000, 0.65]
+  "4.1": [4, 1, KC_SENTENCE_LANGUAGE, language, 4, false, 4000, 2500, 0.70]
+  "4.2": [4, 2, KC_SENTENCE_LANGUAGE, language, 4, false, 4000, 3000, 0.70]
+  "4.3": [4, 3, KC_SENTENCE_LANGUAGE, language, 4, true, 4000, 2500, 0.70]
+  "4.4": [4, 4, KC_SENTENCE_LANGUAGE, language, 4, false, 3500, 8000, 0.60]
+
+# Per pattern and task kind: [time multiplier, odds multiplier for a first-try error]
+pattern_effects:
+  TYPICAL:
+    picture: [1.0, 1.0]
+    orthographic: [1.0, 1.0]
+    phonological: [1.0, 1.0]
+    language: [1.0, 1.0]
+  VISUAL_ORTHOGRAPHIC_PATTERN:
+    picture: [1.35, 1.8]
+    orthographic: [1.6, 3.0]
+    phonological: [1.1, 1.3]
+    language: [1.3, 1.8]
+  PHONOLOGICAL_PATTERN:
+    picture: [1.0, 1.0]
+    orthographic: [1.1, 1.3]
+    phonological: [1.6, 3.0]
+    language: [1.35, 2.0]
+  COMBINED_PATTERN:
+    picture: [1.4, 2.0]
+    orthographic: [1.7, 3.2]
+    phonological: [1.7, 3.2]
+    language: [1.6, 3.0]
+
+# Learner-level traits, sampled uniformly from [low, high] per pattern.
+traits:
+  # pauses > 8 s per 10 s of round time
+  hesitation_per_10s:
+    TYPICAL: [0.02, 0.20]
+    VISUAL_ORTHOGRAPHIC_PATTERN: [0.10, 0.45]
+    PHONOLOGICAL_PATTERN: [0.10, 0.45]
+    COMBINED_PATTERN: [0.25, 0.80]
+  # chance that the child leaves a round unfinished
+  abandon_per_round:
+    TYPICAL: [0.00, 0.06]
+    VISUAL_ORTHOGRAPHIC_PATTERN: [0.02, 0.12]
+    PHONOLOGICAL_PATTERN: [0.02, 0.12]
+    COMBINED_PATTERN: [0.05, 0.20]
+  # relative slowing per round within a session
+  fatigue_slope:
+    TYPICAL: [0.00, 0.05]
+    VISUAL_ORTHOGRAPHIC_PATTERN: [0.01, 0.10]
+    PHONOLOGICAL_PATTERN: [0.01, 0.10]
+    COMBINED_PATTERN: [0.03, 0.14]
+  # audio replays per audio-prompt round
+  audio_replays:
+    TYPICAL: [0.05, 0.40]
+    VISUAL_ORTHOGRAPHIC_PATTERN: [0.05, 0.50]
+    PHONOLOGICAL_PATTERN: [0.40, 1.50]
+    COMBINED_PATTERN: [0.40, 1.50]
+
+# Individual differences inside every pattern (create realistic overlap).
+individual:
+  speed_log_sd: 0.30       # learner-wide speed, log scale
+  round_time_log_sd: 0.35  # round-to-round noise, log scale
+  skill_logit_sd: 0.60     # learner-wide accuracy offset, logit scale
+  wrong_tap_continue: 0.40 # after a wrong tap, chance of another wrong tap
+  wrong_tap_ms: 1200       # time cost of each wrong tap
+  sessions_in_window: [2, 12]
+  # Highest skill the learner has reached (decides which activities appear).
+  # Learners who only reached Skill 1 have no sound-task rounds, so the model
+  # is trained with that measurement missing as it is in the app.
+  skill_reached_weights: [0.30, 0.30, 0.25, 0.15]
+
+# Touch movement (used to train C3 on touch-movement features computed by
+# the live extractor, services/comp2_kinematics.py). Provisional.
+movement:
+  # sideways bow of a drag, as a share of the drag distance
+  path_curvature:
+    TYPICAL: [0.02, 0.10]
+    VISUAL_ORTHOGRAPHIC_PATTERN: [0.05, 0.22]
+    PHONOLOGICAL_PATTERN: [0.02, 0.12]
+    COMBINED_PATTERN: [0.06, 0.25]
+  # hand tremor / sampling noise, screen fraction
+  tremor:
+    TYPICAL: [0.001, 0.004]
+    VISUAL_ORTHOGRAPHIC_PATTERN: [0.002, 0.007]
+    PHONOLOGICAL_PATTERN: [0.001, 0.005]
+    COMBINED_PATTERN: [0.003, 0.009]
+  drag_duration_ms:
+    TYPICAL: [500, 1100]
+    VISUAL_ORTHOGRAPHIC_PATTERN: [650, 1500]
+    PHONOLOGICAL_PATTERN: [500, 1200]
+    COMBINED_PATTERN: [700, 1600]
+  stray_drops_per_drag:
+    TYPICAL: [0.00, 0.10]
+    VISUAL_ORTHOGRAPHIC_PATTERN: [0.05, 0.30]
+    PHONOLOGICAL_PATTERN: [0.00, 0.15]
+    COMBINED_PATTERN: [0.10, 0.40]

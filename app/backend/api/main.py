@@ -13,6 +13,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -21,7 +22,7 @@ from slowapi.errors import RateLimitExceeded
 # Allow importing from shared/
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from shared.database import connect_to_mongo, close_mongo_connection
+from shared.database import connect_to_mongo, close_mongo_connection, get_db
 from config import PORT, CORS_ORIGINS
 
 # Import routers
@@ -33,6 +34,7 @@ from routers.therapist import router as therapist_router
 from routers.parent_dashboard import router as parent_dashboard_router
 from routers.therapist_dashboard import router as therapist_dashboard_router
 from routers.learning import router as learning_router
+from routers.starter_baseline import router as starter_baseline_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -71,6 +73,7 @@ app.include_router(therapist_router)
 app.include_router(parent_dashboard_router)
 app.include_router(therapist_dashboard_router)
 app.include_router(learning_router)
+app.include_router(starter_baseline_router)
 
 # Mount static folder (Moved to speech-monitoring-v1)
 
@@ -78,7 +81,29 @@ app.include_router(learning_router)
 # --- Health Check ---
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "C5-Auth"}
+    return {
+        "status": "ok",
+        "service": "C5-Auth",
+        "c4_policy_mode_forwarded": os.getenv("C4_POLICY_MODE", "shadow"),
+    }
+
+
+@app.get("/ready")
+async def ready():
+    """Verify the Auth API can reach the shared research database."""
+    try:
+        await get_db().command("ping")
+        return {"ready": True, "service": "C5-Auth", "database": "ready"}
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "ready": False,
+                "service": "C5-Auth",
+                "database": "unavailable",
+                "error_type": type(exc).__name__,
+            },
+        )
 
 # --- Centralized OpenAPI Docs ---
 @app.get("/docs", include_in_schema=False)
@@ -95,9 +120,9 @@ async def custom_swagger_ui_html():
             "urls": [
                 {"url": "/openapi.json", "name": "C5 - Auth & Student Management"},
                 {"url": f"{speech_url}/openapi.json", "name": "C2 - Speech Monitoring"},
-                {"url": f"{telemetry_url}/openapi.json", "name": "C4 - Telemetry Analytics"},
+                {"url": f"{telemetry_url}/openapi.json", "name": "C1 - Behavioral Telemetry Analytics"},
                 {"url": f"{fusion_url}/openapi.json", "name": "C3 - Diagnostic Fusion"},
-                {"url": f"{tutoring_url}/openapi.json", "name": "C1 - Adaptive Tutoring"},
+                {"url": f"{tutoring_url}/openapi.json", "name": "C4 - Adaptive Tutoring"},
             ]
         }
     )

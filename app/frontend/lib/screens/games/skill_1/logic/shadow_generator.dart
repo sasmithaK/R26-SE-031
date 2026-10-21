@@ -1,10 +1,7 @@
-import 'dart:math';
 import '../models/shadow_round.dart';
 
 /// Generates 5 randomized shadow matching rounds with progressive difficulty.
 class ShadowGenerator {
-  static final Random _rng = Random();
-
   // ── Asset definitions ──
   // We use visually distinct shapes to avoid ambiguity.
   static const List<String> _distinctAssets = [
@@ -41,35 +38,49 @@ class ShadowGenerator {
   /// Generates 5 progressive shadow matching rounds.
   static List<ShadowRound> generateRounds() {
     final rounds = <ShadowRound>[];
-    
+
     // Level 1: Very Easy - 2 shadows, 2 objects (visually very different)
     rounds.add(_buildRound(count: 2, difficulty: 1));
-    
+
     // Level 2: Easy - 3 shadows, 3 objects
     rounds.add(_buildRound(count: 3, difficulty: 2));
-    
+
     // Level 3: Medium - 4 shadows, 4 objects
     rounds.add(_buildRound(count: 4, difficulty: 3));
-    
+
     // Level 4: Hard - 5 shadows, 5 objects
     rounds.add(_buildRound(count: 5, difficulty: 4));
-    
+
     // Level 5: Challenge - 6 shadows, 6 objects
     rounds.add(_buildRound(count: 6, difficulty: 5));
 
     return rounds;
   }
 
-  static ShadowRound _buildRound({required int count, required int difficulty}) {
+  static ShadowRound fromCurriculum(Map<String, dynamic> data) {
+    final assets = (data['target_assets'] as Iterable? ?? const <dynamic>[])
+        .map((value) => value.toString())
+        .toList();
+    return ShadowRound(
+      targetAssets: assets,
+      difficulty: (data['difficulty'] as num?)?.toInt() ?? 1,
+    );
+  }
+
+  static List<ShadowRound> fromCurriculumRounds(
+    Iterable<Map<String, dynamic>> rounds,
+  ) => rounds.map(fromCurriculum).toList();
+
+  static ShadowRound _buildRound({
+    required int count,
+    required int difficulty,
+  }) {
     // Shuffle the available distinct assets to ensure fresh gameplay
     final available = List<String>.from(_distinctAssets);
-    
+
     // Take exactly [count] items
     final selected = available.take(count).toList();
-    
-    return ShadowRound(
-      targetAssets: selected,
-      difficulty: difficulty,
-    );
+
+    return ShadowRound(targetAssets: selected, difficulty: difficulty);
   }
 }

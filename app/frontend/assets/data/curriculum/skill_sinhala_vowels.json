@@ -1,0 +1,36 @@
+[
+  {
+    "id": "skill_sinhala_vowels",
+    "title": "සිංහල අකුරු කියවමු - ස්වර අකුරු (පණ අකුරු)",
+    "intro_text": "අකුරේ හඬට සවන් දී, ඔබත් කියවා බලන්න!",
+    "description": "අකුර අසා කියවා පුහුණු වෙමු.",
+    "activities": [
+      {
+        "id": "act_1",
+        "title": "ස්වර අකුරු අසා කියවමු",
+        "description": "සවන් දෙන්න, පසුව අකුර කියවා පටිගත කරන්න.",
+        "template_type": "letter_pronunciation",
+        "telemetry_tags": ["letter_sound", "oral_practice", "repeated_attempts"],
+        "research_metadata": {
+          "knowledge_component_id": "KC_SINHALA_VOWEL_PRONUNCIATION",
+          "response_modality": "speech",
+          "research_role": "primary"
+        },
+        "rounds": [
+          {"letter": "අ", "prompt": "අ", "expected_text": "අ", "allowed_spoken_variants": ["අ"], "item_id": "SVOWA1R01", "expected_syllables": 1},
+          {"letter": "ආ", "prompt": "ආ", "expected_text": "ආ", "allowed_spoken_variants": ["ආ"], "item_id": "SVOWA1R02", "expected_syllables": 1},
+          {"letter": "ඇ", "prompt": "ඇ", "expected_text": "ඇ", "allowed_spoken_variants": ["ඇ"], "item_id": "SVOWA1R03", "expected_syllables": 1},
+          {"letter": "ඈ", "prompt": "ඈ", "expected_text": "ඈ", "allowed_spoken_variants": ["ඈ"], "item_id": "SVOWA1R04", "expected_syllables": 1},
+          {"letter": "ඉ", "prompt": "ඉ", "expected_text": "ඉ", "allowed_spoken_variants": ["ඉ"], "item_id": "SVOWA1R05", "expected_syllables": 1},
+          {"letter": "ඊ", "prompt": "ඊ", "expected_text": "ඊ", "allowed_spoken_variants": ["ඊ"], "item_id": "SVOWA1R06", "expected_syllables": 1},
+          {"letter": "උ", "prompt": "උ", "expected_text": "උ", "allowed_spoken_variants": ["උ"], "item_id": "SVOWA1R07", "expected_syllables": 1},
+          {"letter": "ඌ", "prompt": "ඌ", "expected_text": "ඌ", "allowed_spoken_variants": ["ඌ"], "item_id": "SVOWA1R08", "expected_syllables": 1},
+          {"letter": "එ", "prompt": "එ", "expected_text": "එ", "allowed_spoken_variants": ["එ"], "item_id": "SVOWA1R09", "expected_syllables": 1},
+          {"letter": "ඒ", "prompt": "ඒ", "expected_text": "ඒ", "allowed_spoken_variants": ["ඒ"], "item_id": "SVOWA1R10", "expected_syllables": 1},
+          {"letter": "ඔ", "prompt": "ඔ", "expected_text": "ඔ", "allowed_spoken_variants": ["ඔ"], "item_id": "SVOWA1R11", "expected_syllables": 1},
+          {"letter": "ඕ", "prompt": "ඕ", "expected_text": "ඕ", "allowed_spoken_variants": ["ඕ"], "item_id": "SVOWA1R12", "expected_syllables": 1}
+        ]
+      }
+    ]
+  }
+]

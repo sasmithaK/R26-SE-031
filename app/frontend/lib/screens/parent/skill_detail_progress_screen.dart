@@ -142,7 +142,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
                   children: [
                     Text(
                       LocalizationService.instance.t(skillName.toLowerCase().replaceAll(' ', '_')),
-                      style: AppTypography.heading(
+                      style: DashText.heading(
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
@@ -150,7 +150,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
                     ),
                     Text(
                       "$childName${LocalizationService.instance.t('child_progress_suffix')}",
-                      style: AppTypography.caption(
+                      style: DashText.caption(
                         fontSize: 14,
                         color: AppColors.textSecondary,
                       ),
@@ -170,7 +170,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
                   children: [
                     Text(
                       '${_trendData.last}%',
-                      style: AppTypography.heading(
+                      style: DashText.heading(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                         color: skillColor,
@@ -178,8 +178,8 @@ class SkillDetailProgressScreen extends StatelessWidget {
                     ),
                     Text(
                       LocalizationService.instance.t('accuracy'),
-                      style: AppTypography.caption(
-                        fontSize: 10,
+                      style: DashText.caption(
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: skillColor,
                       ),
@@ -221,7 +221,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
           children: [
             Text(
               LocalizationService.instance.t('performance_trend'),
-              style: AppTypography.heading(
+              style: DashText.heading(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -230,7 +230,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               LocalizationService.instance.t('accuracy_over_sessions'),
-              style: AppTypography.caption(
+              style: DashText.caption(
                 fontSize: 12,
                 color: AppColors.textHint,
               ),
@@ -254,8 +254,8 @@ class SkillDetailProgressScreen extends StatelessWidget {
                   7,
                   (i) => Text(
                         'S${i + 1}',
-                        style: AppTypography.caption(
-                          fontSize: 10,
+                        style: DashText.caption(
+                          fontSize: 12,
                           color: AppColors.textHint,
                         ),
                       )),
@@ -275,7 +275,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
         children: [
           Text(
             'activity breakdown',
-            style: AppTypography.heading(
+            style: DashText.heading(
               fontSize: 20,
               fontWeight: FontWeight.w700,
               color: AppColors.calmBlue,
@@ -340,7 +340,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
               children: [
                 Text(
                   activity['name'] as String,
-                  style: AppTypography.body(
+                  style: DashText.body(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: isLocked
@@ -351,8 +351,8 @@ class SkillDetailProgressScreen extends StatelessWidget {
                 if (!isLocked)
                   Text(
                     '${activity['time']} · ${activity['attempts']} ${(activity['attempts'] as int) > 1 ? LocalizationService.instance.t('attempts') : LocalizationService.instance.t('attempt')}',
-                    style: AppTypography.caption(
-                      fontSize: 11,
+                    style: DashText.caption(
+                      fontSize: 12,
                       color: AppColors.textHint,
                     ),
                   ),
@@ -370,7 +370,7 @@ class SkillDetailProgressScreen extends StatelessWidget {
               ),
               child: Text(
                 '$score%',
-                style: AppTypography.caption(
+                style: DashText.caption(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   color: scoreColor,

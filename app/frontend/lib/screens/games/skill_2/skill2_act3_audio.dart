@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../models/curriculum_models.dart';
-import '../../../../services/tts_service.dart';
+import '../../../theme/app_theme.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../models/curriculum_models.dart';
+import '../../../services/tts_service.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
-import '../../../../services/progress_service.dart';
+import '../../../services/progress_service.dart';
 import '../shared_widgets/shared_celebration_popup.dart';
+import '../../../adaptive/controllers/adaptive_choice_controller.dart';
+import '../../../adaptive/models/adaptive_scaffold_models.dart';
+import '../../../adaptive/widgets/adaptive_answer_pool.dart';
+import 'skill2_round_resolver.dart';
+import '../../../adaptive/utils/adaptive_option_order.dart';
 
-/// Activity 9: වචනයට සවන් දී පින්තූරය සොයමු (Listen to Word & Find Image)
-/// Template: audio_image_match_game
 class Skill2Act3Audio extends StatefulWidget {
   final ActivityNode? activityNode;
   final Map<String, dynamic>? studentData;
   final bool isRemedial;
+
   const Skill2Act3Audio({
     super.key,
     this.activityNode,
@@ -27,12 +31,23 @@ class Skill2Act3Audio extends StatefulWidget {
 }
 
 class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
-  String _lastSpokenInstruction = '';
+  final Skill2ItemAutoplayGate _autoplayGate = Skill2ItemAutoplayGate();
+  final Skill2PromptReadiness _promptReadiness = Skill2PromptReadiness();
   final AudioPlayer _audioPlayer = AudioPlayer();
-  int? _selectedIndex;
-  bool _isCorrect = false;
-  bool _activityComplete = false;
   int _currentRoundIndex = 0;
+  bool _isRoundComplete = false;
+  bool _activityComplete = false;
+
+  late List<String> _options;
+  int _correctIndex = 0;
+  String _promptText = '';
+  String _spokenInstruction = '';
+  String _currentItemId = '';
+
+  Set<int> _wrongIndices = {};
+  final AdaptiveChoiceController<int> _choiceController =
+      AdaptiveChoiceController<int>();
+  String? _currentVariantId;
 
   @override
   void initState() {
@@ -49,112 +64,261 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
     if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
       _currentRoundIndex = 0;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playAudioPrompt(autoPlay: true);
+    _setupRound();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _playAudioPrompt(autoPlay: true);
     });
   }
 
   @override
   void dispose() {
     _audioPlayer.dispose();
+    _choiceController.dispose();
     super.dispose();
   }
 
-  void _playAudioPrompt({bool autoPlay = false}) {
+  void _setupRound() {
     final rounds = widget.activityNode?.rounds ?? [];
-    if (rounds.isEmpty) return;
+    if (rounds.isNotEmpty && _currentRoundIndex < rounds.length) {
+      final resolved = Skill2RoundResolver.resolve(
+        activity: widget.activityNode,
+        roundIndex: _currentRoundIndex,
+        variantId: _currentVariantId,
+      );
+      _currentItemId = resolved.itemId;
+      _currentVariantId = resolved.variantId;
+      _promptReadiness.prepare(_currentItemId);
+      final roundData = resolved.data;
 
-    final currentRound = rounds[_currentRoundIndex];
-    final audioText =
-        currentRound['audio_text']?.toString() ??
-        currentRound['prompt']?.toString() ??
-        'වෘත්තය';
-    String spokenInstruction = audioText
-        .replaceAll('මා', 'ම')
-        .replaceAllMapped(
-          RegExp(r"'?(.)'? අකුර"),
-          (match) => '${match.group(1)}, අකුර',
-        )
-        .replaceAllMapped(
-          RegExp(r"'?(.)'? පින්තූරය"),
-          (match) => '${match.group(1)}, පින්තූරය',
-        )
-        .replaceAllMapped(
-          RegExp(r"'?(.)'? තෝරන්න"),
-          (match) => '${match.group(1)}යන්න තෝරන්න',
-        );
-    
-    if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
-      return;
+      _promptText =
+          roundData['prompt']?.toString() ??
+          Skill2RoundResolver.audioChoicePrompt;
+      _spokenInstruction = Skill2RoundResolver.spokenLetterInstruction(
+        roundData,
+      );
+      final rawOptions =
+          (roundData['options'] as List?)?.map((e) => e.toString()).toList() ??
+          [];
+
+      final correctOption = roundData['correctOption']?.toString() ?? '';
+      _options = AdaptiveOptionOrder.withTargets<String>(
+        source: rawOptions,
+        itemId: _currentItemId,
+        isTarget: (value) => value == correctOption,
+      );
+      _correctIndex = _options.indexOf(correctOption);
+      if (_correctIndex == -1) _correctIndex = 0;
+      _choiceController.configure(
+        List<AdaptiveOption<int>>.generate(
+          _options.length,
+          (index) => AdaptiveOption<int>(
+            id: _optionId(index),
+            value: index,
+            role: index == _correctIndex
+                ? AdaptiveOptionRole.target
+                : AdaptiveOptionRole.phonologicalDistractor,
+            metadata: <String, dynamic>{'label': _options[index]},
+          ),
+        ),
+      );
+    } else {
+      _options = [];
+      _spokenInstruction = '';
     }
-    _lastSpokenInstruction = spokenInstruction;
-    TtsService().speak(spokenInstruction, folder: 'skill_2');
+
+    _wrongIndices.clear();
+    _isRoundComplete = false;
   }
 
-  void _checkAnswer(int index, int correctIndex, int totalRounds, String selectedAnswer) async {
-    if (_isCorrect) return;
+  String _optionId(int index) => '${_currentItemId}_O${index + 1}';
+
+  void _transitionToNextRound(Map<String, dynamic>? c4Result) {
+    final rounds = widget.activityNode?.rounds ?? [];
+
+    int? nextIdx;
+    if (c4Result != null && c4Result.containsKey('next_action')) {
+      final nextAction = c4Result['next_action'];
+
+      if (nextAction['decision'] == 'CURRICULUM_COMPLETE' ||
+          nextAction['decision'] == 'ACTIVITY_COMPLETE') {
+        setState(() {
+          _activityComplete = true;
+        });
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          ProgressService().saveActivityScore(sId, aId, 100);
+          ProgressService().clearActivityState(sId, aId);
+        }
+        return;
+      }
+
+      if (nextAction['next_item'] != null) {
+        String nextItem = nextAction['next_item'];
+        _currentVariantId = Skill2RoundResolver.variantFromItemId(nextItem);
+        nextIdx = Skill2RoundResolver.roundIndexFromItemId(nextItem);
+      }
+    }
 
     setState(() {
-      _selectedIndex = index;
+      _currentRoundIndex = nextIdx ?? (_currentRoundIndex + 1);
+      if (_currentRoundIndex >= rounds.length) {
+        _activityComplete = true;
+      } else {
+        _setupRound();
+      }
     });
 
-    final bool isRight = (index == correctIndex);
+    if (!_activityComplete) {
+      Future.delayed(const Duration(milliseconds: 300), () async {
+        await _playAudioPrompt(autoPlay: true);
+      });
+    }
+  }
+
+  Future<void> _playAudioPrompt({
+    bool autoPlay = false,
+    bool slow = false,
+  }) async {
+    final spokenInstruction = _spokenInstruction.isEmpty
+        ? _promptText
+        : _spokenInstruction;
+
+    if (autoPlay && !_autoplayGate.shouldPlay(_currentItemId)) {
+      return;
+    }
+    if (_promptReadiness.isLoading) return;
+
+    final requestItemId = _currentItemId;
+    final requestToken = _promptReadiness.begin(requestItemId);
+    final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+    wrapper?.pauseHesitationTimer();
+    if (mounted) setState(() {});
+
+    final didPlay = await TtsService().speak(
+      spokenInstruction,
+      folder: 'skill_2',
+      waitUntilComplete: true,
+      playbackRate: slow ? 0.78 : 1.0,
+    );
+    if (!mounted ||
+        !_promptReadiness.finish(
+          itemId: requestItemId,
+          requestToken: requestToken,
+          didPlay: didPlay,
+        )) {
+      return;
+    }
+
+    setState(() {});
+    if (didPlay) {
+      if (autoPlay) {
+        // Required stimulus delivery is not part of the child's response time.
+        wrapper?.resetRoundTimers(clearPreResponseEvidence: true);
+      } else {
+        wrapper?.resumeHesitationTimer();
+      }
+    }
+  }
+
+  void _checkAnswer(int index) async {
+    if (_isRoundComplete ||
+        _choiceController.removedIds.contains(_optionId(index)))
+      return;
+
+    final bool isRight = (index == _correctIndex);
 
     if (isRight) {
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
-        100,
-        selectedAnswers: [selectedAnswer],
-      );
       setState(() {
-        _isCorrect = true;
+        _isRoundComplete = true;
+        _choiceController.markCorrect(_optionId(index));
       });
       SoundUtils.playFeedback('audio/correct.mp3');
 
-      Future.delayed(const Duration(milliseconds: 1400), () {
-        if (!mounted) return;
-        if (_currentRoundIndex < totalRounds - 1) {
-          setState(() {
-            _currentRoundIndex++;
-            final sId = widget.activityNode?.skillId ?? '';
-            final aId = widget.activityNode?.id ?? '';
-            if (sId.isNotEmpty && aId.isNotEmpty) {
-              int progress =
-                  ((_currentRoundIndex /
-                              (widget.activityNode?.rounds.length ?? 1)) *
-                          100)
-                      .toInt();
-              ProgressService().saveActivityScore(sId, aId, progress);
-              ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
-            }
-            _selectedIndex = null;
-            _isCorrect = false;
-          });
-          _playAudioPrompt(autoPlay: true);
-        } else {
-          setState(() {
-            _activityComplete = true;
-            final sId = widget.activityNode?.skillId ?? '';
-            final aId = widget.activityNode?.id ?? '';
-            if (sId.isNotEmpty && aId.isNotEmpty) {
-              ProgressService().saveActivityScore(sId, aId, 100);
-              ProgressService().clearActivityState(sId, aId);
-            }
-          });
-        }
-      });
+      final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+      if (wrapper != null) {
+        final result = await wrapper.completeAdaptiveRound(
+          100,
+          currentRoundIndex: _currentRoundIndex,
+          itemId: _currentItemId,
+          selectedAnswers: <String>[_options[index]],
+        );
+        Future.delayed(const Duration(milliseconds: 1400), () {
+          if (mounted) _transitionToNextRound(result);
+        });
+      } else {
+        Future.delayed(const Duration(milliseconds: 1400), () {
+          if (mounted) _transitionToNextRound(null);
+        });
+      }
     } else {
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.logAttempt(
-        isCorrect: false,
-        selectedAnswers: [selectedAnswer],
-        errorType: 'unknown_error',
-      );
       SoundUtils.playFeedback('audio/wrong.mp3');
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && !_isCorrect) {
+      setState(() {
+        _wrongIndices.add(index);
+        _choiceController.markIncorrect(_optionId(index));
+      });
+
+      final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+      if (wrapper != null) {
+        final result = await wrapper.registerAdaptiveWrongAttempt(
+          currentRoundIndex: _currentRoundIndex,
+          itemId: _currentItemId,
+          extraTelemetry: {
+            "original_options_count": _options.length,
+            "visible_option_ids": _choiceController.visibleOptions
+                .map((option) => option.id)
+                .toList(),
+            "incorrect_option_ids": <String>[
+              _optionId(index),
+              ..._choiceController.visibleOptions
+                  .where(
+                    (option) =>
+                        option.value != _correctIndex && option.value != index,
+                  )
+                  .map((option) => option.id),
+            ],
+            "correct_option_ids": <String>[_optionId(_correctIndex)],
+            "selected_option_ids": <String>[_optionId(index)],
+            "selected_answer_values": <String>[_options[index]],
+            "struggled_target_units": <String>[_options[_correctIndex]],
+            "supported_actions": <String>[
+              "REMOVE_OPTION",
+              "HIGHLIGHT_OPTION",
+              "REPLAY_INSTRUCTION",
+              "SLOW_AUDIO",
+            ],
+            "minimum_visible_options": 2,
+            "error_type": "phoneme_grapheme_confusion",
+          },
+        );
+        wrapper.applyScaffoldResult<int>(
+          controller: _choiceController,
+          result: result,
+          correctOptionIds: <String>[_optionId(_correctIndex)],
+        );
+        final rawAction = result?['next_action'];
+        if (rawAction is Map) {
+          final plan = ScaffoldPlan.fromNextAction(
+            Map<String, dynamic>.from(rawAction),
+            correctOptionIds: <String>[_optionId(_correctIndex)],
+          );
+          if (plan.commands.any(
+            (command) => command.type == ScaffoldActionType.slowAudio,
+          )) {
+            await _playAudioPrompt(slow: true);
+          } else if (plan.commands.any(
+            (command) => command.type == ScaffoldActionType.replayInstruction,
+          )) {
+            await _playAudioPrompt();
+          }
+        }
+      }
+
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
           setState(() {
-            if (_selectedIndex == index) {
-              _selectedIndex = null;
-            }
+            _wrongIndices.remove(index);
+            _choiceController.clearTransientFeedback();
           });
         }
       });
@@ -166,40 +330,19 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
     var rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('වචනයට සවන් දී පින්තූරය සොයමු')),
+        appBar: AppBar(title: const Text('අකුර අසා හඳුනා ගනිමු')),
         body: const Center(child: Text('No rounds available.')),
       );
     }
 
-    if (rounds.length > 5) {
-      rounds = rounds.sublist(0, 5);
-    }
-
-    final currentRound = rounds[_currentRoundIndex];
-    final titleText =
-        widget.activityNode?.title ?? 'වචනයට සවන් දී පින්තූරය සොයමු';
-    final promptText = 'ශබ්දයට සවන්දී අකුර තෝරන්න';
-    var options =
-        (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ??
-        ['🔵', '🟥', '🔺', '⭐'];
-    var correctIndex = (currentRound['correct_index'] as int?) ?? 0;
-
-    if (widget.isRemedial && options.length > 2) {
-      // Reduce distractors to max 1 + 1 correct = 2 options total
-      final correctItem = options[correctIndex];
-      var distractors = options.where((item) => item != correctItem).toList();
-      if (distractors.isNotEmpty) distractors = distractors.sublist(0, 1);
-      options = [correctItem, ...distractors];
-      options.shuffle();
-      correctIndex = options.indexOf(correctItem);
-    }
+    final titleText = widget.activityNode?.title ?? 'අකුර අසා හඳුනා ගනිමු';
 
     double itemSize;
     double spacing;
     double fontSize;
-    final total = options.length;
-    final bool hasLongText = options.any(
-      (opt) => opt.toString().length > 4 || opt.toString().contains(' '),
+    final total = _options.length;
+    final bool hasLongText = _options.any(
+      (opt) => opt.length > 4 || opt.contains(' '),
     );
 
     if (total <= 2) {
@@ -214,14 +357,10 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
       itemSize = 120.0;
       spacing = 16.0;
       fontSize = 56.0;
-    } else if (total <= 9) {
+    } else {
       itemSize = 90.0;
       spacing = 12.0;
       fontSize = 44.0;
-    } else {
-      itemSize = 72.0;
-      spacing = 8.0;
-      fontSize = 36.0;
     }
 
     return SharedGameLayout(
@@ -230,7 +369,7 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
       title: titleText,
       currentRoundIndex: _currentRoundIndex,
       totalRounds: rounds.length,
-      isRoundComplete: _isCorrect,
+      isRoundComplete: _isRoundComplete,
       isActivityComplete: _activityComplete,
       onNext: () {
         final wrapper = context
@@ -245,11 +384,8 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
         padding: const EdgeInsets.symmetric(horizontal: 20.0),
         child: Column(
           children: [
-            // Standardized Instruction Card
-            _buildInstructionCard(promptText),
+            _buildInstructionCard(_promptText),
             const SizedBox(height: 64),
-
-            // Image Option Cards Grid
             Flexible(
               fit: FlexFit.loose,
               child: Container(
@@ -284,94 +420,38 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
                   child: Center(
-                    child: Wrap(
+                    child: AdaptiveAnswerPool<int>(
+                      controller: _choiceController,
                       spacing: spacing,
-                      runSpacing: spacing,
-                      alignment: WrapAlignment.center,
-                      children: List.generate(options.length, (index) {
-                        final isSelected = (_selectedIndex == index);
-                        final isRight = isSelected && (index == correctIndex);
-                        final isWrong = isSelected && (index != correctIndex);
-
+                      minExtent: itemSize,
+                      maxExtent: itemSize,
+                      itemBuilder: (context, option, state, extent) {
+                        final index = option.value;
                         return _FloatingLetterCard(
-                          key: ValueKey('${_currentRoundIndex}_$index'),
+                          key: ValueKey(option.id),
                           index: index,
-                          child: GestureDetector(
-                            onTap: () => _checkAnswer(
-                              index,
-                              correctIndex,
-                              rounds.length,
-                              options[index],
-                            ),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
-                              width: hasLongText ? null : itemSize,
-                              height: hasLongText ? null : itemSize,
-                              padding: hasLongText
-                                  ? const EdgeInsets.symmetric(
-                                      horizontal: 24,
-                                      vertical: 16,
-                                    )
-                                  : null,
-                              decoration: BoxDecoration(
-                                color: isRight
-                                    ? const Color(
-                                        0xFF6DBE6D,
-                                      ).withValues(alpha: 0.15)
-                                    : isWrong
-                                    ? const Color(
-                                        0xFFE87C6D,
-                                      ).withValues(alpha: 0.15)
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: isRight
-                                      ? const Color(0xFF6DBE6D)
-                                      : isWrong
-                                      ? const Color(0xFFE87C6D)
-                                      : AppColors.borderLight,
-                                  width: (isRight || isWrong) ? 4.0 : 3.0,
-                                ),
-                                boxShadow: [
-                                  if (isRight)
-                                    BoxShadow(
-                                      color: const Color(
-                                        0xFF6DBE6D,
-                                      ).withValues(alpha: 0.3),
-                                      blurRadius: 16,
-                                      spreadRadius: 2,
-                                    )
-                                  else if (isWrong)
-                                    BoxShadow(
-                                      color: const Color(
-                                        0xFFE87C6D,
-                                      ).withValues(alpha: 0.3),
-                                      blurRadius: 16,
-                                      spreadRadius: 2,
-                                    )
-                                  else
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.08,
-                                      ),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                ],
+                          child: AdaptiveOptionFrame(
+                            state: state,
+                            onTap: () => _checkAnswer(index),
+                            width: hasLongText ? null : extent,
+                            height: hasLongText ? null : extent,
+                            padding: hasLongText
+                                ? const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 16,
+                                  )
+                                : const EdgeInsets.all(12),
+                            semanticLabel: _options[index],
+                            child: Text(
+                              _options[index],
+                              style: TextStyle(
+                                fontSize: hasLongText ? 24.0 : fontSize,
                               ),
-                              child: Center(
-                                child: Text(
-                                  options[index],
-                                  style: TextStyle(
-                                    fontSize: hasLongText ? 24.0 : fontSize,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         );
-                      }),
+                      },
                     ),
                   ),
                 ),
@@ -386,10 +466,11 @@ class _Skill2Act3AudioState extends State<Skill2Act3Audio> {
   Widget _buildInstructionCard(String instruction) {
     return GestureDetector(
       onTap: () async {
+        if (_promptReadiness.isLoading) return;
         context
             .findAncestorStateOfType<TelemetryWrapperState>()
             ?.logAudioReplay();
-        _playAudioPrompt();
+        await _playAudioPrompt();
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),

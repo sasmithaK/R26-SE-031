@@ -1,139 +1,89 @@
-import os
+"""Train C1's synthetic-only RF against the live 19-feature contract."""
 import json
-import numpy as np
+from pathlib import Path
+
 import joblib
+import numpy as np
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, accuracy_score
 
-# Ensure models directory exists
-MODELS_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
-os.makedirs(MODELS_DIR, exist_ok=True)
-MODEL_PATH = os.path.join(MODELS_DIR, "dyslexia_rf_model.pkl")
+ROOT = Path(__file__).resolve().parents[1]
+MODEL_PATH = ROOT / "models" / "dyslexia_rf_model.pkl"
+METRICS_PATH = ROOT / "models" / "c1_random_forest_synthetic_metrics.json"
+SCHEMA_PATH = ROOT / "config" / "c1_features.json"
+RANDOM_SEED = 42
+CLASS_NAMES = ["TYPICAL", "VISUAL_ORTHOGRAPHIC_PATTERN", "PHONOLOGICAL_PATTERN", "COMBINED_PATTERN"]
 
-# The exact 18 features expected by the pipeline, sorted alphabetically
-FEATURE_KEYS = sorted([
-    "abandonment_rate",
-    "accuracy_drift",
-    "accuracy_slope",
-    "assessment_risk_score",
-    "audio_dependency_score",
-    "avg_jerkiness",
-    "fatigue_drift",
-    "first_touch_variability",
-    "hesitation_ratio",
-    "misclick_trend_slope",
-    "motor_precision",
-    "phonological_latency",
-    "response_consistency",
-    "session_duration_ratio",
-    "touch_cluster_count",
-    "visual_processing_speed",
-    "voice_hesitation_ms",
-    "word_error_rate"
-])
 
-def generate_synthetic_data(num_samples: int = 1000):
-    """Generate synthetic telemetry features mimicking neurotypical and neurodivergent patterns."""
-    X = []
-    y = []
-    
-    for _ in range(num_samples):
-        # 0 = Low Risk (Neurotypical), 1 = Moderate Risk, 2 = High Risk (Dyslexia/Dyspraxia)
-        risk = np.random.choice([0, 1, 2], p=[0.6, 0.25, 0.15])
-        
-        # Base distributions depending on risk level
-        # A high risk child might have higher latency, more jerkiness, higher hesitation
-        if risk == 0:
-            feat = {
-                "abandonment_rate": np.random.uniform(0, 0.05),
-                "accuracy_drift": np.random.uniform(-0.1, 0.1),
-                "accuracy_slope": np.random.uniform(-0.1, 0.5),
-                "assessment_risk_score": np.random.uniform(0, 0.2),
-                "audio_dependency_score": np.random.uniform(0, 0.2),
-                "avg_jerkiness": np.random.uniform(0, 2.0),
-                "fatigue_drift": np.random.uniform(-0.1, 0.1),
-                "first_touch_variability": np.random.uniform(0.1, 0.3),
-                "hesitation_ratio": np.random.uniform(0, 0.5),
-                "misclick_trend_slope": np.random.uniform(-0.1, 0.1),
-                "motor_precision": np.random.uniform(85, 100),
-                "phonological_latency": np.random.uniform(1000, 2500),
-                "response_consistency": np.random.uniform(100, 500),
-                "session_duration_ratio": np.random.uniform(0.8, 1.2),
-                "touch_cluster_count": np.random.uniform(1, 3),
-                "visual_processing_speed": np.random.uniform(70, 100),
-                "voice_hesitation_ms": np.random.uniform(0, 500),
-                "word_error_rate": np.random.uniform(0, 0.1)
-            }
-        elif risk == 1:
-            feat = {
-                "abandonment_rate": np.random.uniform(0.05, 0.15),
-                "accuracy_drift": np.random.uniform(-0.2, 0.0),
-                "accuracy_slope": np.random.uniform(-0.3, 0.1),
-                "assessment_risk_score": np.random.uniform(0.2, 0.5),
-                "audio_dependency_score": np.random.uniform(0.2, 0.6),
-                "avg_jerkiness": np.random.uniform(2.0, 5.0),
-                "fatigue_drift": np.random.uniform(0.1, 0.3),
-                "first_touch_variability": np.random.uniform(0.3, 0.6),
-                "hesitation_ratio": np.random.uniform(0.5, 2.0),
-                "misclick_trend_slope": np.random.uniform(0.0, 0.3),
-                "motor_precision": np.random.uniform(65, 85),
-                "phonological_latency": np.random.uniform(2500, 4500),
-                "response_consistency": np.random.uniform(500, 1500),
-                "session_duration_ratio": np.random.uniform(1.1, 1.5),
-                "touch_cluster_count": np.random.uniform(2, 5),
-                "visual_processing_speed": np.random.uniform(40, 70),
-                "voice_hesitation_ms": np.random.uniform(500, 1500),
-                "word_error_rate": np.random.uniform(0.1, 0.3)
-            }
-        else:
-            feat = {
-                "abandonment_rate": np.random.uniform(0.15, 0.4),
-                "accuracy_drift": np.random.uniform(-0.5, -0.1),
-                "accuracy_slope": np.random.uniform(-0.6, -0.1),
-                "assessment_risk_score": np.random.uniform(0.5, 1.0),
-                "audio_dependency_score": np.random.uniform(0.6, 1.0),
-                "avg_jerkiness": np.random.uniform(5.0, 12.0), # Tremors/Dyspraxia
-                "fatigue_drift": np.random.uniform(0.3, 0.8),
-                "first_touch_variability": np.random.uniform(0.5, 1.2),
-                "hesitation_ratio": np.random.uniform(1.5, 4.0),
-                "misclick_trend_slope": np.random.uniform(0.2, 0.8),
-                "motor_precision": np.random.uniform(30, 65),
-                "phonological_latency": np.random.uniform(4000, 8000),
-                "response_consistency": np.random.uniform(1200, 3000),
-                "session_duration_ratio": np.random.uniform(1.4, 2.5),
-                "touch_cluster_count": np.random.uniform(4, 10),
-                "visual_processing_speed": np.random.uniform(10, 40),
-                "voice_hesitation_ms": np.random.uniform(1500, 4000),
-                "word_error_rate": np.random.uniform(0.3, 0.8)
-            }
-            
-        vector = [feat[k] for k in FEATURE_KEYS]
-        X.append(vector)
-        y.append(risk)
-        
-    return np.array(X), np.array(y)
+def schema_features():
+    return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))["features"]
+
+
+def u(rng, low, high):
+    return float(rng.uniform(low, high))
+
+
+def sample_row(rng, label):
+    """Synthetic values use exactly the units emitted by C1's live processor."""
+    if label == 0:
+        acc, lat, hes, mis, replay, fat, load = u(rng,.75,.98),u(rng,900,2600),u(rng,0,.35),u(rng,0,.12),u(rng,0,.18),u(rng,0,.20),u(rng,0,.35)
+        visual, phono, motor, attention = u(rng,65,98),u(rng,60,98),u(rng,70,100),u(rng,70,100)
+    elif label == 1:
+        acc, lat, hes, mis, replay, fat, load = u(rng,.38,.78),u(rng,2300,5200),u(rng,.15,.80),u(rng,.10,.60),u(rng,0,.35),u(rng,.08,.55),u(rng,.28,.78)
+        visual, phono, motor, attention = u(rng,15,62),u(rng,55,95),u(rng,30,82),u(rng,35,85)
+    elif label == 2:
+        acc, lat, hes, mis, replay, fat, load = u(rng,.35,.75),u(rng,2500,5800),u(rng,.12,.78),u(rng,.03,.35),u(rng,.12,.85),u(rng,.08,.58),u(rng,.30,.80)
+        visual, phono, motor, attention = u(rng,50,94),u(rng,12,60),u(rng,50,94),u(rng,35,85)
+    else:
+        acc, lat, hes, mis, replay, fat, load = u(rng,.10,.55),u(rng,4500,8500),u(rng,.60,2.20),u(rng,.25,1.00),u(rng,.25,1.00),u(rng,.35,1.00),u(rng,.65,1.00)
+        visual, phono, motor, attention = u(rng,2,45),u(rng,2,45),u(rng,0,65),u(rng,5,60)
+    return {
+        "accuracy":acc, "mean_latency_ms":lat, "median_latency_ms":lat*u(rng,.80,1.04),
+        "latency_std_ms":lat*u(rng,.08,.32), "mean_first_touch_latency_ms":lat*u(rng,.58,.92),
+        "hesitation_rate":hes, "misclick_rate":mis, "replay_rate":replay,
+        "completion_rate":u(rng,max(.30,acc),1.0),
+        "latency_drift":u(rng,-.15,.12) if label == 0 else u(rng,-.05,.75),
+        "error_drift":u(rng,-.15,.10) if label == 0 else u(rng,-.05,.70),
+        "hesitation_drift":u(rng,-.15,.12) if label == 0 else u(rng,-.05,.70),
+        "accuracy_slope":u(rng,-.05,.22) if label == 0 else u(rng,-.55,.08),
+        "visual_processing_index":visual, "phonological_task_index":phono,
+        "motor_interaction_index":motor, "attention_stability_index":attention,
+        "fatigue_score":fat, "cognitive_load_score":load,
+    }
+
+
+def generate_synthetic_data(samples_per_class=750):
+    features, rng = schema_features(), np.random.default_rng(RANDOM_SEED)
+    rows, labels = [], []
+    for label in range(len(CLASS_NAMES)):
+        for _ in range(samples_per_class):
+            row = sample_row(rng, label)
+            rows.append([row[name] for name in features]); labels.append(label)
+    return np.asarray(rows, dtype=float), np.asarray(labels, dtype=int), features
 
 
 def train():
-    print("Generating synthetic clinical telemetry data...")
-    X, y = generate_synthetic_data(2000)
-    
-    print(f"Generated {len(X)} samples. Splitting dataset...")
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    
-    print("Training RandomForestClassifier...")
-    clf = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
-    clf.fit(X_train, y_train)
-    
-    print("Evaluating model...")
-    y_pred = clf.predict(X_test)
-    print("Accuracy:", accuracy_score(y_test, y_pred))
-    print(classification_report(y_test, y_pred, target_names=["Low", "Moderate", "High"]))
-    
-    print(f"Saving model to {MODEL_PATH}...")
-    joblib.dump(clf, MODEL_PATH)
-    print("Done! The Sipsara backend will now use this model for inference.")
+    X, y, features = generate_synthetic_data()
+    x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=.20, random_state=RANDOM_SEED, stratify=y)
+    model = RandomForestClassifier(n_estimators=300, max_depth=10, min_samples_leaf=2, random_state=RANDOM_SEED, class_weight="balanced_subsample", n_jobs=-1)
+    model.fit(x_train, y_train)
+    predicted = model.predict(x_test)
+    metrics = {
+        "model":"c1_random_forest", "model_version":"2.0.0", "training_data":"synthetic_only",
+        "random_seed":RANDOM_SEED, "feature_schema":"c1-features-v1", "feature_count":len(features),
+        "features":features, "samples":int(len(X)), "test_samples":int(len(x_test)),
+        "accuracy":round(float(accuracy_score(y_test,predicted)),4),
+        "classification_report":classification_report(y_test,predicted,target_names=CLASS_NAMES,output_dict=True,zero_division=0),
+    }
+    model.sipsara_feature_schema = "c1-features-v1"
+    model.sipsara_feature_names = features
+    model.sipsara_training_data = "synthetic_only"
+    MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(model, MODEL_PATH)
+    METRICS_PATH.write_text(json.dumps(metrics,indent=2),encoding="utf-8")
+    print(json.dumps({key:metrics[key] for key in ("model_version","feature_count","samples","accuracy")},indent=2))
+
 
 if __name__ == "__main__":
     train()

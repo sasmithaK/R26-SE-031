@@ -20,24 +20,19 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 from sklearn.pipeline import Pipeline
 
-FEATURE_COLUMNS = [
-    "visual_processing_speed",
-    "motor_precision",
-    "hesitation_ratio",
-    "accuracy_slope",
-    "phonological_latency",
-    "fatigue_drift",
-    "response_consistency",
-    "first_touch_variability",
-    "abandonment_rate",
-    "audio_dependency_score",
-    "misclick_trend_slope",
-    "session_duration_ratio",
-    "touch_cluster_count",
-    "word_error_rate",
-    "voice_hesitation_ms",
-    "assessment_risk_score"
-]
+import json as _json
+
+_SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "c1_features.json")
+with open(_SCHEMA_PATH, "r", encoding="utf-8") as _schema_file:
+    # Same 19-feature contract as the live C1 model (config/c1_features.json).
+    FEATURE_COLUMNS = _json.load(_schema_file)["features"]
+
+PATTERN_LABELS = (
+    "TYPICAL",
+    "VISUAL_ORTHOGRAPHIC_PATTERN",
+    "PHONOLOGICAL_PATTERN",
+    "COMBINED_PATTERN",
+)
 
 def build_balanced_pipeline(base_model):
     """Wrap any sklearn model with standard scaling. (Class balancing is handled via algorithm parameters)."""
@@ -83,10 +78,18 @@ def train_and_compare(features_list: List[Dict[str, float]], labels_list: List[s
         return {"error": "Need at least 15 labelled samples to perform 5-fold CV."}
 
     # Prepare data arrays
-    X = np.array([[f.get(col, 0.0) for col in FEATURE_COLUMNS] for f in features_list])
+    # Rows with a missing feature are dropped rather than filled with 0.
+    kept = [
+        (f, label) for f, label in zip(features_list, labels_list)
+        if all(isinstance(f.get(col), (int, float)) for col in FEATURE_COLUMNS)
+    ]
+    if len(kept) < 15:
+        return {"error": "Fewer than 15 complete labelled feature vectors."}
+    features_list = [f for f, _ in kept]
+    labels_list = [label for _, label in kept]
+    X = np.array([[float(f[col]) for col in FEATURE_COLUMNS] for f in features_list])
     
     le = LabelEncoder()
-    # Assuming labels are "Low", "Moderate", "High"
     y = le.fit_transform(labels_list) 
     
     models = {

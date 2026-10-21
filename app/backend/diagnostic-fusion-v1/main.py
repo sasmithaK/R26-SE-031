@@ -3,13 +3,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import os
+import math
+import json
+from bson import ObjectId
 
-from schemas import FusionRequest, FusionResponse
+from schemas import FusionRequest, FusionResponse, SessionFusionRequest, EvidenceChatRequest
 from services.xai_engine import get_xai_engine, XAIEngine
-from services.llm_explainer import generate_diagnostic_summary
+from services.llm_explainer import generate_diagnostic_summary, answer_evidence_question
 from database import connect_to_mongo, close_mongo_connection, get_db
+from auth import get_current_user, require_student_access
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,12 +23,12 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Initializing XAI Engine and MongoDB...")
-    try:
-        await connect_to_mongo()
-        get_xai_engine()
-        logger.info("XAI Engine & DB initialized successfully.")
-    except Exception as e:
-        logger.error(f"Failed to initialize services: {e}")
+    await connect_to_mongo()
+    await get_db().command("ping")
+    engine = get_xai_engine()
+    if engine is None or engine.model is None or engine.explainer is None:
+        raise RuntimeError("C3 model artifacts did not load")
+    logger.info("C3 XGBoost, SHAP, and MongoDB initialized successfully.")
     yield
     # Shutdown
     await close_mongo_connection()
@@ -47,17 +51,517 @@ app.add_middleware(
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "diagnostic-fusion-v1"}
+    engine = get_xai_engine()
+    healthy = bool(engine and engine.model is not None and engine.explainer is not None)
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content={"status": "ok" if healthy else "degraded", "service": "diagnostic-fusion-v1",
+                 "model": "ready" if healthy else "unavailable"},
+    )
+
+
+@app.get("/ready")
+async def readiness_check():
+    engine = get_xai_engine()
+    model_ready = bool(engine and engine.model is not None and engine.explainer is not None)
+    database_ready = False
+    error_type = None
+    try:
+        await get_db().command("ping")
+        database_ready = True
+    except Exception as exc:
+        error_type = type(exc).__name__
+    auth_ready = bool(os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET"))
+    ready = model_ready and database_ready and auth_ready
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={"ready": ready, "service": "diagnostic-fusion-v1",
+                 "model": "ready" if model_ready else "unavailable",
+                 "database": "ready" if database_ready else "unavailable",
+                 "authentication": "configured" if auth_ready else "missing",
+                 "error_type": error_type},
+    )
+
+
+def _number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    value = float(value)
+    return value if math.isfinite(value) else None
+
+
+def _questionnaire_yes_count(student: dict) -> int:
+    """Count unique current parent observations without double-counting basic."""
+    comprehensive = student.get("comprehensive_assessment_results") or {}
+    groups = list(comprehensive.values())
+    if not comprehensive.get("basic"):
+        groups.append(student.get("assessment_results") or [])
+    seen, total = set(), 0
+    for rows in groups:
+        if not isinstance(rows, list):
+            continue
+        for index, item in enumerate(rows):
+            if isinstance(item, dict):
+                identity = item.get("id") or item.get("question") or (id(rows), index)
+                answer = item.get("answer") is True
+            else:
+                identity, answer = (id(rows), index), item is True
+            if answer and identity not in seen:
+                seen.add(identity)
+                total += 1
+    return total
+
+
+def _completed_rounds(row: dict):
+    if row.get("valid_trials") is not None:
+        return int(row.get("valid_trials") or 0)
+    total = int(row.get("total_trials") or 0)
+    abandoned = _number((row.get("overall") or {}).get("abandonment_rate")) or 0.0
+    return max(0, total - round(abandoned * total))
+
+
+def _pooled_overall(summaries: list) -> dict:
+    """Pool session rates over completed rounds (abandoned-only sessions skipped)."""
+    pooled, rounds = {}, sum(_completed_rounds(r) for r in summaries)
+    for field in ("accuracy", "retry_rate", "correction_rate"):
+        total = weight = 0.0
+        for row in summaries:
+            value, n = _number((row.get("overall") or {}).get(field)), _completed_rounds(row)
+            if value is not None and n > 0:
+                total += value * n
+                weight += n
+        pooled[field] = (total / weight) if weight else None
+    latencies = sorted(v for v in (_number((r.get("overall") or {}).get("median_response_latency_ms"))
+                                   for r in summaries if _completed_rounds(r) > 0) if v is not None)
+    pooled["median_response_latency_ms"] = latencies[len(latencies) // 2] if latencies else None
+    pooled["completed_rounds"] = rounds
+    return pooled
+
+
+def _build_observed_summary(summaries, speech: dict, student: dict, recordings: int = 0):
+    """Descriptive summary over the C3 window. ``speech`` is the latest
+    recording that was clear enough to measure (or {} when there is none)."""
+    if isinstance(summaries, dict):  # backward compatible single-session call
+        summaries = [summaries] if summaries else []
+    overall = _pooled_overall(summaries)
+    accuracy = overall.get("accuracy")
+    retry_rate = overall.get("retry_rate")
+    rounds = overall.get("completed_rounds") or 0
+    word_accuracy = _number(speech.get("word_accuracy"))
+    grapheme_accuracy = _number(speech.get("grapheme_accuracy"))
+    speech_status = speech.get("measurement_status") or "unavailable"
+    questionnaire_count = _questionnaire_yes_count(student)
+
+    statements = []
+    if accuracy is not None:
+        statements.append(f"Across {rounds} completed activity rounds in the last {C3_WINDOW_DAYS} days, "
+                          f"{round(accuracy * 100)}% were correct on the first try.")
+    if retry_rate is not None:
+        statements.append(f"Extra attempts were used in {round(retry_rate * 100)}% of completed rounds.")
+    if word_accuracy is not None and speech_status in USABLE_SPEECH_STATUSES:
+        statements.append(f"Recorded-word agreement was {round(word_accuracy * 100)}% in the latest clear reading recording.")
+    elif recordings:
+        statements.append("Reading recordings were made, but none was clear enough to measure yet.")
+    if questionnaire_count:
+        statements.append(f"In the parent questionnaire, {questionnaire_count} items were marked as observed at home.")
+    if not statements:
+        statements.append("More completed activity observations are needed for a combined learning summary.")
+
+    priorities = []
+    if retry_rate is not None and retry_rate >= float(os.getenv("C3_SUMMARY_RETRY_RATE", "0.35")):
+        priorities.append("Use short practice sets and observe whether support reduces repeated attempts.")
+    if (word_accuracy is not None and word_accuracy < float(os.getenv("C3_SUMMARY_WORD_ACCURACY", "0.70"))
+            and speech_status in USABLE_SPEECH_STATUSES):
+        priorities.append("Repeat familiar oral-reading items and compare several clear recordings over time.")
+    if questionnaire_count:
+        priorities.append("Compare parent observations with patterns repeated across several activities.")
+    if not priorities:
+        priorities.append("Continue regular practice and review the trend after more sessions.")
+
+    evidence = {
+        "c1": {
+            "first_attempt_accuracy": accuracy,
+            "retry_rate": retry_rate,
+            "correction_rate": overall.get("correction_rate"),
+            "median_response_latency_ms": overall.get("median_response_latency_ms"),
+            "completed_rounds": rounds,
+        },
+        "c2": {
+            "measurement_status": speech_status,
+            "word_accuracy": word_accuracy,
+            "grapheme_accuracy": grapheme_accuracy,
+            "recording_quality": speech.get("recording_quality"),
+        },
+        "parent_observation_count": questionnaire_count,
+    }
+    return " ".join(statements), " ".join(priorities), evidence
+
+
+_LETTER_BANKS = {
+    "skill_sinhala_vowels": ("ස්වර අකුරු", ["අ", "ආ", "ඇ", "ඈ", "ඉ", "ඊ", "උ", "ඌ", "එ", "ඒ", "ඔ", "ඕ"]),
+    "skill_sinhala_consonants": ("ව්‍යංජන අකුරු", ["ක", "ග", "ච", "ජ", "ට", "ඩ", "ත", "ද", "න", "ප", "බ", "ම", "ය", "ර", "ල", "ව", "ස", "හ"]),
+}
+
+
+def _summarize_letter_practice(rows: list) -> dict:
+    """Descriptive C3 context for letter practice; deliberately not classifier input."""
+    skills = []
+    for skill_id, (title, letters) in _LETTER_BANKS.items():
+        skill_rows = [row for row in rows if row.get("skill_id") == skill_id]
+        clear_rows = [
+            row for row in skill_rows
+            if row.get("recording_quality") == "valid"
+            and row.get("measurement_status") not in {"retry_required", "persistence_failed"}
+            and str(row.get("recognized_text") or "").strip()
+        ]
+        exact_matches = sum(row.get("exact_match") is True for row in clear_rows)
+        practiced = {row.get("item_id") for row in skill_rows if row.get("item_id")}
+        skills.append({
+            "skill_id": skill_id,
+            "title": title,
+            "letters_total": len(letters),
+            "letters_practiced": len(practiced),
+            "attempts": len(skill_rows),
+            "clear_attempts": len(clear_rows),
+            "automatic_text_matches": exact_matches,
+            "automatic_text_match_rate": exact_matches / len(clear_rows) if clear_rows else None,
+        })
+    total_attempts = sum(skill["attempts"] for skill in skills)
+    total_clear = sum(skill["clear_attempts"] for skill in skills)
+    total_matches = sum(skill["automatic_text_matches"] for skill in skills)
+    return {
+        "attempts": total_attempts,
+        "clear_attempts": total_clear,
+        "automatic_text_matches": total_matches,
+        "automatic_text_match_rate": total_matches / total_clear if total_clear else None,
+        "skills": skills,
+        "interpretation_note": "Automatic transcript matches are not a pronunciation score and are excluded from the combined model estimate.",
+    }
+
+
+def _letter_practice_sentence(summary: dict) -> str:
+    """Plain-language letter coverage for C3 narrative, never a model finding."""
+    if not summary.get("attempts"):
+        return ""
+    vowels, consonants = summary["skills"]
+    return (
+        f"Letter practice included {vowels['letters_practiced']} of {vowels['letters_total']} vowel letters and "
+        f"{consonants['letters_practiced']} of {consonants['letters_total']} consonant letters. "
+        "Automatic transcript matches are not pronunciation scores."
+    )
+
+
+def _chat_context_from_records(activity_rows: list, speech_rows: list, student: dict) -> dict:
+    """Whitelist child-scoped observations for C3 chat; never pass raw audio or IDs."""
+    activity_context = []
+    for row in activity_rows[:20]:
+        overall = row.get("overall") or {}
+        breakdown = row.get("activity_breakdown_by_skill") or row.get("activity_breakdown") or {}
+        activity_context.append({
+            "overall": {key: overall[key] for key in ("accuracy", "retry_rate", "correction_rate", "completed_rounds") if key in overall},
+            "activities": [
+                {key: item[key] for key in ("skill_id", "activity_id", "accuracy", "attempts", "completed_rounds") if key in item}
+                for item in list(breakdown.values())[:30] if isinstance(item, dict)
+            ],
+            "recorded_at": str(row.get("updated_at") or row.get("created_at") or ""),
+        })
+    reading, letters = [], []
+    for row in speech_rows[:50]:
+        safe = {key: row.get(key) for key in (
+            "expected_text", "recognized_text", "word_accuracy", "grapheme_accuracy",
+            "recording_quality", "measurement_status", "task_kind", "skill_id", "item_id",
+            "created_at",
+        ) if key in row}
+        if row.get("task_kind") == "letter_pronunciation":
+            letters.append(safe)
+        else:
+            reading.append(safe)
+    observations = []
+    assessment = student.get("comprehensive_assessment_results") or {}
+    assessment_groups = dict(assessment)
+    if not assessment_groups.get("basic"):
+        assessment_groups["legacy"] = student.get("assessment_results") or []
+    for section, rows in assessment_groups.items():
+        if not isinstance(rows, list):
+            continue
+        for item in rows:
+            if isinstance(item, dict) and "answer" in item:
+                observations.append({
+                    "section": str(section),
+                    "question": item.get("question_en") or item.get("question") or item.get("id"),
+                    "answer": item.get("answer"),
+                })
+    return {
+        "activity_observations_c1": activity_context,
+        "reading_observations_c2": reading,
+        "letter_practice_observations_c2": letters,
+        "parent_reported_observations": observations,
+    }
+
+
+# --- Learner-window fusion ---------------------------------------------------
+# C3 fuses a learner's recent evidence over a time window instead of one
+# session: touch activities and reading/letter practice are recorded separately
+# in different sessions, so a per-session join almost never has both. Missing
+# measurements are never replaced with default values; the model is skipped
+# and the missing evidence is reported instead.
+C3_WINDOW_DAYS = int(os.getenv("C3_WINDOW_DAYS", "14"))
+C3_MIN_USABLE_RECORDINGS = int(os.getenv("C3_MIN_USABLE_RECORDINGS", "2"))
+C3_MIN_MOVEMENT_SESSIONS = int(os.getenv("C3_MIN_MOVEMENT_SESSIONS", "2"))
+C3_MODEL_VERSION = "C3-v2.0"
+# Inputs, aggregation and the evidence rule live in services/c3_features.py and
+# are shared with scripts/train_c3_model.py (training uses the same code).
+from services.c3_features import (FEATURE_VERSION as C3_FEATURE_VERSION, FEATURE_LABELS,
+                                  USABLE_SPEECH_STATUSES, age_years as _c3_age_years,
+                                  build_c3_inputs, evidence_gaps as _c3_evidence_gaps,
+                                  outside_training_range as _c3_outside_range,
+                                  median_feature as _median_feature,
+                                  required_gaps as _c3_required_gaps,
+                                  usable_reading_rows as _usable_reading_rows)
+
+
+def _c3_ranges():
+    """Training ranges for the out-of-range guard; None if unusable.
+
+    Fail closed: without valid ranges for this feature version the guard
+    cannot work, so no estimate is shown (status ``model_unavailable``).
+    """
+    path = os.path.join(os.path.dirname(__file__), "models", "c3_feature_ranges.json")
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    if data.get("feature_version") != C3_FEATURE_VERSION or not data.get("ranges"):
+        return None
+    return data["ranges"]
+
+
+def _row_time(row: dict):
+    for key in ("completed_at", "created_at", "timestamp", "updated_at"):
+        value = row.get(key)
+        if isinstance(value, datetime):
+            return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        if isinstance(value, str) and value:
+            try:
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+    oid = row.get("_id")
+    return oid.generation_time if isinstance(oid, ObjectId) else None
+
+
+async def _recent(db, collection: str, student_id: str, since: datetime, limit: int = 300):
+    rows = await db[collection].find({"student_id": student_id}).sort("_id", -1).to_list(length=limit)
+    return [row for row in rows if (_row_time(row) or since) >= since]
+
+
+def _student_age_years(student: dict):
+    months = _number(student.get("age_months"))
+    if months is None and student.get("birth_year") and student.get("birth_month"):
+        try:
+            today = datetime.now(timezone.utc)
+            months = (today.year - int(student["birth_year"])) * 12 + (today.month - int(student["birth_month"]))
+        except (TypeError, ValueError):
+            months = None
+    if months is not None:
+        return months // 12
+    return _number(student.get("age"))
+
+
+def _student_gender_code(student: dict):
+    code = student.get("gender_code")
+    if code in (0, 1):
+        return code
+    return {"female": 0, "girl": 0, "male": 1, "boy": 1}.get(str(student.get("gender", "")).strip().lower())
+
+
+@app.post("/diagnose/session")
+async def diagnose_saved_session(
+    request: SessionFusionRequest,
+    engine: XAIEngine = Depends(get_xai_engine),
+    current_user: dict = Depends(get_current_user),
+):
+    """Idempotently fuse the learner's recent C1 + C2 evidence (window-based)."""
+    await require_student_access(request.student_id, current_user)
+    if engine is None or engine.model is None or engine.explainer is None:
+        raise HTTPException(status_code=503, detail="C3 pattern model is unavailable")
+    db = get_db()
+    try:
+        student = await db.students.find_one({"_id": ObjectId(request.student_id)}) or {}
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid student_id")
+
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=C3_WINDOW_DAYS)
+    summaries = await _recent(db, "session_summaries", request.student_id, since)
+    all_speech_rows = await _recent(db, "speech_features", request.student_id, since)
+    letter_rows = [row for row in all_speech_rows if row.get("task_kind") == "letter_pronunciation"]
+    letter_practice = _summarize_letter_practice(letter_rows)
+    speech_rows = all_speech_rows
+    # Letter-pronunciation attempts are a distinct task family; do not interpret
+    # isolated grapheme practice as oral-reading fluency for the current C3 model.
+    speech_rows = [row for row in speech_rows if row.get("task_kind") != "letter_pronunciation"]
+    motion_rows = await _recent(db, "kinematic_features", request.student_id, since)
+    # Clear oral-reading recordings that were acoustically measured.
+    usable_speech = _usable_reading_rows(speech_rows)
+
+    # Narrative uses the most recent observed records (descriptive only).
+    narrative, recommendation, evidence = _build_observed_summary(
+        summaries, usable_speech[0] if usable_speech else {}, student, recordings=len(speech_rows),
+    )
+    evidence.setdefault("c2", {})["letter_practice"] = letter_practice
+    if letter_practice["attempts"]:
+        narrative = f"{narrative} {_letter_practice_sentence(letter_practice)}".strip()
+
+    # Activity-behaviour inputs come from the learner-level C1 estimate, used
+    # only when C1 itself had enough evidence.
+    c1_doc = await db.c1_learner_estimates.find_one({"student_id": request.student_id}) or {}
+    # Same rule as training: C1 inputs are used when C1's own evidence rule passed.
+    c1_features = (c1_doc.get("features") or None) if c1_doc.get("status") not in {None, "insufficient_evidence"} else None
+    age = _c3_age_years(student, now)
+    values, feature_counts = build_c3_inputs(usable_speech, motion_rows, c1_features, age)
+    missing = _c3_evidence_gaps(len(usable_speech), len(motion_rows), age,
+                                C3_MIN_USABLE_RECORDINGS, C3_MIN_MOVEMENT_SESSIONS)
+    if not missing:
+        missing = _c3_required_gaps(values)
+    model_inputs = {k: v for k, v in values.items() if v is not None}
+    not_measured = [k for k, v in values.items() if v is None]
+    ranges = _c3_ranges()
+    outside = _c3_outside_range(values, ranges) if (not missing and ranges) else []
+    marginalize = {}
+
+    measurement_notes = []
+    if letter_practice["attempts"]:
+        measurement_notes.append(letter_practice["interpretation_note"])
+    if any((row.get("orthographic_confusion_coverage") == 0) for row in motion_rows):
+        measurement_notes.append("Letter-confusion index covers only the letter pairs in the confusion map.")
+    if not_measured and not missing:
+        measurement_notes.append("Not measured yet (the model handles these as missing, nothing is filled in): "
+                                 + ", ".join(FEATURE_LABELS.get(k, k) for k in not_measured) + ".")
+    if outside:
+        measurement_notes.append("Some measurements are outside the range the model was trained on, so no estimate is shown.")
+
+    modalities = []
+    if summaries or motion_rows:
+        modalities.append("learning activities & touch")
+    if speech_rows:
+        modalities.append("oral reading speech")
+    if evidence["parent_observation_count"]:
+        modalities.append("parent observations")
+
+    learner_profile = {
+        "class_probabilities": {}, "primary_pattern": "Unavailable",
+        "confidence": None, "modalities_used": modalities,
+        "final_predicted_risk": None,
+    }
+    shap_explanations = {"top_contributing_features": []}
+    model_applied = False
+    if not missing and ranges is None:
+        pipeline_status = "model_unavailable"
+        measurement_notes.append("The model's training ranges are missing or out of date, so no estimate is shown.")
+    elif not missing and not outside:
+        result = engine.analyze_patient(model_inputs, marginalize=marginalize)
+        learner_profile = {**result["learner_profile"], "modalities_used": modalities}
+        shap_explanations = result["shap_explanations"]
+        model_applied = True
+        pipeline_status = "model_and_summary_ready"
+    elif outside:
+        pipeline_status = "outside_training_range"
+    else:
+        pipeline_status = "insufficient_evidence" if (summaries or speech_rows or motion_rows) else "no_evidence"
+
+    origins = {row.get("data_origin", "observed") for row in summaries + speech_rows + motion_rows + letter_rows}
+    data_origin = origins.pop() if len(origins) == 1 else ("mixed" if origins else request.data_origin)
+    document = {
+        "student_id": request.student_id, "session_id": request.session_id,
+        "data_origin": data_origin, "dataset_id": f"window:{request.student_id}:{C3_WINDOW_DAYS}d",
+        "validation_status": "synthetic_trained_model",
+        "model_provenance": "multimodal_pattern_model_trained_on_synthetic_data",
+        "pipeline_status": pipeline_status, "model_applied": model_applied,
+        "missing_inputs": missing, "not_measured_inputs": not_measured, "outside_range": outside,
+        "learner_profile": learner_profile,
+        "shap_explanations": shap_explanations, "llm_summary": narrative,
+        "llm_recommendations": recommendation, "evidence_summary": evidence,
+        "evidence_window": {
+            "days": C3_WINDOW_DAYS, "start": since.isoformat(), "end": now.isoformat(),
+            "activity_sessions": len(summaries), "movement_sessions": len(motion_rows),
+            "recordings": len(speech_rows), "usable_recordings": len(usable_speech),
+            "reading_recordings": len(speech_rows), "letter_practice": letter_practice,
+            "min_usable_recordings": C3_MIN_USABLE_RECORDINGS,
+            "min_movement_sessions": C3_MIN_MOVEMENT_SESSIONS,
+            "feature_counts": feature_counts,
+        },
+        "model_inputs": model_inputs if model_applied else {},
+        "c1_evidence_used": c1_features is not None,
+        "measurement_notes": measurement_notes,
+        "model_version": C3_MODEL_VERSION, "feature_version": C3_FEATURE_VERSION,
+        "updated_at": now,
+    }
+    # One current profile per learner window (latest wins); history is kept
+    # in the audit log.
+    await db.learner_profiles.update_one(
+        {"student_id": request.student_id, "feature_version": C3_FEATURE_VERSION},
+        {"$set": document, "$setOnInsert": {"created_at": now}}, upsert=True,
+    )
+    await db.model_audit_log.insert_one({
+        "student_id": request.student_id, "session_id": request.session_id,
+        "model_name": "XGBoost", "model_version": C3_MODEL_VERSION,
+        "timestamp": now, "status": pipeline_status, "missing_features": missing,
+        "model_applied": model_applied, "validation_status": document["validation_status"],
+        "input_features": model_inputs if model_applied else {},
+        "output_probabilities": learner_profile.get("class_probabilities"),
+    })
+    return {"student_id": request.student_id, "session_id": request.session_id,
+            "pipeline_status": pipeline_status, "model_applied": model_applied,
+            "missing_inputs": missing, "outside_range": outside, "summary": narrative,
+            "recommendations": recommendation}
+
+
+@app.post("/{student_id}/evidence-chat")
+@app.post("/chat/students/{student_id}")
+async def evidence_chat(
+    student_id: str,
+    request: EvidenceChatRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Therapist-only C3 chat grounded in this learner's persisted observations."""
+    if current_user.get("role") not in {"therapist", "specialist"}:
+        raise HTTPException(status_code=403, detail="Evidence chat is available to connected therapists only")
+    await require_student_access(student_id, current_user)
+    db = get_db()
+    try:
+        student = await db.students.find_one({"_id": ObjectId(student_id)}) or {}
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid student_id")
+    since = datetime.now(timezone.utc) - timedelta(days=C3_WINDOW_DAYS)
+    activity_rows = await _recent(db, "session_summaries", student_id, since)
+    speech_rows = await _recent(db, "speech_features", student_id, since)
+    evidence = _chat_context_from_records(activity_rows, speech_rows, student)
+    # Bounded context: the last 12 turns only.
+    messages = [message.model_dump() for message in request.messages][-12:]
+    try:
+        answer = await answer_evidence_question(evidence, messages)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    return {
+        "answer": answer,
+        "evidence_types": [key for key, rows in evidence.items() if rows],
+        "letter_practice_is_pronunciation_score": False,
+    }
 
 @app.post("/diagnose")
 async def diagnose_patient(
     request: FusionRequest,
-    engine: XAIEngine = Depends(get_xai_engine)
+    engine: XAIEngine = Depends(get_xai_engine),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Ingests multimodal vectors and returns an experimental synthetic-trained learning-pattern classification
     along with SHAP explanations.
     """
+    await require_student_access(request.student_id, current_user)
     if engine is None or engine.model is None:
         return JSONResponse(
             status_code=503, 
@@ -70,10 +574,27 @@ async def diagnose_patient(
         flat_features.update(request.c1_audio_vector.dict())
         flat_features.update(request.c2_kinematic_vector.dict())
         # Convert age from months to years to match training data scale (range 5-7 years)
-        flat_features["age"] = request.student_age_months // 12
-        flat_features["gender"] = request.gender
-        flat_features["time_of_day_hour"] = request.time_of_day_hour
-        
+        # v2 model: age in decimal years; gender/time of day are no longer
+        # inputs; C1 activity inputs are not part of this legacy request (NaN).
+        flat_features["age_years"] = round(request.student_age_months / 12, 2)
+        syllables = request.c1_audio_vector.expected_syllables
+        flat_features["beat_mismatch_per_syllable"] = (
+            abs(request.c1_audio_vector.peak_count_delta) / syllables if syllables else None
+        )
+        # Same guards as the learner-window endpoint.
+        gaps = _c3_required_gaps(flat_features)
+        if gaps:
+            raise ValueError("Required inputs not measured: " + "; ".join(gaps))
+        ranges = _c3_ranges()
+        if ranges is None:
+            return JSONResponse(status_code=503, content={"status": "model_unavailable",
+                                                          "student_id": request.student_id})
+        outside = _c3_outside_range(flat_features, ranges)
+        if outside:
+            return JSONResponse(status_code=200, content={
+                "status": "outside_training_range", "student_id": request.student_id,
+                "outside_range": outside})
+
         # Analyze
         analysis_result = engine.analyze_patient(flat_features)
         
@@ -104,6 +625,11 @@ async def diagnose_patient(
         diagnosis_doc = response.dict()
         diagnosis_doc["created_at"] = datetime.utcnow()
         diagnosis_doc["session_id"] = request.session_id
+        # Labelled so dashboards never mistake a one-off request for the
+        # learner's window profile.
+        diagnosis_doc["feature_version"] = "c3-legacy-request"
+        diagnosis_doc["model_version"] = C3_MODEL_VERSION
+        diagnosis_doc["model_applied"] = True
         diagnosis_doc["item_id"] = request.item_id
         diagnosis_doc["feature_source"] = {
             "kinematics_source": "C1 legacy telemetry (request.c2_kinematic_vector)",
@@ -116,7 +642,7 @@ async def diagnose_patient(
             "student_id": request.student_id,
             "timestamp": datetime.utcnow(),
             "model_name": "XGBoost",
-            "model_version": "C3-v1.0",
+            "model_version": C3_MODEL_VERSION,
             "validation_status": "synthetic_only",
             "input_features": flat_features,
             "output_probabilities": analysis_result["learner_profile"]["class_probabilities"],

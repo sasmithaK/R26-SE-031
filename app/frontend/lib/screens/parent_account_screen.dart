@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../widgets/app_loading_indicator.dart';
 import '../utils/avatar_utils.dart';
-import '../../theme/app_theme.dart';
+import '../theme/app_theme.dart';
 import 'welcome_screen.dart';
 import 'assessment_prompt_screen.dart';
 import 'add_student_screen.dart';
 import 'therapist/therapist_dashboard_screen.dart';
-import '../../services/localization_service.dart';
+import '../services/localization_service.dart';
 import 'dashboard_screen.dart';
 import 'comprehensive_assessment_screen.dart';
 import 'comprehensive_results_screen.dart';

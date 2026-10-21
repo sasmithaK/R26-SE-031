@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     libgomp1 \
     ffmpeg \
+    psmisc \
+    lsof \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the unified requirements file
@@ -17,6 +19,13 @@ ENV PIP_ROOT_USER_ACTION=ignore
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements-azure.txt
+
+# Bundle the public Sinhala Whisper checkpoint into the image. App Service
+# instances are disposable, so first-request downloads are unreliable.
+ARG WHISPER_MODEL_REPO=AqeelShafy7/Whisper-Sinhala_Audio_to_Text
+ENV WHISPER_MODEL_PATH=/opt/models/whisper-sinhala \
+    PRELOAD_STT=true
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='${WHISPER_MODEL_REPO}', local_dir='${WHISPER_MODEL_PATH}')"
 
 # Copy the entire backend application, excluding tests/venv if any via dockerignore ideally
 COPY . .

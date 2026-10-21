@@ -3,11 +3,14 @@ import json
 import certifi
 from pymongo import MongoClient
 
-# Setup connection
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb+srv://kavindugunasena_db_user:vsqocmP1Fcu8wgYm@cluster0.ypxuqen.mongodb.net/")
+# Never commit database credentials. Set MONGODB_URL in the deployment
+# environment or a local, ignored .env file before running this utility.
+MONGODB_URL = os.getenv("MONGODB_URL")
 DB_NAME = os.getenv("MONGODB_DB_NAME", "r26_se_031")
 
 def seed():
+    if not MONGODB_URL:
+        raise RuntimeError("MONGODB_URL must be set before seeding activities")
     client = MongoClient(MONGODB_URL, tlsCAFile=certifi.where())
     db = client[DB_NAME]
     curriculum_collection = db["curriculum"]

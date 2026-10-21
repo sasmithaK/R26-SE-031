@@ -27,7 +27,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
 
   // Track all answers (null = unanswered, true = yes, false = no)
   late List<bool?> _answers;
-  
+
   // All 14 questions
   final List<AssessmentQuestion> _questions = AssessmentQuestion.allQuestions;
 
@@ -60,7 +60,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     setState(() {
       _answers[index] = isYes;
     });
-    
+
     // Automatically swipe to next question after a tiny delay for satisfaction
     if (index < _questions.length - 1) {
       Future.delayed(const Duration(milliseconds: 400), () {
@@ -78,15 +78,18 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     // Ensure all questions are answered!
     if (_answers.contains(null)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please answer all 14 questions!'), backgroundColor: AppColors.warmAmber),
+        const SnackBar(
+          content: Text('Please answer all 14 questions!'),
+          backgroundColor: AppColors.warmAmber,
+        ),
       );
-      
+
       // Find first unanswered question
       final firstUnanswered = _answers.indexOf(null);
       if (firstUnanswered != -1 && _pageController.hasClients) {
         _pageController.animateToPage(
-          firstUnanswered, 
-          duration: const Duration(milliseconds: 600), 
+          firstUnanswered,
+          duration: const Duration(milliseconds: 600),
           curve: Curves.easeOut,
         );
       }
@@ -97,16 +100,20 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       _isLoading = true;
     });
 
-    final payload = List.generate(_questions.length, (i) => {
-      'question_id': _questions[i].id,
-      'answer': _answers[i]!,
-    });
+    final payload = List.generate(
+      _questions.length,
+      (i) => {
+        'question_id': _questions[i].id,
+        'question_text': _questions[i].questionText,
+        'answer': _answers[i]!,
+      },
+    );
 
     final error = await StudentService().submitAssessment(
       widget.studentId,
       payload,
     );
-    
+
     if (!mounted) return;
 
     setState(() {
@@ -119,7 +126,10 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('screening completed successfully!'), backgroundColor: AppColors.gentleGreen),
+        const SnackBar(
+          content: Text('screening completed successfully!'),
+          backgroundColor: AppColors.gentleGreen,
+        ),
       );
       _navigateToResults();
     }
@@ -136,14 +146,17 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.cream,
-      body: _isLoading 
+      body: _isLoading
           ? const Center(child: AppLoadingIndicator())
           : SafeArea(
               child: Column(
                 children: [
                   // Top Bar: Back button + Progress Bar + Counter
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     child: Row(
                       children: [
                         _buildBackButton(context),
@@ -174,13 +187,17 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                                     duration: const Duration(milliseconds: 400),
                                     height: 12,
                                     // Make sure it doesn't overflow
-                                    width: (MediaQuery.of(context).size.width - 100) * progress,
+                                    width:
+                                        (MediaQuery.of(context).size.width -
+                                            100) *
+                                        progress,
                                     decoration: BoxDecoration(
                                       gradient: AppColors.greenGradient,
                                       borderRadius: BorderRadius.circular(6),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: AppColors.gentleGreen.withValues(alpha: 0.4),
+                                          color: AppColors.gentleGreen
+                                              .withValues(alpha: 0.4),
                                           blurRadius: 8,
                                           offset: const Offset(0, 2),
                                         ),
@@ -200,7 +217,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   Expanded(
                     child: PageView.builder(
                       controller: _pageController,
-                      physics: const BouncingScrollPhysics(), // Re-enabled swiping so they can go back!
+                      physics:
+                          const BouncingScrollPhysics(), // Re-enabled swiping so they can go back!
                       onPageChanged: (index) {
                         setState(() {
                           _currentIndex = index;
@@ -220,17 +238,21 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                       duration: const Duration(milliseconds: 200),
                       opacity: _answers[_currentIndex] == null ? 0.5 : 1.0,
                       child: GradientButton(
-                        text: _currentIndex == _questions.length - 1 ? 'finish assessment' : 'next question',
-                        onPressed: _answers[_currentIndex] == null 
+                        text: _currentIndex == _questions.length - 1
+                            ? 'finish assessment'
+                            : 'next question',
+                        onPressed: _answers[_currentIndex] == null
                             ? () {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('You must answer this question to proceed!'), 
+                                    content: Text(
+                                      'You must answer this question to proceed!',
+                                    ),
                                     backgroundColor: AppColors.warmAmber,
                                     behavior: SnackBarBehavior.floating,
                                   ),
                                 );
-                              } 
+                              }
                             : () {
                                 if (_currentIndex < _questions.length - 1) {
                                   _pageController.nextPage(
@@ -260,12 +282,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           value = _pageController.page! - index;
           value = (1 - (value.abs() * 0.15)).clamp(0.85, 1.0);
         }
-        
+
         return Center(
-          child: Transform.scale(
-            scale: value,
-            child: child,
-          ),
+          child: Transform.scale(scale: value, child: child),
         );
       },
       child: Container(
@@ -296,7 +315,10 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
 
             return SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.symmetric(horizontal: isSmall ? 16 : 24, vertical: isSmall ? 16 : 24),
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmall ? 16 : 24,
+                vertical: isSmall ? 16 : 24,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -306,7 +328,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                     animation: MonsterAnimation.idle,
                     imagePath: _monsterImages[index % _monsterImages.length],
                   ),
-                  
+
                   SizedBox(height: spacing),
 
                   // Question Text

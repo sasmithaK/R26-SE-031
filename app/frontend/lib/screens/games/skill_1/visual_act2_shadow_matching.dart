@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import '../../../widgets/app_loading_indicator.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../models/curriculum_models.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../services/tts_service.dart';
-import '../../../../services/progress_service.dart';
+import '../../../models/curriculum_models.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../theme/app_theme.dart';
+import '../../../services/tts_service.dart';
+import '../../../services/progress_service.dart';
+import '../../../adaptive/controllers/adaptive_task_coordinator.dart';
+import '../../../adaptive/models/adaptive_scaffold_models.dart';
+import '../../../adaptive/utils/adaptive_option_order.dart';
 import 'logic/shadow_generator.dart';
 import 'models/shadow_round.dart';
 import 'widgets/pattern_background.dart';
@@ -24,8 +27,11 @@ class VisualAct2ShadowMatching extends StatefulWidget {
   final ActivityNode activityNode;
   final Map<String, dynamic>? studentData;
 
-  const VisualAct2ShadowMatching({Key? key, required this.activityNode, this.studentData})
-      : super(key: key);
+  const VisualAct2ShadowMatching({
+    Key? key,
+    required this.activityNode,
+    this.studentData,
+  }) : super(key: key);
 
   @override
   _VisualAct2ShadowMatchingState createState() =>
@@ -38,6 +44,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   // ── Game state ──
   int _currentRoundIndex = 0;
   late List<ShadowRound> _rounds;
+  late AdaptiveTaskCoordinator _taskCoordinator;
 
   List<String> _shuffledTrayObjects = [];
   List<String> _shuffledShadows = [];
@@ -48,9 +55,11 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
 
   bool _isDragging = false;
   String? _lastWrongObject;
+  String? _hintedShadow;
 
   // ── Audio ──
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final Random _animationRandom = Random();
 
   // ── Animation controllers ──
   late AnimationController _celebrationController;
@@ -60,9 +69,9 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
 
   // Individual float controllers for objects
   final Map<String, AnimationController> _floatControllers = {};
-  
+
   final ScrollController _trayScrollController = ScrollController();
-  
+
   // Drop feedback controllers
   final Map<String, AnimationController> _shadowGlowControllers = {};
   late AnimationController _wrongShakeController;
@@ -102,17 +111,22 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   @override
   void initState() {
     super.initState();
-    _rounds = ShadowGenerator.generateRounds();
+    _rounds = ShadowGenerator.fromCurriculumRounds(widget.activityNode.rounds);
     _currentRoundIndex = ProgressService().getActivityState(
       widget.activityNode.skillId,
       widget.activityNode.id,
     );
     if (_currentRoundIndex >= _rounds.length) _currentRoundIndex = 0;
-    
+    _taskCoordinator = AdaptiveTaskCoordinator(
+      activity: widget.activityNode,
+      initialRoundIndex: _currentRoundIndex,
+    );
+
     final rng = Random();
     _currentMascot = _mascots[rng.nextInt(_mascots.length)];
     _currentInstruction = _instructions[rng.nextInt(_instructions.length)];
-    _currentEncouragement = _encourageMessages[rng.nextInt(_encourageMessages.length)];
+    _currentEncouragement =
+        _encourageMessages[rng.nextInt(_encourageMessages.length)];
 
     // Celebration
     _celebrationController = AnimationController(
@@ -120,8 +134,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
       duration: const Duration(milliseconds: 800),
     );
     _celebrationScale = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _celebrationController, curve: Curves.elasticOut),
+      CurvedAnimation(parent: _celebrationController, curve: Curves.elasticOut),
     );
 
     // Round transition fade
@@ -131,7 +144,9 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
     );
     _roundFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-          parent: _roundTransitionController, curve: Curves.easeOut),
+        parent: _roundTransitionController,
+        curve: Curves.easeOut,
+      ),
     );
 
     // Wrong answer shake
@@ -139,16 +154,19 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    _wrongShakeAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 8.0), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: 8.0, end: -8.0), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: -8.0, end: 6.0), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: 6.0, end: -4.0), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: -4.0, end: 0.0), weight: 1),
-    ]).animate(CurvedAnimation(
-      parent: _wrongShakeController,
-      curve: Curves.easeInOut,
-    ));
+    _wrongShakeAnimation =
+        TweenSequence<double>([
+          TweenSequenceItem(tween: Tween(begin: 0.0, end: 8.0), weight: 1),
+          TweenSequenceItem(tween: Tween(begin: 8.0, end: -8.0), weight: 1),
+          TweenSequenceItem(tween: Tween(begin: -8.0, end: 6.0), weight: 1),
+          TweenSequenceItem(tween: Tween(begin: 6.0, end: -4.0), weight: 1),
+          TweenSequenceItem(tween: Tween(begin: -4.0, end: 0.0), weight: 1),
+        ]).animate(
+          CurvedAnimation(
+            parent: _wrongShakeController,
+            curve: Curves.easeInOut,
+          ),
+        );
 
     // Speaker bounce
     _speakerBounceController = AnimationController(
@@ -156,7 +174,10 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
       duration: const Duration(milliseconds: 400),
     );
     _speakerBounceAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _speakerBounceController, curve: Curves.elasticOut),
+      CurvedAnimation(
+        parent: _speakerBounceController,
+        curve: Curves.elasticOut,
+      ),
     );
 
     _initRoundState();
@@ -168,7 +189,6 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   }
 
   void _playInstruction({bool autoPlay = false}) {
-    
     if (autoPlay && _lastSpokenInstruction == _currentInstruction) {
       return;
     }
@@ -181,21 +201,29 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
 
   void _initRoundState() {
     _matchedObjects.clear();
-    final rng = Random();
-    
-    // Ensure randomization changes the order for tray and shadows independently
-    _shuffledTrayObjects = List.from(_currentRound.targetAssets)..shuffle(rng);
-    _shuffledShadows = List.from(_currentRound.targetAssets)..shuffle(rng);
-    
+    _hintedShadow = null;
+    _shuffledTrayObjects = AdaptiveOptionOrder.shuffled<String>(
+      _currentRound.targetAssets,
+      _taskCoordinator.itemId,
+      salt: 'tray',
+    );
+    _shuffledShadows = AdaptiveOptionOrder.shuffled<String>(
+      _currentRound.targetAssets,
+      _taskCoordinator.itemId,
+      salt: 'shadow',
+    );
+
     for (var shadow in _shuffledShadows) {
       _shadowGlowControllers[shadow] = AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 400),
       );
     }
-    
+
     // Clear old controllers
-    for (var c in _floatControllers.values) { c.dispose(); }
+    for (var c in _floatControllers.values) {
+      c.dispose();
+    }
     _floatControllers.clear();
 
     // Create float controllers for objects in tray
@@ -203,10 +231,10 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
       final obj = _shuffledTrayObjects[i];
       _floatControllers[obj] = AnimationController(
         vsync: this,
-        duration: Duration(milliseconds: 1800 + rng.nextInt(600)),
+        duration: Duration(milliseconds: 1800 + _animationRandom.nextInt(600)),
       )..repeat(reverse: true);
     }
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _playScrollHint();
     });
@@ -215,17 +243,17 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   void _playScrollHint() async {
     await Future.delayed(const Duration(milliseconds: 1000));
     if (!mounted || !_trayScrollController.hasClients) return;
-    
+
     if (_trayScrollController.position.maxScrollExtent > 0) {
       await _trayScrollController.animateTo(
         min(150.0, _trayScrollController.position.maxScrollExtent),
         duration: const Duration(milliseconds: 600),
         curve: Curves.easeOut,
       );
-      
+
       if (!mounted || !_trayScrollController.hasClients) return;
       await Future.delayed(const Duration(milliseconds: 300));
-      
+
       await _trayScrollController.animateTo(
         0.0,
         duration: const Duration(milliseconds: 600),
@@ -241,16 +269,20 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
     _wrongShakeController.dispose();
     _speakerBounceController.dispose();
     _trayScrollController.dispose();
-    for (var c in _floatControllers.values) { c.dispose(); }
-    for (var c in _shadowGlowControllers.values) { c.dispose(); }
+    for (var c in _floatControllers.values) {
+      c.dispose();
+    }
+    for (var c in _shadowGlowControllers.values) {
+      c.dispose();
+    }
     _audioPlayer.dispose();
     super.dispose();
   }
 
-
   // ── Game logic ──
 
-  ShadowRound get _currentRound => _rounds[_currentRoundIndex];
+  ShadowRound get _currentRound =>
+      ShadowGenerator.fromCurriculum(_taskCoordinator.roundData);
 
   void _onAcceptDrop(String object, String targetShadow) {
     setState(() {
@@ -260,16 +292,17 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
     if (object == targetShadow) {
       // Correct!
       SoundUtils.playFeedback('audio/correct.mp3');
-      
+
       setState(() {
         _matchedObjects.add(object);
+        _hintedShadow = null;
       });
-      
+
       // Flash category glow
       _shadowGlowControllers[targetShadow]?.forward(from: 0).then((_) {
         _shadowGlowControllers[targetShadow]?.reverse();
       });
-          
+
       // Check win
       if (_matchedObjects.length == _currentRound.targetAssets.length) {
         _onRoundComplete();
@@ -277,40 +310,93 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
     } else {
       // Wrong!
       SoundUtils.playFeedback('audio/wrong.mp3');
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.recordMisclick();
-      
+      final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+      if (wrapper != null) {
+        final itemId = _taskCoordinator.itemId;
+        final selectedIndex = _shuffledShadows.indexOf(targetShadow);
+        final correctIndex = _shuffledShadows.indexOf(object);
+        unawaited(
+          wrapper
+              .requestSemanticScaffold(
+                itemId: itemId,
+                visibleOptionIds: List<String>.generate(
+                  _shuffledShadows.length,
+                  (index) => '${itemId}_O${index + 1}',
+                ),
+                selectedOptionIds: <String>['${itemId}_O${selectedIndex + 1}'],
+                selectedAnswerValues: <String>[targetShadow],
+                correctOptionIds: <String>['${itemId}_O${correctIndex + 1}'],
+                incorrectOptionIds: <String>['${itemId}_O${selectedIndex + 1}'],
+                supportedActions: const <String>[
+                  'HIGHLIGHT_OPTION',
+                  'REPLAY_INSTRUCTION',
+                ],
+                struggledTargetUnits: <String>[object],
+                errorType: 'visual_matching_error',
+              )
+              .then((plan) {
+                if (!mounted || plan == null) return;
+                final types = plan.commands
+                    .map((command) => command.type)
+                    .toSet();
+                if (types.contains(ScaffoldActionType.replayInstruction)) {
+                  _playInstruction();
+                }
+                if (types.contains(ScaffoldActionType.highlightOptions)) {
+                  setState(() => _hintedShadow = object);
+                }
+              }),
+        );
+      }
+
       setState(() {
         _lastWrongObject = object;
       });
       _wrongShakeController.forward(from: 0).then((_) {
-        if (mounted) setState(() { _lastWrongObject = null; });
+        if (mounted)
+          setState(() {
+            _lastWrongObject = null;
+          });
       });
     }
   }
 
   void _onRoundComplete() {
+    // Response time ends at the final correct drop, not after the 1.5 s
+    // celebration below.
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markResponseComplete();
     setState(() {
       _roundComplete = true;
     });
-    
+
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (!mounted) return;
       _nextRound();
     });
   }
 
-  void _nextRound() {
-    context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(100);
+  Future<void> _nextRound() async {
+    final result = await context
+        .findAncestorStateOfType<TelemetryWrapperState>()
+        ?.completeAdaptiveRound(
+          100,
+          currentRoundIndex: _currentRoundIndex,
+          itemId: _taskCoordinator.itemId,
+        );
+    if (!mounted) return;
+    final transition = _taskCoordinator.applyResult(result);
 
-    if (_currentRoundIndex < _rounds.length - 1) {
+    if (!transition.isComplete) {
       _roundTransitionController.reverse().then((_) {
         if (!mounted) return;
         setState(() {
-          _currentRoundIndex++;
+          _currentRoundIndex = transition.roundIndex;
           _roundComplete = false;
           final rng = Random();
-          _currentInstruction = _instructions[rng.nextInt(_instructions.length)];
-          _currentEncouragement = _encourageMessages[rng.nextInt(_encourageMessages.length)];
+          _currentInstruction =
+              _instructions[rng.nextInt(_instructions.length)];
+          _currentEncouragement =
+              _encourageMessages[rng.nextInt(_encourageMessages.length)];
         });
         ProgressService().saveActivityState(
           widget.activityNode.skillId,
@@ -337,14 +423,14 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
         100,
       );
       setState(() {
-          _activityComplete = true;
-          final sId = widget.activityNode?.skillId ?? '';
-          final aId = widget.activityNode?.id ?? '';
-          if (sId.isNotEmpty && aId.isNotEmpty) {
-            ProgressService().saveActivityScore(sId, aId, 100);
-            ProgressService().clearActivityState(sId, aId);
-          }
-        });
+        _activityComplete = true;
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          ProgressService().saveActivityScore(sId, aId, 100);
+          ProgressService().clearActivityState(sId, aId);
+        }
+      });
       _celebrationController.forward();
     }
   }
@@ -365,8 +451,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   @override
   Widget build(BuildContext context) {
     if (_rounds.isEmpty) {
-      return const Scaffold(
-          body: Center(child: AppLoadingIndicator()));
+      return const Scaffold(body: Center(child: AppLoadingIndicator()));
     }
 
     return Scaffold(
@@ -375,7 +460,8 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
           // ── Beautiful Blurred Background ──
           const Positioned.fill(
             child: PatternBackground(
-                imagePath: 'assets/images/backgrounds/act3_bg.jpg'),
+              imagePath: 'assets/images/backgrounds/act3_bg.jpg',
+            ),
           ),
 
           // ── Main Content ──
@@ -392,7 +478,6 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
                   const SizedBox(height: 16),
                   _buildObjectTray(),
                   const SizedBox(height: 16),
-
                 ],
               ),
             ),
@@ -432,8 +517,11 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
                 color: const Color(0xFFF0F4FF),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.arrow_back_rounded,
-                  color: Color(0xFF4A90D9), size: 24),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                color: Color(0xFF4A90D9),
+                size: 24,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -444,9 +532,10 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-
                     Text(
-                      widget.activityNode.title.isEmpty ? 'Shadow Matching' : widget.activityNode.title,
+                      widget.activityNode.title.isEmpty
+                          ? 'Shadow Matching'
+                          : widget.activityNode.title,
                       style: AppTypography.heading(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -493,7 +582,9 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
             height: 3,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(2),
-              color: isCompleted ? const Color(0xFF6DBE6D) : const Color(0xFFE0E0E0),
+              color: isCompleted
+                  ? const Color(0xFF6DBE6D)
+                  : const Color(0xFFE0E0E0),
             ),
           );
         } else {
@@ -508,10 +599,13 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
               color: isCompleted
                   ? const Color(0xFF6DBE6D)
                   : isCurrent
-                      ? const Color(0xFFF9C623)
-                      : const Color(0xFFE0E0E0),
+                  ? const Color(0xFFF9C623)
+                  : const Color(0xFFE0E0E0),
               border: isCurrent
-                  ? Border.all(color: const Color(0xFFF9C623).withValues(alpha: 0.3), width: 2)
+                  ? Border.all(
+                      color: const Color(0xFFF9C623).withValues(alpha: 0.3),
+                      width: 2,
+                    )
                   : null,
             ),
           );
@@ -524,7 +618,9 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   Widget _buildInstructionCard() {
     return GestureDetector(
       onTap: () {
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.logAudioReplay();
+        context
+            .findAncestorStateOfType<TelemetryWrapperState>()
+            ?.logAudioReplay();
         _playInstruction();
       },
       child: Container(
@@ -539,15 +635,38 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
           mainAxisSize: MainAxisSize.min,
           children: [
             Flexible(
-              child: Text(_currentInstruction, style: AppTypography.sinhala(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary), textAlign: TextAlign.center),
+              child: Text(
+                _currentInstruction,
+                style: AppTypography.sinhala(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
             const SizedBox(width: 12),
             ScaleTransition(
               scale: _speakerBounceAnimation,
               child: Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.warmAmber, boxShadow: [BoxShadow(color: AppColors.warmAmber.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))]),
-                child: const Icon(Icons.volume_up_rounded, color: Colors.white, size: 26),
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.warmAmber,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.warmAmber.withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.volume_up_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
               ),
             ),
           ],
@@ -565,33 +684,38 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 3),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.6),
+            width: 3,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               spreadRadius: 2,
-            )
+            ),
           ],
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final totalItems = _shuffledShadows.length;
             if (totalItems == 0) return const SizedBox();
-            
+
             double maxCardSize = 0.0;
             const spacing = 24.0;
-            
+
             for (int cols = 1; cols <= totalItems; cols++) {
               int rows = (totalItems / cols).ceil();
-              double cardWidth = (constraints.maxWidth - 32 - (cols - 1) * spacing) / cols;
-              double cardHeight = (constraints.maxHeight - 32 - (rows - 1) * spacing) / rows;
+              double cardWidth =
+                  (constraints.maxWidth - 32 - (cols - 1) * spacing) / cols;
+              double cardHeight =
+                  (constraints.maxHeight - 32 - (rows - 1) * spacing) / rows;
               double currentCardSize = min(cardWidth, cardHeight);
               if (currentCardSize > maxCardSize) {
                 maxCardSize = currentCardSize;
               }
             }
-            
+
             final double limit = (_currentRoundIndex <= 4) ? 160.0 : 120.0;
             if (maxCardSize > limit) maxCardSize = limit;
 
@@ -616,6 +740,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
     final isMatched = _matchedObjects.contains(object);
     final glowController = _shadowGlowControllers[object];
     final showSuccess = _roundComplete && isMatched;
+    final showHint = _hintedShadow == object && !isMatched;
 
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) {
@@ -636,15 +761,23 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
               decoration: BoxDecoration(
                 color: showSuccess
                     ? const Color(0xFF6DBE6D).withValues(alpha: 0.15)
-                    : (isMatched ? Colors.transparent : Colors.white.withValues(alpha: 0.4)),
+                    : showHint
+                    ? AppColors.warmAmberLight.withValues(alpha: 0.65)
+                    : (isMatched
+                          ? Colors.transparent
+                          : Colors.white.withValues(alpha: 0.4)),
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
                   color: showSuccess
                       ? const Color(0xFF6DBE6D)
-                      : (isHovered 
-                          ? const Color(0xFFF9C623) 
-                          : (glowValue > 0 ? const Color(0xFF6DBE6D) : Colors.white.withValues(alpha: 0.8))),
-                  width: (showSuccess || isHovered) ? 4 : 2,
+                      : showHint
+                      ? AppColors.warmAmber
+                      : (isHovered
+                            ? const Color(0xFFF9C623)
+                            : (glowValue > 0
+                                  ? const Color(0xFF6DBE6D)
+                                  : Colors.white.withValues(alpha: 0.8))),
+                  width: (showSuccess || showHint || isHovered) ? 4 : 2,
                 ),
                 boxShadow: showSuccess
                     ? [
@@ -655,22 +788,26 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
                         ),
                       ]
                     : (isHovered || glowValue > 0
-                        ? [
-                            BoxShadow(
-                              color: (glowValue > 0 ? const Color(0xFF6DBE6D) : const Color(0xFFF9C623)).withValues(alpha: 0.6),
-                              blurRadius: 20,
-                              spreadRadius: 4,
-                            ),
-                          ]
-                        : [
-                            if (!isMatched)
+                          ? [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
-                                blurRadius: 8,
-                                spreadRadius: -2,
-                                offset: const Offset(0, 4),
-                              )
-                          ]),
+                                color:
+                                    (glowValue > 0
+                                            ? const Color(0xFF6DBE6D)
+                                            : const Color(0xFFF9C623))
+                                        .withValues(alpha: 0.6),
+                                blurRadius: 20,
+                                spreadRadius: 4,
+                              ),
+                            ]
+                          : [
+                              if (!isMatched)
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 8,
+                                  spreadRadius: -2,
+                                  offset: const Offset(0, 4),
+                                ),
+                            ]),
               ),
               child: Center(
                 child: Padding(
@@ -708,7 +845,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
                             ),
                           ),
                         ),
-                        
+
                       if (glowValue > 0)
                         Positioned.fill(
                           child: IgnorePointer(
@@ -731,11 +868,11 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   // ── Object Tray ──
   Widget _buildObjectTray() {
     if (_roundComplete) {
-      return _currentRoundIndex == 0 
+      return _currentRoundIndex == 0
           ? const Expanded(flex: 2, child: SizedBox())
           : const SizedBox(height: 150); // Keep space but show nothing
     }
-    
+
     final content = Container(
       height: _currentRoundIndex == 0 ? null : 150,
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -756,9 +893,14 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
               builder: (context, constraints) => SingleChildScrollView(
                 controller: _trayScrollController,
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
                 child: Container(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight - 32),
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 32,
+                  ),
                   alignment: Alignment.center,
                   child: Wrap(
                     spacing: 16,
@@ -796,21 +938,30 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   Widget _buildDraggableObject(String object) {
     final isMatched = _matchedObjects.contains(object);
     final floatController = _floatControllers[object];
-    
+
     return AnimatedSize(
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOutBack,
       child: isMatched
-          ? SizedBox(width: 0, height: _currentRoundIndex == 0 ? 140 : 120) // Shrinks to 0 width and disappears smoothly
+          ? SizedBox(
+              width: 0,
+              height: _currentRoundIndex == 0 ? 140 : 120,
+            ) // Shrinks to 0 width and disappears smoothly
           : Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: AnimatedBuilder(
-                animation: Listenable.merge([floatController ?? const AlwaysStoppedAnimation(0), _wrongShakeController]),
+                animation: Listenable.merge([
+                  floatController ?? const AlwaysStoppedAnimation(0),
+                  _wrongShakeController,
+                ]),
                 builder: (context, child) {
-                  final floatY = floatController != null ? sin(floatController.value * 2 * pi) * 5.0 : 0.0;
-                  
+                  final floatY = floatController != null
+                      ? sin(floatController.value * 2 * pi) * 5.0
+                      : 0.0;
+
                   double shakeX = 0;
-                  if (_lastWrongObject == object && _wrongShakeController.isAnimating) {
+                  if (_lastWrongObject == object &&
+                      _wrongShakeController.isAnimating) {
                     shakeX = _wrongShakeAnimation.value;
                   }
 
@@ -823,10 +974,22 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
                   data: object,
                   maxSimultaneousDrags: 1,
                   onDragStarted: () {
-                    setState(() { _isDragging = true; });
+                    setState(() {
+                      _isDragging = true;
+                    });
                   },
-                  onDragEnd: (_) {
-                    setState(() { _isDragging = false; });
+                  onDragEnd: (details) {
+                    // A drop on a target is an answer; a drop elsewhere is a
+                    // movement miss (not a wrong answer).
+                    final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+                    if (details.wasAccepted) {
+                      wrapper?.markAnswer();
+                    } else {
+                      wrapper?.recordStrayDrop();
+                    }
+                    setState(() {
+                      _isDragging = false;
+                    });
                   },
                   feedback: _buildDragFeedback(object),
                   childWhenDragging: _buildDragGhost(),
@@ -847,10 +1010,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Colors.white,
-            Colors.white.withValues(alpha: 0.8),
-          ],
+          colors: [Colors.white, Colors.white.withValues(alpha: 0.8)],
         ),
         borderRadius: BorderRadius.circular(28), // Rounded squircle
         boxShadow: [
@@ -861,10 +1021,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
             offset: const Offset(0, 10),
           ),
         ],
-        border: Border.all(
-          color: Colors.white,
-          width: 3,
-        ),
+        border: Border.all(color: Colors.white, width: 3),
       ),
       child: Image.asset(
         'assets/images/activity_icons/$object',
@@ -877,7 +1034,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
     return Material(
       color: Colors.transparent,
       child: Transform.rotate(
-        angle: 0.1, 
+        angle: 0.1,
         child: Transform.scale(
           scale: 1.1,
           child: Container(
@@ -902,10 +1059,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
                   offset: const Offset(0, 12),
                 ),
               ],
-              border: Border.all(
-                color: const Color(0xFFF9C623),
-                width: 4,
-              ),
+              border: Border.all(color: const Color(0xFFF9C623), width: 4),
             ),
             child: Image.asset(
               'assets/images/activity_icons/$object',
@@ -987,9 +1141,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
                 ),
               ),
               child: Text(
-                _roundComplete
-                    ? 'හොඳයි! 🎉'
-                    : _currentEncouragement,
+                _roundComplete ? 'හොඳයි! 🎉' : _currentEncouragement,
                 style: AppTypography.sinhala(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -1016,11 +1168,7 @@ class _VisualAct2ShadowMatchingState extends State<VisualAct2ShadowMatching>
   }
 
   Widget _buildStar(double size) {
-    return Icon(
-      Icons.star_rounded,
-      size: size,
-      color: const Color(0xFFF9C623),
-    );
+    return Icon(Icons.star_rounded, size: size, color: const Color(0xFFF9C623));
   }
 }
 
@@ -1042,7 +1190,7 @@ class _StarBurstPainter extends CustomPainter {
     for (int i = 0; i < numStars; i++) {
       final angle = (i * 2 * pi / numStars) + (progress * pi / 4);
       final currentRadius = progress * maxRadius;
-      
+
       final starCenter = Offset(
         center.dx + cos(angle) * currentRadius,
         center.dy + sin(angle) * currentRadius,

@@ -1,0 +1,291 @@
+{
+  "model_type": "per_action_logistic_outcome_model",
+  "model_version": "c4-action-outcome-synthetic-v2",
+  "trained_at": "2026-10-14T06:56:59.220187+00:00",
+  "data_origin": "synthetic",
+  "dataset_id": "c4-synthetic-policy-v1-seed-26031",
+  "training_file_sha256": "49c85b5835b64134b51395881fc691089a7d45280f84d915d3c6701f3fe87062",
+  "validation_status": "synthetic_only",
+  "activation_allowed": false,
+  "outcome": "next_independent_success",
+  "feature_names": [
+    "mastery",
+    "difficulty_b",
+    "fatigue",
+    "struggle_score",
+    "attempt_count",
+    "incorrect_attempt_count",
+    "latency_seconds",
+    "hesitation_count",
+    "misclick_count",
+    "audio_replay_count",
+    "options_count",
+    "session_accuracy",
+    "session_support_rate",
+    "profile_max_probability"
+  ],
+  "feature_means": {
+    "mastery": 0.713196014351816,
+    "difficulty_b": -0.0019142490740740674,
+    "fatigue": 0.31811738750000024,
+    "struggle_score": 2.7711964773148168,
+    "attempt_count": 1.8849074074074075,
+    "incorrect_attempt_count": 1.1333333333333333,
+    "latency_seconds": 9.07554764722223,
+    "hesitation_count": 0.44046296296296295,
+    "misclick_count": 0.18407407407407408,
+    "audio_replay_count": 0.1687962962962963,
+    "options_count": 3.5094444444444446,
+    "session_accuracy": 0.700409323055557,
+    "session_support_rate": 0.7517937499074102,
+    "profile_max_probability": 0.2582341231481488
+  },
+  "feature_scales": {
+    "mastery": 0.23950038532800214,
+    "difficulty_b": 0.6934948146661619,
+    "fatigue": 0.14416856615615417,
+    "struggle_score": 1.1137796756144143,
+    "attempt_count": 0.6070526784304945,
+    "incorrect_attempt_count": 0.33993463423950504,
+    "latency_seconds": 2.860607356847936,
+    "hesitation_count": 0.5424325939677319,
+    "misclick_count": 0.3875445901155861,
+    "audio_replay_count": 0.44464762909564576,
+    "options_count": 1.111015412545434,
+    "session_accuracy": 0.25003703000159216,
+    "session_support_rate": 0.18962612920351632,
+    "profile_max_probability": 0.1681097467135772
+  },
+  "models_by_action": {
+    "RETRY_CURRENT": {
+      "intercept": 1.4542491704467646,
+      "weights": {
+        "mastery": 0.39354842795796047,
+        "difficulty_b": -0.4260339599639394,
+        "fatigue": 0.014207835246742986,
+        "struggle_score": -0.6163000883288425,
+        "attempt_count": 0.03122976980249297,
+        "incorrect_attempt_count": -0.07404801963476909,
+        "latency_seconds": -0.3082248731356307,
+        "hesitation_count": 0.048989505258991754,
+        "misclick_count": -0.019653451080939216,
+        "audio_replay_count": 0.06316490423038684,
+        "options_count": -0.04680915446642359,
+        "session_accuracy": 0.2655027417040103,
+        "session_support_rate": 0.02322740828447627,
+        "profile_max_probability": 0.01871583966628629
+      }
+    },
+    "SCAFFOLD_HIGHLIGHT_CORRECT": {
+      "intercept": 2.974954463293694,
+      "weights": {
+        "mastery": 0.4297875549286592,
+        "difficulty_b": -0.4474570484218127,
+        "fatigue": -0.14953732399741787,
+        "struggle_score": -0.06970263435784407,
+        "attempt_count": -0.19935018770130816,
+        "incorrect_attempt_count": 0.1353654065934305,
+        "latency_seconds": -0.20266389128456297,
+        "hesitation_count": 0.06495426637178808,
+        "misclick_count": 0.15288257877487801,
+        "audio_replay_count": 0.006314422893006746,
+        "options_count": -0.028001926713980725,
+        "session_accuracy": -0.00934352102067662,
+        "session_support_rate": 0.23067865466734866,
+        "profile_max_probability": 0.04267819031707435
+      }
+    },
+    "SCAFFOLD_REMOVE_DISTRACTOR": {
+      "intercept": 2.979372523131629,
+      "weights": {
+        "mastery": 0.8115058547272117,
+        "difficulty_b": -0.5641964960037246,
+        "fatigue": -0.09447939333480597,
+        "struggle_score": -0.6954429056377809,
+        "attempt_count": 0.3523625577149303,
+        "incorrect_attempt_count": -0.018258599955096776,
+        "latency_seconds": -0.31829630370686024,
+        "hesitation_count": 0.21244105813401581,
+        "misclick_count": 0.08377666193563107,
+        "audio_replay_count": -0.05173537387040989,
+        "options_count": -0.041744262125926766,
+        "session_accuracy": -0.3316975879926443,
+        "session_support_rate": 0.06378563050170012,
+        "profile_max_probability": 0.03693280338315867
+      }
+    },
+    "SCAFFOLD_REPLAY_INSTRUCTION": {
+      "intercept": 2.199190130682013,
+      "weights": {
+        "mastery": 0.5687853512217754,
+        "difficulty_b": -0.5083213360392158,
+        "fatigue": -0.008281791800527162,
+        "struggle_score": -0.10998447486590095,
+        "attempt_count": -0.2598952024470698,
+        "incorrect_attempt_count": 0.1372953257719962,
+        "latency_seconds": -0.11702825743602047,
+        "hesitation_count": 0.19882409231687503,
+        "misclick_count": -0.08636113933805624,
+        "audio_replay_count": 0.03172480175235923,
+        "options_count": 0.15174162259572968,
+        "session_accuracy": -0.006675960140172206,
+        "session_support_rate": -0.10897988815931964,
+        "profile_max_probability": -0.06364463219320486
+      }
+    },
+    "SCAFFOLD_REVEAL_FIRST_TOKEN": {
+      "intercept": 2.793871524719933,
+      "weights": {
+        "mastery": 0.1292564553632322,
+        "difficulty_b": -0.5152729352459594,
+        "fatigue": -0.019629864314590798,
+        "struggle_score": -0.44149087470576776,
+        "attempt_count": 0.19618294350565998,
+        "incorrect_attempt_count": 0.0017518175739343266,
+        "latency_seconds": -0.180732930658998,
+        "hesitation_count": 0.19236020561123426,
+        "misclick_count": -0.030366158031024822,
+        "audio_replay_count": -0.08803918021109118,
+        "options_count": -0.1519276364869216,
+        "session_accuracy": 0.3627123186974625,
+        "session_support_rate": 0.20759017950481487,
+        "profile_max_probability": -0.10389758157293712
+      }
+    },
+    "SCAFFOLD_SHOW_WORKED_EXAMPLE": {
+      "intercept": 3.027031265220212,
+      "weights": {
+        "mastery": 0.3174045807657613,
+        "difficulty_b": -0.32420863086994706,
+        "fatigue": 0.1983514626762823,
+        "struggle_score": 0.13332921961292,
+        "attempt_count": -0.1382380263185102,
+        "incorrect_attempt_count": 0.19000481837074532,
+        "latency_seconds": -0.1951189671319807,
+        "hesitation_count": -0.17948091033178654,
+        "misclick_count": 0.11798518690561483,
+        "audio_replay_count": 0.45343944075924525,
+        "options_count": -0.06754495938154295,
+        "session_accuracy": 0.0863464438582409,
+        "session_support_rate": -0.03268950450121763,
+        "profile_max_probability": -0.06252206469656052
+      }
+    },
+    "SCAFFOLD_SLOW_AUDIO": {
+      "intercept": 2.102860510983748,
+      "weights": {
+        "mastery": 0.5972179114210836,
+        "difficulty_b": -0.43634502892310767,
+        "fatigue": -0.005179328041641157,
+        "struggle_score": -0.5049904013199475,
+        "attempt_count": 0.044220917856799026,
+        "incorrect_attempt_count": 0.06055759060775665,
+        "latency_seconds": -0.17861716044136414,
+        "hesitation_count": 0.1825384821281662,
+        "misclick_count": 0.025552865048432512,
+        "audio_replay_count": 0.25161896700255876,
+        "options_count": -0.018527534012398917,
+        "session_accuracy": -0.05348124207447787,
+        "session_support_rate": 0.18556466982221886,
+        "profile_max_probability": 0.07564764450559605
+      }
+    }
+  },
+  "held_out_group_evaluation": {
+    "RETRY_CURRENT": {
+      "n_train": 1477,
+      "n_test": 526,
+      "accuracy": 0.773764,
+      "brier_score": 0.16178,
+      "log_loss": 0.492743,
+      "roc_auc": 0.71924
+    },
+    "SCAFFOLD_HIGHLIGHT_CORRECT": {
+      "n_train": 1562,
+      "n_test": 528,
+      "accuracy": 0.914773,
+      "brier_score": 0.078179,
+      "log_loss": 0.298956,
+      "roc_auc": 0.583023
+    },
+    "SCAFFOLD_REMOVE_DISTRACTOR": {
+      "n_train": 1524,
+      "n_test": 563,
+      "accuracy": 0.918295,
+      "brier_score": 0.073109,
+      "log_loss": 0.275213,
+      "roc_auc": 0.65722
+    },
+    "SCAFFOLD_REPLAY_INSTRUCTION": {
+      "n_train": 1582,
+      "n_test": 508,
+      "accuracy": 0.903543,
+      "brier_score": 0.083666,
+      "log_loss": 0.29665,
+      "roc_auc": 0.70028
+    },
+    "SCAFFOLD_REVEAL_FIRST_TOKEN": {
+      "n_train": 1513,
+      "n_test": 479,
+      "accuracy": 0.912317,
+      "brier_score": 0.081461,
+      "log_loss": 0.303545,
+      "roc_auc": 0.607497
+    },
+    "SCAFFOLD_SHOW_WORKED_EXAMPLE": {
+      "n_train": 1577,
+      "n_test": 485,
+      "accuracy": 0.946392,
+      "brier_score": 0.049756,
+      "log_loss": 0.199516,
+      "roc_auc": 0.680744
+    },
+    "SCAFFOLD_SLOW_AUDIO": {
+      "n_train": 1565,
+      "n_test": 511,
+      "accuracy": 0.8591,
+      "brier_score": 0.116952,
+      "log_loss": 0.395307,
+      "roc_auc": 0.638319
+    }
+  },
+  "held_out_model_comparison": {
+    "class_prior": {
+      "accuracy": 0.888056,
+      "brier_score": 0.099446,
+      "log_loss": 0.350732,
+      "roc_auc": 0.5
+    },
+    "logistic_regression": {
+      "accuracy": 0.888611,
+      "brier_score": 0.092051,
+      "log_loss": 0.321785,
+      "roc_auc": 0.708117
+    },
+    "random_forest": {
+      "accuracy": 0.852222,
+      "brier_score": 0.127729,
+      "log_loss": 0.418845,
+      "roc_auc": 0.698422
+    },
+    "hist_gradient_boosting": {
+      "accuracy": 0.889167,
+      "brier_score": 0.092054,
+      "log_loss": 0.320533,
+      "roc_auc": 0.706418
+    }
+  },
+  "off_policy_evaluation": {
+    "method": "self_normalized_inverse_propensity_weighting",
+    "logged_action_match_count": 480,
+    "test_count": 3600,
+    "estimated_next_independent_success": 0.947917,
+    "observed_random_policy_success": 0.888056,
+    "interpretation": "Simulation evidence only; not a child outcome claim."
+  },
+  "limitations": [
+    "Trained on simulated learners, not observed Grade 1 participants.",
+    "Valid for software/policy simulation and shadow-mode research only.",
+    "Must not be activated until an observed-data validation artifact is approved."
+  ]
+}

@@ -1,10 +1,9 @@
 import 'dart:math';
 import '../models/sorting_round.dart';
+import '../../../../adaptive/utils/adaptive_option_order.dart';
 
 /// Generates 5 randomized sorting rounds with progressive difficulty.
 class SortingGenerator {
-  static final Random _rng = Random();
-
   // ── Category definitions using real asset paths ──
 
   static const Map<String, List<String>> _categoryAssets = {
@@ -60,7 +59,8 @@ class SortingGenerator {
   };
 
   /// Generates 5 progressive sorting rounds.
-  static List<SortingRound> generateRounds() {
+  static List<SortingRound> generateRounds({int seed = 20261006}) {
+    final rng = Random(seed);
     // We have 5 categories with enough items. Pick combinations for each round.
     // Shuffle the category pool to keep things fresh each session.
     final allCategoryKeys = _categoryAssets.keys.toList();
@@ -80,21 +80,91 @@ class SortingGenerator {
     // Round 3: 2 categories, 6 objects total (3 each)
     // Round 4: 3 categories, 6 objects total (2 each)
     // Round 5: 3 categories, 9 objects total (3 each)
-    
+
     final r1Cats = _pickCategories(allCategoryKeys, 2, exclude: []);
     final r2Cats = _pickCategories(allCategoryKeys, 2, exclude: r1Cats);
     final r3Cats = _pickCategories(allCategoryKeys, 2, exclude: r2Cats);
     final r4Cats = _pickCategories(allCategoryKeys, 3, exclude: []);
-    final r5Cats = _pickCategories(allCategoryKeys, 3, exclude: r4Cats.isNotEmpty ? [r4Cats[0]] : []);
+    final r5Cats = _pickCategories(
+      allCategoryKeys,
+      3,
+      exclude: r4Cats.isNotEmpty ? [r4Cats[0]] : [],
+    );
 
-    rounds.add(_buildRound(r1Cats, objectsPerCategory: [2, 1], difficulty: 1));
-    rounds.add(_buildRound(r2Cats, objectsPerCategory: 2, difficulty: 2));
-    rounds.add(_buildRound(r3Cats, objectsPerCategory: 3, difficulty: 3));
-    rounds.add(_buildRound(r4Cats, objectsPerCategory: 2, difficulty: 4));
-    rounds.add(_buildRound(r5Cats, objectsPerCategory: 3, difficulty: 5));
+    rounds.add(
+      _buildRound(r1Cats, rng: rng, objectsPerCategory: [2, 1], difficulty: 1),
+    );
+    rounds.add(
+      _buildRound(r2Cats, rng: rng, objectsPerCategory: 2, difficulty: 2),
+    );
+    rounds.add(
+      _buildRound(r3Cats, rng: rng, objectsPerCategory: 3, difficulty: 3),
+    );
+    rounds.add(
+      _buildRound(r4Cats, rng: rng, objectsPerCategory: 2, difficulty: 4),
+    );
+    rounds.add(
+      _buildRound(r5Cats, rng: rng, objectsPerCategory: 3, difficulty: 5),
+    );
 
     return rounds;
   }
+
+  static SortingRound fromCurriculum(
+    Map<String, dynamic> data, {
+    String itemId = '',
+  }) {
+    final rawCategories = Map<String, dynamic>.from(
+      data['categories'] as Map? ?? const <String, dynamic>{},
+    );
+    final parsedCategories = rawCategories.map(
+      (key, value) => MapEntry(
+        key,
+        (value as Iterable).map((asset) => asset.toString()).toList(),
+      ),
+    );
+    final orderedKeys = AdaptiveOptionOrder.shuffled<String>(
+      parsedCategories.keys.toList(),
+      itemId,
+      salt: 'categories',
+    );
+    final categories = <String, List<String>>{
+      for (final key in orderedKeys) key: parsedCategories[key]!,
+    };
+    final labels = Map<String, String>.from(
+      (data['category_labels'] as Map? ?? const <String, String>{}).map(
+        (key, value) => MapEntry(key.toString(), value.toString()),
+      ),
+    );
+    final icons = Map<String, String>.from(
+      (data['category_icons'] as Map? ?? const <String, String>{}).map(
+        (key, value) => MapEntry(key.toString(), value.toString()),
+      ),
+    );
+    final objects = AdaptiveOptionOrder.shuffled<String>(
+      categories.values.expand((items) => items).toList(),
+      itemId,
+      salt: 'objects',
+    );
+    final objectToCategory = <String, String>{};
+    for (final entry in categories.entries) {
+      for (final asset in entry.value) {
+        objectToCategory[asset] = entry.key;
+      }
+    }
+    return SortingRound(
+      categories: categories,
+      categoryIcons: icons,
+      categoryLabels: labels,
+      objects: objects,
+      objectToCategory: objectToCategory,
+      difficulty: (data['difficulty'] as num?)?.toInt() ?? 1,
+    );
+  }
+
+  static List<SortingRound> fromCurriculumRounds(
+    Iterable<Map<String, dynamic>> rounds,
+  ) => rounds.map(fromCurriculum).toList();
 
   /// Pick [count] categories, trying to exclude [exclude] for variety.
   static List<String> _pickCategories(
@@ -123,6 +193,7 @@ class SortingGenerator {
   /// [objectsPerCategory] can be int (uniform) or List<int> (per-category).
   static SortingRound _buildRound(
     List<String> categoryKeys, {
+    required Random rng,
     dynamic objectsPerCategory = 2,
     required int difficulty,
   }) {
@@ -144,7 +215,9 @@ class SortingGenerator {
       }
 
       // Take up to [count] items from the shuffled available list
-      final selected = available.take(count.clamp(1, available.length)).toList();
+      final selected = available
+          .take(count.clamp(1, available.length))
+          .toList();
       categories[key] = selected;
       categoryIcons[key] = _categoryIcons[key]!;
       categoryLabels[key] = _categoryLabels[key]!;
@@ -155,7 +228,7 @@ class SortingGenerator {
       }
     }
 
-    allObjects.shuffle(_rng);
+    allObjects.shuffle(rng);
 
     return SortingRound(
       categories: categories,

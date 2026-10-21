@@ -7,7 +7,7 @@ import socket
 
 from pathlib import Path
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import httpx
 import uvicorn
 import asyncio
@@ -101,9 +101,11 @@ def start_services():
             [sys.executable, str(main_py)],
             cwd=str(svc_path),
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
+            # Inherit container streams so verbose ML logs cannot fill a pipe
+            # and deadlock the service.
+            stdout=None,
+            stderr=None,
+            text=True,
         )
         processes.append(p)
         
@@ -115,20 +117,18 @@ def start_services():
     except Exception as e:
         print(f"[ERROR] Failed to save PID file: {e}")
 
-# Ensure only ONE gateway worker starts the background services (avoids race condition port collisions)
+# Ensure only one gateway worker owns the background services. An advisory
+# lock is released automatically if the process dies, unlike a stale sentinel.
 LOCK_FILE = "/tmp/azure_gateway_services.lock"
-
-if not os.path.exists(LOCK_FILE):
-    try:
-        # Atomic file creation
-        fd = os.open(LOCK_FILE, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.close(fd)
-        print("[INIT] First worker starting background services...")
-        start_services()
-        time.sleep(3) # Give them time to spin up
-    except FileExistsError:
-        print("[INIT] Services already started by another worker.")
-else:
+lock_fd = os.open(LOCK_FILE, os.O_CREAT | os.O_RDWR)
+owns_service_lock = False
+try:
+    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    owns_service_lock = True
+    print("[INIT] Gateway worker starting background services...")
+    start_services()
+    time.sleep(3)  # Give them time to bind their ports.
+except BlockingIOError:
     print("[INIT] Services already started by another worker.")
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -145,33 +145,65 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = httpx.AsyncClient(timeout=60.0)
+client = httpx.AsyncClient(
+    timeout=httpx.Timeout(connect=10.0, read=300.0, write=60.0, pool=10.0)
+)
 
 async def proxy_request(request: Request, service_port: int, path: str):
-    url = f"http://127.0.0.1:{service_port}/{path}"
+    query_str = f"?{request.url.query}" if request.url.query else ""
+    url = f"http://127.0.0.1:{service_port}/{path}{query_str}"
     
     # Read the body
     body = await request.body()
+    
+    # Filter hop-by-hop headers from client request
+    excluded_req_headers = {"host", "content-length"}
+    req_headers = [
+        (name, value) for (name, value) in request.headers.raw
+        if name.lower().decode("latin-1") not in excluded_req_headers
+    ]
     
     try:
         # Forward the request
         req = client.build_request(
             method=request.method,
             url=url,
-            headers=request.headers.raw,
+            headers=req_headers,
             content=body
         )
         
         response = await client.send(req, stream=True)
         
+        excluded_resp_headers = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+        resp_headers = {
+            k: v for k, v in response.headers.items()
+            if k.lower() not in excluded_resp_headers
+        }
+        
         return StreamingResponse(
             response.aiter_raw(),
             status_code=response.status_code,
-            headers=response.headers
+            headers=resp_headers
         )
-    except Exception as e:
-        import traceback
-        return {"error": str(e), "traceback": traceback.format_exc()}
+    except httpx.TimeoutException:
+        return JSONResponse(
+            status_code=504,
+            content={
+                "error": "upstream_timeout",
+                "message": "The ML service took too long to respond. Please retry.",
+                "retryable": True,
+            },
+        )
+    except httpx.HTTPError as exc:
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": "upstream_unavailable",
+                "message": "The ML service is temporarily unavailable.",
+                "retryable": True,
+                "error_type": type(exc).__name__,
+            },
+        )
 
 @app.api_route("/speech/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"])
 async def proxy_speech(request: Request, path: str):
@@ -205,24 +237,54 @@ def get_non_blocking_output(p):
 @app.get("/health")
 def health_check():
     status = {}
+    healthy = len(processes) == len(SERVICES)
     for i, p in enumerate(processes):
         p.poll()
-        logs = get_non_blocking_output(p)
         if p.returncode is not None:
-            status[f"process_{i}"] = f"CRASHED! Exit code: {p.returncode}. Logs: {logs}"
+            status[SERVICES[i]["name"]] = f"crashed:{p.returncode}"
+            healthy = False
         else:
-            status[f"process_{i}"] = f"RUNNING. Logs: {logs}"
+            status[SERVICES[i]["name"]] = "running"
     
     env_vars = {
         "MONGODB_URL": "SET" if os.getenv("MONGODB_URL") else "MISSING",
         "GEMINI_API_KEY": "SET" if os.getenv("GEMINI_API_KEY") else "MISSING"
     }
-    return {"status": "ok", "message": "Azure ML Gateway is running", "details": status, "env": env_vars}
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content={"status": "ok" if healthy else "degraded", "message": "Azure ML Gateway process status",
+                 "details": status, "env": env_vars},
+    )
+
+
+@app.get("/ready")
+async def readiness_check():
+    if len(processes) != len(SERVICES) or any(p.poll() is not None for p in processes):
+        return JSONResponse(status_code=503, content={"ready": False, "services": "process_failure"})
+    checks = {}
+    async with httpx.AsyncClient(timeout=3.0) as health_client:
+        for service in SERVICES:
+            try:
+                endpoint = "health" if service["name"] == "tutoring" else "ready"
+                response = await health_client.get(
+                    f"http://127.0.0.1:{service['port']}/{endpoint}"
+                )
+                checks[service["name"]] = "ready" if response.is_success else f"not_ready:{response.status_code}"
+            except httpx.HTTPError as exc:
+                checks[service["name"]] = f"unreachable:{type(exc).__name__}"
+    ready = all(value == "ready" for value in checks.values())
+    return JSONResponse(status_code=200 if ready else 503, content={"ready": ready, "services": checks})
 
 
 if __name__ == "__main__":
     try:
-        uvicorn.run("azure_gateway:app", host="0.0.0.0", port=8080)
+        # Passing the object avoids importing this module a second time and
+        # losing the child-process state shown by /health.
+        uvicorn.run(app, host="0.0.0.0", port=8080)
     finally:
-        for p in processes:
-            p.terminate()
+        if owns_service_lock:
+            for p in processes:
+                p.terminate()
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+

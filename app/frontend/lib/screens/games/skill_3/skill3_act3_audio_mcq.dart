@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../models/curriculum_models.dart';
-import '../../../../services/tts_service.dart';
+import '../../../theme/app_theme.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../models/curriculum_models.dart';
+import '../../../services/tts_service.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
-import '../../../../services/progress_service.dart';
-import '../shared_widgets/shared_celebration_popup.dart';
+import '../../../services/progress_service.dart';
+import '../../../adaptive/adapters/choice_scaffold_adapter.dart';
+import '../../../adaptive/models/adaptive_scaffold_models.dart';
 
 /// Skill 3 Activity 3 (Listen to Word & Select Matching Word)
 /// Premium redesign with interactive animations and world-class UI
@@ -27,18 +28,32 @@ class Skill3Act3AudioMcq extends StatefulWidget {
 }
 
 class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
-    with TickerProviderStateMixin {
-  String _lastSpokenInstruction = '';
+    with TickerProviderStateMixin, ChoiceScaffoldAdapter<Skill3Act3AudioMcq> {
+  String _lastAutoPlayedItemId = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
   int? _selectedIndex;
   bool _isCorrect = false;
   bool _activityComplete = false;
+  Map<String, dynamic>? _completedRoundSnapshot;
   int _currentRoundIndex = 0;
   int _attemptCount = 0;
 
+  @override
+  List<String> get adaptiveSemanticScaffoldCapabilities => const <String>[
+    'REPLAY_INSTRUCTION',
+    'SLOW_AUDIO',
+  ];
+
+  @override
+  Future<void> handleAdaptiveSemanticScaffold(ScaffoldCommand command) async {
+    if (command.type == ScaffoldActionType.replayInstruction) {
+      await _playAudioPrompt();
+    } else if (command.type == ScaffoldActionType.slowAudio) {
+      await _playAudioPrompt(slow: true);
+    }
+  }
+
   // Animations
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
   late AnimationController _speakerBounceController;
   late Animation<double> _speakerBounceAnimation;
 
@@ -57,15 +72,6 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
     if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
       _currentRoundIndex = 0;
     }
-
-    // Pulsing glow for the speaker button
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
 
     // Speaker bounce when tapped
     _speakerBounceController = AnimationController(
@@ -86,21 +92,28 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
 
   @override
   void dispose() {
-    _pulseController.dispose();
     _speakerBounceController.dispose();
     _audioPlayer.dispose();
+    disposeChoiceScaffoldAdapter();
     super.dispose();
   }
 
-  void _playAudioPrompt({bool autoPlay = false}) {
+  Future<void> _playAudioPrompt({
+    bool autoPlay = false,
+    bool slow = false,
+  }) async {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) return;
 
-    final currentRound = rounds[_currentRoundIndex];
+    final currentRound = adaptiveRoundData(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+    );
     final audioText =
         currentRound['audio_text']?.toString() ??
         currentRound['prompt']?.toString() ??
         'වෘත්තය';
+    final itemId = currentRound['item_id']?.toString() ?? audioText;
     String spokenInstruction = audioText
         .replaceAll('මා', 'ම')
         .replaceAllMapped(
@@ -111,22 +124,43 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
           RegExp(r"'?(.)'? පින්තූරය"),
           (match) => '${match.group(1)}, පින්තූරය',
         );
-    
-    if (autoPlay && _lastSpokenInstruction == spokenInstruction) {
+
+    if (autoPlay && _lastAutoPlayedItemId == itemId) {
       return;
     }
-    _lastSpokenInstruction = spokenInstruction;
-    TtsService().speak(spokenInstruction, folder: 'skill_3');
+    if (autoPlay) {
+      _lastAutoPlayedItemId = itemId;
+    }
+    final played = await TtsService().speak(
+      spokenInstruction,
+      folder: 'skill_3',
+      playbackRate: slow ? 0.78 : 1.0,
+    );
+    if (!mounted) return;
+    if (autoPlay && !played && _lastAutoPlayedItemId == itemId) {
+      // Permit a retry if loading or playback failed; never mark a silent item
+      // as already delivered.
+      _lastAutoPlayedItemId = '';
+    }
 
     // Bounce the speaker icon
-    _speakerBounceController.forward().then((_) {
-      _speakerBounceController.reverse();
-    });
+    await _speakerBounceController.forward(from: 0);
+    if (mounted) {
+      await _speakerBounceController.reverse();
+    }
   }
 
   void _checkAnswer(int index, int correctIndex, int totalRounds) async {
     if (_isCorrect) return;
     if (_selectedIndex != null) return;
+    if (isAdaptivelyRemoved(index)) return;
+
+    final completedRoundSnapshot = Map<String, dynamic>.from(
+      adaptiveRoundData(
+        activity: widget.activityNode,
+        roundIndex: _currentRoundIndex,
+      ),
+    );
 
     _attemptCount++;
     setState(() {
@@ -137,25 +171,40 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
     int score = isRight ? 100 : 0;
 
     if (isRight) {
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(
+      final transition = await completeAdaptiveChoiceTask(
         score,
+        roundIndex: _currentRoundIndex,
       );
       setState(() {
+        _completedRoundSnapshot = completedRoundSnapshot;
         _isCorrect = true;
       });
       SoundUtils.playFeedback('audio/correct.mp3');
 
-      _advanceRoundAfterDelay(totalRounds);
+      _advanceRoundAfterDelay(totalRounds, transition);
     } else {
       SoundUtils.playFeedback('audio/wrong.mp3');
+      await requestChoiceScaffold(
+        selectedIndex: index,
+        options: adaptiveOptionLabels,
+        correctIndex: correctIndex,
+        errorType: 'auditory_word_error',
+      );
+      if (mounted) setState(() {});
 
-      if (_attemptCount >= 2) {
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(0);
+      if (_attemptCount >= 3) {
+        final transition = await completeAdaptiveChoiceTask(
+          0,
+          roundIndex: _currentRoundIndex,
+          isCorrect: true,
+          attemptAlreadyLogged: true,
+        );
         setState(() {
+          _completedRoundSnapshot = completedRoundSnapshot;
           _selectedIndex = correctIndex;
           _isCorrect = true;
         });
-        _advanceRoundAfterDelay(totalRounds);
+        _advanceRoundAfterDelay(totalRounds, transition);
       } else {
         Future.delayed(const Duration(milliseconds: 700), () {
           if (!mounted) return;
@@ -167,12 +216,13 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
     }
   }
 
-  void _advanceRoundAfterDelay(int totalRounds) {
+  void _advanceRoundAfterDelay(int totalRounds, dynamic transition) {
     Future.delayed(const Duration(milliseconds: 1400), () {
       if (!mounted) return;
-      if (_currentRoundIndex < totalRounds - 1) {
+      if (transition != null && !transition.isComplete) {
         setState(() {
-          _currentRoundIndex++;
+          _completedRoundSnapshot = null;
+          _currentRoundIndex = transition.roundIndex;
           _attemptCount = 0;
           final sId = widget.activityNode?.skillId ?? '';
           final aId = widget.activityNode?.id ?? '';
@@ -188,7 +238,13 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
           _selectedIndex = null;
           _isCorrect = false;
         });
-        _playAudioPrompt(autoPlay: true);
+        // Wait until the newly selected adaptive item has rendered. This
+        // prevents its TTS request racing the completed-item feedback frame.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _playAudioPrompt(autoPlay: true);
+          }
+        });
       } else {
         setState(() {
           _activityComplete = true;
@@ -217,7 +273,12 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
       rounds = rounds.sublist(0, 5);
     }
 
-    final currentRound = rounds[_currentRoundIndex];
+    final currentRound =
+        _completedRoundSnapshot ??
+        adaptiveRoundData(
+          activity: widget.activityNode,
+          roundIndex: _currentRoundIndex,
+        );
     final titleText =
         widget.activityNode?.title ?? 'ශබ්දයට සවන් දී වචනය තෝරන්න';
     var options =
@@ -230,9 +291,14 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
       var distractors = options.where((item) => item != correctItem).toList();
       if (distractors.isNotEmpty) distractors = distractors.sublist(0, 1);
       options = [correctItem, ...distractors];
-      options.shuffle();
       correctIndex = options.indexOf(correctItem);
     }
+    configureAdaptiveChoices(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+      options: options,
+      correctIndex: correctIndex,
+    );
 
     return SharedGameLayout(
       studentData: widget.studentData,
@@ -359,19 +425,21 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
         ],
       ),
       child: Wrap(
-        key: ValueKey(_currentRoundIndex),
+        key: ValueKey('answers_$adaptiveItemId'),
         spacing: 16,
         runSpacing: 16,
         alignment: WrapAlignment.center,
-        children: List.generate(options.length, (index) {
-          return _buildOptionTile(
-            index,
-            options[index],
-            correctIndex,
-            totalRounds,
-            options.length,
-          );
-        }),
+        children: <Widget>[
+          for (int index = 0; index < options.length; index++)
+            if (!isAdaptivelyRemoved(index))
+              _buildOptionTile(
+                index,
+                options[index],
+                correctIndex,
+                totalRounds,
+                options.length,
+              ),
+        ],
       ),
     );
   }
@@ -387,6 +455,7 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
     final isRight = isSelected && (index == correctIndex);
     final isWrong = isSelected && (index != correctIndex);
     final isHidden = _isCorrect && (index != correctIndex);
+    final isHinted = isAdaptivelyHighlighted(index);
 
     // Detect if the word is complex (has pillam or is multi-character)
 
@@ -444,9 +513,14 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
           spreadRadius: 2,
         ),
       ];
+    } else if (isHinted) {
+      tileColor = AppColors.warmAmberLight.withValues(alpha: 0.42);
+      borderColor = AppColors.warmAmber;
+      borderWidth = 4.0;
     }
 
     return GestureDetector(
+      key: ValueKey(adaptiveOptionId(index)),
       onTap: () => _checkAnswer(index, correctIndex, totalRounds),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
@@ -473,7 +547,7 @@ class _Skill3Act3AudioMcqState extends State<Skill3Act3AudioMcq>
                   maxLines: 1,
                   style: AppTypography.sinhala(
                     fontSize: fontSize,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
                     color: textColor,
                     height: 1.3,
                   ),

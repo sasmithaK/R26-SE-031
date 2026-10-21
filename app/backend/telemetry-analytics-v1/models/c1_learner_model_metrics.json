@@ -1,0 +1,92 @@
+{
+  "model": "c1_learner_model",
+  "algorithm": "HistGradientBoostingClassifier (native missing values)",
+  "feature_schema": "c1-learner-v2",
+  "features": [
+    "accuracy",
+    "mean_latency_ms",
+    "median_latency_ms",
+    "latency_std_ms",
+    "mean_first_touch_latency_ms",
+    "hesitation_rate",
+    "misclick_rate",
+    "replay_rate",
+    "completion_rate",
+    "latency_drift",
+    "error_drift",
+    "hesitation_drift",
+    "accuracy_slope",
+    "visual_processing_index",
+    "phonological_task_index",
+    "motor_interaction_index",
+    "attention_stability_index",
+    "fatigue_score",
+    "cognitive_load_score"
+  ],
+  "class_names": [
+    "TYPICAL",
+    "VISUAL_ORTHOGRAPHIC_PATTERN",
+    "PHONOLOGICAL_PATTERN",
+    "COMBINED_PATTERN"
+  ],
+  "simulator_version": "c1-sim-v1",
+  "trained_at": "2026-10-21T00:04:58.173439+00:00",
+  "training_data": "simulated rounds -> live feature code (synthetic only)",
+  "evidence_rule": {
+    "window_days": 14,
+    "min_completed_rounds": 20,
+    "min_sessions": 2
+  },
+  "learners_eligible": 4162,
+  "learners_below_evidence_rule": 1838,
+  "learners_without_sound_tasks": 1689,
+  "test_learners": 833,
+  "accuracy": 0.7191,
+  "macro_f1": 0.7145,
+  "accuracy_with_sound_tasks": 0.7635,
+  "accuracy_without_sound_tasks": 0.6527,
+  "classification_report": {
+    "TYPICAL": {
+      "precision": 0.7613636363636364,
+      "recall": 0.8739130434782608,
+      "f1-score": 0.8137651821862348,
+      "support": 230.0
+    },
+    "VISUAL_ORTHOGRAPHIC_PATTERN": {
+      "precision": 0.6683937823834197,
+      "recall": 0.6113744075829384,
+      "f1-score": 0.6386138613861386,
+      "support": 211.0
+    },
+    "PHONOLOGICAL_PATTERN": {
+      "precision": 0.6789473684210526,
+      "recall": 0.6172248803827751,
+      "f1-score": 0.6466165413533834,
+      "support": 209.0
+    },
+    "COMBINED_PATTERN": {
+      "precision": 0.7526881720430108,
+      "recall": 0.7650273224043715,
+      "f1-score": 0.7588075880758808,
+      "support": 183.0
+    },
+    "accuracy": 0.7190876350540216,
+    "macro avg": {
+      "precision": 0.71534823980278,
+      "recall": 0.7168849134620865,
+      "f1-score": 0.7144507932504094,
+      "support": 833.0
+    },
+    "weighted avg": {
+      "precision": 0.7152300839500707,
+      "recall": 0.7190876350540216,
+      "f1-score": 0.7153879500792949,
+      "support": 833.0
+    }
+  },
+  "limitations": [
+    "Trained on simulated learners only; simulator parameters are provisional (config/c1_simulation.yaml).",
+    "Accuracy on simulated data shows the pipeline separates the simulated patterns; it is not clinical validity.",
+    "Estimates are hidden when a learner's inputs fall outside the training ranges."
+  ]
+}

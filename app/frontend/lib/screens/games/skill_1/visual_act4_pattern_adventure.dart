@@ -1,13 +1,14 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import '../../../widgets/app_loading_indicator.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../models/curriculum_models.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../services/tts_service.dart';
-import '../../../../services/progress_service.dart';
+import '../../../models/curriculum_models.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../theme/app_theme.dart';
+import '../../../services/tts_service.dart';
+import '../../../services/progress_service.dart';
 
 import 'logic/pattern_generator.dart';
 import 'models/pattern_round.dart';
@@ -16,6 +17,8 @@ import 'widgets/pattern_train.dart';
 import 'widgets/pattern_carriage.dart';
 import 'widgets/pattern_answer_token.dart';
 import '../shared_widgets/shared_celebration_popup.dart';
+import '../../../adaptive/adapters/choice_scaffold_adapter.dart';
+import '../../../adaptive/utils/adaptive_option_order.dart';
 
 // ──────────────────────────────────────────────────────────────
 // Activity 02: Pattern Adventure
@@ -26,16 +29,19 @@ class VisualAct4PatternAdventure extends StatefulWidget {
   final ActivityNode activityNode;
   final Map<String, dynamic>? studentData;
 
-  const VisualAct4PatternAdventure({Key? key, required this.activityNode, this.studentData})
-      : super(key: key);
+  const VisualAct4PatternAdventure({
+    Key? key,
+    required this.activityNode,
+    this.studentData,
+  }) : super(key: key);
 
   @override
   _VisualAct4PatternAdventureState createState() =>
       _VisualAct4PatternAdventureState();
 }
 
-class _VisualAct4PatternAdventureState
-    extends State<VisualAct4PatternAdventure> with TickerProviderStateMixin {
+class _VisualAct4PatternAdventureState extends State<VisualAct4PatternAdventure>
+    with TickerProviderStateMixin, ChoiceScaffoldAdapter {
   String _lastSpokenInstruction = '';
   // ── Game state ──
   int _currentRoundIndex = 0;
@@ -60,16 +66,16 @@ class _VisualAct4PatternAdventureState
   // ── Animation controllers ──
   late AnimationController _celebrationController;
   late Animation<double> _celebrationScale;
-  
+
   late AnimationController _roundTransitionController;
   late Animation<double> _roundFadeAnimation;
-  
+
   late AnimationController _flyController;
   late Animation<double> _flyProgress;
-  
+
   late List<AnimationController> _shakeControllers;
   late List<Animation<double>> _shakeAnimations;
-  
+
   late AnimationController _bounceController;
   late Animation<double> _bounceAnimation;
 
@@ -107,9 +113,9 @@ class _VisualAct4PatternAdventureState
   @override
   void initState() {
     super.initState();
-    
+
     // Generate randomized rounds dynamically
-    _rounds = PatternGenerator.generateRounds();
+    _rounds = PatternGenerator.fromCurriculumRounds(widget.activityNode.rounds);
     _currentRoundIndex = ProgressService().getActivityState(
       widget.activityNode.skillId,
       widget.activityNode.id,
@@ -126,33 +132,42 @@ class _VisualAct4PatternAdventureState
 
     // Celebration
     _celebrationController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 800));
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
     _celebrationScale = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _celebrationController, curve: Curves.elasticOut),
+      CurvedAnimation(parent: _celebrationController, curve: Curves.elasticOut),
     );
 
     // Round transition
     _roundTransitionController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1500));
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
     _roundFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-          parent: _roundTransitionController, curve: Curves.easeOut),
+        parent: _roundTransitionController,
+        curve: Curves.easeOut,
+      ),
     );
 
     // Fly animation
     _flyController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 600));
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
     _flyProgress = CurvedAnimation(
-        parent: _flyController, curve: Curves.easeInOut);
+      parent: _flyController,
+      curve: Curves.easeInOut,
+    );
     _flyController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         setState(() => _answerRevealed = true);
-        
+
         // Bounce the carriage
         _bounceController.forward(from: 0).then((_) {
           // Sparkle sound removed as per user request to only have one sound
-          
+
           Future.delayed(const Duration(milliseconds: 800), () {
             if (!mounted) return;
             _nextRound();
@@ -163,17 +178,22 @@ class _VisualAct4PatternAdventureState
 
     // Shake for wrong answers
     _shakeControllers = List.generate(
-        4,
-        (_) => AnimationController(
-            vsync: this, duration: const Duration(milliseconds: 400)));
+      4,
+      (_) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 400),
+      ),
+    );
     _shakeAnimations = _shakeControllers
-        .map((c) => TweenSequence<double>([
-              TweenSequenceItem(tween: Tween(begin: 0, end: 10), weight: 1),
-              TweenSequenceItem(tween: Tween(begin: 10, end: -10), weight: 2),
-              TweenSequenceItem(tween: Tween(begin: -10, end: 8), weight: 2),
-              TweenSequenceItem(tween: Tween(begin: 8, end: -6), weight: 2),
-              TweenSequenceItem(tween: Tween(begin: -6, end: 0), weight: 1),
-            ]).animate(c))
+        .map(
+          (c) => TweenSequence<double>([
+            TweenSequenceItem(tween: Tween(begin: 0, end: 10), weight: 1),
+            TweenSequenceItem(tween: Tween(begin: 10, end: -10), weight: 2),
+            TweenSequenceItem(tween: Tween(begin: -10, end: 8), weight: 2),
+            TweenSequenceItem(tween: Tween(begin: 8, end: -6), weight: 2),
+            TweenSequenceItem(tween: Tween(begin: -6, end: 0), weight: 1),
+          ]).animate(c),
+        )
         .toList();
 
     // Bounce for correct answer insertion
@@ -181,13 +201,13 @@ class _VisualAct4PatternAdventureState
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    _bounceAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 1),
-    ]).animate(CurvedAnimation(
-      parent: _bounceController,
-      curve: Curves.easeOut,
-    ));
+    _bounceAnimation =
+        TweenSequence<double>([
+          TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 1),
+          TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 1),
+        ]).animate(
+          CurvedAnimation(parent: _bounceController, curve: Curves.easeOut),
+        );
 
     // Speaker bounce
     _speakerBounceController = AnimationController(
@@ -195,7 +215,10 @@ class _VisualAct4PatternAdventureState
       duration: const Duration(milliseconds: 400),
     );
     _speakerBounceAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _speakerBounceController, curve: Curves.elasticOut),
+      CurvedAnimation(
+        parent: _speakerBounceController,
+        curve: Curves.elasticOut,
+      ),
     );
 
     _roundTransitionController.forward().then((_) {
@@ -210,7 +233,6 @@ class _VisualAct4PatternAdventureState
   }
 
   void _playInstruction({bool autoPlay = false}) {
-    
     if (autoPlay && _lastSpokenInstruction == 'රටාවට ගැළපෙන පින්තූරය තෝරන්න') {
       return;
     }
@@ -222,7 +244,7 @@ class _VisualAct4PatternAdventureState
   }
 
   void _scrollToEndOfTrain() {
-    if (_rounds[_currentRoundIndex].sequence.length <= 4) return;
+    if (_activeRound.sequence.length <= 4) return;
 
     if (_trainScrollController.hasClients) {
       Future.delayed(const Duration(milliseconds: 500), () {
@@ -249,9 +271,9 @@ class _VisualAct4PatternAdventureState
     }
     _trainScrollController.dispose();
     _audioPlayer.dispose();
+    disposeChoiceScaffoldAdapter();
     super.dispose();
   }
-
 
   void _initRound() {
     if (_currentRoundIndex >= _rounds.length) return;
@@ -259,12 +281,19 @@ class _VisualAct4PatternAdventureState
     _matchedChoiceIndex = -1;
     _answerRevealed = false;
     _flyController.reset();
+    final round = _activeRound;
+    configureAdaptiveChoices(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+      options: round.options,
+      correctIndex: round.options.indexOf(round.correctAnswer),
+    );
     setState(() {});
   }
 
   void _onChoiceTapped(int index) {
     if (_roundComplete) return;
-    final currentRound = _rounds[_currentRoundIndex];
+    final currentRound = _activeRound;
     if (index >= currentRound.options.length) return;
 
     final choicePath = currentRound.options[index];
@@ -273,6 +302,8 @@ class _VisualAct4PatternAdventureState
       SoundUtils.playFeedback('audio/correct.mp3');
       _capturePositions(index);
 
+      // Response time ends at the correct tap, not after the fly/bounce.
+      context.findAncestorStateOfType<TelemetryWrapperState>()?.markResponseComplete();
       setState(() {
         _matchedChoiceIndex = index;
         _roundComplete = true;
@@ -286,38 +317,49 @@ class _VisualAct4PatternAdventureState
       if (index < _shakeControllers.length) {
         _shakeControllers[index].forward(from: 0);
       }
-      context
-          .findAncestorStateOfType<TelemetryWrapperState>()
-          ?.recordMisclick();
+      unawaited(
+        requestChoiceScaffold(
+          selectedIndex: index,
+          options: currentRound.options,
+          correctIndex: currentRound.options.indexOf(
+            currentRound.correctAnswer,
+          ),
+          errorType: 'visual_pattern_error',
+          struggledTargetUnits: <String>[currentRound.correctAnswer],
+        ).then((_) {
+          if (mounted) setState(() {});
+        }),
+      );
     }
   }
 
   void _capturePositions(int choiceIndex) {
     try {
-      final choiceBox = _choiceKeys[choiceIndex].currentContext
-          ?.findRenderObject() as RenderBox?;
-      final targetBox = _questionSlotKey.currentContext
-          ?.findRenderObject() as RenderBox?;
+      final choiceBox =
+          _choiceKeys[choiceIndex].currentContext?.findRenderObject()
+              as RenderBox?;
+      final targetBox =
+          _questionSlotKey.currentContext?.findRenderObject() as RenderBox?;
       if (choiceBox != null && targetBox != null) {
-        _flyFromRect =
-            choiceBox.localToGlobal(Offset.zero) & choiceBox.size;
-        _flyToRect =
-            targetBox.localToGlobal(Offset.zero) & targetBox.size;
+        _flyFromRect = choiceBox.localToGlobal(Offset.zero) & choiceBox.size;
+        _flyToRect = targetBox.localToGlobal(Offset.zero) & targetBox.size;
       }
     } catch (_) {}
   }
 
-  void _nextRound() {
+  Future<void> _nextRound() async {
     if (!mounted) return;
-    context
-        .findAncestorStateOfType<TelemetryWrapperState>()
-        ?.completeRound(100);
+    final transition = await completeAdaptiveChoiceTask(
+      100,
+      roundIndex: _currentRoundIndex,
+    );
+    if (!mounted) return;
 
-    if (_currentRoundIndex < _rounds.length - 1) {
+    if (transition != null && !transition.isComplete) {
       _roundTransitionController.reverse().then((_) {
         if (!mounted) return;
         setState(() {
-          _currentRoundIndex++;
+          _currentRoundIndex = transition.roundIndex;
           _initRound();
         });
         ProgressService().saveActivityState(
@@ -349,9 +391,30 @@ class _VisualAct4PatternAdventureState
     }
   }
 
+  PatternRound get _activeRound {
+    final data = adaptiveRoundData(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+    );
+    final round = PatternGenerator.fromCurriculum(data);
+    final itemId = adaptiveTaskCoordinator?.itemId ??
+        data['item_id']?.toString() ??
+        'S1A4R${_currentRoundIndex + 1}';
+    return PatternRound(
+      sequence: round.sequence,
+      missingIndex: round.missingIndex,
+      correctAnswer: round.correctAnswer,
+      options: AdaptiveOptionOrder.withTargets<String>(
+        source: round.options,
+        itemId: itemId,
+        isTarget: (value) => value == round.correctAnswer,
+      ),
+      difficulty: round.difficulty,
+    );
+  }
+
   void _finishActivity() {
-    final wrapper =
-        context.findAncestorStateOfType<TelemetryWrapperState>();
+    final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
     if (wrapper != null) {
       wrapper.completeActivity(context);
     } else {
@@ -362,15 +425,18 @@ class _VisualAct4PatternAdventureState
   @override
   Widget build(BuildContext context) {
     if (_rounds.isEmpty) {
-      return const Scaffold(
-          body: Center(child: AppLoadingIndicator()));
+      return const Scaffold(body: Center(child: AppLoadingIndicator()));
     }
 
     return Scaffold(
       body: Stack(
         children: [
           // Background layer
-          const Positioned.fill(child: PatternBackground(imagePath: 'assets/images/backgrounds/act2_bg.jpg')),
+          const Positioned.fill(
+            child: PatternBackground(
+              imagePath: 'assets/images/backgrounds/act2_bg.jpg',
+            ),
+          ),
 
           SafeArea(
             child: FadeTransition(
@@ -386,13 +452,19 @@ class _VisualAct4PatternAdventureState
                   SizedBox(
                     height: 160,
                     child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(1.5, 0), // Slide in from the right
-                        end: Offset.zero,
-                      ).animate(CurvedAnimation(
-                        parent: _roundTransitionController,
-                        curve: Curves.easeOutCubic,
-                      )),
+                      position:
+                          Tween<Offset>(
+                            begin: const Offset(
+                              1.5,
+                              0,
+                            ), // Slide in from the right
+                            end: Offset.zero,
+                          ).animate(
+                            CurvedAnimation(
+                              parent: _roundTransitionController,
+                              curve: Curves.easeOutCubic,
+                            ),
+                          ),
                       child: _buildTrainSection(),
                     ),
                   ),
@@ -406,16 +478,13 @@ class _VisualAct4PatternAdventureState
                   ),
 
                   const Spacer(flex: 1),
-                  
-
                 ],
               ),
             ),
           ),
 
           // Flying token overlay
-          if (_matchedChoiceIndex >= 0 && !_answerRevealed)
-            _buildFlyingToken(),
+          if (_matchedChoiceIndex >= 0 && !_answerRevealed) _buildFlyingToken(),
 
           // Celebration
           if (_activityComplete) _buildCelebrationOverlay(),
@@ -451,8 +520,11 @@ class _VisualAct4PatternAdventureState
                 color: const Color(0xFFF0F4FF),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.arrow_back_rounded,
-                  color: Color(0xFF4A90D9), size: 24),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                color: Color(0xFF4A90D9),
+                size: 24,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -463,13 +535,16 @@ class _VisualAct4PatternAdventureState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-
-                    Text(widget.activityNode.title.isEmpty ? 'Pattern Adventure' : widget.activityNode.title,
-                        style: AppTypography.heading(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF3E3E3E),
-                        )),
+                    Text(
+                      widget.activityNode.title.isEmpty
+                          ? 'Pattern Adventure'
+                          : widget.activityNode.title,
+                      style: AppTypography.heading(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF3E3E3E),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -478,18 +553,19 @@ class _VisualAct4PatternAdventureState
             ),
           ),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: const Color(0xFFF0F4FF),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text('${_currentRoundIndex + 1}/${_rounds.length}',
-                style: AppTypography.body(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF4A90D9),
-                )),
+            child: Text(
+              '${_currentRoundIndex + 1}/${_rounds.length}',
+              style: AppTypography.body(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF4A90D9),
+              ),
+            ),
           ),
         ],
       ),
@@ -524,12 +600,13 @@ class _VisualAct4PatternAdventureState
               color: isCompleted
                   ? const Color(0xFF6DBE6D)
                   : isCurrent
-                      ? const Color(0xFFF9C623)
-                      : const Color(0xFFE0E0E0),
+                  ? const Color(0xFFF9C623)
+                  : const Color(0xFFE0E0E0),
               border: isCurrent
                   ? Border.all(
                       color: const Color(0xFFF9C623).withValues(alpha: 0.3),
-                      width: 2)
+                      width: 2,
+                    )
                   : null,
             ),
           );
@@ -542,7 +619,9 @@ class _VisualAct4PatternAdventureState
   Widget _buildInstructionCard() {
     return GestureDetector(
       onTap: () {
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.logAudioReplay();
+        context
+            .findAncestorStateOfType<TelemetryWrapperState>()
+            ?.logAudioReplay();
         _playInstruction();
       },
       child: Container(
@@ -557,15 +636,38 @@ class _VisualAct4PatternAdventureState
           mainAxisSize: MainAxisSize.min,
           children: [
             Flexible(
-              child: Text('රටාවට ගැළපෙන පින්තූරය තෝරන්න', style: AppTypography.sinhala(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary), textAlign: TextAlign.center),
+              child: Text(
+                'රටාවට ගැළපෙන පින්තූරය තෝරන්න',
+                style: AppTypography.sinhala(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
             const SizedBox(width: 12),
             ScaleTransition(
               scale: _speakerBounceAnimation,
               child: Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.warmAmber, boxShadow: [BoxShadow(color: AppColors.warmAmber.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))]),
-                child: const Icon(Icons.volume_up_rounded, color: Colors.white, size: 26),
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.warmAmber,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.warmAmber.withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.volume_up_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
               ),
             ),
           ],
@@ -576,27 +678,31 @@ class _VisualAct4PatternAdventureState
 
   // ── Train Section ──
   Widget _buildTrainSection() {
-    final round = _rounds[_currentRoundIndex];
-    
+    final round = _activeRound;
+
     // Build carriages based on sequence
     List<Widget> carriageWidgets = [];
     for (int i = 0; i < round.sequence.length; i++) {
       final isMissing = (i == round.missingIndex);
       final assetPath = round.sequence[i];
       final accent = _wagonAccents[i % _wagonAccents.length];
-      
+
       carriageWidgets.add(
         PatternCarriage(
-          imagePath: isMissing && _answerRevealed ? round.correctAnswer : assetPath,
+          imagePath: isMissing && _answerRevealed
+              ? round.correctAnswer
+              : assetPath,
           accentColor: accent,
           isMissing: isMissing && !_answerRevealed,
           isCorrectRevealed: isMissing && _answerRevealed,
           carriageKey: isMissing ? _questionSlotKey : null,
-          bounceAnimation: (isMissing && _answerRevealed) ? _bounceAnimation : null,
-        )
+          bounceAnimation: (isMissing && _answerRevealed)
+              ? _bounceAnimation
+              : null,
+        ),
       );
     }
-    
+
     return PatternTrain(
       locomotive: _buildLocomotive(),
       carriages: carriageWidgets,
@@ -606,7 +712,9 @@ class _VisualAct4PatternAdventureState
 
   Widget _buildLocomotive() {
     return Container(
-      margin: const EdgeInsets.only(right: 6), // Removed bottom margin so wheels touch track
+      margin: const EdgeInsets.only(
+        right: 6,
+      ), // Removed bottom margin so wheels touch track
       child: SizedBox(
         width: 58, // Slightly larger size (58)
         child: Column(
@@ -736,20 +844,25 @@ class _VisualAct4PatternAdventureState
 
   // ── Answer Choices ──
   Widget _buildChoiceTokens() {
-    final round = _rounds[_currentRoundIndex];
+    final round = _activeRound;
     return Wrap(
       spacing: 20,
       runSpacing: 20,
       alignment: WrapAlignment.center,
-      children: List.generate(round.options.length, (index) {
-        return PatternAnswerToken(
-          tokenKey: _choiceKeys[index],
-          imagePath: round.options[index],
-          onTap: () => _onChoiceTapped(index),
-          shakeAnimation: _shakeAnimations[index],
-          isHidden: (_matchedChoiceIndex == index && !_answerRevealed), // hide the matched token during flight
-        );
-      }),
+      children: [
+        for (var index = 0; index < round.options.length; index++)
+          if (!isAdaptivelyRemoved(index))
+            PatternAnswerToken(
+              tokenKey: _choiceKeys[index],
+              imagePath: round.options[index],
+              onTap: () => _onChoiceTapped(index),
+              shakeAnimation: _shakeAnimations[index],
+              isHinted: isAdaptivelyHighlighted(index),
+              isHidden:
+                  (_matchedChoiceIndex == index &&
+                  !_answerRevealed), // hide the matched token during flight
+            ),
+      ],
     );
   }
 
@@ -765,7 +878,9 @@ class _VisualAct4PatternAdventureState
         // Y goes up then down to create an arc
         final double curveOffset = sin(t * pi) * -80.0;
         final double currentY =
-            _flyFromRect.top + (_flyToRect.top + 15 - _flyFromRect.top) * t + curveOffset;
+            _flyFromRect.top +
+            (_flyToRect.top + 15 - _flyFromRect.top) * t +
+            curveOffset;
 
         // Shrink from token size (90) to carriage content size (~40)
         final double size = 90 - (50 * t);
@@ -776,7 +891,9 @@ class _VisualAct4PatternAdventureState
           width: size,
           height: size,
           child: Opacity(
-            opacity: t < 0.9 ? 1.0 : (1.0 - (t - 0.9) * 10), // fade out slightly at the very end
+            opacity: t < 0.9
+                ? 1.0
+                : (1.0 - (t - 0.9) * 10), // fade out slightly at the very end
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -786,12 +903,12 @@ class _VisualAct4PatternAdventureState
                     color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 10,
                     offset: const Offset(0, 5),
-                  )
-                ]
+                  ),
+                ],
               ),
               padding: const EdgeInsets.all(8),
               child: Image.asset(
-                'assets/images/activity_icons/${_rounds[_currentRoundIndex].options[_matchedChoiceIndex]}',
+                'assets/images/activity_icons/${_activeRound.options[_matchedChoiceIndex]}',
                 fit: BoxFit.contain,
               ),
             ),
@@ -830,9 +947,7 @@ class _VisualAct4PatternAdventureState
                 ],
               ),
               child: Text(
-                _roundComplete
-                    ? 'හොඳයි! 🎉'
-                    : _currentEncouragement,
+                _roundComplete ? 'හොඳයි! 🎉' : _currentEncouragement,
                 style: AppTypography.sinhala(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,

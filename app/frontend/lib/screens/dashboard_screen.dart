@@ -30,7 +30,8 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+class _DashboardScreenState extends State<DashboardScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   CurriculumIndex? _curriculum;
@@ -83,8 +84,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    final studentName = widget.studentData?['first_name'] ?? widget.studentData?['name'] ?? 'Student';
-    final avatarUrl = AvatarUtils.getCorrectedAvatarPath(widget.studentData?['avatar_url'] as String?, 'assets/images/characters/human/human_student_1.png');
+    final studentName =
+        widget.studentData?['first_name'] ??
+        widget.studentData?['name'] ??
+        'Student';
+    final avatarUrl = AvatarUtils.getCorrectedAvatarPath(
+      widget.studentData?['avatar_url'] as String?,
+      'assets/images/characters/human/human_student_1.png',
+    );
 
     return Scaffold(
       backgroundColor: AppColors.cream,
@@ -125,9 +132,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
               // Skill cards list
               Expanded(
-                child: _curriculum == null 
-                  ? const Center(child: AppLoadingIndicator())
-                  : _buildSkillsGrid(),
+                child: _curriculum == null
+                    ? const Center(child: AppLoadingIndicator())
+                    : _buildSkillsGrid(),
               ),
             ],
           ),
@@ -139,21 +146,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildHeader(String name, String avatarUrl) {
     final config = _dashConfig;
     final hour = DateTime.now().hour;
-    final greetingKey = hour < 12 
-        ? 'dash_greeting_morning' 
-        : hour < 17 
-            ? 'dash_greeting_afternoon' 
-            : hour < 20 
-                ? 'dash_greeting_evening' 
-                : 'dash_greeting_night';
-    
-    final greeting = LocalizationService.instance.t(greetingKey).replaceAll('{name}', name);
-    final streakKey = _streak == 0 
-        ? 'dash_streak_0' 
-        : _streak <= 2 
-            ? 'dash_streak_low' 
-            : 'dash_streak_high';
-    final subtitle = LocalizationService.instance.t(streakKey).replaceAll('{streak}', _streak.toString());
+    final greetingKey = hour < 12
+        ? 'dash_greeting_morning'
+        : hour < 17
+        ? 'dash_greeting_afternoon'
+        : hour < 20
+        ? 'dash_greeting_evening'
+        : 'dash_greeting_night';
+
+    final greeting = LocalizationService.instance
+        .t(greetingKey)
+        .replaceAll('{name}', name);
+    final streakKey = _streak == 0
+        ? 'dash_streak_0'
+        : _streak <= 2
+        ? 'dash_streak_low'
+        : 'dash_streak_high';
+    final subtitle = LocalizationService.instance
+        .t(streakKey)
+        .replaceAll('{streak}', _streak.toString());
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
@@ -192,40 +203,44 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           // Right Side: Streak badge + Avatar
           Row(
             children: [
-
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.warmAmber.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color: AppColors.warmAmber.withValues(alpha: 0.4),
-                        width: 1.8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('🔥', style: TextStyle(fontSize: 18)),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$_streak',
-                        style: AppTypography.heading(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.warmAmber,
-                        ),
-                      ),
-                    ],
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.warmAmber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.warmAmber.withValues(alpha: 0.4),
+                    width: 1.8,
                   ),
                 ),
-                const SizedBox(width: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('🔥', style: TextStyle(fontSize: 18)),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$_streak',
+                      style: AppTypography.heading(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.warmAmber,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
 
               GestureDetector(
                 onTap: () {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => const SelectStudentScreen()),
+                      builder: (context) => const SelectStudentScreen(),
+                    ),
                   );
                 },
                 child: Container(
@@ -315,15 +330,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     FaIcon(
                       item['icon'] as FaIconData,
                       size: 24,
-                      color: isSelected ? Colors.white : color.withValues(alpha: 0.85),
+                      color: isSelected
+                          ? Colors.white
+                          : color.withValues(alpha: 0.85),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       LocalizationService.instance.t(item['label'] as String),
                       style: AppTypography.caption(
                         fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
-                        color: isSelected ? Colors.white : AppColors.textSecondary,
+                        fontWeight: isSelected
+                            ? FontWeight.w800
+                            : FontWeight.w700,
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -367,8 +388,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       itemBuilder: (context, index) {
         final skill = _curriculum!.skills[index];
 
-        final String? prevSkillId = index > 0 ? _curriculum!.skills[index - 1].id : null;
-        final int prevTotal = index > 0 ? _curriculum!.skills[index - 1].totalActivities : 0;
+        final String? prevSkillId = index > 0
+            ? _curriculum!.skills[index - 1].id
+            : null;
+        final int prevTotal = index > 0
+            ? _curriculum!.skills[index - 1].totalActivities
+            : 0;
 
         final bool isUnlocked = ProgressService().isSkillUnlocked(
           index,
@@ -397,7 +422,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   void _handleNextSkill(String currentSkillId) async {
     if (_curriculum == null) return;
-    int currentIndex = _curriculum!.skills.indexWhere((s) => s.id == currentSkillId);
+    int currentIndex = _curriculum!.skills.indexWhere(
+      (s) => s.id == currentSkillId,
+    );
     if (currentIndex != -1 && currentIndex + 1 < _curriculum!.skills.length) {
       final nextSkill = _curriculum!.skills[currentIndex + 1];
       final prevTotal = _curriculum!.skills[currentIndex].totalActivities;
@@ -411,7 +438,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (isUnlocked) {
         // Automatically launch the next skill's map!
         if (mounted) setState(() {});
-        
+
         final result = await Navigator.push(
           context,
           MaterialPageRoute(
@@ -424,12 +451,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           ),
         );
-        
+
         if (result == 'next_skill' && mounted) {
-           // If they somehow finish the next skill immediately, recursion!
-           _handleNextSkill(nextSkill.id);
+          // If they somehow finish the next skill immediately, recursion!
+          _handleNextSkill(nextSkill.id);
         } else if (mounted) {
-           setState(() {});
+          setState(() {});
         }
       } else {
         if (mounted) setState(() {});
@@ -505,20 +532,25 @@ class _AnimatedSkillCardState extends State<_AnimatedSkillCard> {
   @override
   Widget build(BuildContext context) {
     // Show exactly one star per activity in the skill
-    final maxStars = widget.skill.totalActivities > 0 ? widget.skill.totalActivities : 5;
-    
+    final maxStars = widget.skill.totalActivities > 0
+        ? widget.skill.totalActivities
+        : 5;
+
     // Count exactly how many are completed
     int filledStars = 0;
     for (int i = 0; i < maxStars; i++) {
       String activityIdToCheck = 'act_${i + 1}';
-      
+
       // Special rule for skill_4: it only has 4 activities, but displays 5 stars.
       // The 4th activity (act_4) grants both the 4th and 5th stars.
       if (widget.skill.id == 'skill_4' && i == 4) {
         activityIdToCheck = 'act_4';
       }
-      
-      if (ProgressService().isActivityCompleted(widget.skill.id, activityIdToCheck)) {
+
+      if (ProgressService().isActivityCompleted(
+        widget.skill.id,
+        activityIdToCheck,
+      )) {
         filledStars++;
       }
     }
@@ -556,25 +588,47 @@ class _AnimatedSkillCardState extends State<_AnimatedSkillCard> {
               fit: StackFit.expand,
               children: [
                 ClipRRect(
-                  borderRadius:
-                      const BorderRadius.horizontal(left: Radius.circular(20)),
+                  borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(20),
+                  ),
                   child: ColorFiltered(
                     colorFilter: widget.isLocked
                         ? const ColorFilter.matrix([
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0, 0, 0, 1, 0,
+                            0.2126,
+                            0.7152,
+                            0.0722,
+                            0,
+                            0,
+                            0.2126,
+                            0.7152,
+                            0.0722,
+                            0,
+                            0,
+                            0.2126,
+                            0.7152,
+                            0.0722,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            1,
+                            0,
                           ])
                         : const ColorFilter.mode(
-                            Colors.transparent, BlendMode.multiply),
+                            Colors.transparent,
+                            BlendMode.multiply,
+                          ),
                     child: Image.asset(
                       widget.imagePath,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: widget.color.withValues(alpha: 0.1),
-                        child: Icon(Icons.auto_awesome_rounded,
-                            color: widget.color, size: 48),
+                        child: Icon(
+                          Icons.auto_awesome_rounded,
+                          color: widget.color,
+                          size: 48,
+                        ),
                       ),
                     ),
                   ),
@@ -584,12 +638,16 @@ class _AnimatedSkillCardState extends State<_AnimatedSkillCard> {
                 if (widget.isLocked)
                   ClipRRect(
                     borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(20)),
+                      left: Radius.circular(20),
+                    ),
                     child: Container(
                       color: Colors.black.withValues(alpha: 0.28),
                       child: const Center(
-                        child: Icon(Icons.lock_rounded,
-                            color: Colors.white, size: 36),
+                        child: Icon(
+                          Icons.lock_rounded,
+                          color: Colors.white,
+                          size: 36,
+                        ),
                       ),
                     ),
                   ),
@@ -628,22 +686,35 @@ class _AnimatedSkillCardState extends State<_AnimatedSkillCard> {
                       GestureDetector(
                         onTap: () async {
                           final url = widget.skill.audioUrl;
-                          if (url.isNotEmpty && !url.contains('githubusercontent')) {
+                          if (url.isNotEmpty &&
+                              !url.contains('githubusercontent')) {
                             try {
                               await _audioPlayer.stop();
-                              if (url.startsWith('http://') || url.startsWith('https://')) {
+                              if (url.startsWith('http://') ||
+                                  url.startsWith('https://')) {
                                 await _audioPlayer.play(UrlSource(url));
                               } else {
-                                final cleanPath = url.replaceFirst('assets/', '');
+                                final cleanPath = url.replaceFirst(
+                                  'assets/',
+                                  '',
+                                );
                                 await _audioPlayer.play(AssetSource(cleanPath));
                               }
                             } catch (e) {
-                              debugPrint('Error playing custom skill audio: $e');
-                              await TtsService().speak(widget.skill.title);
+                              debugPrint(
+                                'Error playing custom skill audio: $e',
+                              );
+                              await TtsService().speakForSkill(
+                                widget.skill.title,
+                                skillId: widget.skill.id,
+                              );
                             }
                           } else {
                             // Fallback to TTS if URL is empty or points to broken github url
-                            await TtsService().speak(widget.skill.title);
+                            await TtsService().speakForSkill(
+                              widget.skill.title,
+                              skillId: widget.skill.id,
+                            );
                           }
                         },
                         child: Container(
@@ -695,76 +766,88 @@ class _AnimatedSkillCardState extends State<_AnimatedSkillCard> {
 
                       const SizedBox(width: 4),
 
-                        // Chunky 3D Play / Try Button
-                        if (!widget.isLocked)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 7),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  widget.color,
-                                  widget.color.withValues(alpha: 0.85),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
+                      // Chunky 3D Play / Try Button
+                      if (!widget.isLocked)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                widget.color,
+                                widget.color.withValues(alpha: 0.85),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: widget.color.withValues(alpha: 0.4),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
                               ),
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: widget.color.withValues(alpha: 0.4),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 3),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(
+                                Icons.play_arrow_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                'අරඹමු',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13,
+                                  letterSpacing: 0.3,
                                 ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(Icons.play_arrow_rounded,
-                                    color: Colors.white, size: 18),
-                                SizedBox(width: 3),
-                                Text(
-                                  'අරඹමු',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 13,
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.warmAmber.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                  color: AppColors.warmAmber, width: 1.5),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.lock_open_rounded,
-                                    color: AppColors.warmAmber, size: 15),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'උත්සාහ කරමු',
-                                  style: AppTypography.heading(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppColors.warmAmber,
-                                  ),
-                                ),
-                              ],
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.warmAmber.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppColors.warmAmber,
+                              width: 1.5,
                             ),
                           ),
-                      ],
-                    ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.lock_open_rounded,
+                                color: AppColors.warmAmber,
+                                size: 15,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'උත්සාහ කරමු',
+                                style: AppTypography.heading(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.warmAmber,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -774,33 +857,33 @@ class _AnimatedSkillCardState extends State<_AnimatedSkillCard> {
     );
 
     return GestureDetector(
-        onTap: () async {
-          if (_isNavigating) return;
-          if (mounted) setState(() => _isNavigating = true);
-          try {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => LoadingSkillScreen(
-                  skill: widget.skill,
-                  studentData: widget.studentData,
-                  onReturn: widget.onReturn,
-                ),
+      onTap: () async {
+        if (_isNavigating) return;
+        if (mounted) setState(() => _isNavigating = true);
+        try {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LoadingSkillScreen(
+                skill: widget.skill,
+                studentData: widget.studentData,
+                onReturn: widget.onReturn,
               ),
-            );
-            if (!mounted) return;
-            if (result == 'next_skill' && widget.onNextSkill != null) {
-              widget.onNextSkill!(widget.skill.id);
-            } else {
-              widget.onReturn();
-            }
-          } catch (e) {
-            debugPrint('Error navigating to loading skill screen: $e');
-          } finally {
-            if (mounted) setState(() => _isNavigating = false);
+            ),
+          );
+          if (!mounted) return;
+          if (result == 'next_skill' && widget.onNextSkill != null) {
+            widget.onNextSkill!(widget.skill.id);
+          } else {
+            widget.onReturn();
           }
-        },
-        child: cardContent,
+        } catch (e) {
+          debugPrint('Error navigating to loading skill screen: $e');
+        } finally {
+          if (mounted) setState(() => _isNavigating = false);
+        }
+      },
+      child: cardContent,
     );
   }
 }

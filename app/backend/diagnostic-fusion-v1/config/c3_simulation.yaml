@@ -1,0 +1,55 @@
+# Reading-recording simulator for C3 training. STATUS: provisional (2026-10-21).
+# Touch-side learners come from telemetry-analytics-v1/scripts/export_c3_simulation.py
+# (round-level simulator + live C1 and movement feature code). Reading features
+# are simulated per recording (no audio is synthesised) and aggregated by the
+# live C3 code (services/c3_features.py). Calibrate with real recordings.
+
+version: c3-sim-v2
+random_seed: 77
+recordings_per_learner: [0, 8]     # in the 14-day window
+min_usable_recordings: 2
+min_movement_sessions: 2
+
+# chance a recording is clear enough to measure
+usable_probability:
+  TYPICAL: 0.75
+  VISUAL_ORTHOGRAPHIC_PATTERN: 0.65
+  PHONOLOGICAL_PATTERN: 0.60
+  COMBINED_PATTERN: 0.55
+
+# voice onset after pressing record (ms): typical median, per-pattern multiplier
+voice_onset:
+  typical_median_ms: 1200
+  learner_log_sd: 0.25
+  recording_log_sd: 0.35
+  multiplier:
+    TYPICAL: 1.0
+    VISUAL_ORTHOGRAPHIC_PATTERN: 1.15
+    PHONOLOGICAL_PATTERN: 1.5
+    COMBINED_PATTERN: 1.6
+
+# syllables in a reading item (Skill 5 sentences, Skill 6 textbook lines)
+syllables_per_item: [4, 24]
+# |detected beats - expected syllables| per syllable (Poisson rate x syllables)
+beat_mismatch_per_syllable:
+  TYPICAL: 0.12
+  VISUAL_ORTHOGRAPHIC_PATTERN: 0.15
+  PHONOLOGICAL_PATTERN: 0.28
+  COMBINED_PATTERN: 0.30
+
+# share of silence inside words: learner range, recording noise sd
+silence_ratio:
+  TYPICAL: [0.08, 0.22]
+  VISUAL_ORTHOGRAPHIC_PATTERN: [0.10, 0.26]
+  PHONOLOGICAL_PATTERN: [0.18, 0.40]
+  COMBINED_PATTERN: [0.20, 0.45]
+silence_noise_sd: 0.04
+
+# Voice-quality measures: NO pattern effect is assumed (exploratory measures
+# on short child recordings; no basis to simulate a difference).
+jitter: [0.010, 0.040]
+shimmer: [0.040, 0.120]
+voice_noise_sd: 0.15   # relative, per recording
+# share of clear recordings where jitter/shimmer cannot be computed (Praat
+# fails on short child voices); the model learns to handle the gap
+voice_measure_missing: 0.10

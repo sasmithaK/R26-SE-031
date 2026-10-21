@@ -13,6 +13,9 @@ import 'add_student_screen.dart';
 import 'parent/parent_hub_screen.dart';
 import 'assessment_prompt_screen.dart';
 import '../services/localization_service.dart';
+import '../models/starter_baseline_models.dart';
+import '../services/starter_baseline_service.dart';
+import 'starter_learning_profile_screen.dart';
 
 /// Select Student Screen
 /// Dyslexia-accessible: calm blue header, warm white student cards,
@@ -32,6 +35,59 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
   bool _isLoading = true;
   List<dynamic> _students = [];
   int? _selectedIndex;
+  bool _openingStudent = false;
+
+  Future<void> _openStudent(int index, Map<String, dynamic> student) async {
+    if (_openingStudent) return;
+    final studentId = student['id']?.toString();
+    if (studentId == null || studentId.isEmpty) return;
+    setState(() {
+      _openingStudent = true;
+      _selectedIndex = index;
+    });
+    await ProgressService().setCurrentStudentId(studentId);
+    await ProgressService().loadFromCloud(student);
+
+    late final StarterBaselineStatus baselineStatus;
+    try {
+      baselineStatus = await StarterBaselineService().getStatus(studentId);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _openingStudent = false;
+        _selectedIndex = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'පුංචි ඉගෙනුම් පියවර දැන් විවෘත කරන්න බැහැ. නැවත උත්සාහ කරන්න.',
+            style: AppTypography.sinhala(fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    final needsStarterProfile =
+        baselineStatus.required && !baselineStatus.isTerminal;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => needsStarterProfile
+            ? StarterLearningProfileScreen(
+                studentData: student,
+                initialStatus: baselineStatus,
+              )
+            : DashboardScreen(studentData: student),
+      ),
+    );
+    if (mounted) {
+      setState(() {
+        _openingStudent = false;
+        _selectedIndex = null;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -85,71 +141,73 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
       builder: (context, _) {
         return Scaffold(
           body: Stack(
-        children: [
-          // Background
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/images/backgrounds/map_bg.png'),
-                fit: BoxFit.cover,
-                opacity: 0.9,
+            children: [
+              // Background
+              Container(
+                width: double.infinity,
+                height: double.infinity,
+                decoration: const BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage('assets/images/backgrounds/map_bg.png'),
+                    fit: BoxFit.cover,
+                    opacity: 0.9,
+                  ),
+                ),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    color: AppColors.cream.withValues(alpha: 0.7),
+                  ),
+                ),
               ),
-            ),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                color: AppColors.cream.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
 
-          SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Column(
-                children: [
-                  // Header
-                  _buildHeader(),
+              SafeArea(
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: Column(
+                    children: [
+                      // Header
+                      _buildHeader(),
 
-                  const SizedBox(height: 8),
+                      const SizedBox(height: 8),
 
-                  // "who's learning today?" title
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        LocalizationService.instance.t('whos_learning_today'),
-                        style: AppTypography.heading(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                      // "who's learning today?" title
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            LocalizationService.instance.t(
+                              'whos_learning_today',
+                            ),
+                            style: AppTypography.heading(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
 
-                  const SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-                  // Student cards grid
-                  Expanded(
-                    child: _isLoading
-                        ? const Center(child: AppLoadingIndicator())
-                        : _students.isEmpty
+                      // Student cards grid
+                      Expanded(
+                        child: _isLoading
+                            ? const Center(child: AppLoadingIndicator())
+                            : _students.isEmpty
                             ? _buildEmptyState()
                             : _buildStudentGrid(screenWidth),
-                  ),
+                      ),
 
-                  // Bottom actions
-                  _buildBottomActions(),
-                ],
+                      // Bottom actions
+                      _buildBottomActions(),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
         );
       },
     );
@@ -167,7 +225,9 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
             onTap: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ParentHubScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const ParentHubScreen(),
+                ),
               );
               _loadStudents();
             },
@@ -249,36 +309,25 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
       itemBuilder: (context, index) {
         final student = _students[index] as Map<String, dynamic>;
         final isSelected = _selectedIndex == index;
-        final avatarUrl = AvatarUtils.getCorrectedAvatarPath(student['avatar_url'] as String?, 'assets/images/characters/human/human_student_1.png');
-        
-        final Map<String, dynamic> compResults = (student['comprehensive_assessment_results'] as Map?)?.cast<String, dynamic>() ?? {};
+        final avatarUrl = AvatarUtils.getCorrectedAvatarPath(
+          student['avatar_url'] as String?,
+          'assets/images/characters/human/human_student_1.png',
+        );
+
+        final Map<String, dynamic> compResults =
+            (student['comprehensive_assessment_results'] as Map?)
+                ?.cast<String, dynamic>() ??
+            {};
         final bool needsScreening = compResults.length < 4;
 
         return GestureDetector(
-          onTap: () async {
-            setState(() => _selectedIndex = index);
-            
-            // Sync progress globally for the selected student
-            if (student['id'] != null) {
-              await ProgressService().setCurrentStudentId(student['id']);
-              await ProgressService().loadFromCloud(student);
-            }
-            
-            Future.delayed(const Duration(milliseconds: 300), () {
-              if (mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DashboardScreen(studentData: student),
-                  ),
-                );
-              }
-            });
-          },
+          onTap: () => _openStudent(index, student),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.calmBlue.withValues(alpha: 0.1) : AppColors.cardSurface,
+              color: isSelected
+                  ? AppColors.calmBlue.withValues(alpha: 0.1)
+                  : AppColors.cardSurface,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
                 color: isSelected ? AppColors.calmBlue : AppColors.borderLight,
@@ -304,7 +353,9 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected ? AppColors.calmBlue : AppColors.borderLight,
+                      color: isSelected
+                          ? AppColors.calmBlue
+                          : AppColors.borderLight,
                       width: 2,
                     ),
                   ),
@@ -351,7 +402,10 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
                       _loadStudents(); // Reload data after returning
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
@@ -361,7 +415,9 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFD97706).withValues(alpha: 0.3),
+                            color: const Color(
+                              0xFFD97706,
+                            ).withValues(alpha: 0.3),
                             blurRadius: 6,
                             offset: const Offset(0, 3),
                           ),
@@ -370,7 +426,11 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.assignment_late_rounded, size: 14, color: Colors.white),
+                          const Icon(
+                            Icons.assignment_late_rounded,
+                            size: 14,
+                            color: Colors.white,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             LocalizationService.instance.t('pending'),
@@ -386,7 +446,10 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
                   )
                 else
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       gradient: AppColors.greenGradient,
                       borderRadius: BorderRadius.circular(16),
@@ -401,7 +464,11 @@ class _SelectStudentScreenState extends State<SelectStudentScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.check_circle_rounded, size: 14, color: Colors.white),
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           LocalizationService.instance.t('ready'),

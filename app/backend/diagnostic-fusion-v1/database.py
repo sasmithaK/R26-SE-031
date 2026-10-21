@@ -2,6 +2,9 @@ import os
 from motor.motor_asyncio import AsyncIOMotorClient
 import certifi
 import logging
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 

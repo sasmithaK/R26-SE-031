@@ -4,8 +4,6 @@ import os
 import base64
 import wave
 from database import get_fs
-from google import genai
-from google.genai import types
 
 def parse_audio_mime_type(mime_type: str) -> dict:
     bits_per_sample = 16
@@ -58,6 +56,11 @@ def convert_to_wav(audio_data: bytes, mime_type: str) -> bytes:
     return header + audio_data
 
 
+# Configurable so the voice/model can change without a code edit.
+TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
+TTS_VOICE = os.getenv("GEMINI_TTS_VOICE", "Zephyr")
+
+
 class TTSService:
     @staticmethod
     def text_to_speech(text: str, folder: str = "general") -> str:
@@ -82,7 +85,7 @@ class TTSService:
               "contents": [{"role": "user", "parts": [{"text": prompt_text}]}],
               "generationConfig": {
                 "responseModalities": ["audio"],
-                "speechConfig": {"voice_config": {"prebuilt_voice_config": {"voice_name": "Zephyr"}}}
+                "speechConfig": {"voice_config": {"prebuilt_voice_config": {"voice_name": TTS_VOICE}}}
               }
             }
             headers = {'Content-Type': 'application/json', 'x-goog-api-key': api_key}
@@ -90,8 +93,10 @@ class TTSService:
             import requests
             import time
             
-            # Use ONLY 3.1 (the original voice the user prefers)
-            url = "https://generativelanguage.googleapis.com/v1alpha/models/gemini-3.1-flash-tts-preview:generateContent"
+            url = (
+                f"https://generativelanguage.googleapis.com/v1alpha/models/"
+                f"{TTS_MODEL}:generateContent"
+            )
             print(f"Calling Gemini 3.1 REST API with text: {repr(prompt_text)}")
             start_time = time.time()
             response = requests.post(url, json=payload, headers=headers, timeout=15)

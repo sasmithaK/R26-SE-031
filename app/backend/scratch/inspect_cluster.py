@@ -1,10 +1,13 @@
 import asyncio
+import os
 import certifi
 from motor.motor_asyncio import AsyncIOMotorClient
 
-MONGODB_URL = "mongodb+srv://kavindugunasena_db_user:vsqocmP1Fcu8wgYm@cluster0.ypxuqen.mongodb.net/"
+MONGODB_URL = os.getenv("MONGODB_URL")
 
 async def inspect():
+    if not MONGODB_URL:
+        raise RuntimeError("MONGODB_URL must be set before inspecting the cluster")
     client = AsyncIOMotorClient(MONGODB_URL, tlsCAFile=certifi.where())
     
     print("=== MONGODB CLUSTER INSPECTION ===")

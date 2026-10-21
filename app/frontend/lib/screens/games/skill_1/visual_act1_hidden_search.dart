@@ -4,11 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import '../../../widgets/app_loading_indicator.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../models/curriculum_models.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../services/tts_service.dart';
-import '../../../../services/progress_service.dart';
+import '../../../models/curriculum_models.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../theme/app_theme.dart';
+import '../../../services/tts_service.dart';
+import '../../../services/progress_service.dart';
+import '../../../adaptive/controllers/adaptive_choice_controller.dart';
+import '../../../adaptive/controllers/adaptive_task_coordinator.dart';
+import '../../../adaptive/models/adaptive_scaffold_models.dart';
+import '../../../adaptive/utils/adaptive_option_order.dart';
 import 'logic/hidden_search_generator.dart';
 import 'widgets/pattern_background.dart';
 import '../shared_widgets/shared_celebration_popup.dart';
@@ -22,12 +26,14 @@ class VisualAct1HiddenSearch extends StatefulWidget {
   final ActivityNode activityNode;
   final Map<String, dynamic>? studentData;
 
-  const VisualAct1HiddenSearch({Key? key, required this.activityNode, this.studentData})
-      : super(key: key);
+  const VisualAct1HiddenSearch({
+    Key? key,
+    required this.activityNode,
+    this.studentData,
+  }) : super(key: key);
 
   @override
-  _VisualAct1HiddenSearchState createState() =>
-      _VisualAct1HiddenSearchState();
+  _VisualAct1HiddenSearchState createState() => _VisualAct1HiddenSearchState();
 }
 
 class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
@@ -36,13 +42,17 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
   // ── Game state ──
   int _currentRoundIndex = 0;
   late HiddenSearchGameData _gameData;
+  late AdaptiveTaskCoordinator _taskCoordinator;
   List<_GameItem> _items = [];
   int _foundCount = 0;
   int _targetCount = 0;
   bool _roundComplete = false;
   bool _activityComplete = false;
-  bool _showHint = false;
+  bool _scaffoldPending = false;
+  int _completedCoreCount = 0;
   int _stars = 0;
+  final AdaptiveChoiceController<int> _adaptiveChoices =
+      AdaptiveChoiceController<int>();
 
   // ── Audio ──
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -86,17 +96,34 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
   @override
   void initState() {
     super.initState();
-    _gameData = HiddenSearchGenerator.generateGame();
+    _gameData = HiddenSearchGenerator.generateFromCurriculum(
+      widget.activityNode.rounds,
+    );
     _currentRoundIndex = ProgressService().getActivityState(
       widget.activityNode.skillId,
       widget.activityNode.id,
     );
     if (_currentRoundIndex >= _gameData.rounds.length) _currentRoundIndex = 0;
+    _taskCoordinator = AdaptiveTaskCoordinator(
+      activity: widget.activityNode,
+      initialRoundIndex: _currentRoundIndex,
+    );
+    final savedScore = ProgressService().getActivityScore(
+      widget.activityNode.skillId,
+      widget.activityNode.id,
+    );
+    _completedCoreCount = _currentRoundIndex == 0
+        ? 0
+        : ((savedScore / 100) * _gameData.rounds.length)
+              .floor()
+              .clamp(0, _gameData.rounds.length)
+              .toInt();
 
     // Pick a random mascot for this session
     final rng = Random();
     _currentMascot = _mascots[rng.nextInt(_mascots.length)];
-    _currentEncouragement = _encourageMessages[rng.nextInt(_encourageMessages.length)];
+    _currentEncouragement =
+        _encourageMessages[rng.nextInt(_encourageMessages.length)];
 
     _celebrationController = AnimationController(
       vsync: this,
@@ -111,21 +138,27 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
       duration: const Duration(milliseconds: 400),
     );
     _roundFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _roundTransitionController, curve: Curves.easeOut),
+      CurvedAnimation(
+        parent: _roundTransitionController,
+        curve: Curves.easeOut,
+      ),
     );
 
     _foundCountBounceController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    _foundCountBounce = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.3), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: 1.3, end: 0.9), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: 0.9, end: 1.0), weight: 1),
-    ]).animate(CurvedAnimation(
-      parent: _foundCountBounceController,
-      curve: Curves.easeInOut,
-    ));
+    _foundCountBounce =
+        TweenSequence<double>([
+          TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.3), weight: 1),
+          TweenSequenceItem(tween: Tween(begin: 1.3, end: 0.9), weight: 1),
+          TweenSequenceItem(tween: Tween(begin: 0.9, end: 1.0), weight: 1),
+        ]).animate(
+          CurvedAnimation(
+            parent: _foundCountBounceController,
+            curve: Curves.easeInOut,
+          ),
+        );
 
     // Speaker bounce animation
     _speakerBounceController = AnimationController(
@@ -133,7 +166,10 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
       duration: const Duration(milliseconds: 400),
     );
     _speakerBounceAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _speakerBounceController, curve: Curves.elasticOut),
+      CurvedAnimation(
+        parent: _speakerBounceController,
+        curve: Curves.elasticOut,
+      ),
     );
 
     // Target image pulse animation
@@ -163,34 +199,57 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
     _speakerBounceController.dispose();
     _targetPulseController.dispose();
     _audioPlayer.dispose();
+    _adaptiveChoices.dispose();
     super.dispose();
   }
-
 
   // ── Round initialization ──
   void _initRound() {
     if (_currentRoundIndex >= _gameData.rounds.length) return;
-    final round = _gameData.rounds[_currentRoundIndex];
+    final round = _activeRound;
 
     _targetCount = round.targetCount;
     _foundCount = 0;
     _roundComplete = false;
-    _showHint = false;
+    _scaffoldPending = false;
     _items = [];
 
     // Update encouragement
     final rng = Random();
-    _currentEncouragement = _encourageMessages[rng.nextInt(_encourageMessages.length)];
+    _currentEncouragement =
+        _encourageMessages[rng.nextInt(_encourageMessages.length)];
 
     // Populate _items from generator output
-    for (var generatedItem in round.items) {
-      _items.add(_GameItem(
-        path: 'assets/images/activity_icons/${generatedItem.imagePath}',
-        isTarget: generatedItem.isTarget,
-        isFlipped: generatedItem.isFlipped,
-        colorHue: generatedItem.colorHue,
-      ));
+    final orderedItems = AdaptiveOptionOrder.withTargets<HiddenSearchItem>(
+      source: round.items,
+      itemId: _currentItemId,
+      isTarget: (item) => item.isTarget,
+    );
+    for (var generatedItem in orderedItems) {
+      _items.add(
+        _GameItem(
+          stableSuffix: generatedItem.id,
+          path: 'assets/images/activity_icons/${generatedItem.imagePath}',
+          isTarget: generatedItem.isTarget,
+          isFlipped: generatedItem.isFlipped,
+          colorHue: generatedItem.colorHue,
+        ),
+      );
     }
+
+    final itemId = _currentItemId;
+    _adaptiveChoices.configure(
+      List<AdaptiveOption<int>>.generate(
+        _items.length,
+        (index) => AdaptiveOption<int>(
+          id: '${itemId}_${_items[index].stableSuffix}',
+          value: index,
+          role: _items[index].isTarget
+              ? AdaptiveOptionRole.target
+              : AdaptiveOptionRole.visualDistractor,
+        ),
+      ),
+    );
 
     _resetHintTimer();
     setState(() {});
@@ -203,12 +262,11 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
 
   // ── Tap handlers ──
   void _onItemTapped(_GameItem item) {
-    if (_roundComplete || item.isFound) return;
+    if (_roundComplete || item.isFound || _scaffoldPending) return;
 
+    // Any picture tap is an answer (first one sets the response time).
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
     _resetHintTimer();
-    setState(() {
-      _showHint = false;
-    });
 
     if (item.isTarget) {
       SoundUtils.playFeedback('audio/correct.mp3');
@@ -217,9 +275,13 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
         _foundCount++;
         _stars++;
       });
+      _adaptiveChoices.markCorrect(_optionIdForItem(item));
       _foundCountBounceController.forward(from: 0);
 
       if (_foundCount == _targetCount) {
+        // Response time ends at the last correct tap, not after the
+        // 1.4 s celebration below.
+        context.findAncestorStateOfType<TelemetryWrapperState>()?.markResponseComplete();
         _roundComplete = true;
         Future.delayed(const Duration(milliseconds: 1400), () {
           if (!mounted) return;
@@ -231,9 +293,11 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
       setState(() {
         item.showWrongFeedback = true;
       });
-      context
-          .findAncestorStateOfType<TelemetryWrapperState>()
-          ?.recordMisclick();
+      final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+      if (wrapper != null && _items.contains(item)) {
+        setState(() => _scaffoldPending = true);
+        unawaited(_requestAdaptiveScaffold(wrapper, item));
+      }
       Future.delayed(const Duration(milliseconds: 500), () {
         if (!mounted) return;
         setState(() {
@@ -243,17 +307,112 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
     }
   }
 
-  void _nextRound() {
-    if (!mounted) return;
-    context
-        .findAncestorStateOfType<TelemetryWrapperState>()
-        ?.completeRound(100);
+  String get _currentItemId {
+    return _taskCoordinator.itemId;
+  }
 
-    if (_currentRoundIndex < _gameData.rounds.length - 1) {
+  HiddenSearchRound get _activeRound =>
+      HiddenSearchGenerator.generateFromCurriculum(<Map<String, dynamic>>[
+        _taskCoordinator.roundData,
+      ]).rounds.first;
+
+  String _optionIdForItem(_GameItem item) =>
+      '${_currentItemId}_${item.stableSuffix}';
+
+  Future<void> _requestAdaptiveScaffold(
+    TelemetryWrapperState wrapper,
+    _GameItem selected,
+  ) async {
+    final selectedId = _optionIdForItem(selected);
+    _adaptiveChoices.markIncorrect(selectedId);
+    final visible = _adaptiveChoices.visibleOptions;
+    final correctIds = visible
+        .where((option) {
+          final item = _items[option.value];
+          return item.isTarget && !item.isFound;
+        })
+        .map((option) => option.id)
+        .toList();
+    final otherDistractors = visible
+        .where((option) {
+          final item = _items[option.value];
+          return !item.isTarget && option.id != selectedId;
+        })
+        .map((option) => option.id)
+        .toList();
+
+    try {
+      final result = await wrapper.registerAdaptiveWrongAttempt(
+        currentRoundIndex: _currentRoundIndex,
+        itemId: _currentItemId,
+        extraTelemetry: <String, dynamic>{
+          'original_options_count': _items.length,
+          'visible_option_ids': visible.map((option) => option.id).toList(),
+          'selected_option_ids': <String>[selectedId],
+          'selected_answer_values': <String>[selected.path],
+          'correct_option_ids': correctIds,
+          'incorrect_option_ids': <String>[selectedId, ...otherDistractors],
+          'supported_actions': const <String>[
+            'REMOVE_OPTION',
+            'HIGHLIGHT_OPTION',
+          ],
+          'minimum_visible_options': 2,
+          'error_type': 'visual_search_miss',
+          'struggled_target_units': <String>[_activeRound.targetPath],
+        },
+      );
+      if (!mounted) return;
+      wrapper.applyScaffoldResult<int>(
+        controller: _adaptiveChoices,
+        result: result,
+        correctOptionIds: correctIds,
+      );
+    } finally {
+      if (mounted) setState(() => _scaffoldPending = false);
+    }
+  }
+
+  Future<void> _nextRound() async {
+    if (!mounted) return;
+    final completedRoundIndex = _currentRoundIndex;
+    final result = await context
+        .findAncestorStateOfType<TelemetryWrapperState>()
+        ?.completeAdaptiveRound(
+          100,
+          currentRoundIndex: completedRoundIndex,
+          itemId: _currentItemId,
+          isCorrect: true,
+        );
+    if (!mounted) return;
+    final transition = _taskCoordinator.applyResult(result);
+    final nextAction = result?['next_action'];
+    final decision = nextAction is Map
+        ? nextAction['decision']?.toString()
+        : null;
+    final backendComplete =
+        decision == 'ACTIVITY_COMPLETE' || decision == 'CURRICULUM_COMPLETE';
+    final nextPhase = nextAction is Map
+        ? nextAction['next_phase']?.toString() ?? 'CORE'
+        : 'CORE';
+    final reportedProgress = nextAction is Map
+        ? int.tryParse(nextAction['progress_core']?.toString() ?? '')
+        : null;
+    final completedCoreCount = nextPhase == 'CORE'
+        ? (reportedProgress ?? _completedCoreCount + 1)
+              .clamp(0, _gameData.rounds.length)
+              .toInt()
+        : _completedCoreCount;
+    final nextRoundIndex = transition.roundIndex;
+
+    if (!backendComplete &&
+        !transition.isComplete &&
+        nextRoundIndex >= 0 &&
+        nextRoundIndex < _gameData.rounds.length) {
       _roundTransitionController.reverse().then((_) {
         if (!mounted) return;
         setState(() {
-          _currentRoundIndex++;
+          _currentRoundIndex = nextRoundIndex;
+          _completedCoreCount = completedCoreCount;
           _initRound();
         });
         ProgressService().saveActivityState(
@@ -264,7 +423,7 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
         ProgressService().saveActivityScore(
           widget.activityNode.skillId,
           widget.activityNode.id,
-          ((_currentRoundIndex / _gameData.rounds.length) * 100).toInt(),
+          ((_completedCoreCount / _gameData.rounds.length) * 100).toInt(),
         );
         _roundTransitionController.forward();
         _playInstruction(autoPlay: true);
@@ -281,21 +440,20 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
         100,
       );
       setState(() {
-          _activityComplete = true;
-          final sId = widget.activityNode?.skillId ?? '';
-          final aId = widget.activityNode?.id ?? '';
-          if (sId.isNotEmpty && aId.isNotEmpty) {
-            ProgressService().saveActivityScore(sId, aId, 100);
-            ProgressService().clearActivityState(sId, aId);
-          }
-        });
+        _activityComplete = true;
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          ProgressService().saveActivityScore(sId, aId, 100);
+          ProgressService().clearActivityState(sId, aId);
+        }
+      });
       _celebrationController.forward();
     }
   }
 
   void _finishActivity() {
-    final wrapper =
-        context.findAncestorStateOfType<TelemetryWrapperState>();
+    final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
     if (wrapper != null) {
       wrapper.completeActivity(context);
     } else {
@@ -306,8 +464,8 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
   /// Play the instruction aloud via TTS and trigger speaker bounce
   void _playInstruction({bool autoPlay = false}) {
     if (_gameData.rounds.isEmpty) return;
-    final round = _gameData.rounds[_currentRoundIndex];
-    
+    final round = _activeRound;
+
     if (autoPlay && _lastSpokenInstruction == round.instructionText) {
       return;
     }
@@ -322,14 +480,13 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
   @override
   Widget build(BuildContext context) {
     if (_gameData.rounds.isEmpty) {
-      return const Scaffold(
-        body: Center(child: AppLoadingIndicator()),
-      );
+      return const Scaffold(body: Center(child: AppLoadingIndicator()));
     }
 
-    final round = _gameData.rounds[_currentRoundIndex];
+    final round = _activeRound;
     final String title = round.instructionText;
-    final String targetPath = 'assets/images/activity_icons/${round.targetPath}';
+    final String targetPath =
+        'assets/images/activity_icons/${round.targetPath}';
     final String instruction = round.instructionText;
 
     return Scaffold(
@@ -337,38 +494,37 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
         children: [
           // ── Background Layer ──
           const Positioned.fill(
-            child: PatternBackground(imagePath: 'assets/images/backgrounds/act1_bg.jpg'),
+            child: PatternBackground(
+              imagePath: 'assets/images/backgrounds/act1_bg.jpg',
+            ),
           ),
 
           // ── Main Content ──
           SafeArea(
             child: Column(
               children: [
-                  _buildTopHUD(),
-                  const SizedBox(height: 8),
-                  _buildInstructionCard(instruction, targetPath),
-                  const SizedBox(height: 6),
-                  _buildFoundCounter(),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: FadeTransition(
-                      opacity: _roundFadeAnimation,
-                      child: Center(child: _buildCardGrid()),
-                    ),
+                _buildTopHUD(),
+                const SizedBox(height: 8),
+                _buildInstructionCard(instruction, targetPath),
+                const SizedBox(height: 6),
+                _buildFoundCounter(),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: FadeTransition(
+                    opacity: _roundFadeAnimation,
+                    child: Center(child: _buildCardGrid()),
                   ),
-
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
 
-            // ── Celebration Overlay ──
-            if (_activityComplete) _buildCelebrationOverlay(),
-          ],
-        ),
+          // ── Celebration Overlay ──
+          if (_activityComplete) _buildCelebrationOverlay(),
+        ],
+      ),
     );
   }
-
-
 
   // ── Top HUD ──
   Widget _buildTopHUD() {
@@ -398,8 +554,11 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
                 color: const Color(0xFFF0F4FF),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.arrow_back_rounded,
-                  color: Color(0xFF4A90D9), size: 24),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                color: Color(0xFF4A90D9),
+                size: 24,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -416,7 +575,9 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          widget.activityNode.title.isEmpty ? 'Picture Hunt' : widget.activityNode.title,
+                          widget.activityNode.title.isEmpty
+                              ? 'Picture Hunt'
+                              : widget.activityNode.title,
                           style: AppTypography.heading(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -486,10 +647,13 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
               color: isCompleted
                   ? const Color(0xFF6DBE6D)
                   : isCurrent
-                      ? const Color(0xFFF9C623)
-                      : const Color(0xFFE0E0E0),
+                  ? const Color(0xFFF9C623)
+                  : const Color(0xFFE0E0E0),
               border: isCurrent
-                  ? Border.all(color: const Color(0xFFF9C623).withValues(alpha: 0.3), width: 2)
+                  ? Border.all(
+                      color: const Color(0xFFF9C623).withValues(alpha: 0.3),
+                      width: 2,
+                    )
                   : null,
             ),
           );
@@ -502,7 +666,9 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
   Widget _buildInstructionCard(String instruction, String targetPath) {
     return GestureDetector(
       onTap: () {
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.logAudioReplay();
+        context
+            .findAncestorStateOfType<TelemetryWrapperState>()
+            ?.logAudioReplay();
         _playInstruction();
       },
       child: Container(
@@ -654,7 +820,8 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
   Widget _buildCardGrid() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final total = _items.length;
+        final visibleOptions = _adaptiveChoices.visibleOptions;
+        final total = visibleOptions.length;
         if (total == 0) return const SizedBox();
 
         // Target ideal layout (force slightly larger margins if few items)
@@ -662,29 +829,31 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
         double spacing = total <= 6 ? 16.0 : 10.0;
 
         double maxItemSize = 0.0;
-        
+
         // Find best layout (cols/rows) that maximizes item size while fitting entirely within screen
         for (int cols = 1; cols <= total; cols++) {
           int rows = (total / cols).ceil();
-          
+
           double availableWidth = constraints.maxWidth - (hPadding * 2);
-          double availableHeight = constraints.maxHeight - 24; // Some vertical padding
+          double availableHeight =
+              constraints.maxHeight - 24; // Some vertical padding
 
           double widthPerItem = (availableWidth - (cols - 1) * spacing) / cols;
-          double heightPerItem = (availableHeight - (rows - 1) * spacing) / rows;
-          
+          double heightPerItem =
+              (availableHeight - (rows - 1) * spacing) / rows;
+
           double currentSize = min(widthPerItem, heightPerItem);
-          
+
           // Add a penalty for extremely wide single-row layouts if not necessary
           if (cols > rows + 2) {
-             currentSize *= 0.8; 
+            currentSize *= 0.8;
           }
 
           if (currentSize > maxItemSize) {
             maxItemSize = currentSize;
           }
         }
-        
+
         // Cap the maximum size so they don't get comically huge on tablets or early rounds
         if (maxItemSize > 160.0) maxItemSize = 160.0;
 
@@ -697,16 +866,20 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
                 alignment: WrapAlignment.center,
                 spacing: spacing,
                 runSpacing: spacing,
-                children: List.generate(_items.length, (index) {
+                children: List.generate(visibleOptions.length, (visibleIndex) {
+                  final option = visibleOptions[visibleIndex];
+                  final index = option.value;
                   return SizedBox(
                     width: maxItemSize,
                     height: maxItemSize,
                     child: _PictureCard(
-                      key: ValueKey('${_currentRoundIndex}_${_items[index].path}_$index'),
+                      key: ValueKey('${_currentRoundIndex}_${option.id}'),
                       item: _items[index],
                       onTap: () => _onItemTapped(_items[index]),
-                      showHint: _showHint && _items[index].isTarget && !_items[index].isFound,
-                      animationDelay: index * 0.05,
+                      showHint:
+                          _adaptiveChoices.visualStateFor(option.id) ==
+                          AdaptiveOptionVisualState.hint,
+                      animationDelay: visibleIndex * 0.05,
                     ),
                   );
                 }),
@@ -714,7 +887,7 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
             ),
           ),
         );
-      }
+      },
     );
   }
 
@@ -749,9 +922,7 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
                 ],
               ),
               child: Text(
-                _roundComplete
-                    ? 'හොඳයි! 🎉'
-                    : _currentEncouragement,
+                _roundComplete ? 'හොඳයි! 🎉' : _currentEncouragement,
                 style: AppTypography.sinhala(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -778,11 +949,7 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
   }
 
   Widget _buildStar(double size) {
-    return Icon(
-      Icons.star_rounded,
-      size: size,
-      color: const Color(0xFFF9C623),
-    );
+    return Icon(Icons.star_rounded, size: size, color: const Color(0xFFF9C623));
   }
 }
 
@@ -790,6 +957,7 @@ class _VisualAct1HiddenSearchState extends State<VisualAct1HiddenSearch>
 // _GameItem — Data model for each object on the game screen
 // ═══════════════════════════════════════════════════════════════
 class _GameItem {
+  final String stableSuffix;
   final String path;
   final bool isTarget;
   final bool isFlipped;
@@ -798,6 +966,7 @@ class _GameItem {
   bool showWrongFeedback;
 
   _GameItem({
+    required this.stableSuffix,
     required this.path,
     required this.isTarget,
     this.isFlipped = false,
@@ -855,9 +1024,10 @@ class _PictureCardState extends State<_PictureCard>
     _entryScale = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _entryController, curve: Curves.elasticOut),
     );
-    _entryOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _entryController, curve: Curves.easeIn),
-    );
+    _entryOpacity = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _entryController, curve: Curves.easeIn));
     Future.delayed(
       Duration(milliseconds: (widget.animationDelay * 1000).toInt()),
       () {
@@ -892,9 +1062,10 @@ class _PictureCardState extends State<_PictureCard>
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
-    _tapScale = Tween<double>(begin: 1.0, end: 0.92).animate(
-      CurvedAnimation(parent: _tapController, curve: Curves.easeInOut),
-    );
+    _tapScale = Tween<double>(
+      begin: 1.0,
+      end: 0.92,
+    ).animate(CurvedAnimation(parent: _tapController, curve: Curves.easeInOut));
   }
 
   @override
@@ -932,10 +1103,26 @@ class _PictureCardState extends State<_PictureCard>
     double c = cos(radians);
     double s = sin(radians);
     return [
-      0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928, 0, 0,
-      0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.140, 0.072 - c * 0.072 - s * 0.283, 0, 0,
-      0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072, 0, 0,
-      0,                             0,                             0,                             1, 0,
+      0.213 + c * 0.787 - s * 0.213,
+      0.715 - c * 0.715 - s * 0.715,
+      0.072 - c * 0.072 + s * 0.928,
+      0,
+      0,
+      0.213 - c * 0.213 + s * 0.143,
+      0.715 + c * 0.285 + s * 0.140,
+      0.072 - c * 0.072 - s * 0.283,
+      0,
+      0,
+      0.213 - c * 0.213 - s * 0.787,
+      0.715 - c * 0.715 + s * 0.715,
+      0.072 + c * 0.928 + s * 0.072,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
     ];
   }
 
@@ -950,13 +1137,16 @@ class _PictureCardState extends State<_PictureCard>
         _tapScale,
       ]),
       builder: (context, child) {
-        final entryScale = _entryController.isAnimating || _entryController.isCompleted
+        final entryScale =
+            _entryController.isAnimating || _entryController.isCompleted
             ? _entryScale.value
             : 0.0;
-        final shakeOffset =
-            _shakeController.isAnimating ? _shakeAnimation.value : 0.0;
+        final shakeOffset = _shakeController.isAnimating
+            ? _shakeAnimation.value
+            : 0.0;
         final hintScale = widget.showHint ? _hintAnimation.value : 1.0;
-        final tapScale = _tapController.isAnimating || _tapController.isCompleted
+        final tapScale =
+            _tapController.isAnimating || _tapController.isCompleted
             ? _tapScale.value
             : 1.0;
 
@@ -978,6 +1168,7 @@ class _PictureCardState extends State<_PictureCard>
   Widget _buildCardContent() {
     final isFound = widget.item.isFound;
     final isWrong = widget.item.showWrongFeedback;
+    final isHint = widget.showHint && !isFound;
 
     return GestureDetector(
       onTapDown: _handleTapDown,
@@ -990,16 +1181,20 @@ class _PictureCardState extends State<_PictureCard>
           color: isFound
               ? const Color(0xFF6DBE6D).withValues(alpha: 0.15)
               : isWrong
-                  ? const Color(0xFFE87C6D).withValues(alpha: 0.15)
-                  : Colors.white,
+              ? const Color(0xFFE87C6D).withValues(alpha: 0.15)
+              : isHint
+              ? AppColors.warmAmber.withValues(alpha: 0.24)
+              : Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isFound
                 ? const Color(0xFF6DBE6D)
                 : isWrong
-                    ? const Color(0xFFE87C6D)
-                    : const Color(0xFFE5E7EB),
-            width: isFound || isWrong ? 4.0 : 1.5,
+                ? const Color(0xFFE87C6D)
+                : isHint
+                ? AppColors.warmAmber
+                : const Color(0xFFE5E7EB),
+            width: isFound || isWrong || isHint ? 4.0 : 1.5,
           ),
           boxShadow: [
             if (isFound)
@@ -1013,6 +1208,12 @@ class _PictureCardState extends State<_PictureCard>
                 color: const Color(0xFFE87C6D).withValues(alpha: 0.3),
                 blurRadius: 16,
                 spreadRadius: 2,
+              )
+            else if (isHint)
+              BoxShadow(
+                color: AppColors.warmAmber.withValues(alpha: 0.55),
+                blurRadius: 20,
+                spreadRadius: 3,
               )
             else
               BoxShadow(
@@ -1031,27 +1232,31 @@ class _PictureCardState extends State<_PictureCard>
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 300),
                 opacity: 1.0, // Always fully visible
-                child: Builder(builder: (context) {
-                  Widget img = Image.asset(
-                    widget.item.path,
-                    fit: BoxFit.contain,
-                    errorBuilder: (c, e, s) => const Icon(
-                      Icons.image_not_supported_outlined,
-                      color: Color(0xFFBBBBBB),
-                      size: 40,
-                    ),
-                  );
-                  if (widget.item.colorHue != null) {
-                    img = ColorFiltered(
-                      colorFilter: ColorFilter.matrix(_getHueRotationMatrix(widget.item.colorHue!)),
-                      child: img,
+                child: Builder(
+                  builder: (context) {
+                    Widget img = Image.asset(
+                      widget.item.path,
+                      fit: BoxFit.contain,
+                      errorBuilder: (c, e, s) => const Icon(
+                        Icons.image_not_supported_outlined,
+                        color: Color(0xFFBBBBBB),
+                        size: 40,
+                      ),
                     );
-                  }
-                  if (widget.item.isFlipped) {
-                    img = Transform.flip(flipX: true, child: img);
-                  }
-                  return img;
-                }),
+                    if (widget.item.colorHue != null) {
+                      img = ColorFiltered(
+                        colorFilter: ColorFilter.matrix(
+                          _getHueRotationMatrix(widget.item.colorHue!),
+                        ),
+                        child: img,
+                      );
+                    }
+                    if (widget.item.isFlipped) {
+                      img = Transform.flip(flipX: true, child: img);
+                    }
+                    return img;
+                  },
+                ),
               ),
             ),
           ],

@@ -6,7 +6,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../../services/student_service.dart';
-import '../../services/c1_parent_service.dart';
+import '../../services/parent_dashboard_service.dart';
 import 'child_progress_screen.dart';
 import 'therapist_management_screen.dart';
 import 'notifications_screen.dart';
@@ -33,6 +33,9 @@ class _ParentHubScreenState extends State<ParentHubScreen>
   String _parentName = '';
   String? _profilePictureUrl;
   List<dynamic> _students = [];
+  int? _sessionsThisWeek;
+  int? _connectedTherapists;
+  final Map<String, Future<Map<String, dynamic>>> _childInsightFutures = {};
 
   String get _initials {
     final parts = _parentName.trim().split(' ');
@@ -68,9 +71,39 @@ class _ParentHubScreenState extends State<ParentHubScreen>
         _parentName = profile?['name'] ?? 'parent';
         _profilePictureUrl = profile?['profile_picture_url'];
         _students = students;
+        _childInsightFutures.clear();
       });
       _fadeController.forward();
     }
+    _loadQuickStats(students);
+  }
+
+  /// Real counts for the quick-stats row (previously hard-coded 24 and 1).
+  Future<void> _loadQuickStats(List<dynamic> students) async {
+    int? sessions = 0;
+    for (final student in students) {
+      final id = (student is Map ? (student['id'] ?? student['_id'] ?? student['student_id']) : null)?.toString();
+      if (id == null) continue;
+      try {
+        final history = await ParentDashboardService().getActivityHistory(id, 'days=7&limit=50');
+        sessions = (sessions ?? 0) + ((history['history'] as List<dynamic>?)?.length ?? 0);
+      } catch (_) {
+        sessions = null;
+        break;
+      }
+    }
+    int? therapists;
+    try {
+      final connections = await AuthService().getConnections();
+      therapists = connections.length;
+    } catch (_) {
+      therapists = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _sessionsThisWeek = sessions;
+      _connectedTherapists = therapists;
+    });
   }
 
   @override
@@ -120,10 +153,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            AppColors.calmBlue.withValues(alpha: 0.08),
-            AppColors.cream,
-          ],
+          colors: [AppColors.calmBlue.withValues(alpha: 0.08), AppColors.cream],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -148,8 +178,11 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                   ),
                 ],
               ),
-              child: const Icon(Icons.arrow_back_rounded,
-                  color: AppColors.textPrimary, size: 22),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                color: AppColors.textPrimary,
+                size: 22,
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -160,7 +193,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
               children: [
                 Text(
                   LocalizationService.instance.t('parent_hub'),
-                  style: AppTypography.caption(
+                  style: DashText.caption(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.calmBlue,
@@ -169,7 +202,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                 const SizedBox(height: 2),
                 Text(
                   '${LocalizationService.instance.t('hello_parent')}, $_parentName!',
-                  style: AppTypography.heading(
+                  style: DashText.heading(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -183,9 +216,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const ParentSettingsScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const ParentSettingsScreen()),
               ).then((_) {
                 _loadData();
               });
@@ -203,7 +234,8 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                     offset: const Offset(0, 4),
                   ),
                 ],
-                image: _profilePictureUrl != null && _profilePictureUrl!.isNotEmpty
+                image:
+                    _profilePictureUrl != null && _profilePictureUrl!.isNotEmpty
                     ? DecorationImage(
                         image: NetworkImage(
                           ApiConfig.getProfileImageUrl(_profilePictureUrl!),
@@ -216,7 +248,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                   ? Center(
                       child: Text(
                         _initials,
-                        style: AppTypography.heading(
+                        style: DashText.heading(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
@@ -233,10 +265,9 @@ class _ParentHubScreenState extends State<ParentHubScreen>
 
   // ─── Quick Stats Row ───
   Widget _buildQuickStats() {
-    // Mock data for now
     final int totalChildren = _students.length;
-    const int weeklyActivities = 24;
-    const int connectedTherapists = 1;
+    final String weeklyActivities = _sessionsThisWeek?.toString() ?? '—';
+    final String connectedTherapists = _connectedTherapists?.toString() ?? '—';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -251,14 +282,14 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           const SizedBox(width: 12),
           _buildStatCard(
             icon: FontAwesomeIcons.gamepad,
-            value: '$weeklyActivities',
+            value: weeklyActivities,
             label: LocalizationService.instance.t('this_week'),
             color: AppColors.gentleGreen,
           ),
           const SizedBox(width: 12),
           _buildStatCard(
             icon: FontAwesomeIcons.link,
-            value: '$connectedTherapists',
+            value: connectedTherapists,
             label: LocalizationService.instance.t('connected'),
             color: AppColors.warmAmber,
           ),
@@ -297,14 +328,12 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                 color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Center(
-                child: FaIcon(icon, size: 18, color: color),
-              ),
+              child: Center(child: FaIcon(icon, size: 18, color: color)),
             ),
             const SizedBox(height: 10),
             Text(
               value,
-              style: AppTypography.heading(
+              style: DashText.heading(
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
@@ -313,7 +342,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
             const SizedBox(height: 2),
             Text(
               label,
-              style: AppTypography.caption(
+              style: DashText.caption(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
@@ -348,7 +377,9 @@ class _ParentHubScreenState extends State<ParentHubScreen>
               _showChildSelectionModal(context);
             }
           } else {
-            _showSnackBar(LocalizationService.instance.t('add_student_first_msg'));
+            _showSnackBar(
+              LocalizationService.instance.t('add_student_first_msg'),
+            );
           }
         },
       },
@@ -374,9 +405,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
         'onTap': () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => const NotificationsScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
           );
         },
       },
@@ -388,9 +417,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
         'onTap': () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => const ParentSettingsScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const ParentSettingsScreen()),
           ).then((_) {
             _loadData();
           });
@@ -416,7 +443,9 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                     color: bgColor,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: color.withValues(alpha: 0.2), width: 1.5),
+                      color: color.withValues(alpha: 0.2),
+                      width: 1.5,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: color.withValues(alpha: 0.1),
@@ -427,12 +456,11 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                   ),
                   child: Column(
                     children: [
-                      FaIcon(item['icon'] as dynamic,
-                          size: 24, color: color),
+                      FaIcon(item['icon'] as dynamic, size: 24, color: color),
                       const SizedBox(height: 10),
                       Text(
                         item['label'] as String,
-                        style: AppTypography.caption(
+                        style: DashText.caption(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: color,
@@ -458,7 +486,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
         children: [
           Text(
             LocalizationService.instance.t('your_children'),
-            style: AppTypography.heading(
+            style: DashText.heading(
               fontSize: 20,
               fontWeight: FontWeight.w700,
               color: AppColors.calmBlue,
@@ -468,13 +496,13 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           if (_students.isEmpty)
             _buildEmptyChildrenState()
           else
-            ..._students.map((student) =>
-                _buildChildCard(student as Map<String, dynamic>)),
+            ..._students.map(
+              (student) => _buildChildCard(student as Map<String, dynamic>),
+            ),
         ],
       ),
     );
   }
-
 
   Widget _buildEmptyChildrenState() {
     return Container(
@@ -487,12 +515,15 @@ class _ParentHubScreenState extends State<ParentHubScreen>
       ),
       child: Column(
         children: [
-          FaIcon(FontAwesomeIcons.childReaching,
-              size: 48, color: AppColors.textHint),
+          FaIcon(
+            FontAwesomeIcons.childReaching,
+            size: 48,
+            color: AppColors.textHint,
+          ),
           const SizedBox(height: 16),
           Text(
             LocalizationService.instance.t('no_students_yet'),
-            style: AppTypography.heading(
+            style: DashText.heading(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppColors.textSecondary,
@@ -501,7 +532,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           const SizedBox(height: 8),
           Text(
             LocalizationService.instance.t('add_student_settings_hint'),
-            style: AppTypography.caption(
+            style: DashText.caption(
               fontSize: 14,
               color: AppColors.textHint,
             ),
@@ -530,7 +561,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
           children: [
             Text(
               LocalizationService.instance.t('select_a_child'),
-              style: AppTypography.heading(
+              style: DashText.heading(
                 fontSize: 20,
                 color: AppColors.calmBlue,
               ),
@@ -540,7 +571,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
               final s = student as Map<String, dynamic>;
               final avatar = AvatarUtils.getCorrectedAvatarPath(
                 s['avatar_url'] as String?,
-                'assets/images/characters/human/human_student_1.png'
+                'assets/images/characters/human/human_student_1.png',
               );
               return ListTile(
                 leading: Container(
@@ -548,7 +579,10 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                   height: 48,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.calmBlue.withValues(alpha: 0.5), width: 2),
+                    border: Border.all(
+                      color: AppColors.calmBlue.withValues(alpha: 0.5),
+                      width: 2,
+                    ),
                     color: AppColors.cream,
                   ),
                   child: ClipOval(
@@ -557,7 +591,7 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                 ),
                 title: Text(
                   s['first_name'] ?? 'student',
-                  style: AppTypography.body(fontWeight: FontWeight.w700),
+                  style: DashText.body(fontWeight: FontWeight.w700),
                 ),
                 trailing: const FaIcon(FontAwesomeIcons.chevronRight, size: 16),
                 onTap: () {
@@ -578,92 +612,91 @@ class _ParentHubScreenState extends State<ParentHubScreen>
   }
 
   Widget _buildChildCard(Map<String, dynamic> student) {
-    final name = student['first_name'] ?? 'student';
-    final grade = student['grade'] ?? 'n/a';
+    final name = (student['first_name'] ?? 'Student').toString();
+    final grade = (student['grade'] ?? 'Grade 1').toString();
     final avatar = AvatarUtils.getCorrectedAvatarPath(
-      student['avatar_url'] as String?, 
-      'assets/images/characters/mascots/solo_blue.png'
+      student['avatar_url'] as String?,
+      'assets/images/characters/mascots/solo_blue.png',
     );
-    final studentId = student['id'] ?? student['_id'];
+    final studentId = (student['id'] ?? student['_id']).toString();
+    final insightFuture = _childInsightFutures.putIfAbsent(
+      studentId,
+      () => ParentDashboardService().getAdaptiveInsights(studentId),
+    );
 
-    return FutureBuilder<List<dynamic>>(
-      future: Future.wait([
-        StudentService().getTelemetry(studentId.toString()),
-        C1ParentService().getSummary(studentId.toString()),
-      ]),
+    return FutureBuilder<Map<String, dynamic>>(
+      future: insightFuture,
       builder: (context, snapshot) {
-        int streak = 0;
-        double weeklyProgress = 0.0;
-        String lastActive = LocalizationService.instance.t('never');
-        dynamic summary;
+        final support = snapshot.data?['support_summary'];
+        final summary = support is Map
+            ? Map<String, dynamic>.from(support)
+            : <String, dynamic>{};
+        final coverageValue = summary['coverage'];
+        final coverage = coverageValue is Map
+            ? Map<String, dynamic>.from(coverageValue)
+            : <String, dynamic>{};
+        final completed = _cardInt(summary['completed_tasks']);
+        final independent = _cardInt(summary['independent_successes']);
+        final helped = _cardInt(summary['supported_successes']);
+        final checked = _cardInt(summary['confirmation_checks']);
+        final activitiesTried = _cardInt(coverage['activities_tried']);
+        final needsPractice = _cardMaps(summary['needs_practice']);
+        final goingWell = _cardMaps(summary['going_well']);
+        final hasLearningData = snapshot.hasData && completed > 0;
 
-        if (snapshot.hasData) {
-          final sessions = snapshot.data![0] as List<dynamic>;
-          summary = snapshot.data![1];
-          final now = DateTime.now();
-          Set<String> activeDates = {};
-          int actsThisWeek = 0;
+        final Color statusColor;
+        final dynamic statusIcon;
+        final String statusText;
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          statusColor = AppColors.calmBlue;
+          statusIcon = FontAwesomeIcons.arrowsRotate;
+          statusText = 'Loading learning';
+        } else if (snapshot.hasError) {
+          statusColor = AppColors.softCoral;
+          statusIcon = FontAwesomeIcons.circleExclamation;
+          statusText = 'Summary unavailable';
+        } else if (!hasLearningData) {
+          statusColor = AppColors.calmBlue;
+          statusIcon = FontAwesomeIcons.seedling;
+          statusText = 'Ready to begin';
+        } else if (needsPractice.isNotEmpty) {
+          statusColor = AppColors.warmAmber;
+          statusIcon = FontAwesomeIcons.lightbulb;
+          statusText = 'Practice suggested';
+        } else {
+          statusColor = AppColors.gentleGreen;
+          statusIcon = FontAwesomeIcons.circleCheck;
+          statusText = 'Learning on track';
+        }
 
-          for (final session in sessions) {
-            final submittedAtStr = session['submitted_at'] as String?;
-            if (submittedAtStr != null) {
-              final submittedAt = DateTime.tryParse(submittedAtStr);
-              if (submittedAt != null) {
-                final dStr = "${submittedAt.year}-${submittedAt.month.toString().padLeft(2, '0')}-${submittedAt.day.toString().padLeft(2, '0')}";
-                activeDates.add(dStr);
-                
-                if (now.difference(submittedAt).inDays < 7) {
-                  actsThisWeek += (session['events'] as List?)?.length ?? 0;
-                }
-              }
-            }
-          }
-          
-          if (activeDates.isNotEmpty) {
-             lastActive = LocalizationService.instance.t('recent'); 
-          }
-          
-          String todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-          String yesterdayStr = "${now.subtract(const Duration(days: 1)).year}-${now.subtract(const Duration(days: 1)).month.toString().padLeft(2, '0')}-${now.subtract(const Duration(days: 1)).day.toString().padLeft(2, '0')}";
-          
-          DateTime checkDate = now;
-          if (activeDates.contains(todayStr) || activeDates.contains(yesterdayStr)) {
-            checkDate = activeDates.contains(todayStr) ? now : now.subtract(const Duration(days: 1));
-            while (true) {
-              String dStr = "${checkDate.year}-${checkDate.month.toString().padLeft(2, '0')}-${checkDate.day.toString().padLeft(2, '0')}";
-              if (activeDates.contains(dStr)) {
-                streak++;
-                checkDate = checkDate.subtract(const Duration(days: 1));
-              } else {
-                break;
-              }
-            }
-          }
-
-          weeklyProgress = (actsThisWeek / 20.0).clamp(0.0, 1.0);
+        Future<void> openProgress() async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChildProgressScreen(studentData: student),
+            ),
+          );
+          if (!mounted) return;
+          setState(() {
+            _childInsightFutures[studentId] = ParentDashboardService()
+                .getAdaptiveInsights(studentId);
+          });
         }
 
         return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ChildProgressScreen(studentData: student),
-              ),
-            );
-          },
+          onTap: openProgress,
           child: Container(
-            margin: const EdgeInsets.only(bottom: 16),
+            margin: const EdgeInsets.only(bottom: 18),
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: AppColors.cardSurface,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.borderLight, width: 1.5),
+              border: Border.all(color: AppColors.borderBlue, width: 1.25),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.shadow,
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
@@ -671,29 +704,45 @@ class _ParentHubScreenState extends State<ParentHubScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: AppColors.calmBlue.withValues(alpha: 0.1),
-                      backgroundImage: AssetImage(avatar),
+                    Container(
+                      width: 54,
+                      height: 54,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: AppColors.slateBg,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.borderBlue,
+                          width: 2,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(avatar, fit: BoxFit.cover),
+                      ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 13),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             name,
-                            style: AppTypography.heading(
-                              fontSize: 18,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: DashText.heading(
+                              fontSize: 19,
                               color: AppColors.textPrimary,
                             ),
                           ),
+                          const SizedBox(height: 3),
                           Text(
-                            grade.toLowerCase().replaceAll(' ', '_') == 'grade_1' 
-                                ? LocalizationService.instance.t('grade_1') 
+                            grade.toLowerCase().replaceAll(' ', '_') ==
+                                    'grade_1'
+                                ? LocalizationService.instance.t('grade_1')
                                 : grade,
-                            style: AppTypography.caption(
+                            style: DashText.caption(
                               fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
@@ -701,140 +750,358 @@ class _ParentHubScreenState extends State<ParentHubScreen>
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.warmAmber.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          const FaIcon(FontAwesomeIcons.fire,
-                              size: 12, color: AppColors.warmAmber),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$streak ${LocalizationService.instance.t("day_streak")}',
-                            style: AppTypography.caption(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.warmAmber,
-                            ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.11),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.28),
                           ),
-                        ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FaIcon(statusIcon, size: 12, color: statusColor),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                statusText,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: DashText.caption(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                if (summary != null) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Accuracy', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                            Text('${summary.accuracy}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Progress', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                            Text('${summary.overallProgress}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Attention', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                            Text('${summary.attention}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.green)),
-                          ],
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 18),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  _buildChildCardMessage(
+                    icon: FontAwesomeIcons.arrowsRotate,
+                    title: 'Loading learning summary',
+                    message: 'Gathering the latest completed learning tasks.',
+                    color: AppColors.calmBlue,
+                  )
+                else if (snapshot.hasError)
+                  _buildChildCardMessage(
+                    icon: FontAwesomeIcons.wifi,
+                    title: 'Could not load this summary',
+                    message: 'Open the learning summary to try again.',
+                    color: AppColors.softCoral,
+                  )
+                else if (!hasLearningData)
+                  _buildChildCardMessage(
+                    icon: FontAwesomeIcons.seedling,
+                    title: 'No completed learning tasks yet',
+                    message:
+                        'Useful learning details will appear after the first activity.',
+                    color: AppColors.calmBlue,
+                  )
+                else ...[
+                  Text(
+                    '$completed completed learning tasks'
+                    '${activitiesTried > 0 ? ' across $activitiesTried activities' : ''}.',
+                    style: DashText.body(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                ] else ...[
+                  const SizedBox(height: 14),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        LocalizationService.instance.t('skills_mastered'),
-                        style: AppTypography.caption(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        '${(weeklyProgress * 100).round()}%',
-                        style: AppTypography.caption(
-                          fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: _buildChildMetric(
+                          icon: FontAwesomeIcons.heart,
+                          value: independent,
+                          label: 'Correct first try',
                           color: AppColors.gentleGreen,
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildChildMetric(
+                          icon: FontAwesomeIcons.handHoldingHeart,
+                          value: helped,
+                          label: 'Needed help',
+                          color: AppColors.warmAmber,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildChildMetric(
+                          icon: FontAwesomeIcons.clipboardCheck,
+                          value: checked,
+                          label: 'Checked again',
+                          color: AppColors.calmBlue,
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: weeklyProgress,
-                      minHeight: 8,
-                      backgroundColor: AppColors.borderLight,
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.gentleGreen),
+                  const SizedBox(height: 14),
+                  if (needsPractice.isNotEmpty)
+                    _buildChildInsight(
+                      icon: FontAwesomeIcons.lightbulb,
+                      eyebrow: 'NEXT PRACTICE',
+                      title:
+                          (needsPractice.first['title'] ??
+                                  needsPractice.first['activity_name'] ??
+                                  'Short practice')
+                              .toString(),
+                      detail:
+                          (needsPractice.first['evidence_text'] ??
+                                  'A short follow-up practice is available.')
+                              .toString(),
+                      color: AppColors.warmAmber,
+                    )
+                  else if (goingWell.isNotEmpty)
+                    _buildChildInsight(
+                      icon: FontAwesomeIcons.star,
+                      eyebrow: 'GOING WELL',
+                      title:
+                          (goingWell.first['title'] ??
+                                  goingWell.first['activity_name'] ??
+                                  'Learning progress')
+                              .toString(),
+                      detail:
+                          (goingWell.first['evidence_text'] ??
+                                  'This area is progressing independently.')
+                              .toString(),
+                      color: AppColors.gentleGreen,
+                    ),
+                ],
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.calmBlue.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.calmBlue.withValues(alpha: 0.18),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                ],
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          const FaIcon(FontAwesomeIcons.clock,
-                              size: 12, color: AppColors.textHint),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              '${LocalizationService.instance.t("last_active_prefix")}$lastActive',
-                              style: AppTypography.caption(
-                                  fontSize: 11, color: AppColors.textHint),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      LocalizationService.instance.t('view_progress_btn'),
-                      style: AppTypography.caption(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                  child: Row(
+                    children: [
+                      const FaIcon(
+                        FontAwesomeIcons.chartSimple,
+                        size: 15,
                         color: AppColors.calmBlue,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          'View learning summary',
+                          style: DashText.body(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.calmBlueDark,
+                          ),
+                        ),
+                      ),
+                      const FaIcon(
+                        FontAwesomeIcons.chevronRight,
+                        size: 13,
+                        color: AppColors.calmBlue,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
         );
-      }
+      },
+    );
+  }
+
+  int _cardInt(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  List<Map<String, dynamic>> _cardMaps(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Widget _buildChildMetric({
+    required dynamic icon,
+    required int value,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 96),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.20)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          FaIcon(icon, size: 17, color: color),
+          const SizedBox(height: 5),
+          Text(
+            '$value',
+            style: DashText.heading(fontSize: 20, color: color),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: DashText.caption(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+            ).copyWith(height: 1.2),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChildInsight({
+    required dynamic icon,
+    required String eyebrow,
+    required String title,
+    required String detail,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: FaIcon(icon, size: 15, color: color),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  eyebrow,
+                  style: DashText.caption(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ).copyWith(letterSpacing: 0.8),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: DashText.body(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: DashText.caption(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ).copyWith(height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChildCardMessage({
+    required dynamic icon,
+    required String title,
+    required String message,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          FaIcon(icon, size: 18, color: color),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: DashText.body(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  message,
+                  style: DashText.caption(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ).copyWith(height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 }

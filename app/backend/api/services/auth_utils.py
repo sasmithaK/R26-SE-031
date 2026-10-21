@@ -4,7 +4,7 @@ services/auth_utils.py
 Password hashing, JWT creation and verification utilities.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 from google.oauth2 import id_token
 from google.auth.transport import requests
@@ -56,18 +56,28 @@ def verify_token(token: str) -> dict:
     except jwt.InvalidTokenError:
         return None
 
+import os as _os
+
+# Public OAuth client IDs (not secrets). Override with GOOGLE_CLIENT_IDS
+# (comma-separated) when the Google Cloud project changes.
+GOOGLE_CLIENT_IDS = [
+    value.strip() for value in _os.getenv(
+        "GOOGLE_CLIENT_IDS",
+        "733315696908-tpau04bmsk824olg6m0a3coanojl147v.apps.googleusercontent.com,"
+        "733315696908-p1b7u8vgcdkfj08kss6r9u0b5mgvt1uo.apps.googleusercontent.com,"
+        "733315696908-le4r1kebs5o83a31d17ngbm4ve0vee4m.apps.googleusercontent.com",
+    ).split(",") if value.strip()
+]
+
+
 def verify_google_token(token: str) -> dict:
     """Verify a Google ID token and return user info."""
     try:
-        # Accept tokens generated for any of our 3 clients (Web, iOS, Android)
+        # Accept tokens generated for any configured client (Web, iOS, Android).
         idinfo = id_token.verify_oauth2_token(
-            token, 
-            requests.Request(), 
-            audience=[
-                "733315696908-tpau04bmsk824olg6m0a3coanojl147v.apps.googleusercontent.com", # Web
-                "733315696908-p1b7u8vgcdkfj08kss6r9u0b5mgvt1uo.apps.googleusercontent.com", # iOS
-                "733315696908-le4r1kebs5o83a31d17ngbm4ve0vee4m.apps.googleusercontent.com", # Android
-            ]
+            token,
+            requests.Request(),
+            audience=GOOGLE_CLIENT_IDS,
         )
         return idinfo
     except ValueError as e:
@@ -95,12 +105,12 @@ def verify_microsoft_token(access_token: str) -> dict:
         print(f"Microsoft Token Verification Error: {e}")
         return None
 
-import random
+import secrets
 import string
 
 def generate_otp(length: int = 6) -> str:
-    """Generate a random numeric OTP."""
-    return "".join(random.choices(string.digits, k=length))
+    """Generate a numeric OTP with a cryptographically secure generator."""
+    return "".join(secrets.choice(string.digits) for _ in range(length))
 
 def send_login_alert_email(email_address: str, ip_address: str, device_name: str, time_str: str):
     """Sends an email notifying the user of a new login."""
@@ -159,10 +169,10 @@ def send_otp_email(email_address: str, otp: str):
     Send the OTP via email using SMTP. 
     If SMTP credentials are not configured, fallback to console print.
     """
-    # Always print to console for development visibility
-    print(f"========== OTP FOR {email_address} ==========")
-    print(f"Your password reset code is: {otp}")
-    print(f"=======================================")
+    # OTP codes are secrets: print them only when explicitly debugging locally.
+    import os as _os
+    if _os.getenv("DEBUG_PRINT_OTP", "").lower() in {"1", "true", "yes"}:
+        print(f"[DEBUG_PRINT_OTP] OTP for {email_address}: {otp}")
     
     import os
     import requests

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../models/curriculum_models.dart';
-import '../../../../services/tts_service.dart';
+import '../../../theme/app_theme.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../models/curriculum_models.dart';
+import '../../../services/tts_service.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
-import '../../../../services/progress_service.dart';
-import '../shared_widgets/shared_celebration_popup.dart';
+import '../../../services/progress_service.dart';
+import '../../../adaptive/adapters/choice_scaffold_adapter.dart';
+import '../../../adaptive/models/adaptive_scaffold_models.dart';
 
 /// Activity 9: වචනයට සවන් දී පින්තූරය සොයමු (Listen to Word & Find Image)
 /// Template: audio_image_match_game
@@ -15,20 +16,42 @@ class Skill4Act1Mcq extends StatefulWidget {
   final ActivityNode? activityNode;
   final Map<String, dynamic>? studentData;
   final bool isRemedial;
-  const Skill4Act1Mcq({super.key, this.activityNode, this.isRemedial = false, this.studentData});
+  const Skill4Act1Mcq({
+    super.key,
+    this.activityNode,
+    this.isRemedial = false,
+    this.studentData,
+  });
 
   @override
   State<Skill4Act1Mcq> createState() => _Skill4Act1McqState();
 }
 
-class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
+class _Skill4Act1McqState extends State<Skill4Act1Mcq>
+    with ChoiceScaffoldAdapter<Skill4Act1Mcq> {
   String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
   int? _selectedIndex;
   bool _isCorrect = false;
   bool _activityComplete = false;
+  bool _isProcessingAnswer = false;
   int _currentRoundIndex = 0;
   int _attemptCount = 0;
+
+  @override
+  List<String> get adaptiveSemanticScaffoldCapabilities => const <String>[
+    'REPLAY_INSTRUCTION',
+    'SLOW_AUDIO',
+  ];
+
+  @override
+  Future<void> handleAdaptiveSemanticScaffold(ScaffoldCommand command) async {
+    if (command.type == ScaffoldActionType.replayInstruction) {
+      _playAudioPrompt();
+    } else if (command.type == ScaffoldActionType.slowAudio) {
+      _playAudioPrompt(slow: true);
+    }
+  }
 
   @override
   void initState() {
@@ -37,7 +60,10 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
     final skillId = widget.activityNode?.skillId ?? '';
     final activityId = widget.activityNode?.id ?? '';
     if (skillId.isNotEmpty && activityId.isNotEmpty) {
-      _currentRoundIndex = ProgressService().getActivityState(skillId, activityId);
+      _currentRoundIndex = ProgressService().getActivityState(
+        skillId,
+        activityId,
+      );
     }
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
@@ -51,57 +77,86 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
   @override
   void dispose() {
     _audioPlayer.dispose();
+    disposeChoiceScaffoldAdapter();
     super.dispose();
   }
 
-  void _playAudioPrompt({bool autoPlay = false}) {
+  void _playAudioPrompt({bool autoPlay = false, bool slow = false}) {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) return;
 
-    final currentRound = rounds[_currentRoundIndex];
-    final audioText = currentRound['audio_text']?.toString() ?? currentRound['prompt']?.toString() ?? 'වෘත්තය';
-    
+    final currentRound = adaptiveRoundData(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+    );
+    final audioText =
+        currentRound['audio_text']?.toString() ??
+        currentRound['prompt']?.toString() ??
+        'වෘත්තය';
+
     if (autoPlay && _lastSpokenInstruction == audioText) {
       return;
     }
     _lastSpokenInstruction = audioText;
-    TtsService().speak(audioText, folder: 'skill_4');
+    TtsService().speak(
+      audioText,
+      folder: 'skill_4',
+      playbackRate: slow ? 0.78 : 1.0,
+    );
   }
 
   void _checkAnswer(int index, int correctIndex, int totalRounds) async {
-    if (_isCorrect) return;
+    if (_isCorrect || _isProcessingAnswer) return;
+    if (isAdaptivelyRemoved(index)) return;
 
     _attemptCount++;
     setState(() {
       _selectedIndex = index;
+      _isProcessingAnswer = true;
     });
 
     final bool isRight = (index == correctIndex);
     int score = isRight ? 100 : 0;
 
     if (isRight) {
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(score);
       setState(() {
         _isCorrect = true;
       });
       SoundUtils.playFeedback('audio/correct.mp3');
-
-      _advanceRoundAfterDelay(totalRounds);
+      final resultFuture = submitAdaptiveChoiceTask(
+        score,
+        roundIndex: _currentRoundIndex,
+      );
+      _advanceRoundAfterDelay(totalRounds, resultFuture);
     } else {
       SoundUtils.playFeedback('audio/wrong.mp3');
+      await requestChoiceScaffold(
+        selectedIndex: index,
+        options: adaptiveOptionLabels,
+        correctIndex: correctIndex,
+        errorType: 'sentence_comprehension_error',
+      );
+      if (mounted) setState(() {});
 
-      if (_attemptCount >= 2) {
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(0);
+      if (_attemptCount >= 3) {
         setState(() {
           _selectedIndex = correctIndex;
           _isCorrect = true;
         });
-        _advanceRoundAfterDelay(totalRounds);
+        SoundUtils.playFeedback('audio/correct.mp3');
+        final resultFuture = submitAdaptiveChoiceTask(
+          0,
+          roundIndex: _currentRoundIndex,
+          isCorrect: true,
+          attemptAlreadyLogged: true,
+        );
+        _advanceRoundAfterDelay(totalRounds, resultFuture);
       } else {
         Future.delayed(const Duration(milliseconds: 700), () {
           if (mounted && !_isCorrect) {
             setState(() {
               _selectedIndex = null;
+              _isProcessingAnswer = false;
             });
           }
         });
@@ -109,36 +164,57 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
     }
   }
 
-  void _advanceRoundAfterDelay(int totalRounds) {
-    Future.delayed(const Duration(milliseconds: 1400), () {
-      if (!mounted) return;
-      if (_currentRoundIndex < totalRounds - 1) {
-        setState(() {
-          _currentRoundIndex++;
-          _attemptCount = 0;
-          final sId = widget.activityNode?.skillId ?? '';
-          final aId = widget.activityNode?.id ?? '';
-          if (sId.isNotEmpty && aId.isNotEmpty) {
-            int progress = ((_currentRoundIndex / (widget.activityNode?.rounds.length ?? 1)) * 100).toInt();
-            ProgressService().saveActivityScore(sId, aId, progress);
-            ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
-          }
-          _selectedIndex = null;
-          _isCorrect = false;
-        });
-        _playAudioPrompt(autoPlay: true);
-      } else {
-        setState(() {
-          _activityComplete = true;
-          final sId = widget.activityNode?.skillId ?? '';
-          final aId = widget.activityNode?.id ?? '';
-          if (sId.isNotEmpty && aId.isNotEmpty) {
-            ProgressService().saveActivityScore(sId, aId, 100);
-            ProgressService().clearActivityState(sId, aId);
-          }
-        });
-      }
-    });
+  Future<void> _advanceRoundAfterDelay(
+    int totalRounds,
+    Future<Map<String, dynamic>?> resultFuture,
+  ) async {
+    await Future<void>.delayed(const Duration(milliseconds: 1400));
+    final result = await resultFuture;
+    if (!mounted) return;
+    final transition = applyAdaptiveChoiceTaskResult(result);
+    if (transition == null) {
+      // A missing/duplicate response is never evidence that all four core
+      // tasks were completed. Keep this item available; a retry will either
+      // complete it or receive the backend's currently expected item.
+      setState(() {
+        _selectedIndex = null;
+        _isCorrect = false;
+        _isProcessingAnswer = false;
+      });
+      return;
+    }
+    if (!transition.isComplete) {
+      setState(() {
+        _currentRoundIndex = transition.roundIndex;
+        _attemptCount = 0;
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          int progress =
+              ((_currentRoundIndex /
+                          (widget.activityNode?.rounds.length ?? 1)) *
+                      100)
+                  .toInt();
+          ProgressService().saveActivityScore(sId, aId, progress);
+          ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+        }
+        _selectedIndex = null;
+        _isCorrect = false;
+        _isProcessingAnswer = false;
+      });
+      _playAudioPrompt(autoPlay: true);
+    } else {
+      setState(() {
+        _activityComplete = true;
+        _isProcessingAnswer = false;
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          ProgressService().saveActivityScore(sId, aId, 100);
+          ProgressService().clearActivityState(sId, aId);
+        }
+      });
+    }
   }
 
   @override
@@ -150,33 +226,47 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
         body: const Center(child: Text('No rounds available.')),
       );
     }
-    
+
     if (rounds.length > 5) {
       rounds = rounds.sublist(0, 5);
     }
 
-    final currentRound = rounds[_currentRoundIndex];
-    final titleText = widget.activityNode?.title ?? 'වචනයට සවන් දී පින්තූරය සොයමු';
-    final promptText = currentRound['prompt']?.toString() ?? 'අසා සිටින පින්තූරය තෝරන්න';
+    final currentRound = adaptiveRoundData(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+    );
+    final titleText =
+        widget.activityNode?.title ?? 'වචනයට සවන් දී පින්තූරය සොයමු';
+    final promptText =
+        currentRound['prompt']?.toString() ?? 'අසා සිටින පින්තූරය තෝරන්න';
     final imageUrl = currentRound['image_url']?.toString();
-    var options = (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ?? ['🔵', '🟥', '🔺', '⭐'];
+    var options =
+        (currentRound['options'] as List?)?.map((e) => e.toString()).toList() ??
+        ['🔵', '🟥', '🔺', '⭐'];
     var correctIndex = (currentRound['correct_index'] as int?) ?? 0;
-    
+
     if (widget.isRemedial && options.length > 2) {
       // Reduce distractors to max 1 + 1 correct = 2 options total
       final correctItem = options[correctIndex];
       var distractors = options.where((item) => item != correctItem).toList();
       if (distractors.isNotEmpty) distractors = distractors.sublist(0, 1);
       options = [correctItem, ...distractors];
-      options.shuffle();
       correctIndex = options.indexOf(correctItem);
     }
+    configureAdaptiveChoices(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+      options: options,
+      correctIndex: correctIndex,
+    );
 
     double itemSize;
     double spacing;
     double fontSize;
     final total = options.length;
-    final bool hasLongText = options.any((opt) => opt.toString().length > 4 || opt.toString().contains(' '));
+    final bool hasLongText = options.any(
+      (opt) => opt.toString().length > 4 || opt.toString().contains(' '),
+    );
 
     if (total <= 2) {
       itemSize = 160.0;
@@ -187,15 +277,15 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
       spacing = 16.0;
       fontSize = 56.0;
     } else if (total <= 6) {
-      itemSize = 100.0; 
+      itemSize = 100.0;
       spacing = 12.0;
       fontSize = 48.0;
     } else if (total <= 9) {
-      itemSize = 80.0; 
+      itemSize = 80.0;
       spacing = 10.0;
       fontSize = 40.0;
     } else {
-      itemSize = 64.0; 
+      itemSize = 64.0;
       spacing = 8.0;
       fontSize = 32.0;
     }
@@ -209,7 +299,8 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
       isRoundComplete: _isCorrect,
       isActivityComplete: _activityComplete,
       onNext: () {
-        final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+        final wrapper = context
+            .findAncestorStateOfType<TelemetryWrapperState>();
         if (wrapper != null) {
           wrapper.completeActivity(context);
         } else {
@@ -223,12 +314,17 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
             // Premium Speaker Card (Instruction)
             GestureDetector(
               onTap: () {
-                context.findAncestorStateOfType<TelemetryWrapperState>()?.logAudioReplay();
+                context
+                    .findAncestorStateOfType<TelemetryWrapperState>()
+                    ?.logAudioReplay();
                 _playAudioPrompt();
               },
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.warmAmber.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(24),
@@ -284,71 +380,117 @@ class _Skill4Act1McqState extends State<Skill4Act1Mcq> {
                       color: AppColors.warmAmber.withValues(alpha: 0.2),
                       blurRadius: 16,
                       offset: const Offset(0, 4),
-                    )
+                    ),
                   ],
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(21),
-                  child: Image.asset(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                  ),
+                  child: Image.asset(imageUrl, fit: BoxFit.cover),
                 ),
               ),
 
-              // Image Option Cards Grid
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Center(
-                    child: Wrap(
-                      spacing: spacing,
-                      runSpacing: spacing,
-                      alignment: WrapAlignment.center,
-                      children: List.generate(options.length, (index) {
-                      final isSelected = (_selectedIndex == index);
-                      final isRight = isSelected && (index == correctIndex);
-                      final isWrong = isSelected && (index != correctIndex);
+            // Image Option Cards Grid
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Center(
+                  child: Wrap(
+                    spacing: spacing,
+                    runSpacing: spacing,
+                    alignment: WrapAlignment.center,
+                    children: <Widget>[
+                      for (int index = 0; index < options.length; index++)
+                        if (!isAdaptivelyRemoved(index))
+                          Builder(
+                            builder: (context) {
+                              final isSelected = (_selectedIndex == index);
+                              final isRight =
+                                  isSelected && (index == correctIndex);
+                              final isWrong =
+                                  isSelected && (index != correctIndex);
+                              final isHinted = isAdaptivelyHighlighted(index);
 
-                      return GestureDetector(
-                        onTap: () => _checkAnswer(index, correctIndex, rounds.length),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          width: hasLongText ? null : itemSize,
-                          height: hasLongText ? null : itemSize,
-                          padding: hasLongText ? EdgeInsets.symmetric(horizontal: 24, vertical: options.length <= 2 ? 24 : 16) : null,
-                          decoration: BoxDecoration(
-                            color: isRight
-                                ? AppColors.gentleGreen.withValues(alpha: 0.3)
-                                : isWrong
-                                    ? AppColors.softCoral.withValues(alpha: 0.3)
-                                    : Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: isRight
-                                  ? AppColors.gentleGreen
-                                  : isWrong
-                                      ? AppColors.softCoral
-                                      : AppColors.borderLight,
-                              width: 3,
-                            ),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4))
-                            ],
+                              return GestureDetector(
+                                key: ValueKey<String>(
+                                  '$adaptiveItemId-option-$index',
+                                ),
+                                onTap: () => _checkAnswer(
+                                  index,
+                                  correctIndex,
+                                  rounds.length,
+                                ),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 250),
+                                  width: hasLongText ? null : itemSize,
+                                  height: hasLongText ? null : itemSize,
+                                  padding: hasLongText
+                                      ? EdgeInsets.symmetric(
+                                          horizontal: 24,
+                                          vertical: options.length <= 2
+                                              ? 24
+                                              : 16,
+                                        )
+                                      : null,
+                                  decoration: BoxDecoration(
+                                    color: isRight
+                                        ? AppColors.gentleGreen.withValues(
+                                            alpha: 0.3,
+                                          )
+                                        : isWrong
+                                        ? AppColors.softCoral.withValues(
+                                            alpha: 0.3,
+                                          )
+                                        : isHinted
+                                        ? AppColors.warmAmberLight.withValues(
+                                            alpha: 0.42,
+                                          )
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: isRight
+                                          ? AppColors.gentleGreen
+                                          : isWrong
+                                          ? AppColors.softCoral
+                                          : isHinted
+                                          ? AppColors.warmAmber
+                                          : AppColors.borderLight,
+                                      width: 3,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      options[index],
+                                      style: TextStyle(
+                                        fontSize: hasLongText
+                                            ? (options.length <= 2
+                                                  ? 30.0
+                                                  : 24.0)
+                                            : fontSize,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                          child: Center(
-                            child: Text(options[index], style: TextStyle(fontSize: hasLongText ? (options.length <= 2 ? 30.0 : 24.0) : fontSize), textAlign: TextAlign.center),
-                          ),
-                        ),
-                      );
-                    }),
+                    ],
                   ),
                 ),
               ),
             ),
-            ],
-          ),
+          ],
         ),
+      ),
     );
   }
 }

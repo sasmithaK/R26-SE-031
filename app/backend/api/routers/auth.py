@@ -4,6 +4,7 @@ routers/auth.py
 Authentication endpoints: signup, login, refresh, me, change-password, verify-password.
 """
 
+import secrets
 from fastapi import UploadFile, File
 from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
@@ -145,10 +146,9 @@ async def verify_email(request: Request, req: VerifyEmailRequest, background_tas
             user_doc["clinic_name"] = pending["clinic_name"]
         
         if pending.get("role") == "specialist":
-            import random
             import string
             # Generate a professional 6-character alphanumeric clinic code
-            user_doc["clinic_code"] = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            user_doc["clinic_code"] = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
         
         # Upsert just in case they were somehow inserted but unverified before we changed architecture
         await db.users.update_one(
@@ -367,9 +367,8 @@ async def google_login(request: Request, login_req: GoogleLoginRequest, backgrou
             user_doc["clinic_name"] = login_req.clinic_name
             
         if user_doc["role"] == "specialist":
-            import random
             import string
-            user_doc["clinic_code"] = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            user_doc["clinic_code"] = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
             
         result = await db.users.insert_one(user_doc)
         user_id = str(result.inserted_id)
@@ -445,9 +444,8 @@ async def microsoft_login(request: Request, login_req: MicrosoftLoginRequest, ba
             user_doc["clinic_name"] = login_req.clinic_name
             
         if user_doc["role"] == "specialist":
-            import random
             import string
-            user_doc["clinic_code"] = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            user_doc["clinic_code"] = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
             
         result = await db.users.insert_one(user_doc)
         user_id = str(result.inserted_id)
@@ -478,16 +476,25 @@ async def refresh_token_endpoint(request: Request, token_req: TokenRefreshReques
             detail="Invalid or expired refresh token",
         )
 
+    # Re-read the account before rotating credentials.  Apart from preventing
+    # deleted accounts from renewing a session, this supplies the authoritative
+    # role/id instead of trusting claims from a month-long refresh token.
+    db = get_db()
+    user_doc = await db.users.find_one({"email": decoded["sub"]})
+    if not user_doc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
     token_data = {
-        "sub": decoded["sub"],
-        "role": decoded.get("role", "parent"),
-        "id": decoded.get("id"),
+        "sub": user_doc["email"],
+        "role": user_doc.get("role", "parent"),
+        "id": str(user_doc["_id"]),
     }
     access_token = create_access_token(data=token_data)
     refresh_token = create_refresh_token(data=token_data)
 
-
-    await _handle_login_alert(db, user_doc, request, background_tasks, None, None)
     return Token(access_token=access_token, refresh_token=refresh_token, token_type="bearer")
 
 
@@ -655,7 +662,7 @@ async def forgot_password(request: Request, req: ForgotPasswordRequest):
         )
     # Check if this is an OAuth account
     hashed_pwd = user.get("hashed_password", "")
-    if verify_password("google-oauth-placeholder-password", hashed_pwd) or "google-oauth" in hashed_pwd:
+    if user.get("auth_provider", "local") != "local" or not hashed_pwd:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You signed up using a social account (Google/Microsoft). Please log in using that button.",

@@ -1,78 +1,187 @@
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException
-from services.stt_service import get_stt_engine
-import math
-import unicodedata
-from datetime import datetime
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends, BackgroundTasks, Request
+from services.stt_service import get_stt_engine, get_stt_status
+from services.audio_quality_service import UnreadableAudioError
+from datetime import datetime, timezone
+from uuid import uuid4
+import hashlib
+import asyncio
+import os
+import httpx
 from database import get_db
+import json
+
+from services.c2_pipeline_service import get_c2_pipeline
+from services.audio_quality_service import AudioQualityService
+from dependencies import get_current_user, require_owned_student
 
 router = APIRouter(prefix="/stt", tags=["Speech-to-Text"])
-
-def normalize_sinhala(text: str) -> str:
-    """Normalize Sinhala text for comparison."""
-    if not text:
-        return ""
-    # NFC normalization
-    text = unicodedata.normalize('NFC', text)
-    # Trim and collapse whitespace
-    text = " ".join(text.split())
-    # Keep only Sinhala unicode range and spaces
-    # Sinhala Unicode range: \u0D80 - \u0DFF
-    filtered = []
-    for c in text:
-        if ('\u0D80' <= c <= '\u0DFF') or c.isspace():
-            filtered.append(c)
-    return "".join(filtered).strip()
+_analysis_slots = asyncio.Semaphore(max(1, int(os.getenv("C2_MAX_CONCURRENT_ANALYSES", "1"))))
 
 
-def levenshtein_distance(s1: str, s2: str) -> int:
-    """Calculate the Levenshtein distance between two strings (measured in words)."""
-    words1 = s1.split()
-    words2 = s2.split()
-    
-    if len(words1) < len(words2):
-        return levenshtein_distance(s2, s1)
-        
-    if len(words2) == 0:
-        return len(words1)
-        
-    previous_row = range(len(words2) + 1)
-    for i, c1 in enumerate(words1):
-        current_row = [i + 1]
-        for j, c2 in enumerate(words2):
-            insertions = previous_row[j + 1] + 1
-            deletions = current_row[j] + 1
-            substitutions = previous_row[j] + (c1 != c2)
-            current_row.append(min(insertions, deletions, substitutions))
-        previous_row = current_row
-        
-    return previous_row[-1]
+LETTER_SKILLS = {"skill_sinhala_vowels", "skill_sinhala_consonants"}
+
+
+def _task_kind(skill_id: str) -> str:
+    """The task family is fixed by the skill, so letter practice can never be
+    counted as oral reading (or the reverse), whatever the client sends."""
+    return "letter_pronunciation" if skill_id in LETTER_SKILLS else "reading"
+
+
+def _validate_curriculum_scope(skill_id: str, activity_id: str, item_id: str) -> None:
+    """Keep C2 evidence attached to a supported speech curriculum skill."""
+    item_prefixes = {
+        "skill_5": "S5",
+        "skill_6": "S6",
+        "skill_sinhala_vowels": "SVOW",
+        "skill_sinhala_consonants": "SCONS",
+    }
+    expected_prefix = item_prefixes.get(skill_id)
+    if expected_prefix is None:
+        raise HTTPException(status_code=422, detail="Unsupported C2 curriculum skill")
+    if not activity_id.startswith("act_"):
+        raise HTTPException(status_code=422, detail="Invalid C2 activity_id")
+    activity_prefix = f"A{activity_id.removeprefix('act_')}"
+    if not item_id.startswith(expected_prefix + activity_prefix):
+        raise HTTPException(status_code=422, detail="item_id does not match the submitted skill and activity")
+
+
+async def _process_audio(*args, **kwargs):
+    """Run CPU-heavy speech inference away from the API event loop."""
+    async with _analysis_slots:
+        return await asyncio.to_thread(get_c2_pipeline().process, *args, **kwargs)
+
+
+async def _refresh_c3(
+    student_id: str, session_id: str, data_origin: str, dataset_id: str,
+    authorization: str | None = None,
+) -> None:
+    url = os.getenv("FUSION_API_URL", "http://localhost:9016").rstrip("/") + "/diagnose/session"
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            response = await client.post(url, json={
+                "student_id": student_id,
+                "session_id": session_id,
+                "data_origin": data_origin,
+                "dataset_id": dataset_id,
+            }, headers={"Authorization": authorization} if authorization else {})
+            response.raise_for_status()
+    except Exception:
+        # The saved C2 attempt remains valid and can be reconciled later.
+        return
+
+
+def require_stt_available() -> None:
+    """Reject quickly while startup preload is running or has failed."""
+    status = get_stt_status()
+    if status["status"] in {"loading", "failed"}:
+        warming_up = status["status"] == "loading"
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "stt_warming_up" if warming_up else "stt_unavailable",
+                "message": "The speech model is preparing. Please retry shortly."
+                if warming_up
+                else "The speech model could not be loaded.",
+                "retryable": warming_up,
+            },
+        )
 
 @router.post("/transcribe")
-async def transcribe_audio(file: UploadFile = File(...)):
+async def transcribe_audio(
+    background_tasks: BackgroundTasks,
+    request: Request,
+    student_id: str = Form(...),
+    session_id: str = Form(...),
+    skill_id: str = Form(...),
+    activity_id: str = Form(...),
+    item_id: str = Form(...),
+    attempt_id: str = Form(None),
+    data_origin: str = Form("observed"),
+    dataset_id: str = Form(None),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
     """
     Accepts an audio file and transcribes it into Sinhala text using Whisper.
     """
     if not file:
         raise HTTPException(status_code=400, detail="No file uploaded")
+    await require_owned_student(student_id, current_user)
+    _validate_curriculum_scope(skill_id, activity_id, item_id)
+    require_stt_available()
         
     try:
         audio_bytes = await file.read()
         if len(audio_bytes) == 0:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
-            
+        if data_origin not in {"observed", "synthetic"}:
+            raise HTTPException(422, "data_origin must be observed or synthetic")
         stt_engine = get_stt_engine()
         transcription = stt_engine.transcribe_audio_bytes(audio_bytes)
-        
-        return {"transcription": transcription}
+        resolved_dataset_id = dataset_id or f"live:{student_id}:{session_id}"
+        resolved_attempt_id = attempt_id or f"{session_id}:{item_id}:transcription:{uuid4().hex}"
+        quality = AudioQualityService().analyze(audio_bytes)
+        doc = {
+            "student_id": student_id, "session_id": session_id,
+            "skill_id": skill_id, "activity_id": activity_id, "item_id": item_id,
+            "attempt_id": resolved_attempt_id, "dataset_id": resolved_dataset_id,
+            "data_origin": data_origin,
+            "validation_status": "synthetic_pipeline_test" if data_origin == "synthetic" else "not_clinically_validated",
+            "pipeline_version": "c2-transcription-v1",
+            "task_kind": _task_kind(skill_id),
+            "acoustics_measured": False,
+            "audio_sha256": hashlib.sha256(audio_bytes).hexdigest(),
+            "recognized_text": transcription,
+            "recording_quality": quality.get("status"),
+            "recording_quality_score": quality.get("quality_score"),
+            "recording_quality_issues": quality.get("issues", []),
+            "measurement_status": "transcription_only" if quality.get("status") == "valid" else "uncertain",
+            "persistence_status": "pending",
+            "created_at": datetime.now(timezone.utc),
+        }
+        try:
+            doc["persistence_status"] = "saved"
+            await get_db().speech_features.update_one(
+                {"student_id": student_id, "attempt_id": resolved_attempt_id},
+                {"$set": doc}, upsert=True,
+            )
+            persistence_status = "saved"
+            background_tasks.add_task(
+                _refresh_c3, student_id, session_id, data_origin, resolved_dataset_id,
+                request.headers.get("Authorization"),
+            )
+        except Exception as exc:
+            persistence_status = "failed"
+            doc["measurement_status"] = "persistence_failed"
+            doc["persistence_status"] = persistence_status
+            doc["persistence_error"] = type(exc).__name__
+        return {"transcription": transcription, "persistence_status": persistence_status,
+                "measurement_status": doc["measurement_status"], "attempt_id": resolved_attempt_id,
+                "data_origin": data_origin, "dataset_id": resolved_dataset_id}
         
     except Exception as e:
+        if isinstance(e, HTTPException):
+            raise
+        if isinstance(e, UnreadableAudioError):
+            raise HTTPException(status_code=422, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/analyze-reading")
 async def analyze_reading(
+    background_tasks: BackgroundTasks,
+    request: Request,
     expected_text: str = Form(...),
-    file: UploadFile = File(...)
+    student_id: str = Form(...),
+    session_id: str = Form(...),
+    skill_id: str = Form(...),
+    activity_id: str = Form(...),
+    item_id: str = Form(...),
+    attempt_id: str = Form(None),
+    data_origin: str = Form("observed"),
+    dataset_id: str = Form(None),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Accepts an audio file and the expected Sinhala text.
@@ -80,49 +189,107 @@ async def analyze_reading(
     """
     if not file:
         raise HTTPException(status_code=400, detail="No file uploaded")
+    await require_owned_student(student_id, current_user)
+    _validate_curriculum_scope(skill_id, activity_id, item_id)
+    require_stt_available()
         
     try:
         audio_bytes = await file.read()
         if len(audio_bytes) == 0:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
             
-        stt_engine = get_stt_engine()
-        transcription = stt_engine.transcribe_audio_bytes(audio_bytes)
-        
-        # Calculate Word Error Rate (WER)
-        # WER = (Substitutions + Deletions + Insertions) / Number of words in expected text
-        expected_words = expected_text.split()
-        num_expected_words = len(expected_words)
-        
-        if num_expected_words == 0:
-            wer = None
-        else:
-            distance = levenshtein_distance(expected_text, transcription)
-            wer = float(distance) / num_expected_words
-            
-        # Ensure WER is capped at 1.0 (100% error) for sanity, though technically it can exceed 1.0 if many insertions
-        # WER is uncapped: insertion errors can exceed 1.
-            
+        if data_origin not in {"observed", "synthetic"}:
+            raise HTTPException(422, "data_origin must be observed or synthetic")
+        result = await _process_audio(audio_bytes, expected_text=expected_text)
+        transcription = result["transcription"].get("text", "")
+        alignment = result["alignment"]
+        resolved_dataset_id = dataset_id or f"live:{student_id}:{session_id}"
+        resolved_attempt_id = attempt_id or f"{session_id}:{item_id}:reading:{uuid4().hex}"
+        word = alignment.get("word") or {}
+        grapheme = alignment.get("grapheme") or {}
+        quality = result.get("quality") or {}
+        doc = {
+            "student_id": student_id, "session_id": session_id,
+            "skill_id": skill_id, "activity_id": activity_id, "item_id": item_id,
+            "attempt_id": resolved_attempt_id, "dataset_id": resolved_dataset_id,
+            "data_origin": data_origin,
+            "validation_status": "speech_feature_analysis",
+            "pipeline_version": result.get("pipeline_version"),
+            "audio_sha256": result.get("audio_sha256"),
+            "expected_text": expected_text, "recognized_text": transcription,
+            "word_error_rate": word.get("error_rate"),
+            "word_accuracy": word.get("accuracy"),
+            "grapheme_error_rate": grapheme.get("error_rate"),
+            "grapheme_accuracy": grapheme.get("accuracy"),
+            "asr_confidence": (result.get("transcription") or {}).get("confidence"),
+            "recording_quality": quality.get("status"),
+            "recording_quality_issues": quality.get("issues", []),
+            "measurement_status": (result.get("fusion") or {}).get("measurement_status", "uncertain"),
+            "created_at": datetime.now(timezone.utc),
+            "persistence_status": "pending",
+            "alignment": alignment, "quality": quality,
+            "task_kind": _task_kind(skill_id),
+            # This endpoint does no acoustic analysis (no timing/voice measures).
+            "acoustics_measured": False,
+        }
+        try:
+            await get_db().speech_features.update_one(
+                {"student_id": student_id, "attempt_id": resolved_attempt_id},
+                {"$set": doc}, upsert=True,
+            )
+            persistence_status = "saved"
+            doc["persistence_status"] = persistence_status
+            background_tasks.add_task(
+                _refresh_c3, student_id, session_id, data_origin, resolved_dataset_id,
+                request.headers.get("Authorization"),
+            )
+        except Exception as exc:
+            persistence_status = "failed"
+            doc["persistence_status"] = persistence_status
+            doc["measurement_status"] = "persistence_failed"
+            doc["persistence_error"] = type(exc).__name__
         return {
             "transcription": transcription,
             "expected_text": expected_text,
-            "word_error_rate": wer
+            "word_error_rate": word.get("error_rate"),
+            "grapheme_error_rate": grapheme.get("error_rate"),
+            "alignment": alignment,
+            "measurement_status": doc["measurement_status"],
+            "persistence_status": persistence_status,
+            "attempt_id": resolved_attempt_id,
+            "data_origin": data_origin,
+            "dataset_id": resolved_dataset_id,
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
+        if isinstance(e, UnreadableAudioError):
+            raise HTTPException(status_code=422, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/analyze-acoustics")
 async def analyze_acoustics(
-    student_id: str = Form(None),
-    session_id: str = Form(None),
-    activity_id: str = Form(None),
-    item_id: str = Form(None),
+    background_tasks: BackgroundTasks,
+    request: Request,
+    student_id: str = Form(...),
+    session_id: str = Form(...),
+    event_id: str = Form(None),
+    attempt_id: str = Form(None),
+    skill_id: str = Form(...),
+    activity_id: str = Form(...),
+    item_id: str = Form(...),
+    round_id: str = Form(None),
+    dataset_id: str = Form(None),
+    data_origin: str = Form("observed"),
+    task_kind: str = Form("reading"),
     expected_text: str = Form(""),
+    allowed_variants_json: str = Form("[]"),
     expected_syllables: int = Form(0),
     t_stimulus: int = Form(0),
     t_record_start: int = Form(0),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Accepts a raw WAV audio file and analyzes it for acoustic hesitation,
@@ -130,92 +297,169 @@ async def analyze_acoustics(
     """
     if not file:
         raise HTTPException(status_code=400, detail="No file uploaded")
+    await require_owned_student(student_id, current_user)
+    _validate_curriculum_scope(skill_id, activity_id, item_id)
+    require_stt_available()
         
     try:
         audio_bytes = await file.read()
         if len(audio_bytes) == 0:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
             
-        from services.acoustic_service import AcousticAnalysisService
-        acoustic_engine = AcousticAnalysisService()
-        
-        results = acoustic_engine.analyze_audio(
+        try:
+            allowed_variants = json.loads(allowed_variants_json or "[]")
+            if not isinstance(allowed_variants, list):
+                raise ValueError
+            allowed_variants = [str(value) for value in allowed_variants]
+        except (ValueError, TypeError, json.JSONDecodeError):
+            raise HTTPException(422, "allowed_variants_json must be a JSON string array")
+        if data_origin not in {"observed", "synthetic"}:
+            raise HTTPException(422, "data_origin must be observed or synthetic")
+        if task_kind not in {"reading", "letter_pronunciation"}:
+            raise HTTPException(422, "task_kind is not supported")
+        task_kind = _task_kind(skill_id)
+        # Match C1's dataset key so modalities align within one child/session.
+        resolved_dataset_id = dataset_id or f"live:{student_id}:{session_id}"
+
+        result = await _process_audio(
             wav_bytes=audio_bytes,
             expected_text=expected_text,
             expected_syllables=expected_syllables,
             t_stimulus=t_stimulus,
-            t_record_start=t_record_start
+            t_record_start=t_record_start,
+            allowed_variants=allowed_variants,
         )
-        
-        # Calculate ASR metrics
-        recognized_text = results.get("transcription", "")
-        norm_expected = normalize_sinhala(expected_text)
-        norm_recognized = normalize_sinhala(recognized_text)
-        
-        exact_match = (norm_expected == norm_recognized) if norm_expected else None
-        
-        # Char Error Rate
-        char_dist = levenshtein_distance(" ".join(norm_expected), " ".join(norm_recognized)) if norm_expected else 0
-        cer = float(char_dist) / len(norm_expected) if norm_expected else None
-        
-        # Word Error Rate
-        word_dist = levenshtein_distance(norm_expected, norm_recognized)
-        wer = float(word_dist) / len(norm_expected.split()) if norm_expected.split() else None
-        
-        # Normalized similarity
-        max_len = max(len(norm_expected), len(norm_recognized), 1)
-        normalized_similarity = max(0.0, 1.0 - (float(char_dist) / max_len))
+        quality = result["quality"]
+        transcription = result["transcription"]
+        alignment = result["alignment"]
+        acoustic = result["acoustic"]
+        fluency = result["fluency"]
+        fusion = result["fusion"]
+        recognized_text = transcription.get("text", "")
+        word_metrics = alignment.get("word") or {}
+        grapheme_metrics = alignment.get("grapheme") or {}
+
+        resolved_attempt_id = attempt_id or event_id
+        if not resolved_attempt_id and session_id and item_id:
+            resolved_attempt_id = f"{session_id}:{item_id}:{t_record_start}"
         
         doc = {
+            "attempt_id": resolved_attempt_id,
+            "event_id": event_id,
             "student_id": student_id,
             "session_id": session_id,
+            "skill_id": skill_id,
             "activity_id": activity_id,
             "item_id": item_id,
+            "round_id": round_id,
+            "dataset_id": resolved_dataset_id,
             "expected_text": expected_text,
             "recognized_text": recognized_text,
-            "asr_engine": "whisper",
-            "asr_confidence": None, # Whisper local doesn't expose confidence easily without tokens
-            "exact_match": exact_match,
-            "character_error_rate": cer,
-            "word_error_rate": wer,
-            "normalized_similarity": normalized_similarity,
-            "acoustic_latency_ms": results.get("Acoustic_Latency_ms"),
-            "voice_onset_ms": results.get("Voice_Onset_ms"),
-            "detected_peaks": results.get("Detected_Peaks"),
-            "expected_syllables": results.get("Expected_Syllables"),
-            "syllabic_event_mismatch": results.get("Peak_Count_Delta"),
-            "intra_word_silence_ratio": results.get("Intra_Word_Silence_Ratio"),
-            "speech_duration_ms": results.get("Speech_Duration_ms"),
-            "pause_count": results.get("Pause_Count"),
-            "mean_pause_duration_ms": results.get("Mean_Pause_Duration_ms"),
-            "pause_ratio": results.get("Pause_Ratio"),
-            "local_jitter": results.get("Local_Jitter"),
-            "local_shimmer": results.get("Local_Shimmer"),
-            "recording_quality": results.get("recording_quality", "unknown"),
-            "created_at": datetime.utcnow(),
-            "feature_version": "c2-v2",
-            "data_origin": "observed",
-            "validation_status": "not_clinically_validated",
-            "measurement_status": "available" if recognized_text and norm_expected else "incomplete_transcription",
-            "persistence_status": "not_requested"
+            "allowed_variants": allowed_variants,
+            "asr_engine": transcription.get("engine"),
+            "asr_model": transcription.get("model"),
+            "asr_confidence": transcription.get("confidence"),
+            "stt_confidence": transcription.get("confidence"),
+            "stt_confidence_method": "mean_token_likelihood",
+            "exact_match": alignment.get("exact_match"),
+            "character_error_rate": grapheme_metrics.get("error_rate"),
+            "grapheme_error_rate": grapheme_metrics.get("error_rate"),
+            "grapheme_accuracy": grapheme_metrics.get("accuracy"),
+            "word_error_rate": word_metrics.get("error_rate"),
+            "word_accuracy": word_metrics.get("accuracy"),
+            "normalized_similarity": grapheme_metrics.get("accuracy"),
+            "error_operations": grapheme_metrics.get("operations", []),
+            "acoustic_latency_ms": acoustic.get("Acoustic_Latency_ms"),
+            "acoustic_latency_reference": acoustic.get("Latency_Reference"),
+            "record_start_delay_ms": acoustic.get("Record_Start_Delay_ms"),
+            "voice_onset_ms": acoustic.get("Voice_Onset_ms"),
+            "detected_peaks": acoustic.get("Detected_Peaks"),
+            "expected_syllables": acoustic.get("Expected_Syllables"),
+            "syllabic_event_mismatch": acoustic.get("Peak_Count_Delta"),
+            "intra_word_silence_ratio": acoustic.get("Intra_Word_Silence_Ratio"),
+            "speech_duration_ms": acoustic.get("Speech_Duration_ms"),
+            "pause_count": acoustic.get("Pause_Count"),
+            "mean_pause_duration_ms": acoustic.get("Mean_Pause_Duration_ms"),
+            "pause_ratio": acoustic.get("Pause_Ratio"),
+            "reading_rate_wpm": fluency.get("recognized_words_per_minute"),
+            "adjacent_repetitions": fluency.get("adjacent_repetitions"),
+            "local_jitter": acoustic.get("Local_Jitter"),
+            "local_shimmer": acoustic.get("Local_Shimmer"),
+            "recording_quality": quality.get("status"),
+            "recording_quality_score": quality.get("quality_score"),
+            "recording_quality_issues": quality.get("issues", []),
+            "combined_confidence": fusion.get("combined_confidence"),
+            "reading_performance_score": fusion.get("reading_performance_score"),
+            "created_at": datetime.now(timezone.utc),
+            "pipeline_version": result.get("pipeline_version"),
+            "feature_version": result.get("pipeline_version"),
+            "data_origin": data_origin,
+            "task_kind": task_kind,
+            "validation_status": "speech_feature_analysis",
+            "measurement_status": fusion.get("measurement_status"),
+            "persistence_status": "pending",
+            "audio_sha256": result.get("audio_sha256"),
+            "quality": quality,
+            "transcription_evidence": transcription,
+            "alignment": alignment,
+            "acoustic": acoustic,
+            "fluency": fluency,
+            "fusion": fusion,
         }
         
+        # A recording with nothing recognised (quality gate failed or STT
+        # returned no text) has no reading accuracy. Alignment against an
+        # empty transcript yields 0% / WER 1.0, which dashboards would show as
+        # a real result, so those fields are stored as missing.
+        if not str(recognized_text or "").strip():
+            for key in ("exact_match", "character_error_rate", "grapheme_error_rate", "grapheme_accuracy",
+                        "word_error_rate", "word_accuracy", "normalized_similarity",
+                        "reading_rate_wpm", "reading_performance_score"):
+                doc[key] = None
+            doc["reading_measurement"] = "not_measured_no_transcript"
+
         # Save to DB
-        if student_id:
-            try:
-                db = get_db()
-                if not all((session_id, activity_id, item_id)):
-                    raise HTTPException(422, "student/session/activity/item identifiers are required for stored speech")
-                await db.speech_features.insert_one(dict(doc))
-                doc["persistence_status"] = "saved"
-            except Exception as e:
-                doc["persistence_status"] = "failed"
-                doc["measurement_status"] = "persistence_failed"
+        try:
+            db = get_db()
+            doc["persistence_status"] = "saved"
+            await db.speech_features.update_one(
+                {"student_id": student_id, "attempt_id": resolved_attempt_id},
+                {"$set": doc},
+                upsert=True,
+            )
+            background_tasks.add_task(
+                _refresh_c3,
+                student_id,
+                session_id,
+                data_origin,
+                resolved_dataset_id,
+                request.headers.get("Authorization"),
+            )
+        except Exception as e:
+            doc["persistence_status"] = "failed"
+            doc["measurement_status"] = "persistence_failed"
+            doc["persistence_error"] = type(e).__name__
                 
-        # Return merged results so the caller gets everything
-        return {**results, **doc}
+        # Preserve the former flat response keys while returning all seven
+        # versioned evidence stages for new clients.
+        return {
+            **acoustic,
+            **doc,
+            "transcription": recognized_text,
+            # Same value as stored: None when nothing was recognised.
+            "word_error_rate": doc.get("word_error_rate"),
+            "Acoustic_Latency_ms": acoustic.get("Acoustic_Latency_ms"),
+            "Peak_Count_Delta": acoustic.get("Peak_Count_Delta"),
+            "Local_Jitter": acoustic.get("Local_Jitter"),
+            "Local_Shimmer": acoustic.get("Local_Shimmer"),
+            "pipeline": result,
+        }
 
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Acoustic analysis error: {e}")
+        if isinstance(e, UnreadableAudioError):
+            raise HTTPException(status_code=422, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))

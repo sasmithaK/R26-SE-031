@@ -22,6 +22,10 @@
 
 ## 🏗 Architecture & Tech Stack
 
+The completed adaptive-learning implementation, item-bank contract, model
+status, calibration workflow, and verification commands are documented in
+[Component 4](docs/component4/README.md).
+
 ### Frontend (Mobile App)
 * **Framework:** Flutter (Dart) `v3.11.4+`
 * **State Management & Logic:** Designed for seamless UI rendering and background processing.

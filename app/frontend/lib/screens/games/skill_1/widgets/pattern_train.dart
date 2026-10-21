@@ -28,15 +28,14 @@ class PatternTrain extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minWidth: constraints.maxWidth > 16 ? constraints.maxWidth - 16 : 0,
+                  minWidth: constraints.maxWidth > 16
+                      ? constraints.maxWidth - 16
+                      : 0,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    locomotive,
-                    ..._buildCoupledCarriages(),
-                  ],
+                  children: [locomotive, ..._buildCoupledCarriages()],
                 ),
               ),
             );
@@ -57,9 +56,7 @@ class PatternTrain extends StatelessWidget {
               ),
             ],
           ),
-          child: CustomPaint(
-            painter: _RailwaySleepersPainter(),
-          ),
+          child: CustomPaint(painter: _RailwaySleepersPainter()),
         ),
       ],
     );
@@ -98,7 +95,8 @@ class _RailwaySleepersPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF3D3126) // darker wood color for sleepers
+      ..color =
+          const Color(0xFF3D3126) // darker wood color for sleepers
       ..strokeWidth = 3
       ..style = PaintingStyle.stroke;
 

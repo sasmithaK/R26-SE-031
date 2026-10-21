@@ -1,9 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import '../services/progress_service.dart';
-import '../services/student_service.dart';
-import '../config/api_config.dart';
 
 class CurriculumIndex {
   final List<SkillSummary> skills;
@@ -12,12 +8,16 @@ class CurriculumIndex {
 
   factory CurriculumIndex.fromJson(List<dynamic> jsonList) {
     return CurriculumIndex(
-      skills: jsonList.map((s) => SkillSummary.fromJson(s as Map<String, dynamic>)).toList(),
+      skills: jsonList
+          .map((s) => SkillSummary.fromJson(s as Map<String, dynamic>))
+          .toList(),
     );
   }
 
   static Future<CurriculumIndex> load() async {
-    final String response = await rootBundle.loadString('assets/data/curriculum/index.json');
+    final String response = await rootBundle.loadString(
+      'assets/data/curriculum/index.json',
+    );
     return CurriculumIndex.fromJson(json.decode(response) as List<dynamic>);
   }
 }
@@ -84,7 +84,11 @@ class SkillDetail {
     required this.activities,
   });
 
-  factory SkillDetail.fromJson(dynamic decodedJson, String fallbackId, String fallbackTitle) {
+  factory SkillDetail.fromJson(
+    dynamic decodedJson,
+    String fallbackId,
+    String fallbackTitle,
+  ) {
     if (decodedJson is List) {
       if (decodedJson.isNotEmpty &&
           decodedJson.first is Map &&
@@ -92,9 +96,16 @@ class SkillDetail {
         final skillMap = decodedJson.first as Map<String, dynamic>;
         final String id = skillMap['id']?.toString() ?? fallbackId;
         final String title = skillMap['title']?.toString() ?? fallbackTitle;
-        final String introText = skillMap['intro_text']?.toString() ?? skillMap['description']?.toString() ?? '';
-        final String audioUrl = skillMap['audio_url']?.toString() ?? skillMap['intro_audio_url']?.toString() ?? '';
-        final List<dynamic> activitiesList = skillMap['activities'] as List<dynamic>? ?? [];
+        final String introText =
+            skillMap['intro_text']?.toString() ??
+            skillMap['description']?.toString() ??
+            '';
+        final String audioUrl =
+            skillMap['audio_url']?.toString() ??
+            skillMap['intro_audio_url']?.toString() ??
+            '';
+        final List<dynamic> activitiesList =
+            skillMap['activities'] as List<dynamic>? ?? [];
         final parsedActivities = activitiesList
             .map((a) => ActivityNode.fromJson(a as Map<String, dynamic>))
             .toList();
@@ -127,17 +138,24 @@ class SkillDetail {
       final skillMap = decodedJson as Map<String, dynamic>;
       final String id = skillMap['id']?.toString() ?? fallbackId;
       final String title = skillMap['title']?.toString() ?? fallbackTitle;
-      final String introText = skillMap['intro_text']?.toString() ?? skillMap['description']?.toString() ?? '';
-      final String audioUrl = skillMap['audio_url']?.toString() ?? skillMap['intro_audio_url']?.toString() ?? '';
-      final List<dynamic> activitiesList = skillMap['activities'] as List<dynamic>? ?? [];
-      
+      final String introText =
+          skillMap['intro_text']?.toString() ??
+          skillMap['description']?.toString() ??
+          '';
+      final String audioUrl =
+          skillMap['audio_url']?.toString() ??
+          skillMap['intro_audio_url']?.toString() ??
+          '';
+      final List<dynamic> activitiesList =
+          skillMap['activities'] as List<dynamic>? ?? [];
+
       final parsedActivities = activitiesList
           .map((a) => ActivityNode.fromJson(a as Map<String, dynamic>))
           .toList();
       for (var a in parsedActivities) {
         a.skillTitle = title;
       }
-      
+
       return SkillDetail(
         id: id,
         title: title,
@@ -147,26 +165,36 @@ class SkillDetail {
       );
     }
 
-    return SkillDetail(id: fallbackId, title: fallbackTitle, introText: '', audioUrl: '', activities: []);
+    return SkillDetail(
+      id: fallbackId,
+      title: fallbackTitle,
+      introText: '',
+      audioUrl: '',
+      activities: [],
+    );
   }
-  static String get _baseUrl {
-    return ApiConfig.authBaseUrl;
-  }
-
   static Future<SkillDetail> load(String fileName) async {
     final skillId = fileName.replaceAll('.json', '');
-    
+
     // We strictly load from local JSON to ensure only the 5 correct activities are shown
     // (Bypassing the CMS backend which was returning 11 incorrect activities)
-    String responseData = await rootBundle.loadString('assets/data/curriculum/$fileName');
+    String responseData = await rootBundle.loadString(
+      'assets/data/curriculum/$fileName',
+    );
 
-    final skillDetail = SkillDetail.fromJson(json.decode(responseData), skillId, 'Skill Details');
+    final skillDetail = SkillDetail.fromJson(
+      json.decode(responseData),
+      skillId,
+      'Skill Details',
+    );
 
     List<ActivityNode> resolvedActivities = [];
     for (var activity in skillDetail.activities) {
       if (activity.filePath.isNotEmpty) {
         try {
-          final String actResponse = await rootBundle.loadString('assets/data/curriculum/${activity.filePath}');
+          final String actResponse = await rootBundle.loadString(
+            'assets/data/curriculum/${activity.filePath}',
+          );
           final Map<String, dynamic> actJson = json.decode(actResponse);
           final resolvedAct = ActivityNode.fromJson(actJson);
           resolvedAct.skillTitle = skillDetail.title;
@@ -206,20 +234,22 @@ class ActivityNode {
   final String templateType;
   final List<Map<String, dynamic>> rounds;
   final ResearchMetadata? researchMetadata;
+  final bool isParentPractice;
 
   ActivityNode({
-    required this.id, 
+    required this.id,
     this.skillId = '',
     this.skillTitle = '',
-    required this.title, 
+    required this.title,
     this.description = '',
     this.introText = '',
     this.audioUrl = '',
     this.filePath = '',
-    required this.telemetryTags, 
-    required this.templateType, 
+    required this.telemetryTags,
+    required this.templateType,
     required this.rounds,
     this.researchMetadata,
+    this.isParentPractice = false,
   });
 
   factory ActivityNode.fromJson(Map<String, dynamic> json) {
@@ -227,8 +257,14 @@ class ActivityNode {
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
-      introText: json['intro_text']?.toString() ?? json['description']?.toString() ?? '',
-      audioUrl: json['audio_url']?.toString() ?? json['intro_audio_url']?.toString() ?? '',
+      introText:
+          json['intro_text']?.toString() ??
+          json['description']?.toString() ??
+          '',
+      audioUrl:
+          json['audio_url']?.toString() ??
+          json['intro_audio_url']?.toString() ??
+          '',
       filePath: json['file_path']?.toString() ?? '',
       telemetryTags: json['telemetry_tags'] != null
           ? List<String>.from(json['telemetry_tags'] as Iterable)
@@ -236,11 +272,105 @@ class ActivityNode {
       templateType: json['template_type']?.toString() ?? '',
       rounds: json['rounds'] != null
           ? List<Map<String, dynamic>>.from(
-              (json['rounds'] as Iterable).map((r) => Map<String, dynamic>.from(r as Map)))
-          : <Map<String, dynamic>>[],
-      researchMetadata: json['research_metadata'] != null 
-          ? ResearchMetadata.fromJson(json['research_metadata']) 
+              (json['rounds'] as Iterable).map(
+                (r) => Map<String, dynamic>.from(r as Map),
+              ),
+            )
+          : (json['core_rounds'] != null
+                ? List<Map<String, dynamic>>.from(
+                    (json['core_rounds'] as Iterable).map(
+                      (r) => Map<String, dynamic>.from(r as Map),
+                    ),
+                  )
+                : <Map<String, dynamic>>[]),
+      researchMetadata: json['research_metadata'] is Map
+          ? ResearchMetadata.fromJson(
+              Map<String, dynamic>.from(json['research_metadata'] as Map),
+            )
           : null,
+      isParentPractice: json['is_parent_practice'] == true,
+    );
+  }
+
+  /// Builds a parent-led practice copy using each core round's reviewed,
+  /// equivalent confirmation item. Normal curriculum rounds are never
+  /// mutated, and the practice copy is explicitly isolated from Component 4
+  /// mastery/progression updates by [isParentPractice].
+  ActivityNode asParentPractice() {
+    final practiceRounds = rounds
+        .map((rawRound) {
+          final core = Map<String, dynamic>.from(rawRound);
+          final variants = core['adaptive_variants'];
+          Map<String, dynamic>? confirmation;
+
+          if (variants is Iterable) {
+            for (final rawVariant in variants) {
+              if (rawVariant is! Map) continue;
+              final variant = Map<String, dynamic>.from(rawVariant);
+              final isGenericConfirmation =
+                  variant['item_role']?.toString().toUpperCase() ==
+                      'CONFIRMATION' &&
+                  variant['targeted_practice'] != true;
+              if (isGenericConfirmation) {
+                confirmation = variant;
+                break;
+              }
+            }
+          }
+
+          // Every Skills 1-4 core item currently has one reviewed generic
+          // confirmation. Retaining the core is a safe fallback for future
+          // curriculum additions that have not yet supplied one.
+          if (confirmation == null) {
+            return <String, dynamic>{
+              ...core,
+              'item_role': 'PARENT_PRACTICE',
+              'parent_practice': true,
+              'practice_origin_item_id': core['item_id'],
+            }..remove('adaptive_variants');
+          }
+
+          final content = confirmation['content'] is Map
+              ? Map<String, dynamic>.from(confirmation['content'] as Map)
+              : const <String, dynamic>{};
+          final variantMetadata = <String, dynamic>{...confirmation}
+            ..remove('content');
+          final sourceItemId = confirmation['item_id']?.toString();
+
+          return <String, dynamic>{
+            ...CanonicalItemResolver.mergeVariantContent(core, content),
+            ...variantMetadata,
+            'item_role': 'PARENT_PRACTICE',
+            'parent_practice': true,
+            'practice_source_item_id': sourceItemId,
+            'practice_origin_item_id': core['item_id'],
+          }..remove('adaptive_variants');
+        })
+        .toList(growable: false);
+
+    return ActivityNode(
+      // A separate identifier prevents game templates from reading or writing
+      // the normal activity's saved round/score while this practice is open.
+      id: 'parent_practice_$id',
+      skillId: skillId,
+      skillTitle: skillTitle,
+      title: title,
+      description: description,
+      introText: introText,
+      audioUrl: audioUrl,
+      filePath: filePath,
+      telemetryTags: List<String>.from(telemetryTags),
+      templateType: templateType,
+      rounds: practiceRounds,
+      researchMetadata: researchMetadata == null
+          ? null
+          : ResearchMetadata(
+              knowledgeComponentId: researchMetadata!.knowledgeComponentId,
+              promptModality: researchMetadata!.promptModality,
+              responseModality: researchMetadata!.responseModality,
+              researchRole: 'parent_guided_practice',
+            ),
+      isParentPractice: true,
     );
   }
 }
@@ -274,7 +404,11 @@ class CanonicalResearchItem {
   final String difficultyLabel;
   final double difficultyB;
   final bool isAnchor;
-  
+  final String? equivalentGroupId;
+  final String itemRole;
+  final String responseLoadRelation;
+  final List<String> allowedScaffolds;
+
   final List<String> targets;
   final List<String> distractors;
 
@@ -284,19 +418,130 @@ class CanonicalResearchItem {
     required this.difficultyLabel,
     required this.difficultyB,
     required this.isAnchor,
+    this.equivalentGroupId,
+    required this.itemRole,
+    required this.responseLoadRelation,
+    this.allowedScaffolds = const <String>[],
     required this.targets,
     required this.distractors,
   });
 }
 
 class CanonicalItemResolver {
-  static CanonicalResearchItem resolve(ActivityNode activity, Map<String, dynamic> roundData, int roundIndex) {
-    // Extract standard item metadata injected by python script
-    final itemId = roundData['item_id'] ?? '${activity.id}_R${roundIndex + 1}';
-    final itemVersion = roundData['item_version'] ?? 1;
-    final difficultyLabel = roundData['difficulty_label'] ?? 'medium';
-    final difficultyB = (roundData['difficulty_b'] as num?)?.toDouble() ?? 0.0;
-    final isAnchor = roundData['is_anchor'] ?? false;
+  /// Merge playable variant content without retaining mutually exclusive
+  /// answer keys from the core item. This is essential when a two-target core
+  /// task uses a one-target remediation item, or vice versa.
+  static Map<String, dynamic> mergeVariantContent(
+    Map<String, dynamic> core,
+    Map<String, dynamic> variantContent,
+  ) {
+    final merged = <String, dynamic>{...core};
+    if (variantContent['correct_indices'] is List) {
+      merged
+        ..remove('correct_index')
+        ..remove('correctOption')
+        ..remove('correct_option');
+    } else if (variantContent.containsKey('correct_index') ||
+        variantContent.containsKey('correctOption') ||
+        variantContent.containsKey('correct_option')) {
+      merged.remove('correct_indices');
+    }
+    merged.addAll(variantContent);
+    return merged;
+  }
+
+  /// Resolves the exact displayed item, including a V1/V2 equivalent nested
+  /// under its core round.
+  static CanonicalResearchItem resolveByItemId(
+    ActivityNode activity,
+    String requestedItemId,
+    int fallbackRoundIndex,
+  ) {
+    final normalized = normalizeItemId(requestedItemId);
+    final match = RegExp(
+      r'^S\d+A\d+R(\d+)(V\d+)?$',
+      caseSensitive: false,
+    ).firstMatch(normalized);
+    final parsedIndex = match == null
+        ? fallbackRoundIndex
+        : (int.tryParse(match.group(1) ?? '') ?? fallbackRoundIndex + 1) - 1;
+    final roundIndex = parsedIndex >= 0 && parsedIndex < activity.rounds.length
+        ? parsedIndex
+        : fallbackRoundIndex;
+    if (roundIndex < 0 || roundIndex >= activity.rounds.length) {
+      return resolve(activity, const <String, dynamic>{}, fallbackRoundIndex);
+    }
+
+    final core = Map<String, dynamic>.from(activity.rounds[roundIndex]);
+    if (match?.group(2) == null) {
+      return resolve(activity, core, roundIndex);
+    }
+
+    final variants = core['adaptive_variants'];
+    if (variants is Iterable) {
+      for (final rawVariant in variants) {
+        if (rawVariant is! Map) continue;
+        final variant = Map<String, dynamic>.from(rawVariant);
+        final variantId = normalizeItemId(variant['item_id']?.toString() ?? '');
+        if (variantId != normalized) continue;
+        final content = variant['content'] is Map
+            ? Map<String, dynamic>.from(variant['content'] as Map)
+            : const <String, dynamic>{};
+        // Variant metadata is authoritative. Some early Skill 1 curriculum
+        // variants copied core research fields into `content`; leaving that
+        // nested map in place caused resolve() to merge it a second time and
+        // report the core item/difficulty for the displayed V1/V2 task.
+        final resolvedVariant = <String, dynamic>{
+          ...mergeVariantContent(core, content),
+          ...variant,
+          'item_id': normalized,
+        }..remove('content');
+        return resolve(activity, resolvedVariant, roundIndex);
+      }
+    }
+
+    // Preserve the requested ID for auditability if a stale client asks for a
+    // variant that is no longer present in the bank.
+    return resolve(activity, <String, dynamic>{
+      ...core,
+      'item_id': normalized,
+    }, roundIndex);
+  }
+
+  static CanonicalResearchItem resolve(
+    ActivityNode activity,
+    Map<String, dynamic> roundData,
+    int roundIndex,
+  ) {
+    // Some activities keep the playable task under `content`. Metadata can be
+    // present on either level, so merge them without losing the outer fields.
+    final content = roundData['content'] is Map
+        ? Map<String, dynamic>.from(roundData['content'] as Map)
+        : const <String, dynamic>{};
+    final data = <String, dynamic>{...roundData, ...content};
+
+    final rawItemId =
+        data['item_id'] ??
+        canonicalItemId(
+          skillId: activity.skillId,
+          activityId: activity.id,
+          roundNumber: roundIndex + 1,
+        );
+    final itemId = normalizeItemId(rawItemId.toString());
+    final itemVersion = (data['item_version'] as num?)?.toInt() ?? 1;
+    final difficultyLabel = data['difficulty_label']?.toString() ?? 'medium';
+    final difficultyB = (data['difficulty_b'] as num?)?.toDouble() ?? 0.0;
+    final isAnchor = data['is_anchor'] == true;
+    final itemRole =
+        data['item_role']?.toString() ??
+        (itemId.endsWith('V1')
+            ? 'REMEDIATION'
+            : itemId.endsWith('V2')
+            ? 'CONFIRMATION'
+            : 'CORE');
+    final responseLoadRelation =
+        data['response_load_relation']?.toString() ??
+        (itemRole == 'CORE' ? 'core' : 'equivalent');
 
     List<String> targets = [];
     List<String> distractors = [];
@@ -305,59 +550,123 @@ class CanonicalItemResolver {
     final type = activity.templateType;
 
     if (type == 'visual_hidden_search' || type == 'skill2_identical_match') {
-      targets = _extractStringList(roundData['targets'] ?? roundData['letters']);
-      distractors = _extractStringList(roundData['distractors']);
-    } 
-    else if (type.contains('mcq') || type == 'skill2_audio' || type == 'interactive_story') {
-      final correctOpt = roundData['correctOption']?.toString();
+      targets = _extractStringList(data['targets'] ?? data['letters']);
+      distractors = _extractStringList(data['distractors']);
+    } else if (type == 'visual_sorting_adventure') {
+      final categories = data['categories'];
+      if (categories is Map) {
+        for (final values in categories.values) {
+          targets.addAll(_extractStringList(values));
+        }
+      }
+    } else if (type == 'visual_pattern_adventure') {
+      final correct = data['correct_answer']?.toString();
+      if (correct != null) targets.add(correct);
+      distractors = _extractStringList(
+        data['options'],
+      ).where((option) => option != correct).toList();
+    } else if (type == 'visual_memory_hats') {
+      final target = data['target_asset']?.toString();
+      if (target != null) targets.add(target);
+      distractors = _extractStringList(
+        data['assets'],
+      ).where((asset) => asset != target).toList();
+    } else if (type.contains('mcq') ||
+        type == 'skill2_audio' ||
+        type == 'interactive_story') {
+      final options = _extractStringList(data['options']);
+      final correctOpt = (data['correctOption'] ?? data['correct_option'])
+          ?.toString();
+      final correctIndices = <int>{};
+      final rawCorrectIndices = data['correct_indices'];
+      if (rawCorrectIndices is List) {
+        correctIndices.addAll(
+          rawCorrectIndices
+              .map((value) => value is int ? value : int.tryParse('$value'))
+              .whereType<int>(),
+        );
+      }
+      final rawCorrectIndex = data['correct_index'];
+      final correctIndex = rawCorrectIndex is int
+          ? rawCorrectIndex
+          : int.tryParse('${rawCorrectIndex ?? ''}');
+      if (correctIndex != null) correctIndices.add(correctIndex);
+
+      for (var index = 0; index < options.length; index++) {
+        final option = options[index];
+        final isTarget =
+            correctIndices.contains(index) ||
+            (correctIndices.isEmpty &&
+                correctOpt != null &&
+                option == correctOpt);
+        (isTarget ? targets : distractors).add(option);
+      }
+    } else if (type.contains('fill_blank') ||
+        type == 'skill4_act2_fill_blank') {
+      final correctOpt = (data['correctOption'] ?? data['correct_option'])
+          ?.toString();
       if (correctOpt != null) targets.add(correctOpt);
-      
-      final options = _extractStringList(roundData['options']);
+      final options = _extractStringList(data['options']);
       if (correctOpt != null) {
         distractors = options.where((o) => o != correctOpt).toList();
-      } else {
-        distractors = options;
       }
-    }
-    else if (type.contains('fill_blank') || type == 'skill4_act2_fill_blank') {
-      final correctOpt = roundData['correctOption']?.toString();
-      if (correctOpt != null) targets.add(correctOpt);
-      final options = _extractStringList(roundData['options']);
-      if (correctOpt != null) {
-        distractors = options.where((o) => o != correctOpt).toList();
+    } else if (type.contains('odd_one_out')) {
+      final targetAssets = _extractStringList(data['target_assets']);
+      if (targetAssets.isNotEmpty) {
+        targets = targetAssets;
+        return CanonicalResearchItem(
+          itemId: itemId,
+          itemVersion: itemVersion,
+          difficultyLabel: difficultyLabel,
+          difficultyB: difficultyB,
+          isAnchor: isAnchor,
+          equivalentGroupId: data['equivalent_group_id']?.toString(),
+          itemRole: itemRole,
+          responseLoadRelation: responseLoadRelation,
+          allowedScaffolds: _extractStringList(data['allowed_scaffolds']),
+          targets: targets,
+          distractors: distractors,
+        );
       }
-    }
-    else if (type.contains('odd_one_out')) {
-      final items = roundData['items'];
+      final items = data['items'];
       if (items is List && items.every((item) => item is Map)) {
-        for (final item in items) {
+        for (var index = 0; index < items.length; index++) {
+          final item = items[index] as Map;
           final value = item['value']?.toString();
           if (value == null) continue;
-          final isTarget = item['is_target'] == true ||
-              (item['is_target'] == null && value == roundData['target_letter']);
-          (isTarget ? targets : distractors).add(value);
+          final optionId =
+              item['option_id']?.toString() ?? '${itemId}_O${index + 1}';
+          final isTarget =
+              item['is_target'] == true ||
+              (item['is_target'] == null && value == data['target_letter']);
+          (isTarget ? targets : distractors).add(optionId);
         }
       } else {
-        final correctOpt = roundData['correctOption']?.toString();
+        final correctOpt = (data['correctOption'] ?? data['correct_option'])
+            ?.toString();
         if (correctOpt != null) targets.add(correctOpt);
-        distractors = _extractStringList(roundData['options'])
-            .where((o) => o != correctOpt).toList();
+        distractors = _extractStringList(
+          data['options'],
+        ).where((o) => o != correctOpt).toList();
       }
-    }
-    else if (type.contains('jumbled_word') || type.contains('jumbled_sentence')) {
-      final correct = roundData['correct_word'] ?? roundData['correct_sentence'];
+    } else if (type.contains('jumbled_word') ||
+        type.contains('jumbled_sentence')) {
+      final correct = data['correct_word'] ?? data['correct_sentence'];
       if (correct != null) targets.add(correct.toString());
-      distractors = _extractStringList(roundData['scrambled_letters'] ?? roundData['scrambled_words']);
-    }
-    else if (type == 'skill2_pattern_memory') {
-      targets = _extractStringList(roundData['pattern']);
-      distractors = _extractStringList(roundData['options']).where((o) => !targets.contains(o)).toList();
-    }
-    else {
+      distractors = _extractStringList(
+        data['scrambled_letters'] ?? data['scrambled_words'],
+      );
+    } else if (type == 'skill2_pattern_memory') {
+      targets = _extractStringList(data['pattern']);
+      distractors = _extractStringList(
+        data['options'],
+      ).where((o) => !targets.contains(o)).toList();
+    } else {
       // Fallback
-      final correctOpt = roundData['correctOption']?.toString();
+      final correctOpt = (data['correctOption'] ?? data['correct_option'])
+          ?.toString();
       if (correctOpt != null) targets.add(correctOpt);
-      final options = _extractStringList(roundData['options'] ?? roundData['items']);
+      final options = _extractStringList(data['options'] ?? data['items']);
       if (correctOpt != null) {
         distractors = options.where((o) => o != correctOpt).toList();
       }
@@ -369,6 +678,10 @@ class CanonicalItemResolver {
       difficultyLabel: difficultyLabel,
       difficultyB: difficultyB,
       isAnchor: isAnchor,
+      equivalentGroupId: data['equivalent_group_id']?.toString(),
+      itemRole: itemRole,
+      responseLoadRelation: responseLoadRelation,
+      allowedScaffolds: _extractStringList(data['allowed_scaffolds']),
       targets: targets,
       distractors: distractors,
     );
@@ -377,8 +690,35 @@ class CanonicalItemResolver {
   static List<String> _extractStringList(dynamic data) {
     if (data == null) return [];
     if (data is List) {
-      return data.map((e) => e.toString()).toList();
+      return data.map((e) {
+        if (e is Map) {
+          return (e['value'] ?? e['label'] ?? e['id'] ?? e).toString();
+        }
+        return e.toString();
+      }).toList();
     }
     return [data.toString()];
+  }
+
+  /// Accepts both historical S2_A1_R01 and canonical S2A1R01 identifiers.
+  static String normalizeItemId(String itemId) {
+    final compact = itemId
+        .toUpperCase()
+        .replaceAll('_', '')
+        .replaceAll('-', '');
+    final match = RegExp(r'^S(\d+)A(\d+)R(\d+)(V\d+)?$').firstMatch(compact);
+    if (match == null) return itemId;
+    final round = int.parse(match.group(3)!).toString().padLeft(2, '0');
+    return 'S${match.group(1)}A${match.group(2)}R$round${match.group(4) ?? ''}';
+  }
+
+  static String canonicalItemId({
+    required String skillId,
+    required String activityId,
+    required int roundNumber,
+  }) {
+    final skill = RegExp(r'(\d+)').firstMatch(skillId)?.group(1) ?? '0';
+    final activity = RegExp(r'(\d+)').firstMatch(activityId)?.group(1) ?? '0';
+    return 'S${skill}A${activity}R${roundNumber.toString().padLeft(2, '0')}';
   }
 }

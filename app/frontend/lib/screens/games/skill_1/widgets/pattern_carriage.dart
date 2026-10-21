@@ -43,17 +43,21 @@ class PatternCarriage extends StatelessWidget {
             width: 68,
             height: 68,
             decoration: BoxDecoration(
-              color: isCorrectRevealed 
-                  ? const Color(0xFF6DBE6D).withValues(alpha: 0.15) 
-                  : (isMissing ? Colors.white.withValues(alpha: 0.9) : Colors.white),
+              color: isCorrectRevealed
+                  ? const Color(0xFF6DBE6D).withValues(alpha: 0.15)
+                  : (isMissing
+                        ? Colors.white.withValues(alpha: 0.9)
+                        : Colors.white),
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(10),
                 bottomRight: Radius.circular(10),
               ),
               border: Border.all(
-                color: isCorrectRevealed 
-                    ? const Color(0xFF6DBE6D) 
-                    : (isMissing ? Colors.grey.withValues(alpha: 0.5) : accentColor.withValues(alpha: 0.4)),
+                color: isCorrectRevealed
+                    ? const Color(0xFF6DBE6D)
+                    : (isMissing
+                          ? Colors.grey.withValues(alpha: 0.5)
+                          : accentColor.withValues(alpha: 0.4)),
                 width: isCorrectRevealed ? 4.0 : (isMissing ? 2 : 1.5),
                 style: BorderStyle.solid,
               ),
@@ -79,10 +83,7 @@ class PatternCarriage extends StatelessWidget {
           // Wheels
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildWheel(16),
-              _buildWheel(16),
-            ],
+            children: [_buildWheel(16), _buildWheel(16)],
           ),
         ],
       ),
@@ -119,7 +120,7 @@ class PatternCarriage extends StatelessWidget {
         );
       }
     }
-    
+
     if (imagePath == null || imagePath!.isEmpty) {
       return const SizedBox();
     }
@@ -127,11 +128,8 @@ class PatternCarriage extends StatelessWidget {
     return Image.asset(
       'assets/images/activity_icons/$imagePath',
       fit: BoxFit.contain,
-      errorBuilder: (c, e, s) => const Icon(
-        Icons.image_outlined,
-        color: Colors.grey,
-        size: 32,
-      ),
+      errorBuilder: (c, e, s) =>
+          const Icon(Icons.image_outlined, color: Colors.grey, size: 32),
     );
   }
 

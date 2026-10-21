@@ -1,14 +1,13 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 
-from dependencies import get_current_user
+from dependencies import get_current_user, require_owned_student
 from schemas.telemetry import TelemetrySessionSubmit
 from schemas.c1 import (
     C1Result, ParentC1Summary, TherapistC1State, 
     C1TrendPoint, C1SessionSummary
 )
 from services.c1.processor import process_session
-from services.ml.inference import predict_c1_pattern
 from repositories import telemetry_repository, c1_repository
 
 router = APIRouter(prefix="/api/v1/c1", tags=["C1 Analytics"])
@@ -27,6 +26,7 @@ async def process_c1_session(
     5. Predict Pattern (ML)
     6. Store C1 State
     """
+    await require_owned_student(payload.student_id, current_user)
     session_data = payload.model_dump()
     events_data = session_data.pop("events", [])
     
@@ -38,8 +38,17 @@ async def process_c1_session(
     await telemetry_repository.save_events(events_data)
     
     c1_partial = process_session(payload.session_id, payload.student_id, events_data)
-    model_metadata = predict_c1_pattern(c1_partial["behavior"])
-    c1_partial["model"] = model_metadata
+    # Per-session model retired: the estimate is per learner (c1_learner_estimates).
+    c1_partial["model"] = {
+        "model_name": "c1_learner_model",
+        "model_version": "learner-level",
+        "feature_schema_version": "c1-learner-v2",
+        "predicted_pattern": None,
+        "probabilities": {},
+        "confidence": None,
+        "model_used": "learner_level_only",
+        "unavailable_reason": "The C1 pattern estimate is made per learner over 14 days (c1_learner_estimates), not per session.",
+    }
     
     await c1_repository.save_c1_state(c1_partial)
     return c1_partial
@@ -51,12 +60,14 @@ async def get_c1_history(
     current_user: dict = Depends(get_current_user)
 ):
     """Retrieve the recent C1 learner states for a student."""
+    await require_owned_student(student_id, current_user)
     states = await c1_repository.get_recent_states(student_id, limit=limit)
     return states
 
 @router.get("/students/{student_id}/summary", response_model=ParentC1Summary)
 async def get_student_summary(student_id: str, current_user: dict = Depends(get_current_user)):
     """Parent dashboard endpoint."""
+    await require_owned_student(student_id, current_user)
     summary = await c1_repository.get_parent_summary(student_id)
     if not summary:
         raise HTTPException(status_code=404, detail="No analytics found for this student")
@@ -65,6 +76,7 @@ async def get_student_summary(student_id: str, current_user: dict = Depends(get_
 @router.get("/students/{student_id}/state", response_model=TherapistC1State)
 async def get_student_state(student_id: str, current_user: dict = Depends(get_current_user)):
     """Therapist dashboard endpoint (latest full state)."""
+    await require_owned_student(student_id, current_user)
     states = await c1_repository.get_recent_states(student_id, limit=1)
     if not states:
         raise HTTPException(status_code=404, detail="No analytics found for this student")
@@ -75,11 +87,13 @@ async def get_student_state(student_id: str, current_user: dict = Depends(get_cu
 @router.get("/students/{student_id}/trend", response_model=List[C1TrendPoint])
 async def get_student_trend(student_id: str, current_user: dict = Depends(get_current_user)):
     """Trend charts endpoint."""
+    await require_owned_student(student_id, current_user)
     return await c1_repository.get_c1_trend(student_id)
 
 @router.get("/students/{student_id}/sessions", response_model=List[C1SessionSummary])
 async def get_student_sessions(student_id: str, current_user: dict = Depends(get_current_user)):
     """Session history list endpoint."""
+    await require_owned_student(student_id, current_user)
     return await c1_repository.get_c1_sessions(student_id)
 
 @router.get("/sessions/{session_id}", response_model=C1Result)
@@ -88,11 +102,13 @@ async def get_session_detail(session_id: str, current_user: dict = Depends(get_c
     session = await c1_repository.get_c1_state_by_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    await require_owned_student(session["student_id"], current_user)
     return session
 
 @router.get("/students/{student_id}/skills-breakdown")
 async def get_skills_breakdown(student_id: str, current_user: dict = Depends(get_current_user)):
     """Aggregate per-skill and per-activity performance metrics directly from telemetry events."""
+    await require_owned_student(student_id, current_user)
     from database import get_db
     db = get_db()
     cursor = db.telemetry_events.find({"student_id": student_id})
@@ -141,15 +157,3 @@ async def get_skills_breakdown(student_id: str, current_user: dict = Depends(get
 @router.get("/students/{student_id}/performance-tree")
 async def get_performance_tree(student_id: str, current_user: dict = Depends(get_current_user)):
     return await get_skills_breakdown(student_id, current_user)
-
-@router.post("/students/{student_id}/c3-ai-summary")
-async def generate_c3_ai_summary(student_id: str, current_user: dict = Depends(get_current_user)):
-    states = await c1_repository.get_recent_states(student_id, limit=1)
-    pattern = states[0].get("model", {}).get("predicted_pattern", "TYPICAL") if states else "NO_DATA"
-    confidence = states[0].get("model", {}).get("confidence", 0.0) if states else 0.0
-    return {
-        "student_id": student_id,
-        "predicted_pattern": pattern,
-        "confidence": confidence,
-        "summary": f"Child shows {pattern} behavioral profile based on longitudinal telemetry."
-    }

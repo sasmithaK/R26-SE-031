@@ -5,11 +5,14 @@ import httpx
 import uuid
 import asyncio
 import os
-from datetime import datetime
+from datetime import datetime, timezone
+import re
 import sys
 from pathlib import Path as PathLib
 sys.path.insert(0, str(PathLib(__file__).parent.parent.parent.parent))
 from shared.database import get_db
+from dependencies import get_current_user
+from bson import ObjectId
 
 router = APIRouter(prefix="/api/v1/learning", tags=["Unified Learning"])
 
@@ -22,72 +25,276 @@ class TelemetryModel(BaseModel):
     total_round_latency_ms: int
     hesitation_count: int
     misclick_count: int
-    audio_replay_count: int = 0
-    touch_stream: List[Any] = []
+    audio_replay_count: Optional[int] = 0
+    scaffold_level_used: Optional[int] = 0
+    original_options_count: Optional[int] = None
+    current_pair_id: Optional[str] = None
+    incorrect_option_ids: Optional[List[str]] = None
+    visible_option_ids: Optional[List[str]] = None
+    selected_option_ids: Optional[List[str]] = None
+    correct_option_ids: Optional[List[str]] = None
+    supported_actions: Optional[List[str]] = None
+    minimum_visible_options: Optional[int] = 2
+    scaffold_applications: Optional[List[Dict[str, Any]]] = None
+    attempt_count: Optional[int] = 0
+    incorrect_attempt_count: Optional[int] = 0
+    first_attempt_correct: Optional[bool] = None
+    correction_count: Optional[int] = 0
+    hint_count: Optional[int] = 0
+    item_role: Optional[str] = None
+    equivalent_group_id: Optional[str] = None
+    response_load_relation: Optional[str] = None
+    target_ids: Optional[List[str]] = None
+    struggled_target_units: Optional[List[str]] = None
+    selected_answers: Optional[List[str]] = None
+    attempt_history: Optional[List[Dict[str, Any]]] = None
+    touch_stream: List[Any] = Field(default_factory=list)
+    item_version: int = 1
+    prompt_modality: str = "visual"
+    response_modality: str = "tap"
+    research_role: str = "primary"
+    difficulty_label: str = "medium"
+    error_type: str = "unknown_error"
+    final_correct: Optional[bool] = None
+    time_to_first_response_ms: int = 0
+    time_to_correct_ms: int = 0
+    score: int = 0
+    is_abandoned: bool = False
 
 class InteractionPayload(BaseModel):
+    event_id: Optional[str] = None
     student_id: str
     session_id: str
+    skill_id: Optional[str] = None
     activity_id: str
+    round_number: Optional[int] = None
     item_id: str
     knowledge_component_id: str = "KC_LETTER_IDENTITY"
     response: InteractionResponseModel
     telemetry: TelemetryModel
     speech: Optional[Any] = None
+    phase: str = "COMPLETE"
     difficulty_b: float = 0.0
     is_anchor: bool = False
-    first_attempt_correct: Optional[bool] = None
-    event_id: Optional[str] = None
+
+
+def summarize_current_session(events: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Create a bounded current-session behavioral context from observed rows."""
+    completed = [
+        event for event in events
+        if str(event.get("phase") or "").upper() == "COMPLETE"
+        and event.get("is_abandoned") is not True
+    ]
+    if not completed:
+        return {
+            "observation_count": 0,
+            "first_attempt_accuracy": None,
+            "mean_latency_ms": None,
+            "support_rate": None,
+            "behavioral_fatigue_proxy": 0.0,
+        }
+    first_attempts = [
+        bool(event["first_attempt_correct"])
+        for event in completed
+        if isinstance(event.get("first_attempt_correct"), bool)
+    ]
+    latencies = [
+        max(0, int(event.get("total_round_latency_ms") or 0))
+        for event in completed
+    ]
+    support_flags = [
+        int(event.get("scaffold_level_used") or 0) > 0
+        or int(event.get("incorrect_attempt_count") or 0) > 0
+        for event in completed
+    ]
+    mean_latency = sum(latencies) / len(latencies) if latencies else 0.0
+    support_rate = sum(support_flags) / len(support_flags)
+    first_accuracy = (
+        sum(first_attempts) / len(first_attempts) if first_attempts else None
+    )
+    # Descriptive, bounded proxy only. It is not a clinical fatigue measure.
+    slow_component = min(1.0, mean_latency / 30000.0)
+    error_component = 1.0 - first_accuracy if first_accuracy is not None else 0.0
+    fatigue_proxy = min(
+        1.0,
+        0.45 * slow_component + 0.35 * error_component + 0.20 * support_rate,
+    )
+    return {
+        "observation_count": len(completed),
+        "first_attempt_accuracy": first_accuracy,
+        "mean_latency_ms": round(mean_latency, 2),
+        "support_rate": round(support_rate, 4),
+        "behavioral_fatigue_proxy": round(fatigue_proxy, 4),
+    }
+
+
+def validated_profile_context(document: Optional[Dict[str, Any]]) -> tuple[Dict[str, float], str]:
+    """Allow only explicitly validated observed C3 evidence into live C4."""
+    if not document:
+        return {}, "NO_C3_PROFILE"
+    if document.get("data_origin") != "observed":
+        return {}, "C3_NON_OBSERVED_BLOCKED"
+    if document.get("validation_status") not in {
+        "pilot_approved", "validated_observed"
+    }:
+        return {}, "C3_UNVALIDATED_BLOCKED"
+    probabilities = (
+        (document.get("learner_profile") or {}).get("class_probabilities") or {}
+    )
+    numeric = {
+        str(key): float(value)
+        for key, value in probabilities.items()
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+    }
+    return numeric, "C3_VALIDATED_OBSERVED"
+
+
+def build_adaptive_submit(
+    payload: InteractionPayload,
+    *,
+    event_id: str,
+    canonical_activity_id: str,
+    canonical_item_id: str,
+    fatigue_score: float,
+    learner_profile: Dict[str, float],
+    behavioral_context: Optional[Dict[str, Any]] = None,
+    context_evidence: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Build the lossless C4 request shared by runtime code and contract tests."""
+    return {
+        "student_id": payload.student_id,
+        "session_id": payload.session_id,
+        "event_id": event_id,
+        "activity_id": canonical_activity_id,
+        "knowledge_component_id": payload.knowledge_component_id,
+        "item_id": canonical_item_id,
+        "is_correct": payload.response.is_correct,
+        "difficulty_b": payload.difficulty_b,
+        "is_anchor": payload.is_anchor,
+        "current_session_duration_sec": (
+            payload.telemetry.total_round_latency_ms // 1000
+        ),
+        "fatigue_score": fatigue_score,
+        # C4 currently receives C1 behavioural evidence only. C2 and C3 remain
+        # observable dashboard evidence until their child-data validation is
+        # complete and an explicit C4 contract is approved.
+        "learner_profile": {},
+        "behavioral_context": behavioral_context or {},
+        "context_evidence": context_evidence or {},
+        # These fields are server-controlled. A mobile client cannot label a
+        # simulation as a real child observation or make it calibratable.
+        "data_origin": "observed",
+        "dataset_id": f"live:{payload.student_id}:{payload.session_id}",
+        "validation_status": "operational_observation",
+        "calibration_eligible": False,
+        "policy_mode": os.getenv("C4_POLICY_MODE", "shadow"),
+        "phase": payload.phase,
+        "telemetry": payload.telemetry.model_dump(),
+    }
+
 
 async def run_background_pipeline(payload: InteractionPayload, c4_result: dict, event_id: str):
     db = get_db()
+    # Speech evidence is owned by C2. Never create a second, less complete
+    # record from the learning gateway's legacy request field.
+    payload.speech = None
+    ingestion_key = f"{payload.student_id}:{event_id}"
     
     # 1. Save Telemetry
     telemetry_doc = {
         "schema_version": "2.0",
         "event_id": event_id,
+        "ingestion_key": ingestion_key,
         "student_id": payload.student_id,
         "session_id": payload.session_id,
+        "skill_id": payload.skill_id,
         "activity_id": payload.activity_id,
         "item_id": payload.item_id,
-        "timestamp": datetime.utcnow().isoformat(),
+        "knowledge_component_id": payload.knowledge_component_id,
+        "difficulty_b": payload.difficulty_b,
+        "is_anchor": payload.is_anchor,
+        "phase": payload.phase,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "is_correct": payload.response.is_correct,
+        "final_correct": (
+            payload.telemetry.final_correct
+            if payload.telemetry.final_correct is not None
+            else payload.response.is_correct
+        ),
+        "score": payload.telemetry.score,
+        "is_abandoned": payload.telemetry.is_abandoned,
         "first_touch_latency_ms": payload.telemetry.first_touch_latency_ms,
         "total_round_latency_ms": payload.telemetry.total_round_latency_ms,
+        "time_to_first_response_ms": payload.telemetry.time_to_first_response_ms,
+        "time_to_correct_ms": payload.telemetry.time_to_correct_ms,
         "hesitation_count": payload.telemetry.hesitation_count,
         "misclick_count": payload.telemetry.misclick_count,
-        "audio_replay_count": getattr(payload.telemetry, "audio_replay_count", 0)
+        "audio_replay_count": getattr(payload.telemetry, "audio_replay_count", 0),
+        "scaffold_level_used": getattr(payload.telemetry, "scaffold_level_used", 0),
+        "scaffold_applications": getattr(payload.telemetry, "scaffold_applications", None) or [],
+        "attempt_count": getattr(payload.telemetry, "attempt_count", 0),
+        "incorrect_attempt_count": getattr(payload.telemetry, "incorrect_attempt_count", 0),
+        "first_attempt_correct": getattr(payload.telemetry, "first_attempt_correct", None),
+        "correction_count": getattr(payload.telemetry, "correction_count", 0),
+        "hint_count": getattr(payload.telemetry, "hint_count", 0),
+        "item_role": getattr(payload.telemetry, "item_role", None),
+        "item_version": payload.telemetry.item_version,
+        "prompt_modality": payload.telemetry.prompt_modality,
+        "response_modality": payload.telemetry.response_modality,
+        "research_role": payload.telemetry.research_role,
+        "difficulty_label": payload.telemetry.difficulty_label,
+        "error_type": payload.telemetry.error_type,
+        "equivalent_group_id": getattr(
+            payload.telemetry, "equivalent_group_id", None
+        ),
+        "response_load_relation": getattr(
+            payload.telemetry, "response_load_relation", None
+        ),
+        "targets": getattr(payload.telemetry, "target_ids", None) or [],
+        "target_ids": getattr(payload.telemetry, "target_ids", None) or [],
+        "struggled_target_units": (
+            getattr(payload.telemetry, "struggled_target_units", None) or []
+        ),
+        "selected_answers": (
+            getattr(payload.telemetry, "selected_answers", None) or []
+        ),
+        "attempt_history": (
+            getattr(payload.telemetry, "attempt_history", None) or []
+        ),
+        # Keep both names because the real-time gateway and the batch
+        # telemetry service historically used different field names.
+        "touch_stream": payload.telemetry.touch_stream,
+        "touch_path": payload.telemetry.touch_stream,
+        "event_source": "learning_interaction",
+        "data_origin": "observed",
+        "dataset_id": f"live:{payload.student_id}:{payload.session_id}",
+        "validation_status": "operational_observation",
+        "calibration_eligible": False,
+    }
+    # Prefer the v2 key, while reconciling one pre-v2 record in place when it
+    # exists. This keeps retries idempotent without deleting legacy records.
+    existing = await db.telemetry_events.find_one(
+        {"ingestion_key": ingestion_key}, {"_id": 1}
+    )
+    if not existing:
+        existing = await db.telemetry_events.find_one(
+            {"event_id": event_id}, {"_id": 1}
+        )
+    event_filter = {"_id": existing["_id"]} if existing else {
+        "ingestion_key": ingestion_key
     }
     await db.telemetry_events.update_one(
-        {"event_id": event_id},
-        {"$setOnInsert": telemetry_doc},
-        upsert=True
+        event_filter,
+        {"$set": telemetry_doc},
+        upsert=existing is None,
     )
 
     # C1 descriptive processing is performed by authenticated end-of-session ingestion.
     # No duplicate call to the incompatible legacy /api/v1/c1/session route is made.
 
-    # Save C4 Decision
-    c4_doc = {
-        "event_id": event_id,
-        "student_id": payload.student_id,
-        "session_id": payload.session_id,
-        "timestamp": datetime.utcnow().isoformat(),
-        "mastery_before": c4_result.get("previous_knowledge_state", {}).get(payload.knowledge_component_id),
-        "previous_difficulty": payload.difficulty_b,
-        "item_id": payload.item_id,
-        "decision": c4_result.get("next_action", {}).get("decision", "Unavailable"),
-        "mastery_after": c4_result.get("updated_knowledge_state", {}).get(payload.knowledge_component_id),
-        "selected_difficulty": c4_result.get("next_action", {}).get("difficulty"),
-        "selected_activity": c4_result.get("next_action", {}).get("next_activity", "Skill_2"),
-        "scaffold_level": c4_result.get("next_action", {}).get("scaffold_level", 0),
-        "decision_reason": c4_result.get("next_action", {}).get("decision", "CONTINUE"),
-        "policy_version": "Policy-v1.0"
-    }
-    if c4_result.get("updated_knowledge_state"):
-        c4_doc["data_origin"] = "observed"
-        c4_doc["validation_status"] = "not_clinically_validated"
-        await db.adaptive_decisions.insert_one(c4_doc)
+    # C4 owns adaptive-decision persistence.  The gateway stores the raw
+    # telemetry event only; writing the decision here as well previously
+    # produced two research rows for one child interaction.
     
     # Save Speech Features and Transcriptions separately as requested
     if payload.speech:
@@ -102,9 +309,16 @@ async def run_background_pipeline(payload: InteractionPayload, c4_result: dict, 
             "wer": payload.speech.get("word_error_rate", 0.0),
             "stt_confidence": 1.0 - (payload.speech.get("word_error_rate") or 0.0),
             "model_version": "whisper-si-v1",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "data_origin": "observed",
+            "dataset_id": f"live:{payload.student_id}:{payload.session_id}",
+            "validation_status": "operational_observation",
         }
-        await db.speech_transcriptions.insert_one(speech_trans_doc)
+        await db.speech_transcriptions.update_one(
+            {"speech_event_id": event_id},
+            {"$set": speech_trans_doc},
+            upsert=True,
+        )
         
         speech_feat_doc = {
             "speech_event_id": event_id,
@@ -120,44 +334,109 @@ async def run_background_pipeline(payload: InteractionPayload, c4_result: dict, 
             "intra_word_silence_ratio": payload.speech.get("Intra_Word_Silence_Ratio", 0.0),
             "jitter": payload.speech.get("Local_Jitter", 0.0),
             "shimmer": payload.speech.get("Local_Shimmer", 0.0),
+            "local_jitter": payload.speech.get("Local_Jitter", 0.0),
+            "local_shimmer": payload.speech.get("Local_Shimmer", 0.0),
             "recording_quality": payload.speech.get("recording_quality", "good"),
             "analysis_confidence": 0.88 if payload.speech.get("recording_quality", "good") == "good" else 0.5,
             "feature_version": "speech-v1",
+            "measurement_status": "available",
+            "data_origin": "observed",
+            "dataset_id": f"live:{payload.student_id}:{payload.session_id}",
+            "validation_status": "operational_observation",
             "speech_data": payload.speech, # Kept for backward compatibility in other endpoints
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        await db.speech_features.insert_one(speech_feat_doc)
+        await db.speech_features.update_one(
+            {"speech_event_id": event_id},
+            {"$set": speech_feat_doc},
+            upsert=True,
+        )
 
 
 @router.post("/interaction")
-async def process_interaction(payload: InteractionPayload, background_tasks: BackgroundTasks):
+async def process_interaction(
+    payload: InteractionPayload,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
     db = get_db()
     event_id = payload.event_id or str(uuid.uuid4())
+
+    try:
+        student_oid = ObjectId(payload.student_id)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid student_id")
+    student = await db.students.find_one({"_id": student_oid})
+    if not student or str(student.get("parent_id")) != str(current_user.get("_id")):
+        raise HTTPException(status_code=403, detail="This account cannot submit data for this student")
+
+    # Speech is accepted in the legacy request shape but is deliberately not
+    # persisted or forwarded here. The authenticated C2 endpoint is the only
+    # source of speech evidence, preventing duplicate/conflicting records.
+    payload.speech = None
     
-    # Fetch latest fatigue from C1 and learner profile from C3 to inform C4
+    # --- CANONICALIZATION ---
+    canonical_activity_id = payload.activity_id
+    canonical_item_id = payload.item_id
+    
+    if payload.skill_id and payload.activity_id and payload.round_number is not None:
+        s_match = re.search(r"skill_(\d+)", str(payload.skill_id))
+        a_match = re.search(r"act_(\d+)", str(payload.activity_id))
+        if s_match and a_match:
+            s_num = s_match.group(1)
+            a_num = a_match.group(1)
+            canonical_activity_id = f"{s_num}.{a_num}"
+            if payload.item_id and payload.item_id.startswith(f"S{s_num}A{a_num}"):
+                canonical_item_id = payload.item_id
+            else:
+                canonical_item_id = f"S{s_num}A{a_num}R{payload.round_number:02d}"
+
+    print(f"\n[LEARNING INTERACTION]")
+    print(f"student={payload.student_id}")
+    print(f"frontend skill={payload.skill_id}")
+    print(f"frontend activity={payload.activity_id}")
+    print(f"round={payload.round_number}")
+    print(f"canonical activity={canonical_activity_id}")
+    print(f"canonical item={canonical_item_id}")
+
+    # Fetch C1 summaries only. C4 is intentionally isolated from C2/C3.
     c1 = await db.session_summaries.find_one({"student_id": payload.student_id}, sort=[("_id", -1)])
-    c3 = await db.learner_profiles.find_one({"student_id": payload.student_id}, sort=[("_id", -1)])
-    
-    fatigue_score = (c1.get("behavioral_fatigue_proxy") or 0.0) if c1 else 0.0
-    learner_profile_dict = c3.get("learner_profile", {}).get("class_probabilities", {}) if c3 else {}
+    current_rows = await db.telemetry_events.find({
+        "student_id": payload.student_id,
+        "session_id": payload.session_id,
+    }).sort("_id", 1).to_list(length=200)
+    current_rows.append({
+        **payload.telemetry.model_dump(),
+        "phase": payload.phase,
+        "is_abandoned": payload.telemetry.is_abandoned,
+    })
+    behavioral_context = summarize_current_session(current_rows)
+    prior_fatigue = (c1.get("behavioral_fatigue_proxy") or 0.0) if c1 else 0.0
+    fatigue_score = float(
+        behavioral_context.get("behavioral_fatigue_proxy", 0.0)
+        if behavioral_context.get("observation_count", 0) > 0
+        else prior_fatigue
+    )
+    context_evidence = {
+        "behavior_source": "current_session_rolling",
+        "prior_session_available": bool(c1),
+        "adaptive_input_scope": "c1_behavior_only",
+    }
     
     c4_result = {}
     async with httpx.AsyncClient() as client:
         # Call Adaptive Tutoring (C4) synchronously
         try:
-            adaptive_submit = {
-                "student_id": payload.student_id,
-                "session_id": payload.session_id,
-                "activity_id": payload.activity_id,
-                "knowledge_component_id": payload.knowledge_component_id,
-                "item_id": payload.item_id,
-                "is_correct": payload.first_attempt_correct if payload.first_attempt_correct is not None else payload.response.is_correct,
-                "difficulty_b": payload.difficulty_b,
-                "is_anchor": payload.is_anchor,
-                "current_session_duration_sec": payload.telemetry.total_round_latency_ms // 1000,
-                "fatigue_score": fatigue_score,
-                "learner_profile": learner_profile_dict
-            }
+            adaptive_submit = build_adaptive_submit(
+                payload,
+                event_id=event_id,
+                canonical_activity_id=canonical_activity_id,
+                canonical_item_id=canonical_item_id,
+                fatigue_score=fatigue_score,
+                learner_profile={},
+                behavioral_context=behavioral_context,
+                context_evidence=context_evidence,
+            )
             
             adaptive_api_url = os.getenv("ADAPTIVE_API_URL", "http://localhost:9017")
             
@@ -180,5 +459,6 @@ async def process_interaction(payload: InteractionPayload, background_tasks: Bac
         "result": {
             "is_correct": payload.response.is_correct
         },
-        "next_action": c4_result.get("next_action", {})
+        "next_action": c4_result.get("next_action", {}),
+        "response_quality": c4_result.get("response_quality")
     }

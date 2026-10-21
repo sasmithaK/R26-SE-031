@@ -1,14 +1,17 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:sipsara_app/utils/sound_utils.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../../../../theme/app_theme.dart';
-import '../../../../widgets/telemetry_wrapper.dart';
-import '../../../../models/curriculum_models.dart';
-import '../../../../services/tts_service.dart';
+import '../../../theme/app_theme.dart';
+import '../../../widgets/telemetry_wrapper.dart';
+import '../../../models/curriculum_models.dart';
+import '../../../services/tts_service.dart';
 import '../shared_templates/widgets/shared_game_layout.dart';
-import '../../../../services/progress_service.dart';
-import '../shared_widgets/shared_celebration_popup.dart';
+import '../../../services/progress_service.dart';
+import '../../../adaptive/adapters/sequence_scaffold_adapter.dart';
+import '../../../adaptive/models/adaptive_scaffold_models.dart';
+import '../../../adaptive/sequence_progression.dart';
 
 class PlacedWord {
   final String word;
@@ -20,13 +23,20 @@ class Skill4Act4JumbledSentence extends StatefulWidget {
   final ActivityNode? activityNode;
   final bool isRemedial;
   final Map<String, dynamic>? studentData;
-  const Skill4Act4JumbledSentence({super.key, this.activityNode, this.isRemedial = false, this.studentData});
+  const Skill4Act4JumbledSentence({
+    super.key,
+    this.activityNode,
+    this.isRemedial = false,
+    this.studentData,
+  });
 
   @override
-  State<Skill4Act4JumbledSentence> createState() => _Skill4Act4JumbledSentenceState();
+  State<Skill4Act4JumbledSentence> createState() =>
+      _Skill4Act4JumbledSentenceState();
 }
 
-class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> with SingleTickerProviderStateMixin {
+class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence>
+    with SingleTickerProviderStateMixin, SequenceScaffoldAdapter {
   String _lastSpokenInstruction = '';
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isCorrect = false;
@@ -35,6 +45,8 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
 
   List<PlacedWord?> _filledSlots = [];
   List<String?> _poolWords = [];
+  List<int> _correctPoolOrder = const <int>[];
+  final Set<int> _lockedSlotIndices = <int>{};
   bool _isChecking = false;
   bool _showError = false;
 
@@ -42,21 +54,37 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
   late Animation<double> _shakeAnimation;
 
   @override
+  Future<void> handleAdaptiveSequenceSemanticScaffold(
+    ScaffoldCommand command,
+  ) async {
+    if (command.type == ScaffoldActionType.replayInstruction) {
+      _playCurrentInstruction();
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     final skillId = widget.activityNode?.skillId ?? '';
     final activityId = widget.activityNode?.id ?? '';
     if (skillId.isNotEmpty && activityId.isNotEmpty) {
-      _currentRoundIndex = ProgressService().getActivityState(skillId, activityId);
+      _currentRoundIndex = ProgressService().getActivityState(
+        skillId,
+        activityId,
+      );
     }
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isNotEmpty && _currentRoundIndex >= rounds.length) {
       _currentRoundIndex = 0;
     }
-    _shakeController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
-    _shakeAnimation = Tween<double>(begin: 0, end: 24)
-        .chain(CurveTween(curve: Curves.elasticIn))
-        .animate(_shakeController);
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _shakeAnimation = Tween<double>(
+      begin: 0,
+      end: 24,
+    ).chain(CurveTween(curve: Curves.elasticIn)).animate(_shakeController);
 
     _initRound();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -75,12 +103,36 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) return;
 
-    final currentRound = rounds[_currentRoundIndex];
-    final scrambledList = (currentRound['scrambled_words'] as List?)?.map((e) => e.toString()).toList() ?? [];
-    
+    final currentRound = adaptiveSequenceRoundData(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+    );
+    final scrambledList =
+        (currentRound['scrambled_words'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+    final correctSentence = currentRound['correct_sentence']?.toString() ?? '';
+    final correctTokens = correctSentence
+        .replaceFirst(RegExp(r'[.!?]$'), '')
+        .split(RegExp(r'\s+'))
+        .where((token) => token.isNotEmpty)
+        .toList();
+    _correctPoolOrder = resolveSequencePoolOrder(
+      poolTokens: scrambledList,
+      target: correctTokens.join(),
+    );
+    configureAdaptiveSequence(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+      poolTokens: scrambledList,
+      correctSequence: correctTokens,
+    );
+
     setState(() {
       _poolWords = List.from(scrambledList);
       _filledSlots = List.filled(scrambledList.length, null);
+      _lockedSlotIndices.clear();
       _isCorrect = false;
       _isChecking = false;
       _showError = false;
@@ -90,9 +142,13 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
   void _playCurrentInstruction({bool autoPlay = false}) {
     final rounds = widget.activityNode?.rounds ?? [];
     if (rounds.isEmpty) return;
-    final currentRound = rounds[_currentRoundIndex];
-    final instructionText = currentRound['prompt']?.toString() ?? 'පින්තූරයට අදාළ වාක්‍යය සාදන්න';
-    
+    final currentRound = adaptiveSequenceRoundData(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+    );
+    final instructionText =
+        currentRound['prompt']?.toString() ?? 'පින්තූරයට අදාළ වාක්‍යය සාදන්න';
+
     if (autoPlay && _lastSpokenInstruction == instructionText) {
       return;
     }
@@ -102,6 +158,7 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
 
   void _onPoolWordTapped(int poolIndex) async {
     if (_isChecking || _poolWords[poolIndex] == null) return;
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.markAnswer();
 
     // Find first empty slot
     int emptySlotIndex = _filledSlots.indexWhere((s) => s == null);
@@ -110,11 +167,12 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
       setState(() {
         _filledSlots[emptySlotIndex] = PlacedWord(word, poolIndex);
         _poolWords[poolIndex] = null;
+        adaptiveHintedTokenIndices.remove(poolIndex);
         _showError = false;
       });
-      
+
       // Do not speak the word to prevent overlapping with success audio
-      
+
       // Check if all slots are filled
       if (!_filledSlots.contains(null)) {
         _validateAnswer();
@@ -123,7 +181,13 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
   }
 
   void _onSlotTapped(int slotIndex) {
-    if (_isChecking || _filledSlots[slotIndex] == null) return;
+    if (_isChecking ||
+        _filledSlots[slotIndex] == null ||
+        _lockedSlotIndices.contains(slotIndex)) {
+      return;
+    }
+
+    context.findAncestorStateOfType<TelemetryWrapperState>()?.logCorrection();
 
     setState(() {
       final placed = _filledSlots[slotIndex]!;
@@ -138,12 +202,14 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
       _isChecking = true;
     });
 
-    final rounds = widget.activityNode?.rounds ?? [];
-    final currentRound = rounds[_currentRoundIndex];
+    final currentRound = adaptiveSequenceRoundData(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+    );
     final correctSentence = currentRound['correct_sentence']?.toString() ?? "";
-    
+
     // Join words with a space and append full stop
-    final formedSentence = _filledSlots.map((e) => e!.word).join(" ") + ".";
+    final formedSentence = '${_filledSlots.map((e) => e!.word).join(" ")}.';
 
     // Check if it matches exactly, or ignoring leading/trailing whitespace
     if (formedSentence.trim() == correctSentence.trim()) {
@@ -151,24 +217,39 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
       setState(() {
         _isCorrect = true;
       });
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(100);
       SoundUtils.playFeedback('audio/correct.mp3');
-
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (!mounted) return;
-        if (_currentRoundIndex < rounds.length - 1) {
-          _currentRoundIndex++;
-              final sId = widget.activityNode?.skillId ?? '';
-              final aId = widget.activityNode?.id ?? '';
-              if (sId.isNotEmpty && aId.isNotEmpty) {
-                int progress = ((_currentRoundIndex / (widget.activityNode?.rounds.length ?? 1)) * 100).toInt();
-                ProgressService().saveActivityScore(sId, aId, progress);
-                ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
-              }
-          _initRound();
-          _playCurrentInstruction(autoPlay: true);
-        } else {
-          setState(() {
+      final resultFuture = submitAdaptiveSequenceTask(
+        100,
+        roundIndex: _currentRoundIndex,
+        selectedAnswers: _filledSlots.map((e) => e!.word).toList(),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      final result = await resultFuture;
+      if (!mounted) return;
+      final transition = applyAdaptiveSequenceTaskResult(result);
+      if (transition == null) {
+        _initRound();
+        return;
+      }
+      if (!transition.isComplete) {
+        setState(() {
+          _currentRoundIndex = transition.roundIndex;
+        });
+        final sId = widget.activityNode?.skillId ?? '';
+        final aId = widget.activityNode?.id ?? '';
+        if (sId.isNotEmpty && aId.isNotEmpty) {
+          int progress =
+              ((_currentRoundIndex /
+                          (widget.activityNode?.rounds.length ?? 1)) *
+                      100)
+                  .toInt();
+          ProgressService().saveActivityScore(sId, aId, progress);
+          ProgressService().saveActivityState(sId, aId, _currentRoundIndex);
+        }
+        _initRound();
+        _playCurrentInstruction(autoPlay: true);
+      } else {
+        setState(() {
           _activityComplete = true;
           final sId = widget.activityNode?.skillId ?? '';
           final aId = widget.activityNode?.id ?? '';
@@ -177,29 +258,57 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
             ProgressService().clearActivityState(sId, aId);
           }
         });
-        }
-      });
+      }
     } else {
       // Incorrect
-      context.findAncestorStateOfType<TelemetryWrapperState>()?.completeRound(0);
+      final selectedPoolIndices = _filledSlots
+          .map((entry) => entry!.poolIndex)
+          .toList();
+      final progressiveScaffold = _filledSlots.length >= 3;
+      final scrambledWords =
+          (currentRound['scrambled_words'] as List?)
+              ?.map((value) => value.toString())
+              .toList() ??
+          const <String>[];
+      final correctTokens = _correctPoolOrder
+          .where((poolIndex) => poolIndex < scrambledWords.length)
+          .map((poolIndex) => scrambledWords[poolIndex])
+          .toList();
+      final correctPrefixLength = progressiveScaffold
+          ? matchingSequencePrefixLength(
+              placedTokens: _filledSlots.map((entry) => entry?.word).toList(),
+              correctTokens: correctTokens,
+            )
+          : 0;
+      unawaited(
+        requestSequenceScaffold(
+          selectedPoolIndices: selectedPoolIndices,
+          correctPosition: correctPrefixLength,
+        ),
+      );
       SoundUtils.playFeedback('audio/wrong.mp3');
-      
+
       setState(() {
         _showError = true;
       });
-      
+
       _shakeController.forward().then((_) {
         _shakeController.reverse();
       });
 
       Future.delayed(const Duration(milliseconds: 800), () {
         if (!mounted) return;
-        // Return all words to pool
+        // Three-word tasks retain only the consecutive correct prefix. This
+        // prevents a correct first word from being removed and advances the
+        // next scaffold highlight to the first unresolved position.
         setState(() {
           for (int i = 0; i < _filledSlots.length; i++) {
-            if (_filledSlots[i] != null) {
+            if (progressiveScaffold && i < correctPrefixLength) {
+              _lockedSlotIndices.add(i);
+            } else if (_filledSlots[i] != null) {
               _poolWords[_filledSlots[i]!.poolIndex] = _filledSlots[i]!.word;
               _filledSlots[i] = null;
+              _lockedSlotIndices.remove(i);
             }
           }
           _showError = false;
@@ -218,14 +327,18 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
         body: const Center(child: Text('No rounds available.')),
       );
     }
-    
+
     if (rounds.length > 5) {
       rounds = rounds.sublist(0, 5);
     }
 
-    final currentRound = rounds[_currentRoundIndex];
+    final currentRound = adaptiveSequenceRoundData(
+      activity: widget.activityNode,
+      roundIndex: _currentRoundIndex,
+    );
     final titleText = widget.activityNode?.title ?? 'වාක්‍යය සකසමු';
-    final promptText = currentRound['prompt']?.toString() ?? 'පින්තූරයට අදාළ වාක්‍යය සාදන්න';
+    final promptText =
+        currentRound['prompt']?.toString() ?? 'පින්තූරයට අදාළ වාක්‍යය සාදන්න';
     final emoji = currentRound['emoji']?.toString();
     final imageUrl = currentRound['image_url']?.toString();
 
@@ -238,7 +351,8 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
       isRoundComplete: _isCorrect,
       isActivityComplete: _activityComplete,
       onNext: () {
-        final wrapper = context.findAncestorStateOfType<TelemetryWrapperState>();
+        final wrapper = context
+            .findAncestorStateOfType<TelemetryWrapperState>();
         if (wrapper != null) {
           wrapper.completeActivity(context);
         } else {
@@ -260,145 +374,242 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
                   Expanded(
                     flex: 8,
                     child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(32),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.shadowMedium,
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                      border: Border.all(color: AppColors.borderLight, width: 2),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Top: Image
-                        Container(
-                          width: 210,
-                          constraints: const BoxConstraints(maxHeight: 170),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.warmAmber.withValues(alpha: 0.2),
-                                blurRadius: 16,
-                                spreadRadius: 4,
-                                offset: const Offset(0, 4),
-                              )
-                            ],
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(32),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.shadowMedium,
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
                           ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: imageUrl != null
-                                ? Image.asset(imageUrl, fit: BoxFit.cover)
-                                : Center(child: Text(emoji ?? '🧩', style: const TextStyle(fontSize: 60))),
-                          ),
+                        ],
+                        border: Border.all(
+                          color: AppColors.borderLight,
+                          width: 2,
                         ),
-                        const SizedBox(height: 16),
-                        // Bottom: Answer Slots (Sentence)
-                        Flexible(
-                          child: AnimatedBuilder(
-                            animation: _shakeAnimation,
-                            builder: (context, child) {
-                              return Transform.translate(
-                                offset: Offset(sin(_shakeAnimation.value * pi) * 10, 0),
-                                child: child,
-                              );
-                            },
-                            child: _isCorrect
-                              ? FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 500),
-                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.gentleGreen.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: AppColors.gentleGreen, width: 3),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.06),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 4),
-                                      )
-                                    ],
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Top: Image
+                          Container(
+                            width: 210,
+                            constraints: const BoxConstraints(maxHeight: 170),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.warmAmber.withValues(
+                                    alpha: 0.2,
                                   ),
-                                  child: Text(
-                                    _filledSlots.map((s) => s!.word).join(" ") + ".",
-                                    style: AppTypography.sinhala(
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
+                                  blurRadius: 16,
+                                  spreadRadius: 4,
+                                  offset: const Offset(0, 4),
                                 ),
-                              )
-                            : FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: List.generate(_filledSlots.length, (index) {
-                                    final slot = _filledSlots[index];
-                                    final isFilled = slot != null;
-                                    return GestureDetector(
-                                      onTap: () => _onSlotTapped(index),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: imageUrl != null
+                                  ? Image.asset(imageUrl, fit: BoxFit.cover)
+                                  : Center(
+                                      child: Text(
+                                        emoji ?? '🧩',
+                                        style: const TextStyle(fontSize: 60),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Bottom: Answer Slots (Sentence)
+                          Flexible(
+                            child: AnimatedBuilder(
+                              animation: _shakeAnimation,
+                              builder: (context, child) {
+                                return Transform.translate(
+                                  offset: Offset(
+                                    sin(_shakeAnimation.value * pi) * 10,
+                                    0,
+                                  ),
+                                  child: child,
+                                );
+                              },
+                              child: _isCorrect
+                                  ? FittedBox(
+                                      fit: BoxFit.scaleDown,
                                       child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 300),
-                                        constraints: const BoxConstraints(minWidth: 120, minHeight: 60),
-                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                        margin: EdgeInsets.only(right: index == _filledSlots.length - 1 ? 0 : 12),
+                                        key: ValueKey<String>(
+                                          '$adaptiveSequenceItemId-correct-sentence',
+                                        ),
+                                        duration: const Duration(
+                                          milliseconds: 500,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 24,
+                                          vertical: 12,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: _showError
-                                              ? AppColors.softCoral.withValues(alpha: 0.2)
-                                              : Colors.white,
-                                          borderRadius: BorderRadius.circular(20),
+                                          color: AppColors.gentleGreen
+                                              .withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
                                           border: Border.all(
-                                            color: _showError
-                                                ? AppColors.softCoral
-                                                : isFilled ? AppColors.calmBlue : const Color(0xFF64B5F6),
+                                            color: AppColors.gentleGreen,
                                             width: 3,
                                           ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.06),
+                                              color: Colors.black.withValues(
+                                                alpha: 0.06,
+                                              ),
                                               blurRadius: 8,
                                               offset: const Offset(0, 4),
-                                            )
+                                            ),
                                           ],
                                         ),
-                                        child: Center(
-                                          child: isFilled 
-                                            ? Text(
-                                                slot.word,
-                                                style: AppTypography.sinhala(
-                                                  fontSize: 28,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: AppColors.textPrimary,
-                                                ),
-                                              )
-                                            : const Icon(
-                                                Icons.help_outline_rounded,
-                                                size: 28,
-                                                color: Color(0xFF90CAF9),
-                                              ),
+                                        child: Text(
+                                          '${_filledSlots.map((s) => s!.word).join(" ")}.',
+                                          style: AppTypography.sinhala(
+                                            fontSize: 32,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.textPrimary,
+                                          ),
                                         ),
                                       ),
-                                    );
-                                  }),
-                                ),
-                              ),
-                        ),
-                        ),
-                      ],
+                                    )
+                                  : FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: List.generate(_filledSlots.length, (
+                                          index,
+                                        ) {
+                                          final slot = _filledSlots[index];
+                                          final isFilled = slot != null;
+                                          final isLocked = _lockedSlotIndices
+                                              .contains(index);
+                                          return GestureDetector(
+                                            onTap: isLocked
+                                                ? null
+                                                : () => _onSlotTapped(index),
+                                            child: AnimatedContainer(
+                                              key: ValueKey<String>(
+                                                '$adaptiveSequenceItemId-slot-$index',
+                                              ),
+                                              duration: const Duration(
+                                                milliseconds: 300,
+                                              ),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 120,
+                                                minHeight: 60,
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 20,
+                                                    vertical: 12,
+                                                  ),
+                                              margin: EdgeInsets.only(
+                                                right:
+                                                    index ==
+                                                        _filledSlots.length - 1
+                                                    ? 0
+                                                    : 12,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: isLocked
+                                                    ? AppColors.gentleGreen
+                                                          .withValues(
+                                                            alpha: 0.18,
+                                                          )
+                                                    : _showError
+                                                    ? AppColors.softCoral
+                                                          .withValues(
+                                                            alpha: 0.2,
+                                                          )
+                                                    : Colors.white,
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                                border: Border.all(
+                                                  color: isLocked
+                                                      ? AppColors.gentleGreen
+                                                      : _showError
+                                                      ? AppColors.softCoral
+                                                      : isFilled
+                                                      ? AppColors.calmBlue
+                                                      : const Color(0xFF64B5F6),
+                                                  width: 3,
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black
+                                                        .withValues(
+                                                          alpha: 0.06,
+                                                        ),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Center(
+                                                child: isFilled
+                                                    ? Stack(
+                                                        alignment:
+                                                            Alignment.center,
+                                                        children: [
+                                                          Text(
+                                                            slot.word,
+                                                            style: AppTypography.sinhala(
+                                                              fontSize: 28,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              color: AppColors
+                                                                  .textPrimary,
+                                                            ),
+                                                          ),
+                                                          if (isLocked)
+                                                            const Positioned(
+                                                              top: 0,
+                                                              right: 0,
+                                                              child: Icon(
+                                                                Icons
+                                                                    .check_circle_rounded,
+                                                                size: 17,
+                                                                color: AppColors
+                                                                    .gentleGreen,
+                                                              ),
+                                                            ),
+                                                        ],
+                                                      )
+                                                    : const Icon(
+                                                        Icons
+                                                            .help_outline_rounded,
+                                                        size: 28,
+                                                        color: Color(
+                                                          0xFF90CAF9,
+                                                        ),
+                                                      ),
+                                              ),
+                                            ),
+                                          );
+                                        }),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   ),
 
                   const Spacer(flex: 2),
@@ -408,7 +619,12 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
                     children: [
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.only(top: 24, bottom: 20, left: 16, right: 16),
+                        padding: const EdgeInsets.only(
+                          top: 24,
+                          bottom: 20,
+                          left: 16,
+                          right: 16,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(32),
@@ -416,54 +632,102 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
                         ),
                         child: Builder(
                           builder: (context) {
-                            final availableWords = _poolWords.asMap().entries.where((e) => e.value != null).toList();
+                            final availableWords = _poolWords
+                                .asMap()
+                                .entries
+                                .where((e) => e.value != null)
+                                .toList();
                             final isSmall = availableWords.length > 2;
                             return Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                for (int i = 0; i < availableWords.length; i += 2)
+                                for (
+                                  int i = 0;
+                                  i < availableWords.length;
+                                  i += 2
+                                )
                                   FittedBox(
                                     fit: BoxFit.scaleDown,
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: availableWords.sublist(i, (i + 2 < availableWords.length) ? i + 2 : availableWords.length).map((entry) {
-                                        int index = entry.key;
-                                        final word = entry.value;
-                                        return GestureDetector(
-                                          onTap: () => _onPoolWordTapped(index),
-                                          child: AnimatedContainer(
-                                            duration: const Duration(milliseconds: 300),
-                                            curve: Curves.easeOut,
-                                            padding: isSmall
-                                                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 10)
-                                                : const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                                            margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius: BorderRadius.circular(24),
-                                              border: Border.all(
-                                                color: const Color(0xFFE5E7EB),
-                                                width: 2,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: availableWords
+                                          .sublist(
+                                            i,
+                                            (i + 2 < availableWords.length)
+                                                ? i + 2
+                                                : availableWords.length,
+                                          )
+                                          .map((entry) {
+                                            int index = entry.key;
+                                            final word = entry.value;
+                                            final isHinted =
+                                                isAdaptiveTokenHinted(index);
+                                            return GestureDetector(
+                                              key: ValueKey<String>(
+                                                '$adaptiveSequenceItemId-token-$index',
                                               ),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: const Color(0xFF4A90D9).withValues(alpha: 0.08),
-                                                  blurRadius: 8,
-                                                  offset: const Offset(0, 3),
+                                              onTap: () =>
+                                                  _onPoolWordTapped(index),
+                                              child: AnimatedContainer(
+                                                duration: const Duration(
+                                                  milliseconds: 300,
                                                 ),
-                                              ],
-                                            ),
-                                            child: Text(
-                                              word ?? '',
-                                              style: AppTypography.sinhala(
-                                                fontSize: isSmall ? 24 : 32,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.textPrimary,
+                                                curve: Curves.easeOut,
+                                                padding: isSmall
+                                                    ? const EdgeInsets.symmetric(
+                                                        horizontal: 16,
+                                                        vertical: 10,
+                                                      )
+                                                    : const EdgeInsets.symmetric(
+                                                        horizontal: 24,
+                                                        vertical: 14,
+                                                      ),
+                                                margin:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8.0,
+                                                      vertical: 6.0,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: isHinted
+                                                      ? AppColors.warmAmberLight
+                                                      : Colors.white,
+                                                  borderRadius:
+                                                      BorderRadius.circular(24),
+                                                  border: Border.all(
+                                                    color: isHinted
+                                                        ? AppColors.warmAmber
+                                                        : const Color(
+                                                            0xFFE5E7EB,
+                                                          ),
+                                                    width: isHinted ? 4 : 2,
+                                                  ),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: const Color(
+                                                        0xFF4A90D9,
+                                                      ).withValues(alpha: 0.08),
+                                                      blurRadius: 8,
+                                                      offset: const Offset(
+                                                        0,
+                                                        3,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: Text(
+                                                  word ?? '',
+                                                  style: AppTypography.sinhala(
+                                                    fontSize: isSmall ? 24 : 32,
+                                                    fontWeight: FontWeight.bold,
+                                                    color:
+                                                        AppColors.textPrimary,
+                                                  ),
+                                                ),
                                               ),
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
+                                            );
+                                          })
+                                          .toList(),
                                     ),
                                   ),
                               ],
@@ -486,7 +750,9 @@ class _Skill4Act4JumbledSentenceState extends State<Skill4Act4JumbledSentence> w
   Widget _buildInstructionCard(String instruction) {
     return GestureDetector(
       onTap: () {
-        context.findAncestorStateOfType<TelemetryWrapperState>()?.logAudioReplay();
+        context
+            .findAncestorStateOfType<TelemetryWrapperState>()
+            ?.logAudioReplay();
         TtsService().speak(instruction, folder: 'skill_4');
       },
       child: Container(

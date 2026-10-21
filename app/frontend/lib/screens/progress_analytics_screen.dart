@@ -92,7 +92,7 @@ class _ProgressAnalyticsScreenState extends State<ProgressAnalyticsScreen> {
         centerTitle: true,
         title: Text(
           'සිසු ප්‍රගතිය',
-          style: AppTypography.heading(fontSize: 20, color: Colors.white),
+          style: DashText.heading(fontSize: 20, color: Colors.white),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
@@ -119,7 +119,7 @@ class _ProgressAnalyticsScreenState extends State<ProgressAnalyticsScreen> {
                                 : const Icon(Icons.picture_as_pdf_rounded, size: 20),
                             label: Text(
                               _isDownloadingReport ? 'වාර්තාව සකසමින්...' : 'සායනික වාර්තාව බාගත කරන්න',
-                              style: AppTypography.body(fontSize: 15, fontWeight: FontWeight.w700),
+                              style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.calmBlue,
@@ -143,7 +143,7 @@ class _ProgressAnalyticsScreenState extends State<ProgressAnalyticsScreen> {
                                 : const Icon(Icons.assessment_rounded, size: 20),
                             label: Text(
                               _isDownloadingAssessment ? 'ඇගයීම සකසමින්...' : 'ඇගයීම් PDF බාගත කරන්න',
-                              style: AppTypography.body(fontSize: 15, fontWeight: FontWeight.w700),
+                              style: DashText.body(fontSize: 15, fontWeight: FontWeight.w700),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
@@ -185,7 +185,7 @@ class _ProgressAnalyticsScreenState extends State<ProgressAnalyticsScreen> {
         ),
         title: Text(
           skill.title,
-          style: AppTypography.heading(fontSize: 16, color: AppColors.textPrimary),
+          style: DashText.heading(fontSize: 16, color: AppColors.textPrimary),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,11 +196,11 @@ class _ProgressAnalyticsScreenState extends State<ProgressAnalyticsScreen> {
               children: [
                 Text(
                   '$completedCount / ${skill.totalActivities} ක් සම්පූර්ණයි',
-                  style: AppTypography.caption(fontSize: 12, color: AppColors.textSecondary),
+                  style: DashText.caption(fontSize: 12, color: AppColors.textSecondary),
                 ),
                 Text(
                   '${(progress * 100).round()}%',
-                  style: AppTypography.caption(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.gentleGreen),
+                  style: DashText.caption(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.gentleGreen),
                 ),
               ],
             ),
@@ -241,7 +241,7 @@ class _ProgressAnalyticsScreenState extends State<ProgressAnalyticsScreen> {
                             Expanded(
                               child: Text(
                                 activity.title,
-                                style: AppTypography.body(
+                                style: DashText.body(
                                   fontSize: 14,
                                   color: isCompleted ? AppColors.textPrimary : AppColors.textSecondary,
                                   fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
@@ -257,7 +257,7 @@ class _ProgressAnalyticsScreenState extends State<ProgressAnalyticsScreen> {
                                 ),
                                 child: Text(
                                   'ලකුණු: $score%',
-                                  style: AppTypography.caption(
+                                  style: DashText.caption(
                                     fontSize: 12,
                                     color: AppColors.orangeDark,
                                     fontWeight: FontWeight.bold,

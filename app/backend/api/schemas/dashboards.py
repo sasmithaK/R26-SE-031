@@ -42,6 +42,12 @@ class ParentOverviewDTO(APIResponseBase):
     practice_time_minutes: Optional[int] = None
     sessions_completed: int
     reading_progress: str
+    assessment_summary: Dict[str, Any] = Field(default_factory=dict)
+    # Same pooled window as the therapist dashboard.
+    window_days: Optional[int] = None
+    completed_rounds: int = 0
+    sessions_ended_early: int = 0
+    median_response_latency_ms: Optional[float] = None
 
 class ParentReadingFluencyDTO(APIResponseBase):
     fluency_status: str
@@ -65,6 +71,56 @@ class ActivityHistoryItem(BaseModel):
 class ParentActivityHistoryDTO(APIResponseBase):
     history: List[ActivityHistoryItem]
 
+class RoundJourneyItem(BaseModel):
+    round_number: int
+    result_icon: str            # "⭐" / "👍" / "💡" / "📝"
+    result_text: str            # "Got it right!" / "Needed a hint" / "Got extra practice"
+    was_first_try: bool
+    needed_remediation: bool
+
+class RecommendedPracticeItem(BaseModel):
+    activity_id: str            # "2.1"
+    activity_name: str          # "අකුරු හඳුනමු (Letter Identification)"
+    description: str            # "Strengthens letter recognition"
+    template_type: str          # "skill2_odd_one_out"
+    rounds_count: int           # 7
+
+class AdaptiveInsightItem(BaseModel):
+    activity_id: str
+    activity_name: str
+    # 1. Completion Progress
+    rounds_completed: int
+    rounds_total: int
+    is_activity_complete: bool
+    completion_text: str        # "3 of 5 puzzles done" / "Activity Complete!"
+    # 2. First-Try Accuracy
+    first_try_correct: int
+    first_try_total: int
+    accuracy_text: str          # "Got 4 right on first try!"
+    # 3. App Adaptation Story
+    remediation_count: int
+    adaptation_text: str        # "App gave extra practice on 2 tricky puzzles"
+    # 4. Independence Level
+    independent_rounds: int
+    guided_rounds: int
+    independence_text: str      # "Solved 4 independently"
+    independence_badge: str     # "Independent Learner 🌟" / "Guided Learner 💡"
+    # 5. Round Journey
+    round_journey: List[RoundJourneyItem]
+    # 6. Overall Rating
+    star_rating: int            # 1-3
+    rating_text: str            # "⭐⭐⭐ Excellent!" / "⭐⭐ Good Progress!"
+    # 7. Recommended Practice
+    recommendations: List[RecommendedPracticeItem]
+    # Meta
+    last_played: str
+    times_played: int
+
+class ParentAdaptiveInsightsDTO(APIResponseBase):
+    activities: List[AdaptiveInsightItem]
+    support_summary: Dict[str, Any] = Field(default_factory=dict)
+    policy_notice: str = ""
+
 # ==========================================
 # THERAPIST DASHBOARD DTOs (C1-C4 Architecture)
 # ==========================================
@@ -84,8 +140,10 @@ class TherapistOverviewDTO(MLResponseBase):
     c3_available: bool = False
     c4_available: bool = False
     latest_recommendation: Optional[str] = None
-    assessment_results: List[bool] = Field(default_factory=list)
-    comprehensive_assessment_results: Dict[str, List[bool]] = Field(default_factory=dict)
+    # Preserve question text/IDs and answer values in dashboard responses;
+    # old records containing plain booleans remain valid too.
+    assessment_results: List[Any] = Field(default_factory=list)
+    comprehensive_assessment_results: Dict[str, List[Any]] = Field(default_factory=dict)
     reviewed_assessments: Dict[str, bool] = Field(default_factory=dict)
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -94,8 +152,30 @@ class TherapistOverviewDTO(MLResponseBase):
     age: Optional[int] = None
     avatar_url: Optional[str] = None
     parent_name: Optional[str] = None
+    fatigue_state: Optional[str] = None
+    birth_year: Optional[int] = None
+    birth_month: Optional[int] = None
+    gender: Optional[str] = None
+    coverage: Dict[str, Any] = Field(default_factory=dict)
+    alerts: List[Dict[str, Any]] = Field(default_factory=list)
+    # Pooled completed rounds over the dashboard window (same numbers as the
+    # Activities tab and the parent dashboard).
+    c1_window: Dict[str, Any] = Field(default_factory=dict)
+    # ``overall_mastery`` averages practised areas only.
+    mastery_practised_areas: int = 0
+    mastery_total_areas: int = 0
 
 class KCPerformance(BaseModel):
+    KC_VISUAL_IDENTIFICATION: Optional[float] = None
+    KC_VISUAL_MATCHING: Optional[float] = None
+    KC_VISUAL_CATEGORIZATION: Optional[float] = None
+    KC_VISUAL_PATTERN: Optional[float] = None
+    KC_VISUAL_MEMORY: Optional[float] = None
+    KC_LETTER_IDENTIFICATION: Optional[float] = None
+    KC_LETTER_MATCHING: Optional[float] = None
+    KC_PHONEME_LETTER_MAPPING: Optional[float] = None
+    KC_LETTER_DECODING: Optional[float] = None
+    KC_LETTER_MEMORY: Optional[float] = None
     KC_AKSHARA_IDENTITY: Optional[float] = None
     KC_PHONEME_GRAPHEME: Optional[float] = None
     KC_WORD_RECOGNITION: Optional[float] = None
@@ -108,6 +188,7 @@ class KCPerformance(BaseModel):
 
 class ErrorDistribution(BaseModel):
     visual_confusion: Optional[float] = None
+    visual_task_error: Optional[float] = None
     phonological_confusion: Optional[float] = None
     sequence_error: Optional[float] = None
     unknown_error: Optional[float] = None
@@ -120,6 +201,7 @@ class BehavioralTrends(BaseModel):
 class TherapistC1BehavioralDTO(MLResponseBase):
     session_id: Optional[str] = None
     data_source: str = "session_summaries"
+    window: Dict[str, Any] = Field(default_factory=dict)
     first_attempt_accuracy: Optional[float] = None
     median_response_latency_ms: Optional[float] = None
     retry_rate: Optional[float] = None
@@ -130,6 +212,16 @@ class TherapistC1BehavioralDTO(MLResponseBase):
     kc_performance: KCPerformance
     error_distribution: ErrorDistribution
     trends: BehavioralTrends
+    # Window-based views (``window_days``) used by the redesigned dashboard.
+    window_days: Optional[int] = None
+    session_count: int = 0
+    total_trials: int = 0
+    fatigue_state: Optional[str] = None
+    kc_breakdown: List[Dict[str, Any]] = Field(default_factory=list)
+    error_breakdown: Dict[str, Any] = Field(default_factory=dict)
+    c1_state: Dict[str, Any] = Field(default_factory=dict)
+    kinematics: Dict[str, Any] = Field(default_factory=dict)
+    index_trend: List[Dict[str, Any]] = Field(default_factory=list)
 
 class SpeechLatest(BaseModel):
     pause_count: Optional[int] = None
@@ -148,7 +240,22 @@ class SpeechLatest(BaseModel):
     silence_ratio: Optional[float] = None
     jitter: Optional[float] = None
     shimmer: Optional[float] = None
+    grapheme_accuracy: Optional[float] = None
+    word_accuracy: Optional[float] = None
+    reading_rate_wpm: Optional[float] = None
+    combined_confidence: Optional[float] = None
+    reading_performance_score: Optional[float] = None
+    method_disagreement: bool = False
+    quality_issues: List[str] = Field(default_factory=list)
     recording_quality: str
+    record_start_delay_ms: Optional[float] = None
+    recording_quality_score: Optional[float] = None
+    measured: bool = False
+    pipeline_version: Optional[str] = None
+    asr_model: Optional[str] = None
+    disagreement_reasons: List[str] = Field(default_factory=list)
+    item_id: Optional[str] = None
+    recorded_at: Optional[str] = None
 
 class SpeechTrends(BaseModel):
     accuracy: List[Dict[str, Any]]
@@ -158,16 +265,28 @@ class SpeechTrends(BaseModel):
     peak_delta: List[Dict[str, Any]]
 
 class TherapistC2SpeechDTO(MLResponseBase):
+    recording_count: int = 0
+    letter_recording_count: int = 0
+    usable_recording_count: int = 0
     latest: SpeechLatest
     trends: SpeechTrends
+    window_days: Optional[int] = None
+    usable_recording_rate: Optional[float] = None
+    quality_issue_counts: Dict[str, int] = Field(default_factory=dict)
+    items: List[Dict[str, Any]] = Field(default_factory=list)
+    session_trend: List[Dict[str, Any]] = Field(default_factory=list)
+    letter_change_counts: Dict[str, int] = Field(default_factory=dict)
+    letter_progress: List[Dict[str, Any]] = Field(default_factory=list)
 
 class ShapExplanation(BaseModel):
     feature: str
     contribution: float
     observed_value: Optional[float] = None
     direction: Optional[str] = None
+    plain_text: Optional[str] = None
 
 class TherapistC3ProfileDTO(MLResponseBase):
+    classifier_available: bool = False
     primary_pattern: str
     probabilities: Dict[str, float]
     confidence: Optional[float] = None
@@ -175,11 +294,29 @@ class TherapistC3ProfileDTO(MLResponseBase):
     shap_explanations: List[ShapExplanation]
     llm_summary: Optional[str] = None
     llm_recommendations: Optional[str] = None
+    pipeline_status: str = "not_run"
+    missing_inputs: List[str] = Field(default_factory=list)
+    summary_text: str = "More activity observations are needed before a combined summary is available."
+    recommendation_text: str = "Continue familiar activities and review progress over time."
+    evidence_window: Dict[str, Any] = Field(default_factory=dict)
+    coverage_checklist: List[Dict[str, Any]] = Field(default_factory=list)
+    measurement_notes: List[str] = Field(default_factory=list)
+    low_agreement: bool = False
+    sources_used: List[str] = Field(default_factory=list)
+    latest_feedback: Optional[Dict[str, Any]] = None
+    marginalized_covariates: List[str] = Field(default_factory=list)
+    outside_range: List[Dict[str, Any]] = Field(default_factory=list)
+    not_measured_inputs: List[str] = Field(default_factory=list)
+    c1_evidence_used: bool = False
 
 class KnowledgeComponent(BaseModel):
     id: str
     name: str
     mastery: float
+    observations: int = 0
+    independent_observations: int = 0
+    supported_observations: int = 0
+    last_observed_at: Optional[str] = None
 
 class AdaptiveHistoryItem(BaseModel):
     timestamp: str
@@ -192,11 +329,29 @@ class AdaptiveHistoryItem(BaseModel):
     next_activity: str
     decision: str
     reason: str
+    reason_codes: List[str] = Field(default_factory=list)
+    item_id: Optional[str] = None
+    knowledge_component_id: Optional[str] = None
+    response_quality: Optional[str] = None
+    item_role: Optional[str] = None
+    mastery_evidence_role: Optional[str] = None
+    mastery_update_applied: Optional[bool] = None
 
 class TherapistC4AdaptiveDTO(MLResponseBase):
     knowledge_components: List[KnowledgeComponent]
+    skills: List[Dict[str, Any]] = Field(default_factory=list)
+    activities: List[Dict[str, Any]] = Field(default_factory=list)
     theta: Optional[float] = None
     theta_se: Optional[float] = None
     updated_at: str
     updated_at_state: Optional[str] = None  # Knowledge state last updated timestamp
     history: List[AdaptiveHistoryItem]
+    policy_status: Dict[str, Any] = Field(default_factory=dict)
+    latest_policy_decision: Dict[str, Any] = Field(default_factory=dict)
+    support_effectiveness: List[Dict[str, Any]] = Field(default_factory=list)
+    persistent_learning_needs: List[Dict[str, Any]] = Field(default_factory=list)
+    summary: Dict[str, Any] = Field(default_factory=dict)
+    mastery_trend: List[Dict[str, Any]] = Field(default_factory=list)
+    recurring_targets: List[Dict[str, Any]] = Field(default_factory=list)
+    next_session_plan: Dict[str, Any] = Field(default_factory=dict)
+    data_quality: Dict[str, Any] = Field(default_factory=dict)
